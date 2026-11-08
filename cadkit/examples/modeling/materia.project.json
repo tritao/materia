@@ -12,7 +12,7 @@
 			"kind": "cad-preview",
 			"module": "ProceduralExcavatorPreview",
 			"function": "preview",
-			"cache": { "inputs": [] }
+			"cache": {}
 		}
 	}
 }

@@ -12,7 +12,7 @@
 			"kind": "cad-preview",
 			"module": "PinPlatePreview",
 			"function": "preview",
-			"cache": { "inputs": ["PinPlatePreview.hx"] }
+			"cache": {}
 		}
 	}
 }

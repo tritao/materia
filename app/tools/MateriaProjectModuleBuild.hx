@@ -90,10 +90,13 @@ class MateriaProjectModuleBuild {
     var invocation = documentInput
       ? "(args.length == 2 ? " + moduleName + "." + functionName + "(sys.io.File.getContent(args[1])) : "
       + moduleName + "." + functionName + "())" : moduleName + "." + functionName + "()";
+    // The run notes the files it reads (`--record-inputs=FILE`, given by the runner) and writes the list when it is done.
+    // The document is already part of the cache key, so it is not noted as a file.
     var wrapper = "class MateriaGeneratedEntrypoint {\n" + "  static function main():Void {\n"
-      + "    var args = Sys.args();\n" + "    if (args.length != 1" + (documentInput
+      + "    var args = haxeon.build.InputFiles.arguments();\n" + "    if (args.length != 1" + (documentInput
       ? " && args.length != 2" : "") + ") throw \"Project generator requires an output path\";\n"
-      + "    sys.io.File.saveBytes(args[0], " + invocation + ");\n" + "  }\n" + "}\n";
+      + (documentInput ? "    if (args.length == 2) haxeon.build.InputFiles.ignoreFile(args[1]);\n" : "")
+      + "    sys.io.File.saveBytes(args[0], " + invocation + ");\n" + "    haxeon.build.InputFiles.save();\n" + "  }\n" + "}\n";
     var wrapperPath = Path.join([wrapperRoot, "MateriaGeneratedEntrypoint.hx"]);
     if (!FileSystem.exists(wrapperPath) || File.getContent(wrapperPath) != wrapper) File.saveContent(
       wrapperPath,

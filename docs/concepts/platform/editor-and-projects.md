@@ -95,9 +95,12 @@ cache, capped by `MATERIA_CACHE_MAX_MB`, least recently used evicted first):
   compiles again (about 12 s after a one-line edit of the hobber, the compiler
   being incremental) and writes the new record.
 - **Artifacts** (store entry `output/<fingerprint>`, plus the document hash for a project opened with a recipe document), only for
-  entrypoints that declare `"cache": {"inputs": [...]}`. That declaration is a
-  promise that the output is deterministic and depends only on the sources, the
-  listed files and the document. Most examples make it.
+  entrypoints that declare `"cache": {}`. That declaration is a promise that the
+  output is deterministic and depends only on the sources, the files the
+  generator reads and the document. The run notes every file it reads (bytes,
+  existence, directory listings, a read that found nothing) and the runner keeps
+  that list with the output (store entry `reads/<fingerprint>`): any change
+  regenerates the output, without compiling. Most examples make it.
 - **Prepared scenes** (`prepared-scenes`): packed vertex streams, mass
   properties and collision hulls derived from an artifact, keyed by the
   artifact's hash and the editor's build identity.

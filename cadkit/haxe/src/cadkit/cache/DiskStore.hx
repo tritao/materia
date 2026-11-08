@@ -36,6 +36,8 @@ class DiskStore {
     this.capBytes = capBytes;
     written = 0;
     checked = false;
+    // The store's files are the cache, not inputs of the program that uses it (see `haxeon.build.InputFiles`).
+    haxeon.build.InputFiles.ignorePrefix(directory);
   }
 
   static var shared:Null<DiskStore>;

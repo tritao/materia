@@ -250,11 +250,11 @@ class MateriaProjectRunner {
       if (recipeDocument != null) File.saveContent(outputPrefix + ".document.json", recipeDocument);
       runCommand(
         hashlink,
-        recipeDocument == null ? [outputPrefix + ".hl", outputPrefix + ".mtrg"] : [
+        (recipeDocument == null ? [outputPrefix + ".hl", outputPrefix + ".mtrg"] : [
           outputPrefix + ".hl",
           outputPrefix + ".mtrg",
           outputPrefix + ".document.json"
-        ],
+        ]).concat([haxeon.build.InputFiles.FLAG + outputPrefix + ".reads.json"]),
         "Could not generate Materia project artifact",
         control
       );
@@ -270,8 +270,10 @@ class MateriaProjectRunner {
       SceneArtifact.decodeView(result);
       records = result;
       var key = location == null || fingerprint == null ? null : outputKey(location, fingerprint);
-      if (key != null && location != null) {
+      if (key != null && location != null && fingerprint != null) {
         if (stored != null && !sameBytes(stored, result)) throw "Cached artifact is stale: regenerating the project gave other bytes";
+        if (!FileSystem.exists(outputPrefix + ".reads.json")) throw "Project generator did not report the files it read";
+        location.store.write(readsKey(location, fingerprint), File.getBytes(outputPrefix + ".reads.json"));
         location.store.write(key, result);
       }
     } catch (error:Dynamic) {
@@ -356,19 +358,10 @@ class MateriaProjectRunner {
     tools:String,
     recipeDocument:Null<String>
   ):Null<BuildCacheLocation> {
-    var inputs:Array<String> = [manifestPath];
-    // Explicit non-source resources may supplement the compiler-derived module set.
+    // The files a generator reads are noted while it runs and kept with its output (`readsKey`); nothing is declared.
     var declaration = Reflect.field(entry, "cache");
-    var raw:Dynamic = declaration == null ? null : Reflect.field(declaration, "inputs");
-    if (raw != null) {
-      if (!Std.isOfType(raw, Array)) throw "Project cache inputs must be an array of file paths";
-      var resources:Array<Dynamic> = raw;
-      for (resource in resources) {
-        if (!Std.isOfType(resource,
-          String) || StringTools.trim(resource).length == 0) throw "Project cache input must be a file path";
-        inputs.push(resolveProjectPath(projectRoot, resource));
-      }
-    }
+    if (declaration != null && Reflect.hasField(declaration, "inputs")) throw 'Project cache declaration "inputs" was removed: the files a generator reads are recorded';
+    var inputs:Array<String> = [manifestPath];
     // One store for every cache entry (`MATERIA_CACHE=off` switches it off, and then nothing is kept).
     var store = DiskStore.process();
     if (store == null) return null;
@@ -393,13 +386,17 @@ class MateriaProjectRunner {
   static function outputKey(location:BuildCacheLocation, fingerprint:String):Null<String>
     return location.outputCache ? ARTIFACT_KEY + "output\n" + fingerprint + "\n" + location.documentKey : null;
 
+  /** The files the run that made an output read, as `haxeon.build.InputFiles` wrote them. */
+  static function readsKey(location:BuildCacheLocation, fingerprint:String):String
+    return ARTIFACT_KEY + "reads\n" + fingerprint + "\n" + location.documentKey;
+
   static function sameBytes(a:Bytes, b:Bytes):Bool {
     if (a.length != b.length) return false;
     for (index in 0...a.length) if (a.get(index) != b.get(index)) return false;
     return true;
   }
 
-  /** The kept output for `fingerprint`, or null (one that is oversized or does not decode is dropped). */
+  /** The kept output for `fingerprint` when the files its run read are unchanged, else null (a damaged one is dropped). */
   static function readCachedArtifact(location:BuildCacheLocation, fingerprint:String, control:Null<ProjectLoadControl>):Null<Bytes> {
     var key = outputKey(location, fingerprint);
     if (key == null) return null;
@@ -409,13 +406,19 @@ class MateriaProjectRunner {
     try {
       if (cached.length > MAX_OUTPUT_BYTES) throw "Cached artifact is too large";
       SceneArtifact.decodeView(cached);
-      Sys.println("Materia project: reused its generated artifact");
-      return cached;
     } catch (_:Dynamic) {
       if (control != null) control.throwIfCancelled();
       location.store.remove(key);
       return null;
     }
+    // The output is only as good as the files it was made from: a missing list, or any file changed, regenerates it.
+    var reads = location.store.read(readsKey(location, fingerprint));
+    if (reads == null || !haxeon.build.InputFiles.unchanged(reads.toString())) {
+      Sys.println("Materia project: its generator's input files changed; regenerating");
+      return null;
+    }
+    Sys.println("Materia project: reused its generated artifact");
+    return cached;
   }
 
   /** The recorded fingerprint when everything its compile read is unchanged, else null (compile). */
@@ -559,7 +562,7 @@ class MateriaProjectRunner {
   }
 
   static function cleanupArtifacts(outputPrefix:String, temporaryRoot:String):Void {
-    for (suffix in [".hl", ".mtrg", ".document.json", ".inputs.json", ".record.json", ".hl.functions", ".hl.hli", ".hl.live.json", ".hl.hlp"]) {
+    for (suffix in [".hl", ".mtrg", ".document.json", ".inputs.json", ".record.json", ".reads.json", ".hl.functions", ".hl.hli", ".hl.live.json", ".hl.hlp"]) {
       var artifact = outputPrefix + suffix;
       if (FileSystem.exists(artifact)) FileSystem.deleteFile(artifact);
     }

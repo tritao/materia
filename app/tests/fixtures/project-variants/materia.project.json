@@ -13,41 +13,25 @@
       "kind": "cad-preview",
       "module": "VariantPreview",
       "function": "small",
-      "cache": {
-        "inputs": [
-          "VariantPreview.hx"
-        ]
-      }
+      "cache": {}
     },
     "large": {
       "kind": "cad-preview",
       "module": "VariantPreview",
       "function": "large",
-      "cache": {
-        "inputs": [
-          "VariantPreview.hx"
-        ]
-      }
+      "cache": {}
     },
     "motor-study": {
       "kind": "cad-preview",
       "module": "VariantPreview",
       "function": "large",
-      "cache": {
-        "inputs": [
-          "VariantPreview.hx"
-        ]
-      }
+      "cache": {}
     },
     "demo": {
       "kind": "cad-preview",
       "module": "VariantPreview",
       "function": "small",
-      "cache": {
-        "inputs": [
-          "VariantPreview.hx"
-        ]
-      }
+      "cache": {}
     }
   },
   "variants": [

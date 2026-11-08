@@ -346,7 +346,8 @@ The generator uses Haxeon's reusable compiler session, and its compiled code is 
 across opens and editable recipe changes. Deterministic entrypoints opt into geometry
 caching with `"cache": {}`. Haxeon's analyzed module graph supplies the transitive
 source inputs using the same request as compilation; source lists are unnecessary.
-External non-source resources may additionally be declared in `cache.inputs`.
+The data files a generator reads (supplier CAD, tables) need no declaration either: the run notes every file it reads
+through the standard library and the runner keeps that list with the output, regenerating when any of them changed.
 The module-graph analysis behind the fingerprint is recorded beside the cache as
 `<key>.inputs.json` (file hashes, source-directory listings, native library stamps,
 compiler options); a repeat open confirms the fingerprint by rehashing those files

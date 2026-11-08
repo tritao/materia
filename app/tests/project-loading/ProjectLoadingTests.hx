@@ -37,6 +37,7 @@ class ProjectLoadingTests {
     var bytes = File.getBytes(path);
     if (bytes.length < 11) return "other";
     if (bytes.get(8) == "{".code) return "record";
+    if (bytes.get(8) == "[".code) return "reads";
     if (bytes.get(8) == "H".code && bytes.get(9) == "L".code && bytes.get(10) == "B".code) return "generator";
     try SceneArtifact.decodeView(bytes.sub(8, bytes.length - 8)) catch (_:Dynamic) return "kernel";
     return "output";
@@ -107,6 +108,76 @@ class ProjectLoadingTests {
       MateriaProjectRunner.loadProject(manifest);
       check(stored(store, "kernel").length > 0, "the generator's kernel operations are in the store after the open");
       check(stored(store, "generator").length == 1 && stored(store, "record").length == 1, "and so are its generator and record");
+    } catch (error:Dynamic) {
+      Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      DiskStore.useProcess(null);
+      remove(root);
+      throw error;
+    }
+    Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    DiskStore.useProcess(null);
+    remove(root);
+  }
+
+  /**
+   * The files a generator reads are noticed as it runs (nothing is declared) and kept with its output: editing one, creating a
+   * file it looked for and found missing, and changing a directory it listed each regenerate the output without a compile; a file
+   * the generator writes itself is not an input, and an unchanged reopen hits.
+   */
+  static function generatorInputs(installation:String):Void {
+    var temporary = Sys.getEnv("TMPDIR");
+    if (temporary == null || temporary.length == 0) temporary = "/tmp";
+    var root = temporary + "/materia-reads-test-" + Sys.getPid() + "-" + Std.random(1000000000);
+    FileSystem.createDirectory(root);
+    FileSystem.createDirectory(root + "/listed");
+    var previousCache = Sys.getEnv("XDG_CACHE_HOME");
+    Sys.putEnv("XDG_CACHE_HOME", root + "/cache");
+    try {
+      var config:Dynamic = {version: 1, sourceRoots: ["."], target: "host", dependencies: {projectkit: {path: installation + "/projectkit"}}};
+      Reflect.setField(config, "package", {name: "reads-fixture"});
+      File.saveContent(root + "/haxeon.json", Json.stringify(config));
+      var counter = root + "/runs.txt", data = root + "/data.txt", optional = root + "/optional.txt";
+      File.saveContent(counter, "");
+      File.saveContent(data, "one");
+      File.saveContent(root + "/listed/a.txt", "a");
+      File.saveContent(root + "/ReadsPreview.hx", 'import haxe.io.Bytes;\nimport sys.FileSystem;\nimport sys.io.File;\nimport materia.project.SceneArtifact;\n'
+        + 'class ReadsPreview { public static function preview():Bytes {\n'
+        + 'File.saveContent(' + Json.stringify(counter) + ', File.getContent(' + Json.stringify(counter) + ') + "x");\n'
+        + 'var text = File.getContent(' + Json.stringify(data) + ') + (FileSystem.exists(' + Json.stringify(optional) + ') ? "+optional" : "")'
+        + ' + FileSystem.readDirectory(' + Json.stringify(root + "/listed") + ').join(",");\n'
+        + 'var vertices = Bytes.alloc(96); var coordinates = [0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];\n'
+        + 'for (i in 0...12) vertices.setDouble(i * 8, coordinates[i]);\n'
+        + 'var indices = Bytes.alloc(48); var triangles = [0,2,1,0,1,3,0,3,2,1,2,3];\n'
+        + 'for (i in 0...12) indices.setInt32(i * 4, triangles[i]);\n'
+        + 'var part:materia.project.SceneArtifact.SceneArtifactPart = {id: "tetra", name: "Tetra", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12, '
+        + 'vertices: vertices, normals: Bytes.alloc(96), indices: indices, faceRanges: []};\n'
+        + 'return SceneArtifact.encode({metresPerUnit: 1.0, parts: [part], recipeDocument: text}); }}\n');
+      var entry:Dynamic = {kind: "cad-preview", module: "ReadsPreview", cache: {}};
+      Reflect.setField(entry, "function", "preview");
+      var manifest = root + "/materia.project.json";
+      File.saveContent(manifest, Json.stringify({
+        format: "materia.project",
+        version: 1,
+        defaultEntrypoint: "preview",
+        build: {system: "haxeon", manifest: "haxeon.json"},
+        entrypoints: {preview: entry}
+      }));
+      var store = root + "/cache/materia/memo";
+      DiskStore.useProcess(new DiskStore(store, 1e9));
+      function open():String return MateriaProjectRunner.loadProject(manifest).recipeDocument;
+      function runs():Int return File.getContent(counter).length;
+      check(open() == "onea.txt" && runs() == 1, "first open generates");
+      check(open() == "onea.txt" && runs() == 1, "an unchanged reopen hits, although the generator wrote a file it had read");
+      File.saveContent(data, "two");
+      check(open() == "twoa.txt" && runs() == 2, "editing a file the generator read regenerates it");
+      check(open() == "twoa.txt" && runs() == 2, "and the new output hits");
+      File.saveContent(optional, "x");
+      check(open() == "two+optionala.txt" && runs() == 3, "creating a file the generator looked for and did not find regenerates it");
+      File.saveContent(root + "/listed/b.txt", "b");
+      check(open() == "two+optionala.txt,b.txt" && runs() == 4, "changing a directory the generator listed regenerates it");
+      File.saveContent(root + "/listed/b.txt", "bb");
+      check(open() == "two+optionala.txt,b.txt" && runs() == 4, "editing a file in a listed directory does not");
+      check(stored(store, "generator").length == 1, "none of this compiled again");
     } catch (error:Dynamic) {
       Sys.putEnv("XDG_CACHE_HOME", previousCache);
       DiskStore.useProcess(null);
@@ -268,7 +339,7 @@ class ProjectLoadingTests {
         kind: "cad-preview",
         module: "LoadingPreview",
         documentInput: true,
-        cache: {inputs: ["input.txt"]}
+        cache: {}
       };
       Reflect.setField(entry, "function", "preview");
       var manifest = root + "/materia.project.json";
@@ -528,6 +599,7 @@ class ProjectLoadingTests {
     DiskStore.useProcess(null);
     remove(root);
     kernelCacheInGeneration(installation);
+    generatorInputs(installation);
     Sys.println("Project loading tests passed");
     return 0;
   }
