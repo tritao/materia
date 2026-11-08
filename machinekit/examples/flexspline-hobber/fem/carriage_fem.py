@@ -1,5 +1,4 @@
-"""Bolts-only C3D10 X carriage check: actual ground deck, four bars and four
-replicated pads. No adhesive stiffness credit. Small holes <=20 mm are filled
+"""Bolts-only C3D10 X carriage check: actual ground deck and four bars. No adhesive stiffness credit. Small holes <=20 mm are filled
 for stiffness; CAD integrity retains them. Run through heavy-run, slots4.
 Usage: carriage_fem.py EXPORT_DIR OUTPUT_JSON [SIZE_MM=10] [METHOD=amg]
 """
@@ -40,20 +39,10 @@ def face_weights(conn, nodes, sel_nodes, z):
 def prepare(root, parts, names):
     gmsh = fe.import_gmsh()
     gmsh.initialize()
-    paths, volumes, pad_bounds = [], {}, {}
+    paths, volumes = [], {}
     origin = np.asarray(parts[names[0]]['pose']['origin'])
     try:
         gmsh.option.setNumber('General.Terminal', 0)
-        for name in names:
-            if not name.startswith('Xpad-'):
-                continue
-            gmsh.clear()
-            tags = gmsh.model.occ.importShapes(str(root / (name + '.step')))
-            gmsh.model.occ.synchronize()
-            # OCC boxes include its geometric tolerance; nominal coordinates in
-            # this export are mm to six decimals. Retain one micron precision.
-            box = [round(v, 6) for v in gmsh.model.getBoundingBox(-1, -1)]
-            pad_bounds[name] = box
         for name in names:
             gmsh.clear()
             occ = gmsh.model.occ
@@ -62,31 +51,14 @@ def prepare(root, parts, names):
             delta = np.asarray(parts[name]['pose']['origin']) - origin
             if not np.allclose(parts[name]['pose']['axes'], parts[names[0]]['pose']['axes']):
                 raise ValueError('rotated XC member ' + name)
-            if name in pad_bounds:
-                # These declared layers are rectangular stock with through
-                # clearances only. Suppress those holes, not their compliance.
-                occ.remove(tags, recursive=True)
-                b = pad_bounds[name]
-                tags = [(3, occ.addBox(*b[:3], *(np.array(b[3:]) - b[:3])))]
-            else:
-                tools = []
-                for hole in parts[name]['holes']:
-                    if not 0 < hole['diameter'] <= 20:
-                        continue
-                    p = hole['position']; d = np.asarray(hole['direction']) * hole['depth']
-                    tools.append((3, occ.addCylinder(*p, *d, hole['diameter'] / 2)))
-                if tools:
-                    tags, _ = occ.fuse(tags, tools)
-                if name == 'GE-X-carriage':
-                    # Filling clearance holes must not make steel pillars in
-                    # the replicated pad pockets. Restore each actual pocket.
-                    pockets = []
-                    for pad, b in pad_bounds.items():
-                        shift = np.asarray(parts[pad]['pose']['origin']) - origin
-                        low = np.array(b[:3]) + shift
-                        span = np.array(b[3:]) - b[:3]
-                        pockets.append((3, occ.addBox(*low, *span)))
-                    tags, _ = occ.cut(tags, pockets)
+            tools = []
+            for hole in parts[name]['holes']:
+                if not 0 < hole['diameter'] <= 20:
+                    continue
+                p = hole['position']; d = np.asarray(hole['direction']) * hole['depth']
+                tools.append((3, occ.addCylinder(*p, *d, hole['diameter'] / 2)))
+            if tools:
+                tags, _ = occ.fuse(tags, tools)
             after = sum(occ.getMass(*tag) for tag in tags)
             volumes[name] = dict(originalMm3=before, smallHolesFilledMm3=after)
             occ.translate(tags, *delta)
@@ -102,8 +74,8 @@ def run(export_dir,size=10.,method='amg'):
     root=Path(export_dir)
     data=json.loads((root/'hobber-fem-export.json').read_text())
     parts={p['name']:p for p in data['parts']}
-    names=['GE-X-carriage']+sorted(n for n in parts if n.startswith('Xrib-'))+sorted(n for n in parts if n.startswith('Xpad-'))
-    if len(names)!=9:raise ValueError('expected deck, four ribs and four replication pads')
+    names=['GE-X-carriage']+sorted(n for n in parts if n.startswith('Xrib-'))
+    if len(names)!=5:raise ValueError('expected ground deck and four ribs')
     paths,_=prepare(root,parts,names)
     pts,cs=fe.mesh_parts(paths,size,min_size=size/3,curvature=0)
     pts,cs,pairs=fe.split_interface(pts,cs)
@@ -113,14 +85,14 @@ def run(export_dir,size=10.,method='amg'):
     patches=[surface_nodes(pts,ids,z,(p['x0'],p['x1'],p['y0'],p['y1'])) for p in joint['contactFootprints']]
     if not patches or any(not p for p in patches):raise ValueError('missing column corner contact')
     sole=sorted(set(n for patch in patches for n in patch))
-    pc=np.vstack([c for n,c in zip(names,cs) if n.startswith('Xpad-')]);pi=fe.used_nodes(pc)
+    pi=ids
     pads=[surface_nodes(pts,pi,pad_z,(x-PAD_HALF[0],x+PAD_HALF[0],y-PAD_HALF[1],y+PAD_HALF[1])) for x,y in PADS]
     if any(not p for p in pads):raise ValueError('missing guide contact')
     rib_for_node={int(node):n for n,c in zip(names,cs) if n.startswith('Xrib-') for node in np.unique(c)}
     bolts={n:[h['position'][:2] for h in parts[n]['holes'] if h['kind']=='clearance'] for n in names if n.startswith('Xrib-')}
     def model():
         m=fe.Model();m.add_nodes(pts)
-        for n,c in zip(names,cs):m.add_body(n,c,dict(E=4000.,nu=.35,rho=1.8e-9) if n.startswith('Xpad-') else fe.STEEL)
+        for n,c in zip(names,cs):m.add_body(n,c,fe.STEEL)
         for a,b in pairs:
             rib=rib_for_node.get(b)
             if rib is None:m.tie(b,a);continue
@@ -141,7 +113,7 @@ def run(export_dir,size=10.,method='amg'):
     a,b=sorted(sole,key=lambda n:pts[n][0])[::len(sole)-1];m.fix(a,(0,1));m.fix(b,(1,))
     load={};weights=[]
     for p in pads[:2]:
-        w=face_weights(pc,pts,p,pad_z);total=sum(w.values());weights.append(w)
+        w=face_weights(cs[0],pts,p,pad_z);total=sum(w.values());weights.append(w)
         for n,area in w.items():load[3*n+2]=1000*area/total
     u=solve(m,load);delta=np.mean([sum(u[3*n+2]*a for n,a in w.items())/sum(w.values()) for w in weights])
     front=1/abs(delta)
@@ -156,7 +128,7 @@ def run(export_dir,size=10.,method='amg'):
         front_tie_N_per_um=front,sole_tilt_kNm_per_rad_pads_uz=1/abs(u[m.master_dof(master,4)]),
         relativeResidualFront=residuals[0],relativeResidualTilt=residuals[1],
         assumptions=['Bolts-only: radius6 mm tied patches, normal contact closed elsewhere; no bond credit',
-            'Replication E4 GPa, nu0.35 ASSUMED; small holes<=20 mm filled',
+            'Ground steel contact at guide pads; small holes<=20 mm filled',
             'Front pair 1 kN each; column contact held z; tilt 1 kN m, block pads held z'])
 
 if __name__=='__main__':

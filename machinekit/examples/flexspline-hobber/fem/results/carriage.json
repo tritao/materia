@@ -2,36 +2,30 @@
   {
     "size": 10.0,
     "elements": [
-      21671,
-      1298,
-      1302,
-      1302,
-      504,
-      881,
-      882,
-      880,
-      877
+      16509,
+      1256,
+      1252,
+      1256,
+      501
     ],
     "members": [
       "GE-X-carriage",
       "Xrib-leftInner",
       "Xrib-leftOuter",
       "Xrib-rightInner",
-      "Xrib-scale",
-      "Xpad-L1",
-      "Xpad-L2",
-      "Xpad-R1",
-      "Xpad-R2"
+      "Xrib-scale"
     ],
-    "front_tie_N_per_um": 43.633364342630585,
-    "sole_tilt_kNm_per_rad_pads_uz": 17076.760469293615,
-    "relativeResidualFront": 8.013145207903359e-11,
-    "relativeResidualTilt": 4.704902795599588e-11,
+    "front_tie_N_per_um": 45.20136634921587,
+    "sole_tilt_kNm_per_rad_pads_uz": 24616.144537117256,
+    "relativeResidualFront": 6.138259293609668e-11,
+    "relativeResidualTilt": 7.48759179090679e-11,
     "assumptions": [
       "Bolts-only: radius6 mm tied patches, normal contact closed elsewhere; no bond credit",
-      "Replication E4 GPa, nu0.35 ASSUMED; small holes<=20 mm filled",
-      "Four80 mm corner sole patches; front pair 1 kN each; tilt 1 kN m, guide pads held z"
+      "Ground steel contact at guide pads; small holes<=20 mm filled",
+      "Front pair 1 kN each; column contact held z; tilt 1 kN m, block pads held z"
     ],
-    "date": "2026-11-07"
+    "date": "2026-11-08",
+    "peakRssKiB": 3730764,
+    "wallSeconds": 106.81
   }
 ]

@@ -44,20 +44,6 @@ class FaceBlock extends MachineComponent {
   }
 }
 
-/** A physical masked shim; the declared thickness can be wrong for a negative control. */
-class MaskedJointLayer extends FaceBlock {
-  public function new(holes:Array<BoltHole>,diameter:Float,masked:Bool=true,thickness:Float=3,declared:Float=3) {
-    super("LAYER",[],thickness);
-    addFacet(new machinekit.component.InterfaceLayer(declared));
-    if(masked)machine([for(i=>h in holes){frame:AssemblyFrames.identity(),x:h.x,y:h.y,diameter:diameter,from:-1.0,to:thickness+1,kind:"clearance",thread:null,name:"mask"+i}]);
-  }
-}
-
-class NarrowJointLayer extends MaskedJointLayer {
-  public function new(holes:Array<BoltHole>)super(holes,5.5);
-  override public function geometry(detail:ComponentDetail=Preview):Part return machined(Part.box(50,100,3));
-}
-
 /** A part that only states its dowel faces, with a body (z from `low`, `thickness` thick) that cuts their reamed holes. */
 class PinBlock extends MachineComponent {
   final faces:Array<machinekit.component.BoltedFace.PinnedFace>;
@@ -138,65 +124,6 @@ class JointFastenerTests {
 
   public static function main():Void run();
 
-  static function layeredFixture(masked:Bool=true,shift:Float=0,solid:Float=3,fixed:Bool=true,recess:Bool=false,air:Float=0):AxisBuilder {
-    var builder=new AxisBuilder(),pattern=square(40);
-    builder.place("host",new FaceBlock("HOST",[BoltedFace.drilledToSuit("top",frameAtTop(10),100,100,8,20,Steel,"M5")],20,-10),AssemblyFrames.identity());
-    var layer=new MaskedJointLayer(pattern,5.5,masked,solid);
-    if(fixed)builder.attach("layer",layer,AssemblyFrames.translation(shift,0,10),"host");
-    else builder.place("layer",layer,AssemblyFrames.translation(shift,0,10));
-    builder.attach("cover",new FaceBlock("COVER",[cover(pattern,"M5",6,5.5,recess?{diameter:10.0,depth:6.0}:null,false)],recess?12:6),AssemblyFrames.translation(0,0,13+air),"host");
-    return builder;
-  }
-
-  static function replicatedLayerJoints():Void {
-    for(recess in [false,true]) {
-      var builder=layeredFixture(true,0,3,true,recess),d=builder.deriveFasteners();d.require();
-      check(d.joints.length==1&&d.count()==4,"one steel joint crosses its physical replication layer");
-      var joint=d.joints[0];
-      check(Math.abs(joint.grip-9)<1e-9&&joint.length==16,"layer adds three mm to screw grip and standard length");
-      check(joint.engagement==7&&joint.minEngagement==5,"compound receives no thread-engagement credit");
-      var report=machinekit.assembly.AssemblyIntegrity.fasteners(builder);
-      check(report.errors().length==0,"layer masks, actual head/counterbore and steel thread geometry fit: "+[for(e in report.errors())e.message].join("; "));
-    }
-    var combined=new AxisBuilder(),pattern=square(40);
-    combined.place("host",new FaceBlock("HOST",[BoltedFace.drilledToSuit("top",frameAtTop(10),100,100,12,20,Steel,"M5")],20,-10),AssemblyFrames.identity());
-    combined.attach("spacer",new MaskedJointLayer(pattern,5.5,true,2,2),AssemblyFrames.translation(0,0,10),"host");
-    combined.attach("resin",new MaskedJointLayer(pattern,5.5),AssemblyFrames.translation(0,0,12),"spacer");
-    combined.attach("cover",new FaceBlock("COVER",[cover(pattern,"M5",6,5.5,null,false)],6),AssemblyFrames.translation(0,0,15),"spacer");
-    var combinedResult=combined.deriveFasteners();combinedResult.require();
-    check(combinedResult.joints[0].grip==11,"spacer and compound both contribute to one through-clamped stack");
-    check(combinedResult.joints[0].engagement==5,"only the original steel host supplies the final thread");
-    check(machinekit.assembly.AssemblyIntegrity.check(combined,{sweepStates:[],strict:true}).errors().length==0,"stack bolts and adjacent fixed contacts agree with the physical layers");
-    var overlapping=layeredFixture();
-    overlapping.attach("overlap",new MaskedJointLayer(pattern,5.5,true,1,1),AssemblyFrames.translation(0,0,11),"host");
-    expect(overlapping,"fasteners.unmatched","an extra layer inside a complete stack cannot be ignored");
-    expect(layeredFixture(false),"fasteners.unmatched","unmasked compound cannot pass a bolt");
-    expect(layeredFixture(true,95),"fasteners.unmatched","a touching layer must support every bolt axis");
-    expect(layeredFixture(true,0,4),"fasteners.unmatched","a layer overlapping the foot cannot bridge it");
-    expect(layeredFixture(true,0,3,false),"fasteners.unmatched","a loose layer is not a structural bridge");
-    expect(layeredFixture(true,0,3,true,false,0.5),"fasteners.unmatched","declared layers cannot hide an air gap");
-    var narrow=new AxisBuilder(),narrowPattern=square(40);
-    narrow.place("host",new FaceBlock("HOST",[BoltedFace.drilledToSuit("top",frameAtTop(10),100,100,8,20,Steel,"M5")],20,-10),AssemblyFrames.identity());
-    narrow.attach("layer",new NarrowJointLayer(narrowPattern),AssemblyFrames.translation(0,0,10),"host");
-    narrow.attach("cover",new FaceBlock("COVER",[cover(narrowPattern,"M5",6,5.5,null,false)],6),AssemblyFrames.translation(0,0,13),"host");
-    var narrowResult=JointFasteners.derive(narrow);narrowResult.require();
-    check([for(d in narrowResult.diagnostics.items)if(d.code=="fasteners.edge-support"&&d.message.indexOf("layer")>=0)d].length>0,"made intermediate spacers obey the same per-hole edge rule");
-    var original=layeredFixture(),rotated=new AxisBuilder();
-    rotated.include("stack",original,AssemblyFrames.fromRotationMatrix(0,0,0,[1.0,0,0,0,0,-1,0,1,0]));
-    var rd=JointFasteners.derive(rotated);rd.require();check(rd.joints[0].grip==9,"physical layer matching is independent of machine orientation");
-    var pins=new AxisBuilder(),pinPattern=[{x:-15.0,y:0.0},{x:15.0,y:0.0}];
-    pins.place("host",new PinBlock("HOST",[new PinnedFace("top",frameAtTop(10),pinPattern,5,10,false,false)],20,-10),AssemblyFrames.identity());
-    pins.attach("spacer",new MaskedJointLayer(pinPattern,5,true,35,35),AssemblyFrames.translation(0,0,10),"host");
-    pins.attach("layer",new MaskedJointLayer(pinPattern,5,true,5,5),AssemblyFrames.translation(0,0,45),"spacer");
-    pins.attach("cover",new PinBlock("COVER",[new PinnedFace("bottom",BoltedFace.frameOf(origin,up,across),pinPattern,5,8,true,false)],8,0),AssemblyFrames.translation(0,0,50),"spacer");
-    var pd=pins.deriveFasteners();pd.require();check(pd.dowels.length==1,"match pins cross the physical layer");
-    var pin=pd.dowels[0];
-    check(Math.abs(pin.length-pin.engagementA-pin.engagementB-40)<1e-9,"pin length includes compound but steel engagement does not");
-    check(pin.engagementA>=5&&pin.engagementB>=5,"both steel parts retain a full-diameter pin engagement");
-    check(machinekit.assembly.AssemblyIntegrity.fasteners(pins).errors().length==0,"joint-derived dowel bores cross the masked layer");
-    Sys.println("interface layers: physical contact, masks, screw grip, counterbores, steel engagement and match pins pass");
-  }
-
   static function repeatedMachiningBom():Void {
     function mount(name:String,x:Float,dx:Float=0,thread:String="M3"):machinekit.cover.WayCoverMount {
       var part=new machinekit.cover.WayCoverMount("REPEATED-MOUNT-TEST",50,50,14);
@@ -217,7 +144,6 @@ class JointFastenerTests {
     check(a.bom.fingerprint!=mount("first-instance",12,0,"M4").bom.fingerprint,"thread callout changes manufacturing revision");
   }
   public static function run():Void {
-    replicatedLayerJoints();
     repeatedMachiningBom();
     sound();
     selection();

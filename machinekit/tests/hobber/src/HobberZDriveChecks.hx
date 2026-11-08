@@ -47,7 +47,7 @@ class HobberZDriveChecks {
     body.close();
     var coupling = cache.posed(members.filter(p -> p.id == "Zcoupling")[0].component, state.worldPose("Zcoupling"));
     var couplingClearance = 1e30;
-    for (id in ["ZdrivePad"]) {
+    for (id in ["ZdriveFixedBar","ZdriveFloatingBar"]) {
       var bracket = cache.posed(members.filter(p -> p.id == id)[0].component, state.worldPose(id));
       couplingClearance = Math.min(couplingClearance, coupling.distance(bracket));
       bracket.close();
@@ -69,7 +69,7 @@ class HobberZDriveChecks {
         minimumRaceMargin = Math.min(minimumRaceMargin, margin);
         check(margin >= 10, "nut stays on race with 10 mm allowance at " + z);
         check(pose("Zfixed").z > F.compose(work, nutWorld).z, "gravity-loaded segment hangs below fixed bearing");
-        for (id in ["Zfixed", "Zfloating", "ZdrivePad"]) {
+        for (id in ["Zfixed", "Zfloating", "ZdriveFixedBar","ZdriveFloatingBar"]) {
           var component = members.filter(p -> p.id == id)[0].component;
           var p = cache.posed(component, state.worldPose(id)), saddle = cache.posed(
             members.filter(p -> p.id == "Zplate")[0].component,

@@ -69,7 +69,7 @@ class FlexsplineHobberChecks {
     var ownership = machine.functionalGroups(), count = 0;
     for (id in ownership.keys()) count++;
     check(count == machine.components().length, "hobber ownership is total and single-valued");
-    for (id in ["railXLeft", "Xbridge", "XdrivePad", "Xfixed", "Xnut", "Xscale", "XscaleHead", "Xskirt"])
+    for (id in ["railXLeft", "Xbridge", "XdriveFixedBar", "XdriveFloatingBar", "Xfixed", "Xnut", "Xscale", "XscaleHead", "Xskirt"])
       check(StringTools.startsWith(ownership.get(id), "X axis"), "X function includes fixed and moving " + id);
     var selections = machine.sets();
     var movesX = selections.filter(s -> s.id == "moves:X")[0].members;

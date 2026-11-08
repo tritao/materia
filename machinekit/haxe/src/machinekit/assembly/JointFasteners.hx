@@ -62,7 +62,7 @@ typedef FastenedJoint = {
   var length:Float;
   var propertyClass:PropertyClass;
   var count:Int;
-  /** Clamped stack under the head (including a verified interface layer), steel thread engagement and the least engagement the receiving material needs, mm. */
+  /** Clamped material under the head, thread engagement and the least engagement the receiving material needs, mm. */
   var grip:Float;
   var engagement:Float;
   var minEngagement:Float;
@@ -347,13 +347,6 @@ class JointFasteners {
   static function edgeRound(value:Float):Float return Math.round(value * 1000) / 1000;
 
   public static function derive(assembly:MachineAssembly, ?options:FastenerOptions):FastenerDerivation {
-    var result:Null<FastenerDerivation>=null;
-    PosedParts.scope(cache->{result=deriveWithLayers(assembly,options,cache);});
-    if(result==null)throw "Fastener derivation did not finish";
-    return result;
-  }
-
-  static function deriveWithLayers(assembly:MachineAssembly, options:Null<FastenerOptions>, cache:PosedParts):FastenerDerivation {
     var result = new FastenerDerivation();
     var tolerance = options == null || options.tolerance == null ? TOLERANCE : options.tolerance;
     var propertyClass = options == null || options.propertyClass == null ? PropertyClass.Steel129 : options.propertyClass;
@@ -384,15 +377,13 @@ class JointFasteners {
     }
     var members = new Map<String, MachineComponent>();
     for (entry in assembly.components()) members.set(entry.id, entry.component);
-    var layers=[for(entry in assembly.components())if(machinekit.component.InterfaceLayer.of(entry.component)!=null)entry.id];
     var matchedAlternatives = new Map<String, Bool>();
     var unmatched:Array<{placed:Placed, subject:String}> = [];
     var used = new Map<String, String>();
     var derived = new Map<String, Array<{x:Float, y:Float, joint:String}>>();
     for (a in clamped) {
       var subject = a.member + "#" + a.face.id;
-      var candidates = [for (b in receiving) if (b.member != a.member && (meets(a,b,tolerance)
-        || layeredFaces(a,b,layers,members,poses,group,cache,tolerance))) b];
+      var candidates = [for (b in receiving) if (b.member != a.member && meets(a, b, tolerance)) b];
       if (candidates.length == 0) {
         unmatched.push({placed: a, subject: subject});
         continue;
@@ -435,12 +426,7 @@ class JointFasteners {
       }
       var b = candidates[0];
       var joint = joinFaces(result, a, b, tolerance, propertyClass, access, group, members, used, derived);
-      if (joint != null) {
-        if(!meets(a,b,tolerance))layerBridge(a.member,b.member,a.world,b.world,a.face.holes,
-          switch a.face.role {case Clamped(_,c,_,_):c;case _:throw "Expected clamped layer joint";},
-          layers,members,poses,group,cache,tolerance,result.diagnostics,joint.id,SocketHeadCapScrew.catalog().get(joint.size).diameter);
-        result.joints.push(joint);
-      }
+      if (joint != null) result.joints.push(joint);
     }
     // A face is unmatched unless it is one of a set of alternatives and another of them is bolted on.
     for (entry in unmatched) {
@@ -453,7 +439,7 @@ class JointFasteners {
       );
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
-    derivePins(result, assembly, poses, group, members, tolerance, selection, layers, cache);
+    derivePins(result, assembly, poses, group, members, tolerance, selection);
     if (options != null && options.loads != null) slip(result, options.loads, members);
     return result;
   }
@@ -501,7 +487,7 @@ class JointFasteners {
 	 * holes in common with another but not all, or of another diameter, is an error; a face with no partner is one too.
 	 */
   static function derivePins(result:FastenerDerivation, assembly:MachineAssembly, poses:Map<String, AssemblyFrame>, group:Map<String, Int>,
-      members:Map<String, MachineComponent>, tolerance:Float, selection:Null<Array<String>>, layers:Array<String>, cache:PosedParts):Void {
+      members:Map<String, MachineComponent>, tolerance:Float, selection:Null<Array<String>>):Void {
     var diagnostics = result.diagnostics;
     var pins:Array<{member:String, face:PinnedFace, world:AssemblyFrame}> = [];
     for (entry in assembly.components()) {
@@ -524,10 +510,7 @@ class JointFasteners {
       if (selection != null && selection.indexOf(a.member) < 0 && selection.indexOf(b.member) < 0) continue;
       var local = AssemblyFrames.compose(AssemblyFrames.inverse(b.world), a.world);
       var normal = AssemblyFrames.transformVector(local, 0, 0, 1);
-      if(normal.z > -0.9999)continue;
-      var gap=local.z < -tolerance?-local.z:0.0;
-      if(Math.abs(local.z)>tolerance && (gap==0 || !layerBridge(a.member,b.member,a.world,b.world,a.face.holes,a.face.diameter,
-        layers,members,poses,group,cache,tolerance)))continue;
+      if (normal.z > -0.9999 || Math.abs(local.z) > tolerance) continue;
       var at = [for (hole in a.face.holes) AssemblyFrames.transformPoint(local, hole.x, hole.y, 0)];
       function onB(x:Float, y:Float):Bool {
         for (hole in b.face.holes) if (Math.abs(hole.x - x) <= tolerance && Math.abs(hole.y - y) <= tolerance) return true;
@@ -575,8 +558,8 @@ class JointFasteners {
         );
         continue;
       }
-      var length = DowelPin.standardLengthAtLeast(2 * minEngagement + gap);
-      if (length == null || length > usableA + usableB + gap + 1e-9) {
+      var length = DowelPin.standardLengthAtLeast(2 * minEngagement);
+      if (length == null || length > usableA + usableB + 1e-9) {
         diagnostics.error(
           "fasteners.dowel-depth",
           id,
@@ -584,8 +567,7 @@ class JointFasteners {
         );
         continue;
       }
-      var embedded=length-gap;
-      var engagementA = Math.min(usableA, Math.max(embedded / 2, embedded - usableB)), engagementB = embedded - engagementA;
+      var engagementA = Math.min(usableA, Math.max(length / 2, length - usableB)), engagementB = length - engagementA;
       var pin = DowelPin.metric(spec.size, length);
       var cuts = [{p: a, member: a.member}, {p: b, member: b.member}];
       for (side in cuts) if (!side.p.face.drawn) {
@@ -633,7 +615,7 @@ class JointFasteners {
           name: "dowel pin",
           code: "fasteners.hole",
           diameter: HOLE_SHARE * spec.diameter,
-          from: -engagementA - gap + margin,
+          from: -engagementA + margin,
           to: engagementB - margin,
           access: false
         }]
@@ -646,83 +628,11 @@ class JointFasteners {
     );
   }
 
-  /** A separated joint needs a physical, fixed layer stack, not a numerical
-   * allowance. Compound contributes grip but never steel thread/pin engagement. */
-  static function layeredFaces(a:Placed,b:Placed,layers:Array<String>,members:Map<String,MachineComponent>,
-    poses:Map<String,AssemblyFrame>,group:Map<String,Int>,cache:PosedParts,tolerance:Float):Bool {
-    if(layers.length==0 || a.face.holes==null)return false;
-    var local=AssemblyFrames.compose(AssemblyFrames.inverse(b.world),a.world),gap=-local.z;
-    if(gap<=tolerance || !meets(a,b,tolerance,gap))return false;
-    var clearance=switch a.face.role {case Clamped(_,c,_,_):c;case _:return false;};
-    return layerBridge(a.member,b.member,a.world,b.world,a.face.holes,clearance,layers,members,poses,group,cache,tolerance);
-  }
-
-  static function layerBridge(a:String,b:String,aw:AssemblyFrame,bw:AssemblyFrame,holes:Array<BoltHole>,clearance:Float,
-    layers:Array<String>,members:Map<String,MachineComponent>,poses:Map<String,AssemblyFrame>,group:Map<String,Int>,cache:PosedParts,tolerance:Float,?edgeDiagnostics:Diagnostics,jointId:String="",diameter:Float=0):Bool {
-    if(layers.length==0)return false;
-    var local=AssemblyFrames.compose(AssemblyFrames.inverse(bw),aw),gap=-local.z;
-    if(gap<=tolerance)return false;
-    var ac=members.get(a),bc=members.get(b),ap=poses.get(a),bp=poses.get(b);
-    if(ac==null||bc==null||ap==null||bp==null||!ac.hasGeometry()||!bc.hasGeometry())return false;
-    var candidates:Array<{member:String,body:Part,from:Float,to:Float}>=[];
-    var left=cache.posed(ac,ap),right=cache.posed(bc,bp),leftBox=PosedParts.boxOf(left),rightBox=PosedParts.boxOf(right);
-    for(id in layers) {
-      if(id==a||id==b||group.get(id)!=group.get(a)||group.get(id)!=group.get(b))continue;
-      var component=members.get(id),pose=poses.get(id);
-      if(component==null||pose==null)continue;
-      var layer=machinekit.component.InterfaceLayer.of(component);
-      if(layer==null)continue;
-      var body=cache.posed(component,pose),inFace=PosedParts.moved(body,AssemblyFrames.inverse(bw));
-      var bounds=PosedParts.boxOf(inFace);inFace.close();
-      var from=bounds.minZ,to=bounds.maxZ,thickness=to-from,box=PosedParts.boxOf(body);
-      var valid=from>=-gap-tolerance && to<=tolerance && Math.abs(thickness-layer.thickness)<=tolerance
-        && PosedParts.commonVolume(body,box,left,leftBox)<0.001 && PosedParts.commonVolume(body,box,right,rightBox)<0.001;
-      if(valid)for(h in holes) {
-        var p=AssemblyFrames.transformPoint(local,h.x,h.y,0),at=AssemblyFrames.compose(bw,AssemblyFrames.translation(p.x,p.y,0));
-        var edge=Math.min(0.01,thickness/4),inner=clearance/2+0.01,half=Math.min(0.1,thickness/4),middle=(from+to)/2;
-        // One mm of compound around a masked bore is an engineering
-        // assumption, matching LinearMountReplication; no strength credit.
-        if(edgeSupportFraction(body,at,inner,inner+1,middle-half,middle+half,null)<0.99999){valid=false;break;}
-        var cylinder=Part.cylinderSpan(clearance/2-0.01,from+edge,to-edge),bore=PosedParts.moved(cylinder,at);cylinder.close();
-        var common=body.intersect(bore),blocked=common.volume();common.close();bore.close();
-        if(blocked>0.001){valid=false;break;}
-      }
-      if(valid)candidates.push({member:id,body:body,from:from,to:to});else body.close();
-    }
-    // The layers must tile the complete gap uniquely, without an overlap or
-    // an unmodelled air allowance. Verify the real contacts of the chain.
-    var cursor=-gap,previous=left,valid=true,chain:Array<{member:String,body:Part,from:Float,to:Float}>=[];
-    for(step in 0...candidates.length+1) {
-      if(Math.abs(cursor)<=tolerance)break;
-      var next=candidates.filter(c->Math.abs(c.from-cursor)<=tolerance);
-      if(next.length!=1){valid=false;break;}
-      var current=next[0];
-      if(current.to<=cursor+tolerance || previous.distance(current.body)>tolerance
-        || PosedParts.commonVolume(previous,PosedParts.boxOf(previous),current.body,PosedParts.boxOf(current.body))>0.001){valid=false;break;}
-      previous=current.body;cursor=current.to;chain.push(current);
-    }
-    if(Math.abs(cursor)>tolerance || previous.distance(right)>tolerance || chain.length!=candidates.length)valid=false;
-    if(valid&&edgeDiagnostics!=null)for(c in chain) {
-      var component=members.get(c.member);
-      if(component==null||!requiresEdgeCheck(component))continue;
-      var depth=Math.min(0.1,(c.to-c.from)/4),radius=requiredEdgeRadius(diameter,diameter);
-      for(h in holes) {
-        var p=AssemblyFrames.transformPoint(local,h.x,h.y,0),at=AssemblyFrames.compose(bw,AssemblyFrames.translation(p.x,p.y,0));
-        var support=Math.min(edgeSupportFraction(c.body,at,clearance/2+0.01,radius,c.from+depth/10,c.from+depth,null),
-          edgeSupportFraction(c.body,at,clearance/2+0.01,radius,c.to-depth,c.to-depth/10,null));
-        if(support<0.99999)edgeDiagnostics.warning("fasteners.edge-support",jointId,
-          '$jointId: ${c.member} lacks actual layer support around hole (${edgeRound(h.x)}, ${edgeRound(h.y)}): ${edgeRound(100*support)}%; made-part clearance edge >=1.5d, required radius $radius mm');
-      }
-    }
-    for(c in candidates)c.body.close();left.close();right.close();
-    return valid;
-  }
-
   /** Whether `a` lies on `b`'s plane with opposed normals and at least one of its holes over `b`'s footprint. */
-  static function meets(a:Placed, b:Placed, tolerance:Float, gap:Float=0):Bool {
+  static function meets(a:Placed, b:Placed, tolerance:Float):Bool {
     var local = AssemblyFrames.compose(AssemblyFrames.inverse(b.world), a.world);
     var normal = AssemblyFrames.transformVector(local, 0, 0, 1);
-    if (normal.z > -0.9999 || Math.abs(local.z+gap) > tolerance) return false;
+    if (normal.z > -0.9999 || Math.abs(local.z) > tolerance) return false;
     if (a.face.holes == null) {
       // A footprint takes the receiving face whose holes are centred inside it: a face that is merely beside it is another.
       var tappedHoles = b.face.holes;
@@ -812,9 +722,6 @@ class JointFasteners {
         recess = r;
       case _:
     }
-    var materialGrip=grip;
-    var faceOffset=AssemblyFrames.compose(AssemblyFrames.inverse(b.world),a.world).z;
-    if(faceOffset < -tolerance)grip-=faceOffset;
     var receivingSize:Null<String> = null, depth = 0.0, thickness = 0.0, through = false, material:ThreadMaterial = ThreadMaterial.Steel;
     var nutted = false, plateClearance = 0.0;
     switch b.face.role {
@@ -1042,7 +949,7 @@ class JointFasteners {
         '$id: ${a.member} has clearance holes its geometry does not draw and does not cut derived holes'
       );
       else for (k => hole in aHoles) {
-        var back = materialGrip + (recess == null ? 0.0 : recess.depth);
+        var back = grip + (recess == null ? 0.0 : recess.depth);
         cutsOf(result, a.member).push({name: cutName(id, k + 1, "clearance"), frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance, from: -1.0, to: back + 1, kind: "clearance", thread: size});
         if (recess != null) cutsOf(result, a.member).push({
           name: cutName(id, k + 1, "counterbore"),
@@ -1050,7 +957,7 @@ class JointFasteners {
           x: hole.x,
           y: hole.y,
           diameter: recess.diameter,
-          from: materialGrip,
+          from: grip,
           to: back + 1,
           kind: "counterbore",
           thread: size

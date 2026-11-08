@@ -362,19 +362,17 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     exposePort("mains48", "supply48", "mains");
     // The three sealed scales are read by a BiSS-C master module of the controller.
     fixAt("bissMaster", new BissMaster(4), HobberElectricalLayout.devicePose(110, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
-    // Drive seats: one ground bar under both supports of X and Z (the nut block travels above it; grinding makes both seats coplanar and
-    // it stays the re-grindable height spacer), two brackets on the swivel plate for Y.
-    var xDrive = HobberDrives.x(), zDrive = HobberDrives.z();
-    var xb = HobberDrives.padBoundsBoth(xDrive, HobberDrives.PAD_WIDTH, 15), zb = HobberDrives.padBoundsBoth(zDrive, HobberDrives.PAD_WIDTH, 40);
-    group("X axis/Drive");
-    fixAt("XdrivePad", new HobberSaddle("GE-X-drive-pad"), F.identity(), "bed/driveSeat", F.alongY((xb[0] + xb[3]) / 2, 0, 140, 0, 0, 1));
-    precisionMounts.push({name: "XdrivePad-mount", parent: "bed/driveSeat"});
-    group("Z axis/Drive");
-    fixAt("ZdrivePad", new HobberSaddle("GE-Z-drive-pad"), F.identity(), "column/driveSeat",
-      F.alongY(HobberZLayout.SEAT_FACE_X, 0, (zb[2] + zb[5]) / 2, -1, 0, 0));
-    precisionMounts.push({name: "ZdrivePad-mount", parent: "column/driveSeat"});
-    drive(xDrive,"XdrivePad","XdrivePad","Xbridge");
-    drive(zDrive,"ZdrivePad","ZdrivePad","Zplate");
+    // Four short ground bars, matched in thickness per axis; open nut channel.
+    for(axis in [HobberDrives.x(),HobberDrives.z()]) {
+      group(axis.id+" axis/Drive");var insert=axis.id=="X"?"bed/driveSeat":"column/driveSeat";
+      for(support in ["fixed","floating"]) {
+        var id=HobberDrives.barMember(axis.id,support),face=HobberPadBolts.face(axis,support);
+        fixAt(id,new HobberSaddle(HobberDrives.barDesign(axis.id,support)),F.identity(),insert,face.frame);
+        precisionMounts.push({name:id+"-mount",parent:insert});
+      }
+    }
+    drive(HobberDrives.x(),HobberDrives.barMember("X","fixed"),HobberDrives.barMember("X","floating"),"Xbridge");
+    drive(HobberDrives.z(),HobberDrives.barMember("Z","fixed"),HobberDrives.barMember("Z","floating"),"Zplate");
     bind("Ydrive","Ymodule/screw-turn","Ymodule/motor");
     // Sealed scales (FRAME_PLAN H4): X on a ground bar on the bed beam, Z on a bar on the column channel's wall with its head on
     // an arm from the Z saddle, Y on the swivel plate with its head on a boss of the Y saddle.
@@ -450,44 +448,6 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     installZBellows();
     // The screws, washers, nuts and the holes they need follow from the bolted faces the parts declare (BOM_PLAN F1).
     deriveFasteners();
-    // Replicated pad drilling follows the carriage joints, never a second bolt list.
-    var deck:Null<MachineComponent> = null;
-    for (entry in components()) if (entry.id == "Xbridge") deck = entry.component;
-    if (deck == null) throw "Missing X carriage for replicated pads";
-    var guide = LinearRailBlock.metric("HGH25CA");
-    var film = HobberCarriageStockCheck.padLayer().nominalMm;
-    for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) {
-      var y = side * FoundationLayout.BED_RAIL_CENTRE;
-      var holes:Array<materia.casting.InsertHole> = [];
-      for (hole in deck.derivedRouteHoles()) {
-        if (hole.kind != "clearance" || Math.abs(hole.position[0] - row) > guide.spec.blockLength / 2
-          || Math.abs(hole.position[1] - y) > guide.spec.blockWidth / 2) continue;
-        var record = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.through(hole.diameter, film))[0];
-        record.id = hole.id;
-        record.frame = F.fromRotationMatrix(Math.round((hole.position[0] - row) * 1e6) / 1e6,
-          Math.round((hole.position[1] - y) * 1e6) / 1e6, film,
-          [1, 0, 0, 0, -1, 0, 0, 0, -1]);
-        holes.push(record);
-      }
-      if (holes.length != 4) throw "X replicated pad must inherit four joint-derived clearances";
-      holes.sort((a, b) -> a.frame.x == b.frame.x
-        ? (a.frame.y < b.frame.y ? -1 : a.frame.y > b.frame.y ? 1 : 0)
-        : (a.frame.x < b.frame.x ? -1 : 1));
-      for (i in 0...holes.length) holes[i].id = "clearance-" + (i + 1);
-      var pad = new machinekit.structural.LinearMountReplication(new ComponentValues()
-        .setNumber("width", guide.spec.blockLength).setNumber("length", guide.spec.blockWidth)
-        .setNumber("thickness", film).setToken("holes", machinekit.structural.InsertHoles.fromNeutral(holes))
-        .setToken("reference", "ASSUMED compound/process properties; four pads replicated against one master to 0.01 mm; "
-          + HobberCarriageStockCheck.report()));
-      var padId = "Xpad-" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2");
-      fixAt(padId, pad,
-        F.translation(row, y, HobberSaddle.xCarriageBottom()), "Xbridge", F.alongY(row, y, HobberSaddle.xCarriageBottom() + film, 0, 0, 1));
-      var blockId = "blockX" + (side < 0 ? "Left" : "Right") + (row == HobberXLayout.BLOCK_FRONT ? "" : "Front");
-      var oldContacts = mountContacts.filter(c -> (c.parent == "Xbridge" && c.child == blockId)
-        || (c.child == "Xbridge" && c.parent == blockId));
-      for (contact in oldContacts) mountContacts.remove(contact);
-      mountContacts.push({parent: blockId, child: padId});
-    }
     // The loads the joints carry come from the finished parts (masses), so they are checked after the derived holes are cut.
     checkJointLoads(HobberJointLoads.of(this));
     // Chip protection and service (FRAME_PLAN, "Chip protection and service"): wipers on every guide block, and the removals a technician needs.

@@ -109,23 +109,20 @@ RM2 completion or production mount release.
   fixture is the other remedy. The model computes the budget per hole and chooses only routes the
   interface requirement permits; when none closes, it raises a design change request.
 
-- **RM-D11. Screw-support seats (XA process; physical conversion pending).** Use an
-  alignment arbor instead of the screw, referenced to the installed rail line/plane and
-  the carriage nut bore through a height reference. Hold the fixed mount and BF coaxial
-  and parallel while injecting replication compound under each support foot, with release
-  agent, dams and bore masks. Derive each layer from the required support plane minus
-  the insert's as-cast height, including cast-height tolerance; check both extrema against
-  the selected product's published thickness range. Until a grade is chosen those limits,
-  modulus and creep are ASSUMED, never Moglice/SKC vendor data. After cure, torque into
-  steel, indicate again and match-drill/ream service-return pins into the steel inserts.
-  Compound supplies no thread or pin engagement. A separate plain height spacer may
-  make up the derived height; the same support bolts and match-pins pass through its
-  masked holes into the insert. Model every spacer and compound layer physically:
-  `JointFasteners` verifies a continuous contacting stack and includes it in bolt grip,
-  without counting it as steel engagement. Product thickness and sustained-load checks
-  still require the chosen compound's datasheet. The nut travels in the open channel between
-  the separate seats; verify travel and overtravel. Arbors, height references, release
-  agent, compound and dams belong to the tooling BOM and the A3/A7 sequence.
+- **RM-D11. Hobber screw supports (wrap-up decision,2026-11-08).** X and Z each use
+  two short ground bars, one under the HZMotion mount and one under BF12, on the existing
+  cast-in steel inserts. Derive matched thickness from the support-foot and insert planes:
+  X15 mm, Z40 mm. Saw the70x75 and65x35 mm finished footprints from80 mm bought ground
+  stock; inspect the broad faces and match each pair within0.01 mm before assembly.
+  Indicate the supports to the rails with the actual screw and carriage nut at both travel
+  ends, then torque and match-pin for service return. Support threads/pins engage their
+  ground bars; bar clamps engage the inserts. Tighten covered bar clamps first; removing a
+  support is deliberate for rare bar replacement, ordinary motor service leaves the bars.
+  The nut traverses the open channel between bars, including overtravel; no groove exists.
+  Guard feet attach to the inserts beside the bars. No drive epoxy, spacer layer, alignment
+  arbor, height-reference fixture, special reaming kit or compound-friction screen remains.
+  Replication remains a process for large casting surfaces that need it, with the RM-D8
+  datasheet/coupon qualification. Small ground interfaces are inspected, selected or finish-ground.
 
 ## Accuracy budgets (inputs)
 

@@ -77,7 +77,7 @@ class HobberFemExport {
     // The solid FE must use these shapes rather than reconstructing an obsolete
     // integral rib carriage from nominal boxes.
     for (entry in machine.components()) {
-      if (!StringTools.startsWith(entry.id, "Xrib-") && !StringTools.startsWith(entry.id, "Xpad-")) continue;
+      if (!StringTools.startsWith(entry.id, "Xrib-")) continue;
       var component = entry.component;
       var shape = component.geometry();
       shape.shape.exportStep('$dir/${entry.id}.step');

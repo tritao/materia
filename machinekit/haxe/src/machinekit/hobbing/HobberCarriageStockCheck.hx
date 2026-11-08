@@ -12,44 +12,21 @@ class HobberCarriageStockCheck {
   /** HIWIN G99TE22-2008 table 2-1-3, HG25 normal-class matched-set height variation. */
   public static inline final BLOCK_HEIGHT_VARIATION_MM = 0.020;
   public static inline final PAD_COPLANARITY_MM = 0.01;
-  /** Temporary process limits, NOT Moglice/SKC product data. Replace when ordered. */
-  public static inline final ASSUMED_LAYER_MIN_MM = 0.2;
-  public static inline final ASSUMED_LAYER_MAX_MM = 2.0;
-  /** Stock, matched-block variation and the fixture target consume the allowance.
-   * Set the master from the actual installed guide stack: common-mode catalogue
-   * block height is measured into this setting, not inferred from a nominal H.
-   * Keep the block contact datum fixed; this is material removed from its pad,
-   * not a layer added to the axis height stack. */
-  public static function padLayer():{nominalMm:Float, minimumMm:Float, maximumMm:Float,
-    uncertaintyMm:Float, assumed:Bool} {
-    var stock = GroundStock.plate(GroundStock.STEEL, HobberSaddle.X_CARRIAGE_THICKNESS);
-    var uncertainty = stock.thicknessTolerance + result().stockFlatnessMm
-      + BLOCK_HEIGHT_VARIATION_MM + PAD_COPLANARITY_MM;
-    var nominal = Math.ceil((ASSUMED_LAYER_MIN_MM + uncertainty) * 10) / 10;
-    var low = nominal - uncertainty;
-    var high = nominal + uncertainty;
-    if (low < ASSUMED_LAYER_MIN_MM - 1e-9 || high > ASSUMED_LAYER_MAX_MM + 1e-9)
-      throw "X block-pad replication thickness exceeds ASSUMED process limits; choose qualified stock/compound";
-    return {nominalMm: nominal, minimumMm: low, maximumMm: high,
-      uncertaintyMm: uncertainty, assumed: true};
-  }
   public static function result():{stockFlatnessMm:Float, hiwinMountHeightMm:Float,
-    blockHeightVariationMm:Float, requiredMm:Float, replicationRequired:Bool, assumedStock:Bool} {
+    blockHeightVariationMm:Float, requiredMm:Float, finishingRequired:Bool, assumedStock:Bool} {
     var stock = GroundStock.plate(GroundStock.STEEL, HobberSaddle.X_CARRIAGE_THICKNESS);
     var spacing = 2 * FoundationLayout.BED_RAIL_CENTRE;
     var allowance = 0.085 * spacing / 500;
     var flatness = stock.flatness * spacing / 100;
     var required = Math.min(allowance, Math.min(BLOCK_HEIGHT_VARIATION_MM, PAD_COPLANARITY_MM));
     return {stockFlatnessMm: flatness, hiwinMountHeightMm: allowance, blockHeightVariationMm: BLOCK_HEIGHT_VARIATION_MM, requiredMm: required,
-      replicationRequired: flatness > required, assumedStock: stock.assumed};
+      finishingRequired: flatness > required, assumedStock: stock.assumed};
   }
   public static function report():String {
     var r = result();
-    var layer = padLayer();
     return 'X plate stock flatness ${r.stockFlatnessMm} mm (ASSUMED stock) versus HIWIN mounting S1 ${r.hiwinMountHeightMm} mm '
       + 'and class $ACCURACY_CLASS block height variation ${r.blockHeightVariationMm} mm; all-pad target ${r.requiredMm} mm; preload $PRELOAD; '
-      + (r.replicationRequired ? "replicate all four block pads against one master set from the actual installed blocks" : "stock meets requirement")
-      + '; derived pad allowance ${layer.nominalMm} mm, worst-case ${layer.minimumMm}..${layer.maximumMm} mm '
-      + '(ASSUMED compound limits ${ASSUMED_LAYER_MIN_MM}..${ASSUMED_LAYER_MAX_MM} mm); ' + SOURCE;
+      + (r.finishingRequired ? "stock acceptance OPEN: inspect/select stock or supplier finish-grind four lands in one setup; no small replicated pads" : "stock meets requirement")
+      + "; " + SOURCE;
   }
 }

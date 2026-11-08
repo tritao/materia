@@ -21,7 +21,7 @@ class HobberChipCover extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [machinekit.component.ComponentRecipeSupport.choice("role",MADE,"XleftFront")];
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType("machinekit.hobbing.chip-cover",parameters(),v->new HobberChipCover(v),false,false,null,false)
-      .numbered(v->"HOBBER-GUARD-"+v.token("role").toUpperCase()).procured(v->Make(v.token("role")=="Xrear"?"cut plate":"cut and formed sheet")));
+      .versioned(2).numbered(v->"HOBBER-GUARD-"+v.token("role").toUpperCase()).procured(v->Make(v.token("role")=="Xrear"?"cut plate":"cut and formed sheet")));
   }
   public function new(?overrides:ComponentValues) {
     var v=machinekit.component.ComponentRecipeSupport.resolve(parameters(),overrides),r=v.token("role");
@@ -36,9 +36,9 @@ class HobberChipCover extends MachineComponent {
   public static function installations():Array<{id:String,role:String,parent:String,seat:AssemblyFrame}> {
     var rows:Array<{id:String,role:String,parent:String,seat:AssemblyFrame}>=[];
     for(front in [true,false])for(side in [-1,1]) rows.push({id:"Xcover"+(front?"Front":"Rear")+(side<0?"Left":"Right"),
-      role:"X"+(side<0?"left":"right")+(front?"Front":"Rear"),parent:"XdrivePad",seat:plane(footX(front),side*37,155,1)});
-    rows.push({id:"XfrontCover",role:"Xfront",parent:"XcoverFrontLeft",seat:plane(242,-51,222,1)});
-    rows.push({id:"XrearCover",role:"Xrear",parent:"XcoverRearLeft",seat:plane(rearLidCentre(),-51,232,1)});
+      role:"X"+(side<0?"left":"right")+(front?"Front":"Rear"),parent:"bed/driveSeat",seat:plane(footX(front),side*footY(),footZ(),1)});
+    rows.push({id:"XfrontCover",role:"Xfront",parent:"XcoverFrontLeft",seat:plane(242,-lidY(),222,1)});
+    rows.push({id:"XrearCover",role:"Xrear",parent:"XcoverRearLeft",seat:plane(rearLidCentre(),-lidY(),232,1)});
     rows.push({id:"Xskirt",role:"Xskirt",parent:"Xbridge",seat:plane(170,-100,260,-1)});
     return rows;
   }
@@ -48,12 +48,19 @@ class HobberChipCover extends MachineComponent {
     {x:386 + HobberXLayout.RETRACT + 9 - rearLidCentre(), y:0.0}, {x:560 - rearLidCentre(), y:0.0}];
   public static function plugs():Array<{id:String,parent:String,x:Float,y:Float,z:Float}> return [
     for(front in [true,false])for(side in [-1,1]) {id:"X"+(front?"front":"rear")+"Plug"+(side<0?"Left":"Right"),
-      parent:front?"XfrontCover":"XrearCover",x:footX(front),y:side*37.0,z:front?224.0:234.0}
+      parent:front?"XfrontCover":"XrearCover",x:footX(front),y:side*footY(),z:front?224.0:234.0}
   ];
   public static function fixedMembers():Array<String> return [for(r in installations())if(r.parent!="Xbridge")r.id].concat([for(p in plugs())p.id]);
-  public static function footX(front:Bool):Float {var b=HobberDrives.padBoundsBoth(HobberDrives.x(),HobberDrives.PAD_WIDTH,15);return front?b[0]+25:b[3]-25;}
-  public static function padReceivers():Array<BoltedFace> return [for(front in [true,false])for(side in [-1,1])
-    BoltedFace.drilledToSuit("chip-"+(front?"front":"rear")+side,plane(footX(front),side*37,155,-1),12,12,12,15,BoltedFace.ThreadMaterial.Steel,"M3")];
+  public static function lidY():Float return (footY()+11+OUTER_HALF_WIDTH-4)/2;
+  public static function footY():Float {var d=HobberDrives.x(),b=HobberDrives.barBounds(d,"fixed");return (b[4]-b[1])/2+2+5;}
+  public static function footZ():Float return HobberDrives.barBounds(HobberDrives.x(),"fixed")[2];
+  public static function footX(front:Bool):Float {
+    var points=HobberDrives.seatHoles(HobberDrives.x(),"fixed").concat(HobberDrives.seatHoles(HobberDrives.x(),"floating"));
+    var low=1e9,high=-1e9;for(p in points){low=Math.min(low,p.position[0]);high=Math.max(high,p.position[0]);}
+    return front?low+7:high-7; // Existing guard tool-port station, independent of seat stock.
+  }
+  public static function insertReceivers():Array<BoltedFace> return [for(front in [true,false])for(side in [-1,1])
+    BoltedFace.drilledToSuit("chip-"+(front?"front":"rear")+side,plane(footX(front),side*footY(),footZ(),-1),12,12,12,20,BoltedFace.ThreadMaterial.Steel,"M3")];
   public static function carriageReceivers():Array<BoltedFace> {
     var faces=[for(x in [170.0,350.0])for(side in [-1,1]) BoltedFace.drilledToSuit("skirt-"+x+"-"+side,plane(x,side*100,260,1),14,14,10,20,BoltedFace.ThreadMaterial.Steel,"M4")];
     return faces;
@@ -62,17 +69,17 @@ class HobberChipCover extends MachineComponent {
     var zero:Array<BoltHole>=[{x:0.0,y:0.0}],side=StringTools.startsWith(role,"Xleft")?-1:1;
     if(StringTools.startsWith(role,"Xleft")||StringTools.startsWith(role,"Xright")) {
       var front=StringTools.endsWith(role,"Front");
-      return [BoltedFace.clamped("pad",plane(footX(front),side*37,155,1),zero,4.0,2,"M3",null,false,true),
-        front ? BoltedFace.clamped("lid",plane(242,side*51,222,-1),zero,4.0,2,"M3",null,false,true)
-          : BoltedFace.through("lid",plane(rearLidCentre(),side*51,232,-1),rearLidHoles(),4.0,2,"M3",false)];
+      return [BoltedFace.clamped("pad",plane(footX(front),side*footY(),footZ(),1),zero,4.0,2,"M3",null,false,true),
+        front ? BoltedFace.clamped("lid",plane(242,side*lidY(),222,-1),zero,4.0,2,"M3",null,false,true)
+          : BoltedFace.through("lid",plane(rearLidCentre(),side*lidY(),232,-1),rearLidHoles(),4.0,2,"M3",false)];
     }
     if(role=="Xfront"||role=="Xrear") {
       var front=role=="Xfront";
       // Rear nuts are fitted on the bench. A flat AF5.5 spanner enters along
       // the open rear channel for service; no captive retention is assumed.
       return [for(side in [-1,1]) front
-        ? BoltedFace.through("side"+side,plane(242,side*51,222,1),zero,4.0,2,"M3",false)
-        : BoltedFace.clamped("side"+side,plane(rearLidCentre(),side*51,232,1),rearLidHoles(),4.0,2,"M3",null,false,true)];
+        ? BoltedFace.through("side"+side,plane(242,side*lidY(),222,1),zero,4.0,2,"M3",false)
+        : BoltedFace.clamped("side"+side,plane(rearLidCentre(),side*lidY(),232,1),rearLidHoles(),4.0,2,"M3",null,false,true)];
     }
     if(role=="Xskirt") return [for(x in [170.0,350.0])for(side in [-1,1])
       BoltedFace.clamped("tab"+x+"-"+side,plane(x,side*100,260,-1),zero,5.0,2,"M4",null,false,true)];
@@ -82,14 +89,14 @@ class HobberChipCover extends MachineComponent {
     if(role!="Xfront"&&role!="Xrear")return [];
     var front=role=="Xfront",z=front?224.0:234.0;
     return [for(side in [-1,1]) {id:"tool-port"+side,kind:"bore",thread:null,diameter:machinekit.standard.PanelHolePlug.HOLE,nominal:machinekit.standard.PanelHolePlug.HOLE,
-      fit:null,depth:machinekit.standard.PanelHolePlug.PANEL,position:[footX(front),side*37.0,z],direction:[0.0,0,-1]}];
+      fit:null,depth:machinekit.standard.PanelHolePlug.PANEL,position:[footX(front),side*footY(),z],direction:[0.0,0,-1]}];
   }
   public static function coverage():Array<String> {
     var b=nutBounds(),front=20+b.minX-3,rear=115+b.maxX+3;
     var frontOverlap=front-(120+115),rearOverlap=(386+20)-rear;
     if(frontOverlap<10||rearOverlap<10)throw "X chip-shield end overlap is insufficient";
     return ['Chip shields: X end overlaps ${frontOverlap} / ${rearOverlap} mm over travel plus 5 mm overtravel; side flat overlap 6 mm (projected edge 10 mm). '
-      +'Z screw Y73..89 lies behind fixed panels Y64..173, Z282..750; moving Z saddle overlaps behind them. No channel drain declared: no fall or bore is modelled.'];
+      +'Z rail bellows are checked separately; offset-screw ingress remains unqualified. No channel drain declared: no fall or bore is modelled.'];
   }
   static function box(x0:Float,x1:Float,y0:Float,y1:Float,z0:Float,z1:Float):Part return Part.box(x1-x0,y1-y0,z1-z0).translated(new Vector((x0+x1)/2,(y0+y1)/2,z0));
   static function mirrorY(p:Part):Part {
@@ -117,19 +124,19 @@ class HobberChipCover extends MachineComponent {
   }
   static function side(front:Bool):Part {
     var x0=front?179.0:250.0,x1=front?279.0:REAR_END,roof=front?220.0:230.0,top=front?228.0:242.0;
-    var p=[box(x0,x1,47,66,roof,roof+2),bendX(x0,x1,66,roof+4,1,-1),box(x0,x1,OUTER_HALF_WIDTH-2,OUTER_HALF_WIDTH,roof+4,top)];
+    var p=[box(x0,x1,footY()+11,66,roof,roof+2),bendX(x0,x1,66,roof+4,1,-1),box(x0,x1,OUTER_HALF_WIDTH-2,OUTER_HALF_WIDTH,roof+4,top)];
     var xx=front?179.0:378.0;
-    p.push(box(xx,xx+100,33.5,41,155,157));
-    p.push(bendX(xx,xx+100,41,159,1,-1));
-    p.push(box(xx,xx+100,43,45,159,roof-2));
-    p.push(bendX(xx,xx+100,47,roof-2,-1,1));
+    p.push(box(xx,xx+100,footY()-5,footY()+5,footZ(),footZ()+2));
+    p.push(bendX(xx,xx+100,footY()+5,footZ()+4,1,-1));
+    p.push(box(xx,xx+100,footY()+7,footY()+9,footZ()+4,roof-2));
+    p.push(bendX(xx,xx+100,footY()+11,roof-2,-1,1));
     return Solids.union(p);
   }
   static function lid(front:Bool):Part {
     var b=nutBounds(), end=20+b.minX-3, start=115+b.maxX+3;
     var p=front ? Solids.union([box(174,end,-65,65,222,224),bendY(-65,65,174,220,-1,1),box(170,172,-65,65,215,220)])
       : box(start,REAR_END,-65,65,232,234);
-    var tools=[for(y in [-37.0,37.0]) Part.cylinderSpan(machinekit.standard.PanelHolePlug.HOLE/2,front?221:231,front?225:235,footX(front),y)];
+    var tools=[for(y in [-footY(),footY()]) Part.cylinderSpan(machinekit.standard.PanelHolePlug.HOLE/2,front?221:231,front?225:235,footX(front),y)];
     return Solids.cut(p,tools);
   }
   static function skirt():Part {

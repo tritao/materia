@@ -47,7 +47,7 @@ class HobberMotorStudy {
     var cache = new PosedParts();
     var adapter = Part.box(10, 89, 72).translated(new Vector(-53, 194.5, HobberZLayout.SEAT_Z - 36));
     var adapterMass = adapter.volume() * 1e-9 * 7850;
-    var targets = ["bed/casting", "column/casting", "Xbridge", "Zplate", "Ymodule/carriage", "Ymodule/base", "Ymodule/railLeft", "Ymodule/railRight", "Ymodule/base", "Ymodule/base", "Ymodule/carriage", "ZdrivePad"];
+    var targets = ["bed/casting", "column/casting", "Xbridge", "Zplate", "Ymodule/carriage", "Ymodule/base", "Ymodule/railLeft", "Ymodule/railRight", "Ymodule/base", "Ymodule/base", "Ymodule/carriage", "ZdriveFixedBar", "ZdriveFloatingBar"];
     var lower = machinekit.hobbing.HobberXLayout.MIN;
     for (side in [0, -1, 1]) {
       var c = side == 0 ? 1.0 : 0.0, s = side * 1.0;

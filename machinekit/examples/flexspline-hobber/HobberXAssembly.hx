@@ -2,7 +2,7 @@ import machinekit.hobbing.HobberCarriageRib;
 import machinekit.hobbing.FoundationLayout;
 
 /** Assembly instructions are keyed to the actual derived joints, never a second bolt list.
- * Tool IDs are shared with the LM6 tooling BOM. Existing support bars remain an XA open item. */
+ * Tool IDs are shared with the LM6 tooling BOM. Support seat layers are held by the same through-stack fasteners. */
 typedef XAssemblyStep = {
   id:String, parts:Array<String>, tools:Array<String>, measurement:String,
   joints:Array<{member:String, face:String, method:String}>
@@ -12,31 +12,33 @@ class HobberXAssembly {
   public static function steps():Array<XAssemblyStep> return [
     {id:"A1 bed", parts:["bed/casting"], tools:["precision-level"],
       measurement:"Level datum P in both directions; lock three feet without rocking.", joints:[]},
+    {id:"A2 ground bars",parts:["XdriveFixedBar","XdriveFloatingBar"],tools:["dial-indicator","magnetic-base","torque-driver"],
+      measurement:"Buy matched thickness from one ground parent bar; inspect pair within0.01 mm. Tighten the flush recessed bar screws before fitting supports. Their covered heads are deliberate: remove the support only for rare bar replacement/regrinding; ordinary motor service leaves the bars installed.",
+      joints:[for(id in ["XdriveFixedBar","XdriveFloatingBar"]){member:id,face:"insert",method:"shim or adjust"}]},
     {id:"A2 rails", parts:["railXLeft","railXRight"], tools:["straightedge-granite","dial-indicator","magnetic-base"],
       measurement:"Reference rail against its edge; indicate second rail parallel over full travel.",
       joints:[for (id in ["railXLeft","railXRight"]) {member:id,face:"*",method:"reference edge"}]},
     {id:"A2 blocks", parts:["blockXLeft","blockXLeftFront","blockXRight","blockXRightFront"],
       tools:["block-transfer-sleeves","dial-indicator","magnetic-base"], measurement:"Slide the matched blocks from their sleeves onto clean rails; protect their wipers. Check free running before lowering the carriage.", joints:[]},
-    {id:"A3 supports", parts:["XdrivePad","Xfixed","Xfloating"], tools:["replication-kit","x-drive-arbor","nut-bore-height-reference","dial-indicator","magnetic-base"],
-      measurement:"Arbor coaxial, parallel to datum P/X line and at carriage nut-bore height; match-ream supports only after indication. Replace the existing bar by replicated seats before release.",
-      joints:[{member:"XdrivePad",face:"*",method:"shim or adjust"}]
-        .concat([for (id in ["Xfixed","Xfloating"]) {member:id,face:"*",method:"indicate then match-pin"}])},
+    {id:"A3 supports",parts:["Xfixed","Xfloating"],tools:["dial-indicator","magnetic-base","torque-driver"],
+      measurement:"Indicate supports coaxial with the actual screw and parallel to the rails; check the nut at both travel ends, torque, then match-ream/pin the supports to their own ground bars. No alignment arbor or epoxy seat.",
+      joints:[for(id in ["Xfixed","Xfloating"]){member:id,face:"*",method:"indicate then match-pin"}]},
     {id:"A4 screw and nut", parts:["Xscrew","XnutBlock","Xnut"], tools:["af4-long-key","dial-indicator","magnetic-base"],
       measurement:"Support screw during insertion; retain nut on transfer sleeve; check free rotation.",
       joints:[{member:"Xnut",face:"*",method:"indicate then match-pin"}]},
     {id:"A4 carriage", parts:["Xbridge"].concat([for (role in HobberCarriageRib.ROLES) "Xrib-"+role]),
-      tools:["replication-kit","block-pad-master","dial-indicator","magnetic-base"], measurement:"Replicate four block pads against one master; mask those datums and blast-clean both steel rib lands. Qualify mu>=0.40 with a slip coupon; keep oil, paint and adhesive off the lands. Bolt ribs before lowering carriage. Indicate nut block to screw at BOTH travel ends, tighten, then match-drill/ream; never pre-drill its dowels from drawing coordinates.",
-      joints:[for (face in ["blockL1","blockL2","blockR1","blockR2"]) {member:"Xbridge",face:face,method:"fixture-replicated"}]
+      tools:["torque-driver","dial-indicator","magnetic-base"], measurement:"Inspect/select the ground plate or finish-grind its four block lands together to0.01 mm before assembly; no small epoxy pads. Mask those datums and blast-clean both steel rib lands. Qualify mu>=0.40 with a slip coupon; keep oil, paint and adhesive off the lands. Bolt ribs before lowering carriage. Indicate nut block to screw at BOTH travel ends, tighten, then match-drill/ream; never pre-drill its dowels from drawing coordinates.",
+      joints:[for (face in ["blockL1","blockL2","blockR1","blockR2"]) {member:"Xbridge",face:face,method:"shim or adjust"}]
         .concat([{member:"Xbridge",face:"nut-block",method:"indicate then match-pin"}])
         .concat([for (role in HobberCarriageRib.ROLES) {member:"Xrib-"+role,face:"*",method:"drawing dowels"}])},
     {id:"A6 sole", parts:[for (pad in FoundationLayout.columnSolePads()) "column/"+pad.id],
-      tools:["c-test-mandrel","dial-indicator","magnetic-base","square-granite"], measurement:"Indicate Z parallel to C mandrel in two planes; A6 replicated sole and match-pin release remains open. No pin or bond credit in slip/stiffness.",
+      tools:["c-test-mandrel","dial-indicator","magnetic-base","square-granite"], measurement:"Indicate Z parallel to C mandrel in two planes; A6 sole matching/indication and match-pin release remains open. No pin or bond credit in slip/stiffness.",
       joints:[for (pad in FoundationLayout.columnSolePads()) {member:"Xbridge",face:"column-sole-"+pad.id,method:"shim or adjust"}]},
     {id:"A11 scale", parts:["XscaleSeat","Xscale","XscaleHead"], tools:["dial-indicator","magnetic-base","feeler-gauges","af3-low-profile-key"],
       measurement:"Adjust at head to scale supplier parallelism and 1 +/-0.3 mm gap; check full reading travel before guards. Service uses an ASSUMED AF3 key envelope: 6 mm projection plus 3.5 mm diameter bend/handle, 90 mm reach along X; a straight 20 mm driver hits the bed. Confirm the tool before release.",
       joints:[for (id in ["XscaleSeat","Xscale","XscaleHead"]) {member:id,face:"*",method:"shim or adjust"}]},
     {id:"guards and tray", parts:["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight","XfrontCover","XrearCover","Xskirt"],
-      tools:["torque-driver","af5.5-long-spanner"], measurement:"Fit guard nuts on bench; hold rear nuts through the open rear channel with the long flat spanner for lid service. Fit tray last; check each blank and motor-bay lid removal path.", joints:[]}
+      tools:["torque-driver","af5.5-long-spanner","af2.5-key"], measurement:"Fit guard nuts on bench; hold rear nuts through the open rear channel with the long flat spanner for lid service. Fit tray last; check each blank and motor-bay lid removal path.", joints:[]}
   ];
   public static function main():Void {
     var machine=new FlexsplineHobber(); check(machine);
@@ -137,6 +139,53 @@ class HobberXAssembly {
     Sys.println('Motor bay: $count rear-entry AF5.5 spanner corridors clear; ASSUMED D10 jaw / 5 x 2 mm handle / 7 mm offset / >=140 mm reach.');
     return count;
   }
+  /** Long AF2.5 leg through the actual roof ports with only their plugs off.
+   * Front/rear tool access uses the same opposite-end X parking as the manual. */
+  static function guardFootAccess(machine:FlexsplineHobber):Int {
+    var derived=machine.derivedFasteners();if(derived==null)throw "Missing guard joints";
+    var members=machine.components(),cache=new machinekit.assembly.PosedParts(),count=0;
+    var plugs=[for(p in machinekit.hobbing.HobberChipCover.plugs())p.id];
+    var travel=machine.travel.filter(t->t.id=="X")[0];
+    for(front in [true,false]) {
+      var state=new cadkit.modeling.AssemblyState(machine.definition());
+      state.setJoint("X",front?travel.upper:travel.lower);state.setJoint("Z",machinekit.hobbing.HobberZLayout.TRAVEL_MAX);state.forwardKinematics();
+      var poses=machine.solvedPoses(state);
+      for(joint in derived.joints)if(joint.clampedFace=="pad"&&StringTools.startsWith(joint.clampedMember,front?"XcoverFront":"XcoverRear")) {
+        var host=members.filter(m->m.id==joint.receivingMember)[0],hp=poses.get(host.id);if(hp==null)throw "Missing guard receiver pose";
+        var face=host.component.fasteningFaces().filter(f->f.id==joint.receivingFace)[0];
+        var frame=materia.assembly.AssemblyFrames.compose(hp,face.frame);
+        for(index=>point in joint.hostHoles)for(head in joint.volumes)if(head.name=="head") {
+          var raw=cadkit.modeling.Part.cylinderSpan(1.75,head.from-100,head.from,point.x,point.y);
+          var tool=machinekit.assembly.PosedParts.moved(raw,frame);raw.close();
+          for(other in members)if(other.component.hasGeometry()&&!plugs.contains(other.id)) {
+            var pose=poses.get(other.id);if(pose==null)throw "Missing guard tool obstacle";
+            if(machinekit.assembly.PosedParts.apart(machinekit.assembly.PosedParts.boxOf(tool),cache.box(other.component,pose)))continue;
+            var body=cache.posed(other.component,pose),common=tool.intersect(body),volume=common.volume();body.close();common.close();
+            if(volume>0.001)throw 'Guard AF2.5 corridor ${joint.id} / ${other.id}: $volume mm3';
+          }
+          // The engaged target head is the sole hardware exemption.
+          for(other in derived.joints) {
+            var receiver=members.filter(m->m.id==other.receivingMember)[0],rp=poses.get(receiver.id);if(rp==null)throw "Missing hardware pose";
+            var rf=receiver.component.fasteningFaces().filter(f->f.id==other.receivingFace)[0];
+            var world=materia.assembly.AssemblyFrames.compose(rp,rf.frame);
+            for(k=>p in other.hostHoles)if(other.id!=joint.id||k!=index)for(v in other.volumes)
+              if(["head","head washer","nut","nut washer"].contains(v.name)) {
+                var shape=cadkit.modeling.Part.cylinderSpan(v.diameter/2,v.from,v.to,p.x,p.y),body=machinekit.assembly.PosedParts.moved(shape,world);shape.close();
+                if(!machinekit.assembly.PosedParts.apart(machinekit.assembly.PosedParts.boxOf(tool),machinekit.assembly.PosedParts.boxOf(body))) {
+                  var common=tool.intersect(body),volume=common.volume();common.close();if(volume>0.001)throw "Guard key meets hardware: "+other.id;
+                }
+                body.close();
+              }
+          }
+          tool.close();count++;
+        }
+      }
+    }
+    cache.close();if(count!=4)throw "Expected four guard-foot tool corridors";
+    Sys.println('X guard feet: $count AF2.5 D3.5 x100 mm corridors clear, plugs removed, front at X retract/rear at X minimum; tool envelope ASSUMED.');
+    return count;
+  }
+
   /** Friction-only VQ/I screen. Charge the full X mass to the beam shear,
    * with 2x uneven sharing ASSUMED; no bond or assembly-dowel capacity. */
   static function ribSlip(machine:FlexsplineHobber):Int {
@@ -180,7 +229,7 @@ class HobberXAssembly {
       for (rule in step.joints) if (!METHODS.contains(rule.method)) throw 'Unknown alignment method ${rule.method}';
     }
     var derived=machine.derivedFasteners(); if (derived==null) throw "X sequence needs derived joints";
-    var precision=["railXLeft","railXRight","XdrivePad","Xfixed","Xfloating","Xnut","Xbridge","XscaleSeat","Xscale","XscaleHead"]
+    var precision=["railXLeft","railXRight","XdriveFixedBar","XdriveFloatingBar","Xfixed","Xfloating","Xnut","Xbridge","XscaleSeat","Xscale","XscaleHead"]
       .concat([for (role in HobberCarriageRib.ROLES) "Xrib-"+role]);
     for (joint in derived.joints) if (precision.contains(joint.clampedMember)) {
       var matches=0;
@@ -189,7 +238,7 @@ class HobberXAssembly {
       if (matches!=1) throw 'Precision joint ${joint.id} needs exactly one alignment declaration, got $matches';
       count++;
     }
-    Sys.println('X assembly: $count precision joints have alignment methods; ${declarations.length} steps name tools and measurement. Replicated drive seats/A6 release remain open.');
-    return count + headAccess(machine) + bayNutAccess(machine) + ribSlip(machine);
+    Sys.println('X assembly: $count precision joints have alignment methods; ${declarations.length} steps name tools and measurement. Short matched ground bars; A6 release remains open.');
+    return count + headAccess(machine) + bayNutAccess(machine) + guardFootAccess(machine) + ribSlip(machine);
   }
 }

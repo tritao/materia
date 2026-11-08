@@ -53,6 +53,11 @@ class HobberFrameChecks {
     options.fittedBefore = options.fittedBefore.concat([{member: "Ymodule/scaleHead", fastened: FlexsplineHobber.outboardMembers()},
       {member: "blockZLeft", fastened: ["ZscaleArm"]}, {member: "blockZLeftUpper", fastened: ["ZscaleArm"]}]);
     var order=options.fittedBefore;if(order==null)throw "Missing assembly order";
+    // Bar clamps are torqued before the drive subassembly covers their heads.
+    for(axis in ["X","Z"])for(support in ["fixed","floating"])
+      for(later in [axis+"fixed",axis+"floating",axis+"motor",axis+"motor-shaft",axis+"screw",axis+"coupling",axis+"floatingRing"])
+        order.push({member:later,fastened:[HobberDrives.barMember(axis,support)],faces:["insert"]});
+
     for(rule in machine.yModule.fittingOrder()) {
       var mapped:machinekit.assembly.AssemblyIntegrity.FastenerFitOrder={member:"Ymodule/"+rule.member,fastened:[for(id in rule.fastened)"Ymodule/"+id]};
       var faces=rule.faces;if(faces!=null)mapped.faces=faces.copy();order.push(mapped);

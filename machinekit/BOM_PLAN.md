@@ -500,15 +500,6 @@ The plain check reports `fasteners.edge-support` findings by member and joint. E
 made part or report the finding; there is no certified-material exception mechanism. These
 reported findings do not waive ordinary hole, head-interference or tool-access errors.
 
-Physical interface layers (XA): separated clamped and receiving faces pair only when
-fixed `InterfaceLayer` solids tile the complete gap, touch both members and leave every
-fastener bore clear. Multiple layers may form one stack; overlapping material or an air
-gap rejects the match. Bolt grip includes the stack, while thread engagement and dowel
-engagement count only the two steel members. Counterbores stay in the clamped member.
-Made intermediate layers receive the same clearance-hole edge check. The masked bore
-requires a1 mm material ring in each layer (ASSUMED geometry allowance, no strength
-credit). These checks establish geometry, not compound creep or slip qualification.
-
 The hobber X ribs additionally specify bare blast-cleaned faying lands (mask the guide
 pad datums; exclude oil, paint and adhesive). RCSC 2020 sections5.4/8.4 gives a0.50 mean
 coefficient for Class B blast-cleaned steel: https://www.boltcouncil.org/files/2020RCSCSpecification.pdf.

@@ -22,8 +22,9 @@ class HobberAssemblyProcedures {
 
   /** Fit the supports loose, run the carriage to both ends so the screw centres on the nut, tighten, ream and pin. */
   public static function alignScrewSupports(axis:String, travel:{lower:Float, upper:Float}):Procedure {
-    // X and Z have one ground bar under both supports; Y has a bracket under each.
-    var fixedPad = axis == "Y" ? "Ymodule/base" : axis + "drivePad", floatingPad = axis == "Y" ? "Ymodule/base" : axis + "drivePad";
+    // X/Z have one short ground bar per support; Y uses the module base.
+    var fixedPad=axis=="Y"?"Ymodule/base":HobberDrives.barMember(axis,"fixed");
+    var floatingPad=axis=="Y"?"Ymodule/base":HobberDrives.barMember(axis,"floating");
     var members = [HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating"), HobberDrives.member(axis,"screw"), HobberDrives.member(axis,"nut"), HobberDrives.member(axis,"nutCarrier")];
     return {
       id: axis.toLowerCase() + "-align-supports",
@@ -32,8 +33,7 @@ class HobberAssemblyProcedures {
       start: Assembled,
       steps: [
         note("seat", "Fit the supports loose",
-          "Bolt the motor mount to its pad and the BF12 to the floating pad with the tapped bolts only snug (no dowels). The pads are drilled and tapped, "
-          + "not reamed: the supports can still move about 0.5 mm.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating")])),
+          "Fit the two matched ground bars and tighten their recessed insert screws before the supports cover them. Fit the supports loosely. Indicate using the actual screw, rails and nut; no alignment arbor or replicated support seat.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating")])),
         note("nut", "Bolt the nut block to the carriage",
           "Fit the nut, its block and the block's two carriage bolts, then thread the screw through the nut into the mount and the BF12.",
           [HobberDrives.member(axis,"nut"), HobberDrives.member(axis,"nutCarrier"), HobberDrives.member(axis,"screw")]),
@@ -46,8 +46,7 @@ class HobberAssemblyProcedures {
         note("centre-high", "Check the screw is centred at both ends",
           "Repeat the free-turning check at both ends. If it binds, loosen the supports and shift them by half the difference.", members),
         note("tighten", "Tighten, then ream and pin",
-          "Tighten all support bolts. Ream the two dowel holes in each support foot through the pad at "
-          + "5 mm and drive the dowels. The pins keep the alignment, so the pad needs no precision machining.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating")]))
+          "Torque, re-indicate at both travel ends, then match-ream and pin each support to its ground bar (Y: module base). Never pre-drill assembly pins from drawing coordinates. The ground bars remain installed during ordinary motor service.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating")]))
       ],
       source: Generated("hobber")
     };
@@ -181,7 +180,7 @@ class HobberAssemblyProcedures {
     id:"fit-chip-guards",label:"Fit the fixed chip sheets and overlapping carriage skirt",kind:Assembly,start:Assembled,
     steps:[
       note("bench","Preassemble the fixed X guard on the bench","Bolt the low front and high rear side sheets to their front and rear lids on the bench, with the M3 heads below the side roofs. This leaves room for the nut driver before the assembly is lowered onto the casting. Do not weld the sheet corners or the lapped height transition.",["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight","XfrontCover","XrearCover"]),
-      note("feet","Lower the guard before fitting the carriage","Set the formed feet on the X pad and fit the four joint-derived M3 through the tool ports. Use a long 2.5 mm hex key. After the carriage is fitted, front ports are reached at X retract; rear ports at X minimum. Fit the NBR plugs after tightening; their procurement envelope and oil compatibility remain assumed requirements.",["XdrivePad","XfrontCover","XrearCover","XfrontPlugLeft","XfrontPlugRight","XrearPlugLeft","XrearPlugRight"]),
+      note("feet","Lower the guard before fitting the carriage","Set the formed feet on the bed drive insert and fit the four joint-derived M3 through the tool ports. Use a long 2.5 mm hex key. After the carriage is fitted, front ports are reached at X retract; rear ports at X minimum. Fit the NBR plugs after tightening; their procurement envelope and oil compatibility remain assumed requirements.",["bed/driveSeat","XfrontCover","XrearCover","XfrontPlugLeft","XfrontPlugRight","XrearPlugLeft","XrearPlugRight"]),
       note("moving","Fit the skirt and Z bellows","Bolt the skirt to the carriage underside. Bench-fit the four moving bellows brackets to the Z saddle before lowering it onto the guide blocks: their rear M4 screws are deliberately bench-serviced. Indicate each upper fixed bracket on its existing rail insert and transfer-drill its joint-derived M3 threads. Bolt each lower fixed flange to the X carriage and each moving flange to its bracket. Use an AF2.5 low-profile key; corridor qualification remains open. All fabric, packed length and end seals are ASSUMED RFQ requirements.",["Xbridge","Xskirt","ZbellowsLeftLower-fixed","ZbellowsRightUpper-fixed"]),
       note("gaps","Verify the overlaps over full travel","With screws snug, set at least 2 mm running clearance and then tighten. Check the low fixed sheets at A +/-15, X limits and minimum Z. The rear skirt return has reliefs over the high side lips. Nominal end overlaps include 5 mm linear overtravel; flat side overlap is 6 mm. The Z bellows shield the guides; check every fold at both travel limits including overtravel. The offset screw ingress gate remains open. Keep the existing block wipers.",["Xskirt","XfrontCover","XrearCover","ZbellowsLeftUpper-fixed","ZbellowsRightLower-fixed"]),
       note("clean","Keep the tool ports closed","Brush chips from the lapped roofs and refit all four port plugs. These are fixed overlapping chip shields; the enclosure contains mist. No drain is declared for the flat channels, and no new casting floor or bore is implied.",["XfrontPlugLeft","XfrontPlugRight","XrearPlugLeft","XrearPlugRight"])

@@ -76,21 +76,16 @@ class HobberJointLoads {
     // pads and brackets, and the nut block's base into its carriage (the nut's flange is perpendicular to the screw: tension, not slip). The nut blocks are
     // located against it by dowels (X and Z) or by a key on the seat (Y), and the seat is held to the Y saddle by friction alone.
     for (axis in [
-      {id: "X", pad: "XdrivePad", foot: "Xfixed", carriage: "Xbridge", block: "XnutBlock", seat: null, insert: "bed/driveSeat"},
-      {id: "Z", pad: "ZdrivePad", foot: "Zfixed", carriage: "Zplate", block: "ZnutBlock", seat: null, insert: "column/driveSeat"}
+      {id:"X",carriage:"Xbridge",block:"XnutBlock",insert:"bed/driveSeat"},
+      {id:"Z",carriage:"Zplate",block:"ZnutBlock",insert:"column/driveSeat"}
     ]) {
-      var crash = HobberCrashProtection.axis(machine, axis.id);
-      var design = crash.limit.designThrust, jam = crash.limit.thrust + crash.gravityN;
-      loads.push({
-        label: axis.id + " drive: screw thrust on the fixed support",
-        between: [axis.pad, axis.foot],
-        shear: {peak: design, momentary: jam}
-      });
-      // The pad bar passes the same thrust into the cast insert under it (four screws in the groove floor).
-      if (axis.insert != null) loads.push({label: axis.id + " drive: screw thrust from the pad bar into the casting insert", between: [axis.pad, axis.insert], shear: {peak: design, momentary: jam}});
-      var base = axis.seat == null ? axis.carriage : axis.seat;
-      loads.push({label: axis.id + " drive: screw thrust through the nut block", between: [base, axis.block], shear: {peak: design, momentary: jam}});
-      if (axis.seat != null) loads.push({label: axis.id + " drive: screw thrust from the nut seat into the saddle", between: [axis.seat, axis.carriage], shear: {peak: design, momentary: jam}});
+      var crash=HobberCrashProtection.axis(machine,axis.id),design=crash.limit.designThrust,jam=crash.limit.thrust+crash.gravityN;
+      var fixed=machinekit.hobbing.HobberDrives.barMember(axis.id,"fixed"),floating=machinekit.hobbing.HobberDrives.barMember(axis.id,"floating");
+      loads.push({label:axis.id+" screw thrust on fixed support",between:[fixed,axis.id+"fixed"],shear:{peak:design,momentary:jam}});
+      loads.push({label:axis.id+" fixed ground bar on casting insert",between:[fixed,axis.insert],shear:{peak:design,momentary:jam}});
+      // ASSUMED10 N handling allowance; the floating bearing takes no axial drive thrust.
+      loads.push({label:axis.id+" floating ground bar handling/weight",between:[floating,axis.insert],shear:{peak:massOf(machine,[floating,axis.id+"floating"])*(g+0.5)+10}});
+      loads.push({label:axis.id+" screw thrust through nut block",between:[axis.carriage,axis.block],shear:{peak:design,momentary:jam}});
     }
     var yCrash=HobberCrashProtection.axis(machine,"Y"),yg=yCrash.movingKg*g,ys=machine.yModule.spec;
     var normal=yCrash.limit.designThrust,crash=yCrash.limit.thrust+yCrash.gravityN;
@@ -143,7 +138,7 @@ class HobberJointLoads {
     // assembly weight to each foot conservatively; all loads remain joint-derived.
     var fixedGuardWeight=massOf(machine,machinekit.hobbing.HobberChipCover.fixedMembers())*(g+0.5)+2;
     for(r in machinekit.hobbing.HobberChipCover.installations()) {
-      var shear=r.parent=="XdrivePad"?fixedGuardWeight:massOf(machine,[r.id])*(g+0.5)+2;
+      var shear=r.parent=="bed/driveSeat"?fixedGuardWeight:massOf(machine,[r.id])*(g+0.5)+2;
       loads.push({label:"Chip guard "+r.id,between:[r.id,r.parent],shear:{peak:shear}});
     }
     for(cover in machine.zBellows) {
