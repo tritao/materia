@@ -3,7 +3,6 @@ package cadkit.cache;
 import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 import sys.FileSystem;
-import sys.io.AtomicFile;
 import sys.io.File;
 
 /**
@@ -11,8 +10,10 @@ import sys.io.File;
  * size cap and least-recently-used eviction (by file modification time, which a hit refreshes).
  *
  * Writes are atomic (temp file then rename), so concurrent writers and readers, in this or another process, see either the
- * whole entry or none. Two writers of one key write the same bytes, since the key names everything the value depends on.
- * A failed read or write is a miss, never an error: the cache only ever makes a run faster.
+ * whole entry or none. They are not flushed to the device (a durable write cost about a third of a cold open): every entry
+ * carries its length, so one cut short by a crash reads as a miss. Two writers of one key write the same bytes, since the
+ * key names everything the value depends on. A failed read or write is a miss, never an error: the cache only ever makes a
+ * run faster.
  *
  * Environment: `MATERIA_MEMO_DIR` (directory; default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`),
  * `MATERIA_MEMO=off` (no persistent tier), `MATERIA_MEMO_MAX_MB` (cap, default 2048), `MATERIA_MEMO_VERIFY=1` (see `Memo`).
@@ -21,6 +22,9 @@ class DiskStore {
   static final defaultCapMegabytes = 2048;
   /** A hit older than this is rewritten to refresh its recency; younger hits cost nothing. */
   static final refreshSeconds = 3600;
+  /** Every file starts with this tag and the payload's length (two 32-bit words). */
+  static final magic = 0x4D454D31;
+  static final headerBytes = 8;
 
   public final directory:String;
   public final capBytes:Float;
@@ -91,18 +95,35 @@ class DiskStore {
     try {
       var meta = FileSystem.metadata(path);
       if (meta == null) return null;
-      var bytes = File.getBytes(path);
-      if (Std.int(Sys.time()) - meta.modified > refreshSeconds) AtomicFile.writeBytes(path, bytes);
-      return bytes;
+      var stored = File.getBytes(path);
+      if (stored.length < headerBytes || stored.getInt32(0) != magic || stored.getInt32(4) != stored.length - headerBytes) return null;
+      if (Std.int(Sys.time()) - meta.modified > refreshSeconds) publish(path, stored);
+      return stored.sub(headerBytes, stored.length - headerBytes);
     } catch (error:Dynamic) {
       return null;
+    }
+  }
+
+  /** Temp file, then rename over the destination: whole or absent to every reader. */
+  static function publish(path:String, content:Bytes):Void {
+    var temporary = path + "." + Std.random(1 << 30) + "." + Math.round(Sys.time() * 1000) + ".tmp";
+    try {
+      File.saveBytes(temporary, content);
+      FileSystem.rename(temporary, path);
+    } catch (error:Dynamic) {
+      deleteQuietly(temporary);
+      throw error;
     }
   }
 
   public function write(key:String, bytes:Bytes):Void {
     try {
       ensureDirectory();
-      AtomicFile.writeBytes(fileFor(key), bytes);
+      var framed = Bytes.alloc(headerBytes + bytes.length);
+      framed.setInt32(0, magic);
+      framed.setInt32(4, bytes.length);
+      framed.blit(headerBytes, bytes, 0, bytes.length);
+      publish(fileFor(key), framed);
       written += bytes.length;
       // Re-check the cap after about a tenth of it has been written since the last check, not on every write.
       if (!checked || written > capBytes / 10) {
