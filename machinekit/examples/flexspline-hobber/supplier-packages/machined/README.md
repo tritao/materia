@@ -27,15 +27,15 @@ The installed assembly's `ManufacturingRoute` facets are the inventory; no paral
 | Four X ribs | sawn bright bar; the scale rib has its declared milled interface |
 | Y module | profiled ground base/carriage, standard rail riser bars, nut carrier, scale seat/head carrier and stops |
 | Head/Z interfaces | Z saddle, spindle split-clamp seat, servo cradle, outboard carrier and scale arm |
-| X/Z drive seats | existing ground bars are still in the model; XA fixture-replicated replacements remain OPEN |
+| X/Z drive seats | four short ground bars (X15/Z40 mm), matched pairs sawn from80 mm bought ground parent stock; no drive epoxy or nut groove |
 | Nut blocks and spindle/outboard | installed X/Z blocks, BT30 arbor, housing/sleeve/gland/cap/spacer |
 | Guards | seven X sheets, upper/lower Y module covers/retainers and six Z bellows mounts (two finished mounting designs) |
 
-Cast-in inserts and sole pads retain their casting-package manufacturing records; bought bellows and scales are not fabricated by this package. Z bellows use a custom, ASSUMED thin-fabric RFQ envelope, not a confirmed vendor product. Ground-stock data is ASSUMED until a supplier row is chosen; inspect finished interfaces and replicate failing faces before custom grinding.
+Cast-in inserts and sole pads retain their casting-package manufacturing records; bought bellows and scales are not fabricated by this package. Z bellows use a custom, ASSUMED thin-fabric RFQ envelope, not a confirmed vendor product. Ground-stock data is ASSUMED until a supplier row is chosen; inspect/select stock or supplier-finish failing small interfaces; replication is reserved for large casting faces.
 
-`assembly-tooling.csv` is a separate **Tooling** BOM category, excluded from machine quantities/mass. Each row carries an ASSUMED EUR price and the assembly steps that reference it. The exporter rejects an unknown tool reference. Tools include X/Y/Z drive arbors and the nut-bore height reference, replication kit, block-pad master, C/spindle mandrels, square/straightedge/level, indicators and bases, AF4 key>=400 mm, qualified low-profile keys, hoist/slings and bellows support straps. See `ALIGNMENT.md` and the generated X/Y/Z procedures.
+`assembly-tooling.csv` is a separate **Tooling** BOM category, excluded from machine quantities/mass. Each row carries an ASSUMED EUR price and the assembly steps that reference it. The exporter rejects an unknown tool reference. Tools include C/spindle test mandrels, square/straightedge/level, indicators and bases, AF4 key>=400 mm, qualified low-profile keys, hoist/slings and bellows support straps. See `ALIGNMENT.md` and the generated X/Y/Z procedures.
 
-This is a model RFQ package, **not a machine release**. The Y stiffness/accuracy qualification, PU lip release/retention and sealing, XA replicated support seats/A6 qualification,29 other made-edge findings and Z screw ingress remain open in LINEAR_MODULE_PLAN.md. Part/drawing checks below validate the exported parts; they do not waive those machine-level gates.
+This is a model RFQ package, **not a machine release**. The final extended sweep reports one0.8 mm Z-floating-bar/eRob housing gap against2 mm required; correction and the full sweep/service rerun remain open. The Y stiffness/accuracy qualification, PU lip release/retention and sealing, stock acceptance and A6 qualification,21 other made-edge findings and Z screw ingress remain open in LINEAR_MODULE_PLAN.md. The separate casting-package refresh and large-casting-face qualification also remain open (FRAME_PLAN casting freeze). Part/drawing checks below validate the exported parts; they do not waive those machine-level gates.
 
 ## What is written
 

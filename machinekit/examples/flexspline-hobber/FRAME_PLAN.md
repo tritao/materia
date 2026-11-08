@@ -46,19 +46,19 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
   the servo keeps its own for the drive's loop (`hob-motor`, feedback of `hob-drive` on the `motor-turn` joint). Belt wind-up and pulley error are now inside the gearbox loop's measurement, not
   hidden behind it. **Cartridge acceptance requirement:** a belt-drive cartridge rated for the belt's pull, 450 N on the pulley (pretension 225 N per strand, slack side kept at a quarter of the 300 N peak force, assumed rule), on the assumed rear stub (the internal bearing location is unpublished); ask for at least 700 N radial; a motor spindle (same seat, same encoder interface) is the upgrade path. Pulley and belt rows are the library's generic `TimingPulley`/`TimingBelt`
   (no vendor catalogue rows yet): pulleys, belt and encoder are to be replaced by catalogue parts when the cartridge maker names them.
-- **Y:** two rails + SFU1605 screw with the standard bracket and a nut block (R0). Bought KK modules rejected: the
+- **Y:** library ScrewLinearModule with ground profiled base/carriage, derived risers, centred SFU1605 and integrated scale/guards; the R0 brackets and nut/scale seat bars are deleted. Bought KK modules rejected: the
   shortest KK86 is 440 mm long (210 stroke for a 30 mm need) on a 230 mm head, +5.7 kg on the eRob, stiffness
   unpublished; KK60 cannot take the 400 W servo.
 - **X carriage:** bought ground 20 mm deck with separate bolted bright-bar ribs and four full-footprint sole pads (XC); X rail height unchanged. Bond is optional and gets no stiffness credit.
 - **Machined parts:** a part exists either as a structural member or as the deliberate adjustment/interface element at a joint (height
   spacer, alignment bar, actuator adapter). Don't merge parts to reduce count; judge by the joints in the precision paths (tool-to-work
-  stiffness, screw alignment, scale alignment). Kept separate on purpose: the scale seat bars and the Z scale arm (alignment and shimming
-  of housing and head), the two Y brackets (the nut seat travels between them), the Y nut seat bar (the nut's height spacer on a 12 mm
-  milled edge), the eRob adapter ring (isolates the actuator's bolt pattern; a Honpine fallback changes only the ring). X and Z have one
-  ground pad bar under both screw supports, so both seats are coplanar by grinding (one interface fewer in the screw-alignment path).
-- **Swivel plate:** ground *steel* plate (15 mm), not aluminium. It sits in the tool-to-work path, carrying the steel Y rails and the spindle seat:
-  aluminium is about a third as stiff, and its thermal expansion against the steel rails bows the plate. The model already used steel
-  for its mass; only the stock row said aluminium, so the A-axis head load does not change.
+  stiffness, screw alignment, scale alignment). Scale bars/head carriers remain deliberate adjustment interfaces.
+  Y now belongs to the library module; its former brackets, nut/scale bars and actuator adapter are deleted.
+  X/Z supports use two short matched ground bars per axis (X15/Z40 mm), indicated to rails
+  and actual screw then pinned. Bar clamps engage inserts; nuts traverse the open channel, without grooves.
+- **Y actuator interface:** the former swivel plate and adapter ring are deleted. A profiled
+  ground steel module base bolts directly to the eRob output and carries the precision path;
+  use steel for stiffness and expansion compatibility with the rails.
 - **Ground stock tolerances** are those of the stock as bought (thickness about +-0.03 to 0.1 mm, flatness 0.05 to 0.1 mm per 100 mm;
   assumed typical values, each row names its source: DIN 59350-type flat steel, Blanchard-ground steel plate, MIC-6 type tooling plate). A
   functional face tighter than that is *ground after cutting* and listed so on the part's route.
@@ -91,16 +91,19 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
 
 ## Open
 
-- **Casting freeze gate (2026-11-07).** Do not release the bed or column to a mould maker until these have landed and the casting
-  package (`supplier-packages/casting/`) has been regenerated and passes: step XA (motor bay replacing the tray rear service
-  bridge and its two seat pockets, replicated drive seats in place of the X and Z pads, guard feet on inserts), the column sole
-  redesign in XC, the moved motor-end tray clamp seats, and [ALIGNMENT.md](ALIGNMENT.md) (replication allowances on every precision
-  insert: rail seats, drive seats, table seat, column sole). Each changes insert positions, pockets or allowances.
-- **Y screw centred between the rails in a 30 mm swivel plate (head redesign item 1): NOT DONE, numbers in the Log (2026-11-04).** It needs a small-screw drive family (SFU1204 or compact nut with BK10/BF10 supports and a 40-60 frame motor mount) that the library does not have; the SFU1605/BK12/M60D drive cannot be centred in a 30 mm plate (the motor mount stands 22 mm into the plate from the rail plane and its body meets the Y saddle) and
-  its supports cannot sit "outside the saddle's travel" on a plate shorter than the saddle (plate 230, saddle -130..222 mm, so about 400 mm). Decision needed: new drive family rows (maker data to source) or a different Y drive.
+- **Casting freeze gate (updated2026-11-08).** Casting-package refresh remains OPEN;
+  do not release bed/column moulds from the machined RFQ pass. Include the XA motor bay,
+  straight tray ledge, removed bridge pockets/clamps, joint-derived insert guard threads,
+  four short ground drive bars and full-footprint column sole pads. ALIGNMENT.md reserves
+  replication for large casting surfaces that need it; X/Z supports and small X block
+  lands use inspected ground stock. Large casting allowances/process still need qualification.
+- **Y screw centring: resolved in the installed module.** Derived rail risers and a ground
+  base place the existing SFU1605/M60D-BK12/BF12 between the guides; no new small-screw
+  family or30 mm swivel plate is needed. Y numerical stiffness/accuracy and PU seal/release
+  qualification remain OPEN in Phase Y and LINEAR_MODULE_PLAN.
 - Spindle drive: belt strength (HTD5M 15 mm tight-side 375 N at the motor's peak torque) and the pulley/encoder parts are not checked against a maker's data; the first-mode estimate (`HobberFrameChecks.spindleDrive`) is analytic with stated joint assumptions, to be confirmed by an FE model of the cradle on the seat and an impact test.
 
-- eRob output bearing moment rating and brake holding torque (asked from ZeroErr): P3 corrects the pose datum: LM5 follow-up demand is 51.01 N m tilting at the output face and 27.29 N m about A, against an assumed 87 N m brake. The bearing rating remains unknown.
+- eRob output bearing moment rating and brake holding torque (asked from ZeroErr): P3 corrects the pose datum: LM5 follow-up demand is 51.0 N m tilting at the output face and27.24 N m about A, against an assumed 87 N m brake. The bearing rating remains unknown.
 - Servo voltage class: the ELM2H is a 220 V motor, the rack is 400 V; the model uses an assumed winding (R4).
 - **Z screw offset (decided by the lead 2026-11-04, derived):** the eRob housing stands behind the Z saddle at y 0 where the Z screw used to be; the screw keeps off it by the derived least |y| (`HobberZOffset`, y +81 on the side of the Z moving mass's centre of mass, set by the BF12 support's 2 mm gap to the housing; the casting cover allows at most 82.5). The yaw moment on the Z blocks is checked in `HobberFrameChecks.zOffsetMoments`. Open: the Z scale moved to the -y channel wall; a centred screw would need the housing moved.
 - **Guard and service qualification:** P4 fixed shields and P5 rearward X / complete Z-module removals replace the earlier bellows and blocked-service open item; historical numbers remain in the Log. Qualify the four oil-compatible D10 / 2 mm-panel NBR plugs, the sheet shop's bend allowance, the long AF4 service key and the hoist/sling and temporary Z-reader support arrangements. These procurement/shop inputs remain assumed, not vendor-rated model fixtures.
@@ -190,44 +193,29 @@ Status: **complete** — P1–P5 accepted on branch `hobber-round-r5`; supplier 
 
 ## Phase Y: Y as a linear module (started 2026-11-07)
 
-Status: **LM0/XC complete; XA partial; library module289 checks pass; LM4 upper/lower guard service, six wiper probes,32 carried-hardware envelopes and fastener fit0 pass, with0 Y made-edge findings; enclosure48/128 passes. Hobber3357 and the full requested sweep pass (0 errors in2199 s;18 root removal reports clear). LM5 drive sizing passes at Z65.30 kg, Y stiffness/accuracy remains unqualified; ZB screw ingress, XA replicated seats/A6 and29 other made-edge findings remain open. LM6 tooling and routed RFQ generation are implemented; the regenerated package passes46 designs/50 instances/90.22 kg** on `linear-module`.
-Keep the ground20 mm X deck, bolted bright-bar ribs and four corner sole pads.
-One bolts-only FE result:43.633 N/um /17.077 MN m/rad. Passing frame sweep0 errors,
-13 removals; trimmed hobber2453 PASS. XA then LM1-LM5,ZB,LM6 run lean (about90 min
-per step, model gates, no FE unless a stiffness path changes). XA's motor bay, tray paths,
-21 alignment declarations and six service-tool corridors pass; hobber2633, hobbing1186,
-joint-fasteners,assembly-integrity and enclosure48 states/66 pairs/30 lid samples pass.
-The replicated X/Z drive seats, guard-foot relocation,29 made-part edge findings and A6/Z/wiper release remain open;
-the XA commit records this checked subset. The library module now passes289 checks across
-20/80/200 mm strokes with sealed scales, split short guards and long-stroke bellows;
-modeled guard masses1.273/8.775/8.018 kg are assumptions, and end sealing/PU retention
-still require qualification. Short-module cable routing now stays below the roof, and its split guards withdraw
-longitudinally with declared head/motor prerequisites. The host-carriage interface is
-provided by the containing machine. The hobber now uses the actual Y module and its direct actuator/base interface.
-The host shields seal to the carriage back and now split across the guides. Park X
-retracted, Z high and Y/A centred: the upper half moves135 mm up; with the workholding
-mandrel cleared, the lower half moves202 mm down; each then moves108 mm forward.
-Both precision supports and the X skirt remain installed. Both guards come off before
-stop unbolting; the scale head needs the front-left stop off. Six full wiper-footprint
-probes,32 conservative carried head/nut sweeps and the focused guard paths pass.
-The lower attachment is two M5 at45 mm pitch on the existing base's full-thickness
-central land; all Y made-hole edge checks pass. The previous3 deck/7 service findings
-are closed in the model: hobber3357 and full sweep0 errors in2199 s;18 root removal reports clear. Valid Y stiffness/accuracy and
-shop stock/seal qualifications remain release gates.
-LM6 declares27 tooling rows separately from machine parts,89 checked sequence references,
-and regenerates46 routed machined RFQ parts (90.22 kg). Prices and custom bellows data
-remain ASSUMED; the supplier package is not a machine-release claim.
+Status: **Implementation scope closed at the user's timeboxed wrap-up (2026-11-08): LM0/XC complete; XA motor bay and four short matched ground support bars implemented, drive replication removed; module frozen at hobber Y and its already-tested examples. Hobber3361,hobbing1185,core suites and enclosure48/128 pass. Final extended sweep has one0.8 mm eRob-housing/Z-floating-bar gap against2 mm required; full service phase was not reached. LM5/LM6 comparison and this open correction are in MACHINE_DESIGN and LINEAR_MODULE_PLAN. Remaining LM4 Y stiffness/accuracy, PU release/retention/seals, A6 alignment/pins,21 made-edge findings, ZB offset-screw ingress and complete Z/wiper service remain OPEN. The RFQ package passes48 designs/52 instances/80.74 kg;21 tooling rows have checked sequence references. This is model/RFQ close-out, not machine release.**
+The ground20 mm X deck, four bolted bright-bar ribs and four full-footprint sole
+pads replace the one-piece carriage without changing X rail height. One existing
+carriage FE case governs stiffness; no bond credit. Inspect/select ground stock
+or supplier-finish failing small faces; no X block-pad epoxy remains.
 
-Y becomes an instance of the MachineKit screw linear module, planned in
-[LINEAR_MODULE_PLAN.md](../../LINEAR_MODULE_PLAN.md) (LM0-LM6): the swivel plate is the module's host, with two ground
-riser bars under the rails and a floor that takes the HZMotion M60D-BK12 and the BF12 centred between the rails; the Y saddle is
-the carriage; the JFT-40 ML 70 seat, head bracket, travel window, cable and air are module features. This unblocks the
-"Y screw centred" item without a new small-screw drive family. Z is not converted: its rails stay on the column's cast
-inserts (the eRob fixes the screw at y -82), and it gets a bellows cover only.
-The same round applies the plan's structure rule (castings for mass, ground flat stock for precision, derived heights,
-location by part type) to the X carriage: a bought ground 20 mm plate with bolted and dowelled bright-bar ribs (bond optional, no stiffness credit)
-replaces the one-piece milled `GE-X-carriage`, with no change to the bed or the X rail height (step XC). This
-supersedes the Open item "Thicker X carriage deck: needs the X rails lower".
+The actual Y module has a profiled ground base directly on the eRob output,
+derived rail risers, centred HZMotion/BF screw, carriage and integrated JFT-40.
+The old L brackets, nut/scale bars, swivel plate and actuator adapter are deleted.
+Keep the tested HG15 strokes20/80 and HG25 stroke200; do not add host modes or
+long-stroke mounts. Short cable routing stays below the roof; split host guards
+withdraw135 mm up/202 down then108 forward with their declared prerequisites.
+Six full wiper probes and32 carried-hardware sweeps are retained; rigid clearance
+does not qualify PU strain/peeling, retention or end/port seals.
+
+X/Z each have two short matched ground support bars, X15/Z40 mm, with nuts
+traversing the open channel. Supports are indicated using rails and actual screw/nut
+then match-pinned. Guard feet attach to inserts beside the bars. No drive epoxy,
+spacer layer, alignment arbor, height reference or special reaming kit remains.
+A6, the remaining LM4 and ZB qualifications listed above are deferred at the
+user's wrap-up direction. Final before/after figures and gate results are recorded
+in MACHINE_DESIGN and the plan's one-line LM5/LM6 Log entries. RFQ/tooling prices
+and the custom thin bellows envelope remain ASSUMED until quoted/qualified.
 
 ## Suppliers (outside the model)
 
@@ -311,3 +299,5 @@ main at the end of each phase.
 - 2026-11-06: **Z saddle modes in the routine report (`HobberFrameChecks.zSaddleModes`, `zsaddle` argument, also in the main run).** FE (13 mm plate, head as a rigid 36.7 kg mass on the eRob seat, so upper bounds; eRob bearing and housing compliance not modelled): 121-125 Hz (head tilting about y on the plate), 154-161, 360-384 Hz. Tooth-pass (12 gashes, Ø32) reaches them at 605 / 772 / 1799 rpm = 61 / 78 / 181 m/min; the +-20 % windows 49-73 and 62-93 m/min lie below the used 100-300 m/min, **the third (145-217 m/min) lies inside it**. The first mode is below the 159 Hz lower edge of the avoid band as asked; the third is the one in the band at the speeds used. Proposal (not implemented): keep the finish passes out of 145-217 m/min until the first article's impact test gives the true (lower) frequencies; stiffen the plate where the seat tilts, e.g. ribs along the block rows on the swivel side or a steel stiffener under the eRob pocket, then re-run `fem/saddle_fem.py`; a thicker plate needs the swivel seat or the block planes moved (decision).
 - 2026-11-06: **Yuheng STEPs received; `SealedScalePart` rebuilt from them and the three scales re-placed (branch yuheng-step).** `YuhengScaleCad` pins the three files (`MATERIA_YUHENG_ROOT`, `machinekit/scripts/prepare-yuheng-cad`); `SealedScaleStepTests` (in `haxeon.sealed-scale.json`, skipped with a message when a file is absent) measures each by solids and cylinders. What the model had wrong (datasheet drawing misread): the drawing's "13.5" is the fixing-hole height above the bottom face, not the housing height; the housing is **18 thick x 32.2 across**, its two Ø9.6 holes (11.5 from each end, 13.5 above the bottom face) **run through the 18 mm thickness, not through the 13.5 mm**, so the housing is bolted by its **side** and the reading head, 97.5 long (115.3 is body plus strain relief), stands **beside** it, level, 1 mm past the reading face, not stacked above it; the Ø15 counterbores are **5.75 deep from each face** (STEP 6.0 from the end caps, which stand 0.25 proud), not 9.5 from one (assumed), so the M8 head (8 mm) does not fit: the derived screw is the **DIN 7984 low-head M8** (`SocketHeadCapScrew.lowHead`, `BoltedFace.lowHeaded`; code-only part until the catalogue has the series); the head's two holes are **M4 slots Ø4.6 x 2.4, 56 apart** (not M5 tapped at 97.5 pitch), Ø7.6 counterbores 5 deep each face, **through the head's thickness**, so its screws enter from the seat side and thread into the carrier (the head's face is clamped, the carrier tapped to suit); the head has no tapped holes (the 8 mm thread depth is gone). Also from the STEP: 13 mm square strain relief 17.5 mm beyond the body, Ø6 cable stub 37 mm past it (the cable sheet says Ø6.7), cable leaving along the travel toward the housing's **start** end, M5 air ports in both end faces 7 mm below the reading face (plugged in the STEP), the reading finger a 25 mm nub in an 8 x 3.2 groove (taken as the reading datum; the head's frame origin), the three files agree on everything but the length. Overall length ML + 138 matched on all three. Hobber consequences: housings on a **32 x 15 ground bar** (X on the bed beam, Z on the column wall; 15 because the 12.25 mm grip needs the 25 mm screw and 12.75 mm of thread) or the swivel plate (Y, with a **3 mm relief milled in its front face** for the head's path and the hole line moved 10 mm off the A axis so the housing and head clear the heads of the ring's M6); head carriers: X rib 17 deep over the head (it now stands on the bed side of the bar, y 147..160, with the hole line at y 180 so the housing clears the guide blocks by the 2 mm running gap), Y boss, Z arm 12 thick reaching x 239 (the bar's 32 mm leaves the head deeper in the channel). The head screws are driven from the seat side, so each head is fitted with its carrier off the machine (new `fittedBefore` rules: Y head after the outboard support's screws, Z blocks after the arm); the Z head cannot be unbolted from its arm with the saddle on the rails (the procedure now unbolts the arm). Cable and air envelopes are drawn (`airPort` "end" on all three; the cable stub on all three, the R75 bend on Y only). **Open: the X and Z cables have no free direction for their 75 mm bend.** Z leaves downward toward the carriage deck, 32 mm below the stub's end at joint zero (the bend would meet the deck); X leaves toward the swivel stack, and the bend meets the guide rails and blocks one way and (at A +15 deg, strict sweep) the swivel plate the other. Needs a decision (a cable guide, the scale read the other way with the housing's 121.5 mm tail on the other side, a static cable radius from Yuheng). The X housing and bar overhang the bed beam's flat strip (y 165..195, 30 wide) by 2.5 and 3.7 mm on the inboard side (the bar's reading-side edge stops 1.2 mm inside the housing's, so the sweep's 2 mm gap to the moving head holds). Abbe offsets (now from the measuring line, the groove floor under the reading face, to the hob centre; before from the housing's centre line): X y 164.5 + z 129 = **209.0** (was 220.1), Y x 76 + z 5.5 = **76.2** (was 71.5), Z x 215.5 + y 96 = **235.9** (was 220.3); uncompensated Abbe error 5.1 / 1.8 / 5.7 um at 5" (was 5.3 / 1.7 / 5.3). Head carriers keep the running gap to the housing beside them: the X rib stops 2.2 mm short of the housing's reading face, the Y boss likewise, the Z arm bridges over the housing and steps down to the carrier plane only at the head (a 14.2 mm pad); the Y relief runs out 11 mm past the housing's ends to the plate's edges (the head body overhangs the measuring window). Checks on branch yuheng-step (commit 1600a2b84): `haxeon.sealed-scale.json` (now with the three STEP comparisons), `tests/hobber/haxeon.json` 2333 assertions (unchanged), frames `scales fasteners integrity sweep` strict integrity **0 findings** (sweep 2158 s; 68 joints / 246 screws as before), `haxeon.accuracy.json` passes, `haxeon.joint-fasteners.json`, `haxeon.bom-key.json` and `haxeon.procurement.json` exit 0, machined package 34 parts 76.94 kg all checks pass. `haxeon.naming.json` already fails on main (vacuum-table, brake-resistor, linear-mount-cleat, unrelated; the sealed scale is not in its list).
 
+
+- 2026-11-08 LM6 wrap-up: four short ground X/Z support bars replace continuous pads/drive replication; machined RFQ48/52/80.741 kg PASS, tooling21/85 refs/EUR1436 ASSUMED. Five required gates PASS (hobber3361,hobbing1185,joint-fasteners,assembly-integrity,enclosure48/128). Extended sweep1 gap finding/2863 s (Z floating bar/eRob0.8 versus2 mm); service phase not reached. This correction/rerun and remaining LM4/ZB/A6/stock/supplier/casting qualifications are OPEN; implementation scope closed at user direction.

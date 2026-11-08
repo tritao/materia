@@ -783,6 +783,16 @@ margin48.5 mm, saddle/drive gap10.0 mm and coupling/bar gap12.5 mm, including
 travel and overtravel. Casting backing remains125 mm. These are geometry gates,
 not brake, thermal or structural qualification.
 
+Final wrap-up gates pass: hobber3361,hobbing1185,module289,joint-fasteners,
+core assembly-integrity,way-cover,enclosure48 states/128 near pairs and Z-drive42.
+The extended whole-machine sweep is **not a pass**: it finished with one running-gap
+finding in2863 s. `swivel/housing` and `ZdriveFloatingBar` have0.8 mm clearance
+against2 mm required at X45.215,Y-10,Z-10,A-15deg. Its full service-report phase
+was not reached. Correct the BF-bar clearance while preserving foot support and
+made-hole edges, then rerun sweep/service. This remains OPEN at the user's timeboxed
+close-out, alongside the remaining LM4/ZB qualifications; no final machine release
+or complete travel-clearance qualification is claimed.
+
 Scale head normal/gap stacks0.24/0.22 mm fit+/-0.5/0.55 mm adjustment after accepted
 stock. Raw Y stock/block stack0.91 mm exceeds0.01: select/finish faces and inspect.
 X raw flatness0.440 mm exceeds HIWIN S1 allowance0.0748 mm and class-C height
