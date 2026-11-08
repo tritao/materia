@@ -129,7 +129,8 @@ class Memo<V> implements MemoTable {
    * (null identity) or no CadKit build sits beside the program.
    */
   public function persist(identity:Null<String>, encode:V -> Bytes, decode:Bytes -> V):Memo<V> {
-    var native = identity == null || DiskStore.process() == null ? null : Memos.nativeIdentity();
+    // MATERIA_MEMO_COMPONENTS=off keeps the kernel's operation cache but not these code-identity memos (to measure what they add).
+    var native = identity == null || DiskStore.process() == null || Sys.getEnv("MATERIA_MEMO_COMPONENTS") == "off" ? null : Memos.nativeIdentity();
     disk = identity == null || native == null ? null : new MemoDisk<V>(null, identity + "|" + native, encode, decode);
     return this;
   }
