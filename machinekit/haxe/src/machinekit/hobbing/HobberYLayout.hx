@@ -139,12 +139,14 @@ class HobberYLayout {
   static final reliefCache=new machinekit.cache.Once<cadkit.modeling.Part>();
   public static function sweptDeckRelief():cadkit.modeling.Part {
     var raw=reliefCache.get(()->{
+      var drop=HobberZLayout.TRAVEL_MAX-HobberZLayout.TRAVEL_MIN+2*HobberScales.overtravel();
       var gap=machinekit.motion.ScrewLinearModuleSpec.GAP,skirt=new HobberChipCover(new machinekit.component.ComponentValues().setToken("role","Xskirt")).geometry();
       var b=machinekit.assembly.PosedParts.boxOf(skirt);skirt.close();
-      // Conservative envelope of the existing skirt, including the folds.
-      var skirtBox=cadkit.modeling.Part.box(b.maxX-b.minX+2*gap,b.maxY-b.minY+2*gap,b.maxZ-b.minZ+2*gap);
-      var skirtKeep=skirtBox.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ-gap));skirtBox.close();
-      var deck=machinekit.component.Solids.union([HobberSaddle.xDeckKeepout(gap),skirtKeep]);
+      // Sweep the stationary deck/skirt through the complete relative Z
+      // passage. A single low-Z slab misses material near its lower face.
+      var skirtBox=cadkit.modeling.Part.box(b.maxX-b.minX+2*gap,b.maxY-b.minY+2*gap,b.maxZ-b.minZ+2*gap+drop);
+      var skirtKeep=skirtBox.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ-gap-drop));skirtBox.close();
+      var deck=machinekit.component.Solids.union([HobberSaddle.xDeckKeepout(gap,drop),skirtKeep]);
       var low=HobberZLayout.SEAT_Z+HobberZLayout.TRAVEL_MIN-HobberScales.overtravel();
       var local=machinekit.assembly.PosedParts.moved(deck,materia.assembly.AssemblyFrames.translation(0,0,-low));deck.close();
       var copies:Array<cadkit.modeling.Part>=[];

@@ -17,7 +17,7 @@ class HobberYPart extends MachineComponent {
   public final role:String;
   public final spec:ScrewLinearModuleSpec;
   public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage","coverFront","coverRear","retainerFront","retainerRear","lipFront","lipRear"],"base")];
-  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(13).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->StringTools.startsWith(v.token("role"),"lip")?Buy(null,null,null):Make("ground stock / formed guard, joint drilling")));
+  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(14).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->StringTools.startsWith(v.token("role"),"lip")?Buy(null,null,null):Make("ground stock / formed guard, joint drilling")));
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberYLayout.moduleSpec();
     super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,StringTools.startsWith(role,"lip")?"polyurethane PU":isGuard()?"stainless A2-70":"steel",false,v);

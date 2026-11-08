@@ -234,9 +234,9 @@ class HobberSaddle extends MachineComponent {
    * Replicated block pads occupy relieved plate material, adding no axis height. */
   public static function headFaceX():Float return SEAT_X1;
   /** Expanded deck keepout, retaining the open front window. */
-  public static function xDeckKeepout(gap:Float):Part return Solids.cut(
-    box(60-gap,386+gap,-xCarriageHalfWidth()-gap,xCarriageHalfWidth()+gap,xCarriageBottom()-gap,xCarriageTop()+gap),
-    [box(55+gap,140-gap,-150+gap,150-gap,xCarriageBottom()-gap-1,xCarriageTop()+gap+1)]);
+  public static function xDeckKeepout(gap:Float,drop:Float):Part return Solids.cut(
+    box(60-gap,386+gap,-xCarriageHalfWidth()-gap,xCarriageHalfWidth()+gap,xCarriageBottom()-gap-drop,xCarriageTop()+gap),
+    [box(55+gap,140-gap,-150+gap,150-gap,xCarriageBottom()-gap-drop-1,xCarriageTop()+gap+1)]);
   public static function xGuideOriginZ():Float return FoundationLayout.bedRailSeatTop() + xGuideSpec().railHeight;
   static function xGuideSpec():machinekit.motion.LinearRailProfile.LinearRailProfileSpec {
     var spec=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA");
