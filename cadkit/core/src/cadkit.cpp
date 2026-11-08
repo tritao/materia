@@ -2806,6 +2806,64 @@ extern "C" CADKIT_API cad_result cad_cut(
     return make_boolean_shape<BRepAlgoAPI_Cut>(first, second, out_shape);
 }
 
+extern "C" CADKIT_API cad_result cad_cut_many(
+    cad_shape first,
+    const cad_shape_ref* tools,
+    uint32_t tool_count,
+    cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+    if (tools == nullptr || tool_count == 0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "cut needs at least one tool");
+    }
+    std::vector<naming::NamedShape> inputs(1 + static_cast<std::size_t>(tool_count));
+    const auto base_result = copy_named_shape(first, inputs[0]);
+    if (base_result != CAD_OK) {
+        return base_result;
+    }
+    for (uint32_t index = 0; index < tool_count; ++index) {
+        const auto tool_result = copy_named_shape(tools[index].shape, inputs[1 + index]);
+        if (tool_result != CAD_OK) {
+            return tool_result;
+        }
+    }
+    try {
+        BRepAlgoAPI_Cut operation;
+        NCollection_List<TopoDS_Shape> arguments;
+        arguments.Append(inputs[0].shape);
+        NCollection_List<TopoDS_Shape> tool_list;
+        for (std::size_t index = 1; index < inputs.size(); ++index) tool_list.Append(inputs[index].shape);
+        operation.SetArguments(arguments);
+        operation.SetTools(tool_list);
+        operation.SetNonDestructive(true);
+        operation.SetToFillHistory(true);
+        operation.SetRunParallel(true);
+        operation.Build();
+        if (!operation.IsDone() || operation.HasErrors()) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "OCCT boolean operation failed");
+        }
+        if (!BRepCheck_Analyzer(operation.Shape()).IsValid()) {
+            const auto message = "OCCT boolean produced invalid topology" + boolean_warning_summary(operation);
+            return fail(CAD_ERROR_OPERATION_FAILED, message.c_str());
+        }
+        auto result = operation.Shape();
+        naming::AlgorithmHistory<BRepAlgoAPI_Cut> history(operation);
+        auto names = naming::propagate(inputs, &history, result);
+        return insert_shape(std::move(result), out_shape, std::move(names));
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_common(
     cad_shape first,
     cad_shape second,

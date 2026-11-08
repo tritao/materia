@@ -277,6 +277,16 @@ class Part extends Model {
   /** Subtract borrowed tools, preserving this part and every tool. */
   public function subtractAll(tools:Array<Part>):Part {
     if (tools.length == 0) return new Part(shape.cloneShape());
+    // Several keyed tools go to one native cut (OCCT subtracts overlapping tools itself): no fuse of the tools first.
+    if (tools.length > 1 && shape.key != null && shape.threadAttributes.length == 0) {
+      var cuttable = true;
+      for (tool in tools) if (tool.shape.key == null || tool.shape.threadAttributes.length > 0) cuttable = false;
+      if (cuttable) {
+        var many = new Part(shape.cutMany([for (tool in tools) tool.shape]));
+        if (cadkit.cache.DiskStore.verifying()) checkAgainstFusedTools(many, tools);
+        return many;
+      }
+    }
     var tool = Part.fuseAll(tools);
     try {
       var result = joined(this, tool, Subtract);
@@ -286,6 +296,19 @@ class Part extends Model {
       tool.close();
       throw error;
     }
+  }
+
+  /** Verify mode: the one-cut result must be the solid that fusing the tools first gives (same volume, solids and faces). */
+  function checkAgainstFusedTools(many:Part, tools:Array<Part>):Void {
+    var fused = Part.fuseAll(tools);
+    var reference = joined(this, fused, Subtract);
+    fused.close();
+    var a = many.volume(), b = reference.volume();
+    var solids = many.shape.subshapeCount(CadKit.ShapeKind.Solid), referenceSolids = reference.shape.subshapeCount(CadKit.ShapeKind.Solid);
+    var faces = many.shape.subshapeCount(CadKit.ShapeKind.Face), referenceFaces = reference.shape.subshapeCount(CadKit.ShapeKind.Face);
+    reference.close();
+    if (Math.abs(a - b) > 1e-6 * Math.max(1.0, Math.abs(b)) || solids != referenceSolids || faces != referenceFaces)
+      throw 'multi-tool cut differs from cutting the fused tools: volume $a vs $b, solids $solids vs $referenceSolids, faces $faces vs $referenceFaces';
   }
 
   public function intersect(other:Part):Part {

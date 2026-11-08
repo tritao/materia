@@ -58,6 +58,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_common_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_compound(shapes: ptr<const<cad_shape_ref>> @in_array("shape_count"), shape_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_cut(first: cad_shape, second: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_cut_many(first: cad_shape, tools: ptr<const<cad_shape_ref>> @in_array("tool_count"), tool_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_cut_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_cylinder(radius: f64, height: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_edge_axis(edge: cad_shape, out_axis: ptr<cad_axis> @out) -> cad_result;

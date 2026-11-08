@@ -30,6 +30,15 @@ class ShapeKeySmoke {
     passed++;
   }
 
+  /** A stored entry: its payload's length, then the payload (a bare payload would read as damaged, a miss). */
+  static function entry(payload:Bytes):Bytes {
+    var framed = Bytes.alloc(8 + payload.length);
+    framed.setInt32(0, 0x4D454D31);
+    framed.setInt32(4, payload.length);
+    framed.blit(8, payload, 0, payload.length);
+    return framed;
+  }
+
   static function hex(b:Bytes):String {
     var out = new StringBuf();
     for (i in 0...b.length) out.add(StringTools.hex(b.get(i), 2));
@@ -325,7 +334,7 @@ class ShapeKeySmoke {
     );
     var files = [for (name in FileSystem.readDirectory(store.directory)) if (StringTools.endsWith(name, ".memo")) name];
     var planted = Shape.box(7, 7, 7).toBytes();
-    for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, planted);
+    for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, entry(planted));
     var message = "";
     try shank().cut(cutter(-10)) catch (error:Dynamic) message = Std.string(error);
     DiskStore.forceVerify(null);
@@ -364,7 +373,7 @@ class ShapeKeySmoke {
     var victim = block(10);
     OpCache.resetStats();
     // Overwrite every entry with a wrong shape: the next build reads it back.
-    for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, planted);
+    for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, entry(planted));
     var fooled = block(10);
     check(
       OpCache.snapshot().hits >= 1 && hex(fooled.toBytes()) != hex(bytes),
@@ -596,7 +605,7 @@ class ShapeKeySmoke {
       var files = [for (name in FileSystem.readDirectory(store.directory)) if (StringTools.endsWith(name,
         ".memo")) name];
       var planted = Shape.box(7, 7, 7).toBytes();
-      for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, planted);
+      for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, entry(planted));
       var message = "";
       try loftKeptBytes(0.1) catch (error:Dynamic) message = Std.string(error);
       check(message.indexOf("stale") >= 0, "verify mode refuses a planted wrong loft entry: " + message);
@@ -876,6 +885,36 @@ class ShapeKeySmoke {
     DiskStore.useProcess(null);
   }
 
+  /** Several tools in one native cut: the same solid as fusing the tools first, kept in the cache. */
+  static function cutMany():Void {
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    function tools():Array<Part> return [
+      Part.cylinderSpan(3, -1, 21, -8, 0),
+      Part.cylinderSpan(3, -1, 21, -5, 0),
+      Part.cylinderSpan(2, -1, 21, 10, 10),
+      Part.box(6, 6, 6).translated(new cadkit.modeling.Vector(0, -12, 0))
+    ];
+    var base = Part.box(40, 40, 20);
+    var many = tools();
+    var fused = Part.fuseAll(many);
+    var reference = base.combineKept(fused, Subtract);
+    var kept = base.subtractAll(many);
+    check(kept.shape.key != null, "a keyed multi-tool cut is keyed");
+    check(Math.abs(kept.volume() - reference.volume()) < 1e-6 * reference.volume(), "same volume as fusing the tools first: " + kept.volume() + " vs " + reference.volume());
+    check(kept.shape.subshapeCount(CadKit.ShapeKind.Face) == reference.shape.subshapeCount(CadKit.ShapeKind.Face), "same face count");
+    check(kept.shape.subshapeCount(CadKit.ShapeKind.Solid) == 1, "one solid");
+    var before = OpCache.snapshot();
+    var again = base.subtractAll(tools());
+    var after = OpCache.snapshot();
+    check(hex(again.shape.toBytes()) == hex(kept.shape.toBytes()), "a second cut gives the same bytes");
+    check(after.hits == before.hits + 1 && after.misses == before.misses, "and is a cache hit: " + after.hits + "/" + after.misses);
+    var order = tools();
+    order.reverse();
+    check(base.subtractAll(order).shape.key != kept.shape.key, "the tool order is part of the key");
+  }
+
   public static function main():Void run();
 
   public static function run():Void {
@@ -890,6 +929,7 @@ class ShapeKeySmoke {
     queries();
     canonicalKeys();
     tessellation();
+    cutMany();
     Sys.println("shape key smoke: " + passed + " checks passed");
   }
 }

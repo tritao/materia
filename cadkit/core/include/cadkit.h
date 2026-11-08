@@ -470,6 +470,11 @@ CADKIT_API cad_result cad_cut(
     cad_shape first,
     cad_shape second,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* `first` minus every tool in one operation; the tools may overlap each other. */
+CADKIT_API cad_result cad_cut_many(
+    cad_shape first,
+    const cad_shape_ref* tools CADKIT_HXI_IN_ARRAY(tool_count), uint32_t tool_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
 CADKIT_API cad_result cad_common(
     cad_shape first,

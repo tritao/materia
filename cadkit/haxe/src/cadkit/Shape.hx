@@ -631,6 +631,23 @@ class Shape {
     return new Shape(CadKit.cutChecked(native.borrow(), other.native.borrow()));
   }
 
+  /**
+   * This shape minus every tool in one native operation (the tools may overlap), instead of fusing the tools first. Kept on disk
+   * under the construction keys of all the shapes when they have them (`OpCache`); the result is then the canonical form. The
+   * caller checks that no shape carries thread attributes.
+   */
+  public function cutMany(tools:Array<Shape>):Shape {
+    return cadkit.cache.OpCache.construct("cut-many", "", [this].concat(tools), () -> {
+      var refs:Array<CadKit.ShapeRef> = [];
+      for (tool in tools) {
+        var ref = new CadKit.ShapeRef();
+        ref.set_shape(tool.borrowHandle());
+        refs.push(ref);
+      }
+      return new Shape(CadKit.cutManyChecked(native.borrow(), refs));
+    });
+  }
+
   public function cutOperation(other:Shape):Operation {
     // History-keeping booleans are keyed under their own name: their result is the built form, not the canonical one a cached
     // `cut` gives, and a key must name one form only.
