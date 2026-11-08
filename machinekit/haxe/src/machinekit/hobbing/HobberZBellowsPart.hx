@@ -24,7 +24,7 @@ class HobberZBellowsPart extends WayCoverSection {
   });
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType(
     "machinekit.hobbing.z-bellows",parameters(),v->new HobberZBellowsPart(v),true,false,null,false)
-    .versioned(2).numbered(v->{
+    .versioned(3).numbered(v->{
       var base=WayCoverSection.purchaseNumber(WayCoverCatalog.get(v.token("row")),v.number("width"),v.number("height"),v.number("stroke"),v.number("space"),
         {open:true,hostMin:v.number("hostMin"),hostMax:v.number("hostMax"),hostHalfWidth:v.number("hostHalfWidth"),reversed:true});
       return v.token("role")=="Fixed"?base:v.token("role")=="Moving"?base+"-M":base+"-S"+v.integer("level");
@@ -52,6 +52,14 @@ class HobberZBellowsPart extends WayCoverSection {
     var screw=machinekit.standard.SocketHeadCapScrew.catalog().get(plan.row.screw);
     var half=plan.fullPlateHalf()-ScrewLinearModuleSpec.GAP,low=plan.row.flangeThickness+0.2,edge=1.5*screw.diameter;
     return [for(x in [-half+plan.row.lip/2,half-plan.row.lip/2])for(y in [low+edge,plan.shape.hostMax-edge]){x:x,y:y}];
+  }
+  override public function fasteningFaces():Array<BoltedFace> {
+    if(role==Sleeve)return [];
+    // These custom end plates are 3 mm steel, not cloth: the socket head
+    // bears directly on steel. A plain washer would foul the attached skin.
+    return [BoltedFace.clamped(role==Fixed?"fixed":"moving",
+      BoltedFace.frameOf({x:0.0,y:0.0,z:0.0},{x:0.0,y:0.0,z:1.0},{x:1.0,y:0.0,z:0.0}),
+      holes(),plan.row.clearance,plan.row.flangeThickness,plan.row.screw,null,false,false)];
   }
   override public function geometry(detail:ComponentDetail=Preview):Part {
     var body=super.geometry(detail);if(role==Sleeve)return body;
