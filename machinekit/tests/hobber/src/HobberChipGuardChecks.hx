@@ -24,7 +24,7 @@ class HobberChipGuardChecks {
       }
       for(p in shields)p.close();
     }
-    var zguards=[for(m in members)if(HobberChipCover.zMembers().indexOf(m.id)>=0) cache.posed(m.component,F.compose(back,state.worldPose(m.id)))];
+    var zguards=[for(m in members)if([for(c in machine.zBellows)for(id in c.members())id].indexOf(m.id)>=0) cache.posed(m.component,F.compose(back,state.worldPose(m.id)))];
     for(y in [-155.0,-145.0,-135.0,73.0,81.0,89.0,135.0,145.0,155.0])for(k in 0...22) {
       // Z guards travel with X: translate the ray by the same X displacement.
       var ray=Part.cylinderAlong(0.1,new Vector(120+115,y,320+k*20),Vector.X(),26), hit=false;

@@ -124,7 +124,27 @@ class JointFastenerTests {
 
   public static function main():Void run();
 
+  static function repeatedMachiningBom():Void {
+    function mount(name:String,x:Float,dx:Float=0,thread:String="M3"):machinekit.cover.WayCoverMount {
+      var part=new machinekit.cover.WayCoverMount("REPEATED-MOUNT-TEST",50,50,14);
+      part.machine([{name:name,frame:AssemblyFrames.fromRotationMatrix(dx,25,0,[1.0,0,0,0,-1,0,0,0,-1]),
+        x:x,y:7.0+dx*1e-15,diameter:2.5,from:-1.0,to:8.0,kind:"tapped",thread:thread}]);
+      return part;
+    }
+    var a=mount("first-instance",12),b=mount("second-instance",2,10),bom=new machinekit.component.Bom();
+    var first=a.geometry(),second=b.geometry(),stock=new machinekit.cover.WayCoverMount("REPEATED-MOUNT-TEST",50,50,14).geometry(),common=first.intersect(second);
+    check(Math.abs(stock.volume()-first.volume()-Math.PI*1.25*1.25*8)<0.01,"identity fixture drills a real blind bore in steel");
+    check(Math.abs(first.volume()-common.volume())<1e-6 && Math.abs(second.volume()-common.volume())<1e-6,"different joint frames produce the same finished solid");
+    common.close();stock.close();first.close();second.close();
+    check(a.bom.fingerprint==b.bom.fingerprint,"same physical machining survives joint naming, frame choice and rigid-transform roundoff");
+    check(a.geometryKey()!=b.geometryKey(),"geometry cache preserves instance face labels");
+    bom.addComponent(a);bom.addComponent(b);
+    check(bom.lines().length==1 && bom.lines()[0].quantity==2,"repeated machined brackets aggregate in the BOM");
+    check(a.bom.fingerprint!=mount("first-instance",13).bom.fingerprint,"moved hole changes manufacturing revision");
+    check(a.bom.fingerprint!=mount("first-instance",12,0,"M4").bom.fingerprint,"thread callout changes manufacturing revision");
+  }
   public static function run():Void {
+    repeatedMachiningBom();
     sound();
     selection();
     machining();

@@ -448,6 +448,7 @@ class HobberPartTests {
       physical.dampingLossFactor == 0.02 && physical.thermalConductivityWPerMK == 2,
       "damping and conductivity explicit"
     );
+    zBellows();
     Sys.println('HobberPartTests: $assertions assertions passed');
   }
   static function geometry():Void {
@@ -496,7 +497,28 @@ class HobberPartTests {
     }
     Sys.println('Hobber geometry: $assertions assertions passed');
   }
+  static function zBellows():Void {
+    var p=HobberZBellowsLayout.plan();
+    check(p.stroke>=210 && p.compressed<=p.space,"Z bellows spans travel and overtravel");
+    for(role in [machinekit.cover.WayCoverSection.WayCoverRole.Fixed,machinekit.cover.WayCoverSection.WayCoverRole.Moving]) {
+      var original=new machinekit.cover.WayCoverSection(p.row,role,role==machinekit.cover.WayCoverSection.WayCoverRole.Fixed?p.fixedLevel():p.movingLevel(),p.width,p.height,p.stroke,p.space,p.shape);
+      var made=new HobberZBellowsPart(original.values()),shape=made.geometry();
+      var b=machinekit.assembly.PosedParts.boxOf(shape);
+      check(shape.solidCount()==1,"Z bellows end remains connected after flange trimming");
+      check(b.maxY<=p.shape.hostMax+1e-6,"Z bellows flange stays behind Z saddle");
+      check(made.holes().length>=4,"Z bellows retains both rows of side fastenings");
+      var rebuilt=MachineKitComponents.standard().byId(HobberZBellowsPart.recipeType().id).create(made.values());
+      check(rebuilt.materialSpec()==made.materialSpec(),"Z bellows steel flange survives recipe roundtrip");
+      shape.close();
+    }
+    for(mount in [HobberZBellowsLayout.movingMount(),HobberZBellowsLayout.fixedUpperMount()]) {
+      var shape=mount.geometry();check(shape.solidCount()==1,"Z bellows bracket is one connected made part: "+mount.designation+" solids="+shape.solidCount());shape.close();
+    }
+    Sys.println('Hobber Z bellows: $assertions assertions passed');
+  }
   public static function main():Void {
+    if(Sys.args().length>0 && Sys.args()[0]=="z-bellows"){zBellows();return;}
+
     if (Sys.args().length > 0 && Sys.args()[0] == "hob-mesh") {
       HobMeshTests.run();
       return;

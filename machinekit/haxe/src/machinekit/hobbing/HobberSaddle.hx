@@ -323,7 +323,7 @@ class HobberSaddle extends MachineComponent {
         // Two derived M8 per ground corner pad, spread over the whole column base.
         for (pad in FoundationLayout.columnSolePads()) faces.push(columnSoleFace(pad));
         faces.push(nutBlockFace(HobberDrives.x(), X_CARRIAGE_THICKNESS, [0.0, 0, 0]));
-        faces = faces.concat(HobberChipCover.carriageReceivers());
+        faces = faces.concat(HobberChipCover.carriageReceivers()).concat(HobberZBellowsLayout.deckReceivers());
         // The X scale head's two M4 enter from the seat side (below, before the carriage is set on the rails) and thread into the rib's underside.
         for (role in HobberCarriageRib.ROLES) {
           var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
@@ -332,8 +332,9 @@ class HobberSaddle extends MachineComponent {
             246, b.high - b.low, 15, 20, BoltedFace.ThreadMaterial.Steel, rib.boltSize()));
         }
       case "GE-Z-saddle":
+        faces=faces.concat(HobberZBellowsLayout.saddleReceivers());
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
-        for (side in [-1, 1]) for (row in [0.0, 110.0])
+        for (side in [-1, 1]) for (row in [0.0, HobberZLayout.BLOCK_SPACING])
           faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == 0 ? "1" : "2"), [148.0, side * 145.0, row], [-1.0, 0, 0], [0.0, 1, 0], block, 13, PLATE_BLOCK_SOLE));
         // Flush heads keep the fixed Z chip shield clear throughout saddle travel.
         faces.push(nutBlockFace(HobberDrives.z(), 6.5, [0.0, 0, Z_SADDLE_ORIGIN_Z], {diameter: 12.0, depth: 6.5}));

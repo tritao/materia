@@ -144,6 +144,19 @@ class HobberJointLoads {
       var shear=r.parent=="XdrivePad"?fixedGuardWeight:massOf(machine,[r.id])*(g+0.5)+2;
       loads.push({label:"Chip guard "+r.id,between:[r.id,r.parent],shear:{peak:shear}});
     }
+    for(cover in machine.zBellows) {
+      var load=massOf(machine,cover.members())*(g+0.5)+10; // ASSUMED whole-cover weight and debris allowance at each end.
+      var moving=cover.id+"MovingMount",upper=cover.id.indexOf("Upper")>=0;
+      loads.push({label:cover.id+" moving flange",between:[cover.movingMember,moving],shear:{peak:load}});
+      loads.push({label:cover.id+" moving bracket",between:[moving,"Zplate"],shear:{peak:load}});
+      if(!upper)loads.push({label:cover.id+" fixed flange",between:[cover.fixedMember,"Xbridge"],shear:{peak:load}});
+      else {
+        var fixed=cover.id+"FixedMount",side=cover.id.indexOf("Left")>=0?-1:1;
+        var rail=machinekit.hobbing.HobberRailPlacement.placements("column",machinekit.hobbing.FoundationLayout.placements("column")).filter(r->side*r.contact.y>0)[0];
+        loads.push({label:cover.id+" fixed flange",between:[cover.fixedMember,fixed],shear:{peak:load}});
+        loads.push({label:cover.id+" fixed bracket",between:[fixed,"column/"+rail.insertId],shear:{peak:load}});
+      }
+    }
     // Each lid also transfers weight through its other side, whose fixed tree
     // parent is the common X pad rather than the lid.
     loads.push({label:"Front lid on right sheet",between:["XfrontCover","XcoverFrontRight"],shear:{peak:fixedGuardWeight}});

@@ -3,6 +3,9 @@ package machinekit.hobbing;
  * Fixed bearing/motor above the nut; the loaded screw segment works in tension.
  */
 class HobberZLayout {
+  public static inline final TRAVEL_MIN=-10.0;
+  public static inline final TRAVEL_MAX=190.0;
+  public static inline final BLOCK_SPACING=110.0;
   /** Height of the work seat above the work frame's zero (z), mm: the hob axis, the mandrel's seat and the origin of the Z, Y and swivel parts. */
   public static inline final SEAT_Z = 363.0;
   /** Screw axis, 25 mm (the BK12 and BF12 shaft height) in front of the 40 mm ground bar pads on the column's drive seat at 241. */

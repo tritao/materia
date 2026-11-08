@@ -41,6 +41,10 @@ class HobberMountingHoles {
       );
       result[index] = {id: row.id, purpose:row.purpose, pose: row.pose, openings: row.openings, part: addFixture(row.id, part)};
     }
+    if(kind=="column")for(placed in HobberRailPlacement.placements(kind,rows))for(index in 0...result.length)if(result[index].id==placed.insertId) {
+      var row=result[index];
+      result[index]={id:row.id,purpose:row.purpose,pose:row.pose,openings:row.openings,part:addBellowsHoles(row,placed.contact.y<0?-1:1)};
+    }
     // The drive pad bar's screws: the pad declares its pattern (`HobberPadBolts`), the cast insert under it is tapped to suit.
     for (index in 0...result.length) if (result[index].id == "driveSeat") {
       var row = result[index];
@@ -52,6 +56,24 @@ class HobberMountingHoles {
         result[index]={id:row.id,purpose:row.purpose,pose:row.pose,openings:row.openings,part:addSoleHoles(row,pad)};
       }
     return result;
+  }
+
+  /** The made upper bracket owns its source drilling pattern. Transfer after
+   * indicating it on the existing rail insert; no independent hole list. */
+  static function addBellowsHoles(row:CastInsertPlacement,side:Int):CastInsert {
+    var mount=HobberZBellowsLayout.fixedUpperMount(),face=mount.fasteningFaces().filter(f->f.id=="column")[0];
+    var toInsert=F.compose(F.inverse(F.compose(FoundationLayout.worldPose("column"),row.pose)),F.compose(HobberZBellowsLayout.pose(side,true,true),face.frame));
+    var part=row.part,spec=part.insertSpec(),thickness=part.boxDimensions(row.id).height;
+    var size=switch face.role {case Clamped(thread,_,_,_):if(thread==null)throw "Bellows bracket needs its selected thread";thread;case _:throw "Bellows source must follow a clamped face";};
+    var choice=InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(Std.parseFloat(size.substr(1))).mating()),n=0;
+    for(point in face.holes) {
+      var hole=InsertHoles.records(InsertHoles.tappedBlind(choice,thickness))[0];
+      hole.id="bellowsUpper"+(++n);
+      hole.frame=F.compose(F.compose(toInsert,F.translation(point.x,point.y,0)),F.fromRotationMatrix(0,0,0,[1.0,0,0,0,-1,0,0,0,-1]));
+      spec.holes.push(hole);
+      switch spec.origin {case Fabricated(m):m.holeRoutes.push({holeId:hole.id,route:TransferAfterCasting});case _:throw "Bellows bracket needs a made insert";}
+    }
+    return new CastInsert(part.values().copy().setToken("holes",InsertHoles.fromNeutral(spec.holes)).setToken("origin",haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(spec.origin))));
   }
 
   /** Reserve the sole joint's transferred service threads before choosing

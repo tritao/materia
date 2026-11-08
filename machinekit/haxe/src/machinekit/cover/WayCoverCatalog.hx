@@ -80,6 +80,13 @@ class WayCoverCatalog {
         flangeThickness: 4, screw: "M6", clearance: 6.6, holePitch: 150, wiper: 8, maxSpeed: 1500,
         basis: "Typical telescopic-cover family values (assumed): shorter sections than the 250 mm row for shorter strokes"
       }
+      ,{
+        id:"BELLOWS-PU-LOW-8x10", purchaseCode:"RFQ-P8x10-THIN",kind:Bellows,
+        description:"Custom thin PU bellows envelope, RFQ required",material:"polyurethane PU",
+        foldCompressed:8,ratio:10,sectionLength:0,overlap:0,stackStep:0,wall:0.2,gap:0.05,lip:10,
+        flangeThickness:3,screw:"M3",clearance:3.4,holePitch:150,wiper:0.2,maxSpeed:1000,
+        basis:"ASSUMED custom RFQ envelope, cloth thickness, packed length and speed; not supplier data. The hobber requires cropped H24 end flanges; qualify chip/coolant resistance before purchase."
+      }
     ];
     return cached.copy();
   }

@@ -15,7 +15,7 @@ class HobberChipCover extends MachineComponent {
   public static inline final OUTER_HALF_WIDTH = 70.0;
   public static inline final REAR_END = 630.0;
   public final role:String;
-  public static final MADE:Array<String> = ["XleftFront", "XrightFront", "XleftRear", "XrightRear", "Xfront", "Xrear", "Xskirt", "Zleft", "Zright"];
+  public static final MADE:Array<String> = ["XleftFront", "XrightFront", "XleftRear", "XrightRear", "Xfront", "Xrear", "Xskirt"];
 
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [machinekit.component.ComponentRecipeSupport.choice("role",MADE,"XleftFront")];
@@ -40,7 +40,6 @@ class HobberChipCover extends MachineComponent {
     rows.push({id:"XfrontCover",role:"Xfront",parent:"XcoverFrontLeft",seat:plane(242,-51,222,1)});
     rows.push({id:"XrearCover",role:"Xrear",parent:"XcoverRearLeft",seat:plane(rearLidCentre(),-51,232,1)});
     rows.push({id:"Xskirt",role:"Xskirt",parent:"Xbridge",seat:plane(170,-100,260,-1)});
-    for(side in [-1,1]) rows.push({id:"Zcover"+(side<0?"Left":"Right"),role:side<0?"Zleft":"Zright",parent:"Xbridge",seat:plane(149,side*100,260,-1)});
     return rows;
   }
   // Front row stays behind the skirt at the parked carriage, including driver radius.
@@ -52,16 +51,15 @@ class HobberChipCover extends MachineComponent {
       parent:front?"XfrontCover":"XrearCover",x:footX(front),y:side*37.0,z:front?224.0:234.0}
   ];
   public static function fixedMembers():Array<String> return [for(r in installations())if(r.parent!="Xbridge")r.id].concat([for(p in plugs())p.id]);
-  public static function zMembers():Array<String> return ["ZcoverLeft","ZcoverRight"];
   public static function footX(front:Bool):Float {var b=HobberDrives.padBoundsBoth(HobberDrives.x(),HobberDrives.PAD_WIDTH,15);return front?b[0]+25:b[3]-25;}
   public static function padReceivers():Array<BoltedFace> return [for(front in [true,false])for(side in [-1,1])
     BoltedFace.drilledToSuit("chip-"+(front?"front":"rear")+side,plane(footX(front),side*37,155,-1),12,12,12,15,BoltedFace.ThreadMaterial.Steel,"M3")];
   public static function carriageReceivers():Array<BoltedFace> {
     var faces=[for(x in [170.0,350.0])for(side in [-1,1]) BoltedFace.drilledToSuit("skirt-"+x+"-"+side,plane(x,side*100,260,1),14,14,10,20,BoltedFace.ThreadMaterial.Steel,"M4")];
-    for(side in [-1,1]) faces.push(BoltedFace.drilledToSuit("z-guard-"+side,plane(149,side*100,260,1),16,32,10,20,BoltedFace.ThreadMaterial.Steel,"M4"));return faces;
+    return faces;
   }
   override public function fasteningFaces():Array<BoltedFace> {
-    var zero:Array<BoltHole>=[{x:0.0,y:0.0}],side=StringTools.startsWith(role,"Xleft")||role=="Zleft"?-1:1;
+    var zero:Array<BoltHole>=[{x:0.0,y:0.0}],side=StringTools.startsWith(role,"Xleft")?-1:1;
     if(StringTools.startsWith(role,"Xleft")||StringTools.startsWith(role,"Xright")) {
       var front=StringTools.endsWith(role,"Front");
       return [BoltedFace.clamped("pad",plane(footX(front),side*37,155,1),zero,4.0,2,"M3",null,false,true),
@@ -78,7 +76,7 @@ class HobberChipCover extends MachineComponent {
     }
     if(role=="Xskirt") return [for(x in [170.0,350.0])for(side in [-1,1])
       BoltedFace.clamped("tab"+x+"-"+side,plane(x,side*100,260,-1),zero,5.0,2,"M4",null,false,true)];
-    return [BoltedFace.clamped("carriage",plane(149,side*100,260,-1),[{x:0.0,y:-10.0},{x:0.0,y:10.0}],5.0,2,"M4",null,false,true)];
+    throw "Unknown X chip cover role: "+role;
   }
   public function toolHoles():Array<ManufacturingRoute.RouteHole> {
     if(role!="Xfront"&&role!="Xrear")return [];
@@ -149,16 +147,11 @@ class HobberChipCover extends MachineComponent {
     }
     var b=nutBounds();return Solids.cut(Solids.union(p),[box(b.minX-3,b.maxX+3,b.minY-3,b.maxY+3,245,249),box(381,387,65,73,237,245),box(381,387,-73,-65,237,245)]);
   }
-  static function zCover():Part return Solids.union([
-    box(128,130,64,173,282,750),bendZ(282,750,126,64,1,-1),bendZ(282,750,126,173,1,1),
-    box(120,126,60,62,282,750),box(120,126,175,177,282,750),
-    box(132,157,70,117,258,260),bendY(70,117,132,262,-1,-1),box(128,130,70,117,262,282)
-  ]);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail=Preview):Part return machined(switch role {
     case "XleftFront":mirrorY(side(true)); case "XrightFront":side(true);
     case "XleftRear":mirrorY(side(false)); case "XrightRear":side(false);
     case "Xfront":lid(true); case "Xrear":lid(false); case "Xskirt":skirt();
-    case "Zleft":mirrorY(zCover()); case "Zright":zCover(); default:throw "unknown chip cover role";
+    default:throw "unknown chip cover role";
   });
 }

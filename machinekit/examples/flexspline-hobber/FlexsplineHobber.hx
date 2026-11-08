@@ -16,7 +16,9 @@ typedef HobberTravel = {id:String, lower:Float, upper:Float, initial:Float};
 
 /** Six independent physical axes. There is deliberately no B/C mechanical gear coupling.
     CAD and prismatic coordinates mm; rotary coordinates rad. Nested joint IDs are explicit. */
-class FlexsplineHobber extends MachineAssembly {
+class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCover.CoverMembers {
+  public final zBellows:Array<machinekit.cover.WayCover>=[];
+  public final zBellowsMounts:Array<String>=[];
   /** Work-frame +X (radial) -> machine +Y; work-frame -Y (hob) -> machine +X. */
   public static final MACHINE_FROM_WORK = F.fromRotationMatrix(0, 0, 637, [0.0, -1, 0, 1, 0, 0, 0, 0, 1]);
   /** Collapsed sleeve to cup bore, diametral. The H5 bore (58.050/+0.013) against a sleeve OD of 58.040 -0.005/0 gives
@@ -237,7 +239,7 @@ class FlexsplineHobber extends MachineAssembly {
     travel = [
       {id: "X", lower: minX, upper: HobberXLayout.RETRACT, initial: cutDistance},
       {id: "Y", lower: -10, upper: 10, initial: 0},
-      {id: "Z", lower: -10, upper: 190, initial: 0}
+      {id: "Z", lower: HobberZLayout.TRAVEL_MIN, upper: HobberZLayout.TRAVEL_MAX, initial: 0}
     ];
     group("X axis");
     for (placed in HobberRailPlacement.placements("bed", FoundationLayout.placements("bed"))) {
@@ -276,7 +278,7 @@ class FlexsplineHobber extends MachineAssembly {
       fixAt(placed.memberId, placed.rail, placed.pose, insert, placed.contact);
       precisionMounts.push({name: placed.memberId + "-mount", parent: insert});
     }
-    for (side in [-1, 1]) for (row in [0, 110]) {
+    for (side in [-1, 1]) for (row in [0.0, HobberZLayout.BLOCK_SPACING]) {
       var id = "blockZ" + (side < 0 ? "Left" : "Right") + (row == 0 ? "" : "Upper");
       var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);
       var pose = AxisBuilder.orient(centre + 161, side * 145, HobberZLayout.SEAT_Z + row, [-1.0, 0, 0], [0.0, 0, 1]);
@@ -284,7 +286,7 @@ class FlexsplineHobber extends MachineAssembly {
       if (id == "blockZLeft") {
         addComponent(id, block);
         zero.set(id, pose);
-        moving("Z", Prismatic, "railZLeft", id, F.translation(centre + 161, 0, HobberZLayout.SEAT_Z), [0.0, 0, 1], 0, -10, 190);
+        moving("Z", Prismatic, "railZLeft", id, F.translation(centre + 161, 0, HobberZLayout.SEAT_Z), [0.0, 0, 1], 0, HobberZLayout.TRAVEL_MIN, HobberZLayout.TRAVEL_MAX);
         fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
       } else fixAt(id, block, pose, "Zplate", face);
     }
@@ -443,6 +445,7 @@ class FlexsplineHobber extends MachineAssembly {
       for (p in HobberChipCover.plugs()) fixAt(p.id,new machinekit.standard.PanelHolePlug(),F.translation(p.x,p.y,p.z),p.parent,
         F.alongY(p.x,p.y,p.z,0,0,-1));
     });
+    installZBellows();
     // The screws, washers, nuts and the holes they need follow from the bolted faces the parts declare (BOM_PLAN F1).
     deriveFasteners();
     // Replicated pad drilling follows the carriage joints, never a second bolt list.
@@ -578,22 +581,90 @@ class FlexsplineHobber extends MachineAssembly {
       [{direction:worldDir(0,0,1),distance:100.0}],stack,[]));
     var head = below("Ymodule/base").concat(["Ymodule/base"]).filter(id -> id != "Ymodule/motor" && id != "Ymodule/motorShaft");
     var retract = [{joint:"X",value:HobberXLayout.RETRACT}];
-    // Free the under-deck foot, lift it above the deck, then move the
-    // C-profile clear of the head. Left/right shields leave to their own side.
-    for (side in [-1,1]) out.push(ServiceRemoval(side<0?"zLeftGuardWithdrawal":"zRightGuardWithdrawal",
-      [side<0?"ZcoverLeft":"ZcoverRight"],
-      [{direction:worldDir(-1,0,0),distance:19.0}, {direction:worldDir(0,0,1),distance:24.0},
-       {direction:worldDir(1,0,0),distance:4.0}, {direction:worldDir(0,side,0),distance:200.0}],side>0?["Ymodule/motor","Ymodule/motorShaft"]:[],retract));
     // Keep the head on the actuator: the adapter output screws are buried
     // behind the swivel plate. Release the saddle from its blocks and nut
     // block, and support the disconnected scale head on the fixed scale.
-    out.push(ServiceRemoval("erobWithSaddle",["Zplate","swivel/housing","swivel/output","ZscaleArm"].concat(head),
-      [{direction:worldDir(-1,0,0),distance:60.0}],HobberChipCover.zMembers().concat(["Ymodule/motor","Ymodule/motorShaft"]),retract));
+    out.push(ServiceRemoval("erobWithSaddle",["Zplate","swivel/housing","swivel/output","ZscaleArm"].concat(zBellowsMounts.filter(id->id.indexOf("Moving")>=0)).concat(head),
+      [{direction:worldDir(-1,0,0),distance:60.0}],["Ymodule/motor","Ymodule/motorShaft"],retract));
     return out;
   }
 
   /** The pairs of members the hobbing process brings together: the hob in the cup's band. */
-  public function processContacts():Array<{a:String, b:String}> return [{a: "blank", b: "hob"}, {a: "mandrel", b: "hob"}, {a: "mandrelSleeve", b: "hob"}];
+  public function processContacts():Array<{a:String, b:String}> return [{a: "blank", b: "hob"}, {a: "mandrel", b: "hob"}, {a: "mandrelSleeve", b: "hob"}].concat([for(pair in yModule.stopContacts()){a:"Ymodule/"+pair.a,b:"Ymodule/"+pair.b}]).concat(zBellowsInternalContacts());
+
+  /** Thin nested cloth is internal to one bought cover, with its own radial
+   * clearance rather than the machine's 2 mm running gap. Only grant those
+   * internal pairs after actual-solid zero-overlap checks at both overtravel
+   * limits and mid travel. External guard clearances remain machine checks. */
+  function zBellowsInternalContacts():Array<{a:String,b:String}> {
+    var out:Array<{a:String,b:String}>=[],poses=solvedPoses(),entries=components();
+    PosedParts.scope(cache->{
+      for(cover in zBellows) {
+        var ids=cover.members();
+        for(q in [HobberZBellowsLayout.lowerLimit(),0.0,HobberZBellowsLayout.upperLimit()]) {
+          var shapes:Array<cadkit.modeling.Part>=[];
+          for(i in 0...ids.length) {
+            var id=ids[i],entry=entries.filter(m->m.id==id)[0],pose=poses.get(id);
+            if(pose==null)throw "Missing Z bellows pose: "+id;
+            var ratio=i==0?0.0:i==ids.length-1?1.0:i*1.0/cover.plan.levels;
+            shapes.push(cache.posed(entry.component,F.compose(F.translation(0,0,ratio*q),pose)));
+          }
+          for(i in 0...shapes.length)for(j in i+1...shapes.length) {
+            var volume=PosedParts.commonVolume(shapes[i],PosedParts.boxOf(shapes[i]),shapes[j],PosedParts.boxOf(shapes[j]));
+            if(volume>1e-5)throw 'Z bellows internal overlap: ${ids[i]} / ${ids[j]} at $q: $volume mm3';
+          }
+          PosedParts.closeAll(shapes);
+        }
+        for(i in 0...ids.length)for(j in i+1...ids.length)out.push({a:ids[i],b:ids[j]});
+      }
+    });
+    return out;
+  }
+
+  /** Bellows flanges and loose skins use the shared coupled-cover builder. */
+  function installZBellows():Void {
+    var p=HobberZBellowsLayout.plan();
+    for(side in [-1,1])for(upper in [false,true]) {
+      var id="Zbellows"+(side<0?"Left":"Right")+(upper?"Upper":"Lower"),moving=id+"MovingMount",fixed=id+"FixedMount";
+      group("Z axis/Protection/"+id+"/Mounts");
+      var movingPose=HobberZBellowsLayout.pose(side,upper,false);
+      fixAt(moving,HobberZBellowsLayout.movingMount(),movingPose,"Zplate");zBellowsMounts.push(moving);
+      if(upper) {
+        var mount=HobberZBellowsLayout.fixedUpperMount(),pose=HobberZBellowsLayout.pose(side,true,true);
+        var face=mount.fasteningFaces().filter(f->f.id=="column")[0];
+        var contact=F.compose(pose,face.frame);
+        var rail=HobberRailPlacement.placements("column",FoundationLayout.placements("column")).filter(r->side*r.contact.y>0)[0];
+        fixAt(fixed,mount,pose,"column/"+rail.insertId,contact);zBellowsMounts.push(fixed);
+      }
+      var origin=HobberZBellowsLayout.pose(side,upper,true),cover=machinekit.cover.WayCover.installOn(this,this,{
+        id:id,row:p.row.id,fixedParent:upper?fixed:"Xbridge",movingParent:moving,
+        leader:{id:"Z",lower:HobberZBellowsLayout.lowerLimit(),upper:HobberZBellowsLayout.upperLimit(),initial:0.0},
+        origin:[origin.x,origin.y,origin.z],along:[0.0,0,upper?-1.0:1.0],up:[-1.0,0,0],width:p.width,height:p.height,space:p.space,shape:p.shape});
+      zBellows.push(cover);
+      var last=cover.skinMembers[cover.skinMembers.length-1];
+      addMemberConnector(last,"end-guide",F.compose(F.inverse(required(last)),movingPose));
+      addMemberConnector(cover.movingMember,"end-guide",F.compose(F.inverse(required(cover.movingMember)),movingPose));
+      addConstraintOnAxis(id+"-end-guide","prismatic",last,"end-guide",cover.movingMember,"end-guide",{x:0.0,y:0,z:1});
+    }
+  }
+  public function axisDirection(id:String):Array<Float> {if(id!="Z")throw "Unknown cover axis: "+id;return [0.0,0,1];}
+  public function attach(id:String,component:MachineComponent,pose:AssemblyFrame,parent:String):Void {
+    if(Std.isOfType(component,machinekit.cover.WayCoverSection)) {
+      group("Z axis/Protection/"+id.substr(0,id.lastIndexOf("-"))+"/"+(StringTools.endsWith(id,"-fixed")?"Fixed end":"Moving end"));
+      component=new HobberZBellowsPart(component.values());
+    }
+    fixAt(id,component,pose,parent);
+  }
+  public function hang(id:String,component:MachineComponent,pose:AssemblyFrame,parent:String):Void {
+    if(Std.isOfType(component,machinekit.cover.WayCoverSection)) {
+      group("Z axis/Protection/"+id.substr(0,id.lastIndexOf("-"))+"/Folds");
+      component=new HobberZBellowsPart(component.values());
+    }
+    addComponent(id,component);zero.set(id,pose);
+    var meeting=F.translation(pose.x,pose.y,pose.z);
+    addMemberConnector(parent,'to-$id',F.compose(F.inverse(required(parent)),meeting));
+    addMemberConnector(id,'attach-$id',F.compose(F.inverse(pose),meeting));
+  }
 
   function includeAt(id:String, a:MachineAssembly, pose:AssemblyFrame):Void {
     include(id, a, F.compose(MACHINE_FROM_WORK, pose));

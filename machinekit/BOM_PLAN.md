@@ -485,6 +485,8 @@ and readers reject anything else. It contains:
 
 ### F1 — Joint-derived fasteners (2026-11-04)
 
+Joint-derived machining revisions compare physical bores in the part frame (including thread, fit and through/blind callout), independent of joint-instance names and cut order. Transform noise is normalised at1e-12 for this revision key only; recipe inputs and named geometry-cache keys remain exact. Repeated brackets therefore aggregate without inventing different drawing numbers, while a moved hole or changed thread changes the revision. JointFastenerTests checks both behaviours.
+
 Status: first slice done (local main 15c70f491): the bench mill's rail and motor screws are derived and the B6
 declarations are deleted. Second slice below (items 1-3 of the old open list, and the nut flange adopters).
 

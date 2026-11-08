@@ -78,11 +78,22 @@ class MachineComponent {
     }];
   }
 
-  /** Names the recorded holes, for a cache of the geometry and for the revision. */
-  function machiningKey():String {
-    var out:Array<String> = [];
-    for (cut in machining) out.push([cut.frame.x, cut.frame.y, cut.frame.z, cut.frame.qx, cut.frame.qy, cut.frame.qz, cut.frame.qw, cut.x, cut.y,
-      cut.diameter, cut.from, cut.to].map(v -> ComponentNumberKey.encode(v)).join(",") + "," + cut.name);
+  /** Geometry caches retain instance face labels and exact coordinates. A BOM
+   * revision instead names the physical machining in the part frame, independent
+   * of joint IDs, cut order and sub-picometre rigid-transform roundoff. Recipe
+   * input identity remains exact. The1e-12 resolution is below CAD tolerance. */
+  function machiningKey(forGeometry:Bool):String {
+    var out:Array<String>=[];
+    for(cut in machining) {
+      if(forGeometry)out.push([cut.frame.x,cut.frame.y,cut.frame.z,cut.frame.qx,cut.frame.qy,cut.frame.qz,cut.frame.qw,cut.x,cut.y,
+        cut.diameter,cut.from,cut.to].map(v->ComponentNumberKey.encode(v)).join(",")+","+cut.name);
+      else {
+        var p=materia.assembly.AssemblyFrames.transformPoint(cut.frame,cut.x,cut.y,0),axis=materia.assembly.AssemblyFrames.transformVector(cut.frame,0,0,1);
+        var values=[p.x,p.y,p.z,axis.x,axis.y,axis.z,cut.diameter,cut.from,cut.to];
+        out.push(values.map(v->ComponentNumberKey.encode(Math.fround(v*1e12)/1e12)).join(",")+"|"+Std.string(cut.kind)+"|"+Std.string(cut.thread)+"|"+Std.string(cut.fit)+"|"+Std.string(cut.through));
+      }
+    }
+    if(!forGeometry)out.sort(Reflect.compare);
     return out.join(";");
   }
 
@@ -283,13 +294,13 @@ class MachineComponent {
   function machinedRevision(revision:Null<String>):Null<String> return revision == null || machining.length == 0 ? revision : BomRevision.fingerprint(revision
     + machinedSuffix(), 1);
 
-  function machinedSuffix():String return machining.length == 0 ? "" : "|machined:" + machiningKey();
+  function machinedSuffix(forGeometry:Bool=false):String return machining.length == 0 ? "" : "|machined:" + machiningKey(forGeometry);
 
   public function geometryKey(detail:ComponentDetail = Preview):String {
     var recipe = type, suffix = materialId + "|" + Std.string(detail);
     return recipe
-      == null ? "instance|" + instanceId + "|" + suffix + machinedSuffix() : recipe.id + "|" + recipe.key(values()) + "|" + suffix
-      + machinedSuffix();
+      == null ? "instance|" + instanceId + "|" + suffix + machinedSuffix(true) : recipe.id + "|" + recipe.key(values()) + "|" + suffix
+      + machinedSuffix(true);
   }
 
   /**

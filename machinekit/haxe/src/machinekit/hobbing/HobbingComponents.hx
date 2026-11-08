@@ -16,6 +16,7 @@ class HobbingComponents {
     registry.register(OutboardBearingPart.recipeType());
     registry.register(Hob.recipeType());
     registry.register(HobberYPart.recipeType());
+    registry.register(HobberZBellowsPart.recipeType());
     registry.register(ExpandingMandrel.recipeType());
     registry.register(RotaryClamp.recipeType());
     registry.register(TablePlaten.recipeType());

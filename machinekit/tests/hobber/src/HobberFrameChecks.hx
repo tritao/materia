@@ -60,6 +60,9 @@ class HobberFrameChecks {
     for(member in ["scaleSeat","scaleHousing","riserLeft","riserRight"])order.push({member:"Ymodule/"+member,fastened:["Ymodule/base"],faces:["actuator-output"]});
     for(member in ["spindleSeat","outboardCarrier"])order.push({member:member,fastened:["Ymodule/carriage"],faces:["block-1-1","block-11","block1-1","block11","nut-carrier"]});
     order.push({member:"Ymodule/scaleHead",fastened:["Ymodule/carriage"],faces:["seat","outboard-carrier"]});
+    for(cover in machine.zBellows)if(cover.id.indexOf("Upper")>=0)for(member in [cover.fixedMember,cover.id+"FixedMount"])
+      order.push({member:member,fastened:["railZLeft","railZRight"]});
+    for(member in machine.zBellowsMounts)if(member.indexOf("Moving")>=0)order.push({member:"column/",fastened:[member],faces:["saddle"]});
     if (!sweep) options.sweepStates = [];
     return options;
   }
@@ -133,6 +136,39 @@ class HobberFrameChecks {
    * cover of the lamella row needs for that stroke round the bare screw (opening 40 x 50). Where the free length is short, the line says by how much: the geometry change that would make
    * the cover fit is that much more screw between the support and the nut's end stop (`HobberXLayout`, `HobberZLayout`). Returns one line per cover.
    */
+  /** Park each opposite end away rather than assuming a straight driver can
+   * reach through it. The derived P5 access cylinders include the driver/head
+   * diameter, recess and reach. Check every installed part, including hardware. */
+  public static function zBellowsTools(machine:FlexsplineHobber):Array<String> {
+    var derived=machine.derivedFasteners();if(derived==null)throw "Missing Z bellows fasteners";
+    var model=new cadkit.modeling.AssemblyModel("mm");machine.addTo(model,"");
+    var state=new cadkit.modeling.AssemblyState(model.definition("z-bellows-tools")),members=machine.components(),count=0;
+    state.setJoint("X",HobberXLayout.RETRACT);
+    PosedParts.scope(cache->{
+      for(joint in derived.joints)if(StringTools.startsWith(joint.clampedMember,"Zbellows") &&
+        (StringTools.endsWith(joint.clampedMember,"-fixed")||StringTools.endsWith(joint.clampedMember,"-moving"))) {
+        var q=joint.clampedMember.indexOf("Upper")>=0?HobberZLayout.TRAVEL_MIN:HobberZLayout.TRAVEL_MAX;
+        state.setJoint("Z",q);state.forwardKinematics();
+        var poses=machine.solvedPoses(state),host=members.filter(m->m.id==joint.receivingMember)[0],pose=poses.get(host.id);
+        if(pose==null)throw "Missing bellows receiver pose";
+        var face=host.component.fasteningFaces().filter(f->f.id==joint.receivingFace)[0],frame=F.compose(pose,face.frame);
+        for(volume in joint.volumes)if(volume.access)for(hole in joint.hostHoles) {
+          var raw=cadkit.modeling.Part.cylinderSpan(volume.diameter/2,volume.from,volume.to,hole.x,hole.y),tool=PosedParts.moved(raw,frame);raw.close();
+          var bounds=PosedParts.boxOf(tool);
+          for(other in members) {
+            var at=poses.get(other.id);if(at==null)throw "Missing tool obstruction pose";
+            if(PosedParts.apart(bounds,cache.box(other.component,at),0))continue;
+            var body=cache.posed(other.component,at),overlap=PosedParts.commonVolume(tool,bounds,body,PosedParts.boxOf(body));body.close();
+            if(overlap>0.001){tool.close();throw 'Z bellows driver ${joint.clampedMember} meets ${other.id} at Z$q: $overlap mm3';}
+          }
+          tool.close();count++;
+        }
+      }
+    });
+    if(count!=32)throw "Expected32 bellows end-flange driver corridors, got "+count;
+    return ['Z bellows: $count derived driver corridors clear at Z${HobberZLayout.TRAVEL_MIN}/${HobberZLayout.TRAVEL_MAX}; bench-fit moving brackets before the column.'];
+  }
+
   public static function coverFit(machine:FlexsplineHobber):Array<String> {
     var poses = machine.solvedPoses(), lines = [];
     PosedParts.scope(posed -> {
@@ -807,6 +843,27 @@ class HobberFrameChecks {
       Sys.println('${d.id}: block ${b.width} x ${b.thickness} x ${b.length}, centre height ${b.centreHeight}, base xs ${b.baseHoleXs()}, base depth ${b.baseDepth}');
       Sys.println('  flange holes ${[for (h in nut.mountingHoles()) [Math.round(h.x * 10) / 10, Math.round(h.y * 10) / 10]]}, tap drill ${nut.mountingTapDrill()}, flange dia ${nut.flangeDiameter}, bolt circle ${nut.boltCircleDiameter}');
       Sys.println('  world: origin ${w(0, 0, 0)} x ${w(1, 0, 0)} y ${w(0, 1, 0)} z ${w(0, 0, 1)} base centre ${w(0, -b.centreHeight, b.thickness / 2)}');
+    }
+    if(args.indexOf("bellows-travel")>=0) {
+      // Expand only the validation snapshot to the declared Z overtravel.
+      // The machine's operating limits and its saved design remain unchanged.
+      var record=machine.describe();
+      for(j in record.mechanical.joints)if(j.id=="Z"){j.limits.lower=machinekit.hobbing.HobberZBellowsLayout.lowerLimit();j.limits.upper=machinekit.hobbing.HobberZBellowsLayout.upperLimit();}
+      var copy=MachineAssembly.fromDescription(record,MachineKitComponents.standard()),states:Array<Map<String,Float>>=[];
+      var x=machine.travel.filter(t->t.id=="X")[0],y=machine.travel.filter(t->t.id=="Y")[0];
+      for(xx in [x.lower,x.upper])for(yy in [y.lower,y.upper])for(zz in [machinekit.hobbing.HobberZBellowsLayout.lowerLimit(),machinekit.hobbing.HobberZBellowsLayout.upperLimit()])for(a in [-HobberSwivelLayout.RANGE,0.0,HobberSwivelLayout.RANGE])
+        states.push(["X"=>xx,FlexsplineHobber.Y=>yy,"Z"=>zz,FlexsplineHobber.A=>a]);
+      var report=AssemblyIntegrity.check(copy,{sweepStates:states,runningGap:2.0,processContacts:machine.processContacts(),serviceProcedures:[],fasteners:false});
+      var own=[for(e in report.errors())if(e.message.indexOf("Zbellows")>=0)e];
+      for(e in report.errors())Sys.println(e.code+" "+e.message);
+      Sys.println('ZB travel: ${states.length} specified poses including Z overtravel; ${own.length} Z-bellows errors; ${report.errors().length} whole-machine findings (Y fit remains an LM5 gate).');
+      if(own.length>0)throw "Z bellows travel interference";
+    }
+    if(args.indexOf("bellows")>=0) {
+      var contacts=machine.processContacts();
+      for(line in zBellowsTools(machine))Sys.println(line);
+      Sys.println('Z bellows: ${machine.zBellows.length} covers; actual-solid internal overlap gate PASS at travel/overtravel limits and zero. ${contacts.length} declared process/internal pairs.');
+      for(c in machine.zBellows)Sys.println('${c.id}: stroke ${c.plan.stroke}, compressed ${c.plan.compressed}, space ${c.plan.space}, levels ${c.plan.levels}, end height ${c.plan.shape.hostMax}; all product values ASSUMED custom RFQ.');
     }
     if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
     if (args.indexOf("fasteners") >= 0) {

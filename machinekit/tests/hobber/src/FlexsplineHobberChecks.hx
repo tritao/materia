@@ -46,13 +46,14 @@ class FlexsplineHobberChecks {
       check(groups.get("casting") == "casting", "casting has its own group");
       var anchorCount = 0;
       for (insert in foundation.insertLocations()) {
-        // An insert with anchor bolts has its own folder in its purpose group; its bolts share it.
+        // Anchors stay under their insert purpose; large patterns may use physical-side subfolders.
         var anchored = [for (member in foundation.components()) if (StringTools.startsWith(member.id, insert.id + "-bolt")) member].length > 0;
         var expected = machinekit.structural.MineralFoundation.purposeGroup(insert.purpose) + (anchored ? "/" + insert.id : "");
         check(groups.get(insert.id) == expected, "insert belongs to its declared purpose " + insert.id);
         for (member in foundation.components()) if (StringTools.startsWith(member.id, insert.id + "-bolt")) {
           anchorCount++;
-          check(groups.get(member.id) == expected, "anchor shares insert purpose " + member.id);
+          var actual=groups.get(member.id);
+          check(actual==expected || (actual!=null && StringTools.startsWith(actual,expected+"/")), "anchor shares insert purpose " + member.id);
         }
       }
       check(anchorCount > 0, "foundation grouping test exercises actual anchor hardware");
@@ -75,9 +76,10 @@ class FlexsplineHobberChecks {
     check(movesX.indexOf("Xbridge") >= 0 && movesX.indexOf("column/casting") >= 0
       && movesX.indexOf("railXLeft") < 0, "moves-with X follows joint descendants across functional groups");
     var covers = selections.filter(s -> s.id == "kind:Covers and wipers")[0].members;
-    check(covers.indexOf("Xskirt") >= 0 && covers.indexOf("ZcoverLeft") >= 0, "covers set derives from component metadata");
+    check(covers.indexOf("Xskirt") >= 0 && covers.indexOf("ZbellowsLeftLower-fixed") >= 0, "covers set derives from component metadata");
     Sys.println("Hobber groups: " + count + " members, no ungrouped members; " + selections.length + " derived sets");
     assertions += HobberXAssembly.check(machine);
+    for(line in HobberFrameChecks.zBellowsTools(machine)){Sys.println(line);assertions++;}
     assertions += HobberDesignChecks.run(machine);
     assertions += HobberFrameChecks.run(machine);
     assertions += HobberCastingMassChecks.run(machine);
@@ -261,7 +263,9 @@ class FlexsplineHobberChecks {
         "B/C have no mechanical gear coupling (B's only coupling is the belt to its servo)"
       );
       for (axis in ["X", "Y", "Z"]) {
-        var j = joint.filter(k -> k.id == axis)[0];
+        var matching=joint.filter(k->k.id==machinekit.hobbing.HobberDrives.jointId(axis));
+        check(matching.length==1,"one physical linear joint for "+axis);
+        var j=matching[0];
         check(j.limits.lower != null && j.limits.upper != null, "bounded linear travel");
       }
       check(
@@ -273,7 +277,9 @@ class FlexsplineHobberChecks {
         "foundation precision mounts all land on inserts"
       );
       for (axis in ["X", "Y", "Z"]) {
-        var coupling = definition.couplings.filter(k -> k.id == axis + "lead")[0];
+        var matching=definition.couplings.filter(k->k.id==machinekit.hobbing.HobberDrives.member(axis,"lead"));
+        check(matching.length==1,"one physical screw coupling for "+axis);
+        var coupling=matching[0];
         near(Math.abs(coupling.ratio), 2 * Math.PI / 5, 1e-12, "ball screw derives rad/mm coupling");
         var drive = machine.actuatorFor(axis + "drive");
         check(drive.maxRate > 0 && drive.maxEffort > 0, "installed servo supplies finite drive limits");

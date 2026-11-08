@@ -257,7 +257,7 @@ class HobberEnclosurePreview {
     var scene = AssemblyPreview.scene(assembly, "hobber-enclosed");
     var pressureAngle = machine.spec.form.pressureAngle();
     if (scene.machineMotion == null) scene.machineMotion = {belts: []};
-    var axes = ["machine/X", "machine/Y", "machine/Z", "machine/swivel/A", "machine/spindle/B", "machine/table/C"];
+    var axes = ["machine/X", "machine/"+FlexsplineHobber.Y, "machine/Z", "machine/swivel/A", "machine/spindle/B", "machine/table/C"];
     scene.machineMotion.hobbing = {
       module: machine.spec.module,
       teeth: machine.spec.teeth,

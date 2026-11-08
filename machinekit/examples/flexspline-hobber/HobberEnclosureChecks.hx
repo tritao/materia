@@ -247,7 +247,7 @@ class HobberEnclosureChecks {
       var ranges = [for (t in source.travel)[t.lower, t.upper]];
       for (x in ranges[0]) for (y in ranges[1]) for (z in ranges[2]) for (a in [-Math.PI / 12, 0.0, Math.PI / 12]) {
         state.setJoint("machine/X", x);
-        state.setJoint("machine/Y", y);
+        state.setJoint("machine/"+FlexsplineHobber.Y, y);
         state.setJoint("machine/Z", z);
         state.setJoint("machine/" + FlexsplineHobber.A, a);
         for (door in [0.0, shell.layout.stroke]) {
