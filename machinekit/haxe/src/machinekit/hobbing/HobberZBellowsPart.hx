@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.cover.*;
+import machinekit.motion.ScrewLinearModuleSpec;
 import machinekit.cover.WayCoverSection.WayCoverRole;
 import machinekit.component.ComponentRecipeSupport as P;
 
@@ -15,7 +16,7 @@ class HobberZBellowsPart extends WayCoverSection {
     case "row":P.choice("row",[HobberZBellowsLayout.ROW],HobberZBellowsLayout.ROW);
     case "section":P.choice("section",["Box"],"Box");
     case "nesting":P.choice("nesting",["GrowsToFixed"],"GrowsToFixed");
-    case "height":P.length("height",17);
+    case "height":P.length("height",17.2);
     case "stroke":P.length("stroke",210);
     case "space":P.length("space",30);
     case "hostMax":P.length("hostMax",24);
@@ -23,7 +24,7 @@ class HobberZBellowsPart extends WayCoverSection {
   });
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType(
     "machinekit.hobbing.z-bellows",parameters(),v->new HobberZBellowsPart(v),true,false,null,false)
-    .numbered(v->{
+    .versioned(2).numbered(v->{
       var base=WayCoverSection.purchaseNumber(WayCoverCatalog.get(v.token("row")),v.number("width"),v.number("height"),v.number("stroke"),v.number("space"),
         {open:true,hostMin:v.number("hostMin"),hostMax:v.number("hostMax"),hostHalfWidth:v.number("hostHalfWidth"),reversed:true});
       return v.token("role")=="Fixed"?base:v.token("role")=="Moving"?base+"-M":base+"-S"+v.integer("level");
@@ -45,11 +46,18 @@ class HobberZBellowsPart extends WayCoverSection {
     return out;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** Custom RFQ pattern: retain complete M3 washer lands after trimming the
+   * flange clear of the catalogue supports. The joint owns this single pattern. */
+  override public function holes():Array<{x:Float,y:Float}> {
+    var screw=machinekit.standard.SocketHeadCapScrew.catalog().get(plan.row.screw);
+    var half=plan.fullPlateHalf()-ScrewLinearModuleSpec.GAP,low=plan.row.flangeThickness+0.2,edge=1.5*screw.diameter;
+    return [for(x in [-half+plan.row.lip/2,half-plan.row.lip/2])for(y in [low+edge,plan.shape.hostMax-edge]){x:x,y:y}];
+  }
   override public function geometry(detail:ComponentDetail=Preview):Part {
     var body=super.geometry(detail);if(role==Sleeve)return body;
-    var half=plan.fullPlateHalf()+1,high=plan.shape.hostMax;
-    var raw=Part.box(2*half,high+1,plan.flangeSkin()+plan.row.flangeThickness+plan.row.wiper+2);
-    var keep=raw.translated(new Vector(0,(high-1)/2,-1));raw.close();
+    var half=plan.fullPlateHalf()-ScrewLinearModuleSpec.GAP,high=plan.shape.hostMax,low=plan.row.flangeThickness+0.2;
+    var raw=Part.box(2*half,high-low,plan.flangeSkin()+plan.row.flangeThickness+plan.row.wiper+2);
+    var keep=raw.translated(new Vector(0,(high+low)/2,-1));raw.close();
     var trimmed=body.intersect(keep);keep.close();body.close();return trimmed;
   }
 }
