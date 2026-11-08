@@ -37,7 +37,9 @@ class ProjectLoadingTests {
     var bytes = File.getBytes(path);
     if (bytes.length < 11) return "other";
     if (bytes.get(8) == "{".code) return "record";
-    return bytes.get(8) == "H".code && bytes.get(9) == "L".code && bytes.get(10) == "B".code ? "generator" : "output";
+    if (bytes.get(8) == "H".code && bytes.get(9) == "L".code && bytes.get(10) == "B".code) return "generator";
+    try SceneArtifact.decodeView(bytes.sub(8, bytes.length - 8)) catch (_:Dynamic) return "kernel";
+    return "output";
   }
 
   static function stored(store:String, kind:String):Array<String> return [for (path in files(store, ".memo")) if (kindOf(path) == kind) path];
@@ -54,6 +56,66 @@ class ProjectLoadingTests {
     bytes.setInt32(4, body.length);
     bytes.blit(8, body, 0, body.length);
     return bytes;
+  }
+
+  /**
+   * A generator the runner starts runs from a temporary directory with no native libraries beside it. Its kernel cache must
+   * still be on (the native identity comes from the library the process loaded), and say so loudly if it is not: the editor
+   * once ran with the cache silently off. The generator fails when it has no native identity, and the store must hold
+   * kernel-operation entries after the open.
+   */
+  static function kernelCacheInGeneration(installation:String):Void {
+    var temporary = Sys.getEnv("TMPDIR");
+    if (temporary == null || temporary.length == 0) temporary = "/tmp";
+    var root = temporary + "/materia-kernel-cache-test-" + Sys.getPid() + "-" + Std.random(1000000000);
+    FileSystem.createDirectory(root);
+    var previousCache = Sys.getEnv("XDG_CACHE_HOME");
+    Sys.putEnv("XDG_CACHE_HOME", root + "/cache");
+    try {
+      var config:Dynamic = {
+        version: 1,
+        sourceRoots: ["."],
+        target: "host",
+        dependencies: {projectkit: {path: installation + "/projectkit"}, cadkit: {path: installation + "/cadkit"}}
+      };
+      Reflect.setField(config, "package", {name: "kernel-cache-fixture"});
+      File.saveContent(root + "/haxeon.json", Json.stringify(config));
+      File.saveContent(root + "/KernelPreview.hx", 'import haxe.io.Bytes;\nimport materia.project.SceneArtifact;\n'
+        + 'class KernelPreview { public static function preview():Bytes {\n'
+        + 'var drilled = cadkit.Shape.box(10, 10, 10).cut(cadkit.Shape.box(4, 4, 20));\n'
+        + 'if (drilled.volume() < 1) throw "no geometry";\n'
+        + 'if (cadkit.cache.NativeIdentity.get() == null) throw "kernel cache off: no native identity";\n'
+        + 'var vertices = Bytes.alloc(96); var coordinates = [0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];\n'
+        + 'for (i in 0...12) vertices.setDouble(i * 8, coordinates[i]);\n'
+        + 'var indices = Bytes.alloc(48); var triangles = [0,2,1,0,1,3,0,3,2,1,2,3];\n'
+        + 'for (i in 0...12) indices.setInt32(i * 4, triangles[i]);\n'
+        + 'var part:materia.project.SceneArtifact.SceneArtifactPart = {id: "tetra", name: "Tetra", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12, '
+        + 'vertices: vertices, normals: Bytes.alloc(96), indices: indices, faceRanges: []};\n'
+        + 'return SceneArtifact.encode({metresPerUnit: 1.0, parts: [part]}); }}\n');
+      var entry:Dynamic = {kind: "cad-preview", module: "KernelPreview"};
+      Reflect.setField(entry, "function", "preview");
+      var manifest = root + "/materia.project.json";
+      File.saveContent(manifest, Json.stringify({
+        format: "materia.project",
+        version: 1,
+        defaultEntrypoint: "preview",
+        build: {system: "haxeon", manifest: "haxeon.json"},
+        entrypoints: {preview: entry}
+      }));
+      var store = root + "/cache/materia/memo";
+      DiskStore.useProcess(new DiskStore(store, 1e9));
+      MateriaProjectRunner.loadProject(manifest);
+      check(stored(store, "kernel").length > 0, "the generator's kernel operations are in the store after the open");
+      check(stored(store, "generator").length == 1 && stored(store, "record").length == 1, "and so are its generator and record");
+    } catch (error:Dynamic) {
+      Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      DiskStore.useProcess(null);
+      remove(root);
+      throw error;
+    }
+    Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    DiskStore.useProcess(null);
+    remove(root);
   }
 
   static function remove(root:String):Void {
@@ -465,6 +527,7 @@ class ProjectLoadingTests {
     Sys.putEnv("XDG_CACHE_HOME", previousCache);
     DiskStore.useProcess(null);
     remove(root);
+    kernelCacheInGeneration(installation);
     Sys.println("Project loading tests passed");
     return 0;
   }
