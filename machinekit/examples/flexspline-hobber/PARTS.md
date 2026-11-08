@@ -75,7 +75,7 @@ and empty verified-field lists.
   The expansion is a capacity, not a solved deformation or hydraulic circuit. Other cup bores
   require another recipe size.
 - `ErobActuator` (`machinekit.motion`, ZeroErr eRob110I V6 rev D, ratio 100, brake, 20-bit output encoder, 48 V bus) is the A axis in the
-  machine: housing in a pocket of the Z saddle, output flange on a turned adapter ring and the ground swivel plate; A is ±15°. Its bearing
+  machine: housing in a pocket of the Z saddle, output flange on the Y module ground base; A is ±15°. Its bearing
   moment rating and brake holding torque are not published (asked of ZeroErr); the model assumes the brake holds the rated output torque
   and an A acceleration of π/2 rad/s². `SwivelHead` (direct torque motor, crossed-roller support, clamp, ±45°) remains in the library
   but the hobber no longer uses it.
@@ -172,11 +172,9 @@ case checks project loading, source-derived axis limits and a coarse physical Mu
 
 ## Redesigned machine structure
 
-The example uses registered `HobberSaddle` recipes: the milled X carriage and Z saddle, the ground swivel plate, adapter ring, Y saddle, the
-spindle split-clamp seat and the servo cradle on its top, one ground bar drive pad each for X and Z, Y brackets and nut seat, scale seat bars and arm, and the electrical rack. Every made one has a
-`ManufacturingRoute` (see `supplier-packages/machined/`). The old overhead A-yoke, Y-saddle, X-bridge and Z-saddle recipes are retired.
-These extend `MachineComponent` directly. Designed steel weldments remain assumed;
-physical contacts, connected solids and recipe/pose round trips are checked.
+X uses a bought ground20 mm carriage plate and bolted bright-bar ribs; the column stands on four joint-derived sole pads spanning its footprint. Y uses `ScrewLinearModule`: ground base, derived rail risers, screw drive, carriage, adjustable sealed scale and covers. `HobberYPart` supplies the profiled actuator/head interfaces. The old Y L brackets, nut/scale seat bars, swivel plate and adapter ring are deleted. Z retains its milled saddle and carries four shared-library rail bellows; thin fabric, packed length and end sealing are ASSUMED custom RFQ requirements. X/Z drive-pad replacement by replicated support seats remains OPEN.
+
+Manufacturing routes and installed joint holes drive the machined RFQ package directly. Repeat parts aggregate by physical machining revision, independently of joint-instance face names. Assembly tools have separate Tooling BOM rows with ASSUMED EUR prices and validated step references; they are excluded from machine part/mass totals.
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md) for datums, load paths and qualification scope.
 The generic `HobberBracket` recipe is retained for saved descriptions, but is no
 longer used to assemble the machine.

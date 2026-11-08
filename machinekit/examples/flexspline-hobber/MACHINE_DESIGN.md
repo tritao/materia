@@ -7,17 +7,13 @@ Turning belongs to the separate lathe plan. This checked design is not a release
 manufacturing drawing set: stiffness, guide preload, fits and drive friction
 remain assumed inputs.
 
-## Current frames, drives and head (FRAME_PLAN.md, 2026-11-04)
+## Current frames, drives and head (LINEAR_MODULE_PLAN, 2026-11-08)
 
 This section is the current state; the sections below keep their history and are corrected where a figure changed. All of it is
 model, not released manufacturing, and every assumption is listed in [FRAME_PLAN.md](FRAME_PLAN.md) (Decisions, Open).
 
-- **Frames, no welding:** the X carriage is one milled steel part (20 mm deck, 25 mm ribs, open U); the Z saddle one milled plate
-  with the eRob pocket and the nut block bolts; one ground steel bar pad per axis (X and Z) carries both screw supports, ground together so the seats are coplanar; the Y drive stands on two milled
-  L brackets and a nut seat bar; the swivel plate is ground steel plate (the Y rails and the spindle seat are steel: aluminium would be about a third as stiff and would bow against them as it warms), the adapter ring turned aluminium; the bought Ø80 BT30 belt spindle is held
-  by one milled split-clamp seat (axial envelope assumed, `SpindleHousing.CLAMP_FROM..CLAMP_TO`); its standard-taper hob arbor is a separate made part. Each has a `ManufacturingRoute`;
-  `supplier-packages/machined/` holds their STEP, drawings and RFQ table.
-- **Drives:** SFU1605 screws (X 260, Y 170, Z 420 mm), HZMotion M60D-BK12-C mount with BF12, Leadshine ELM2H-0400 servo on each axis, Z with its built-in
+- **Frames, no welding:** X is a bought ground20 mm plate with four bolted bright-bar ribs and four full-footprint column sole pads. The retained bolts-only carriage FE is43.633 N/um and17.077 MN m/rad; no adhesive or dowel strength is credited. Rib lands require bare blast-cleaned steel and an ASSUMED coupon-qualified friction floor0.40. Z retains its milled saddle. Y is the library `ScrewLinearModule`, attached directly to the actuator output through a profiled ground base, with derived rail risers and a ground carriage carrying the original spindle-seat and outboard interfaces. The L brackets, Y nut/scale bars, swivel plate and adapter ring are deleted. X/Z support bars remain pending the requested fixture-replicated seat replacement (XA OPEN). Routes and joint-derived holes feed `supplier-packages/machined/`.
+- **Drives:** SFU1605 screws (X260 and Z420 mm; Y length derived by the module), HZMotion M60D-BK12-C mount with BF12, Leadshine ELM2H-0400 servo on each axis, Z with its built-in
   brake (holding torque assumed 2 × rated), steel nut blocks.
 - **Scales:** Yuheng JFT-40 sealed absolute BiSS-C scales, X ML 120, Y ML 70, Z ML 220, with the Abbe offset of each printed by `HobberFrameChecks.scales`.
 - **A axis:** ZeroErr eRob110I (ratio 100, brake, ±15°) on the Z saddle; output bearing moment rating and brake holding torque are unknown or assumed.
@@ -53,9 +49,7 @@ Its table seat, two column rail seats, drive seat and lifting points use shared
 Precision mounts land on inserts, never on mineral cast. The recessed column is
 400 × 200 × 500 mm, on a steel carriage and twin preloaded HGR25 bed rails.
 Z uses twin 480 mm HGR15 rails with four blocks. Its vertical saddle carries
-a ZeroErr eRob110I actuator, its housing in a pocket cut into the saddle from behind. The rotating output and vertical swivel plate
-carry the Y rails on their front face with four blocks. The spindle (in its split-clamp seat) and floating-sleeve outboard housing share the vertical
-Y saddle; there is no overhead roof. These compact motor and bearing dimensions and ratings require
+a ZeroErr eRob110I actuator, its housing in a pocket cut into the saddle from behind. The rotating output carries the screw-driven Y module. Its ground base, rail risers, four guide blocks, carriage, sealed scale and split guards form one library mechanism; the containing machine supplies its profiled head interface. The spindle split-clamp seat and floating-sleeve outboard housing share that carriage. These compact motor and bearing dimensions and ratings require
 supplier confirmation; geometry checks do not establish a thermal duty rating.
 All twelve carriages use pinned HGH25CA (X) or HGH15CA (Z/Y) supplier CAD,
 including wraparound sides and lubrication fittings. X uses matching supplier-derived
@@ -158,11 +152,7 @@ cone. The stationary lip clears the rotating face radially by 5 mm and sits
 to 2 mm above the table seat. For the default table this gives a Ø210 mm
 opening and Ø294 mm lower outside diameter, covering the full 210 mm housing.
 Removal/fastening details remain manufacturing-design work. A drilled
-coolant-manifold placeholder reserves flushing provision. The stationary rail-end
-shields have been removed at the user’s request. Rails, blocks and the central
-screw remain exposed; bellows with suitable chip protection and attached end
-frames are an open design item, including compressed-length checks at both
-travel limits. The enclosure recipe reserves
+coolant-manifold placeholder reserves flushing provision. X uses fixed overlapping sheets and a moving skirt. Y has module covers and separately retained PU lips. Z has four library rail bellows with custom ASSUMED thin-fabric envelopes and made interfaces. The offset Z screw ingress gate remains OPEN; the deleted broad Z sheets are not an alternate configuration. The enclosure recipe reserves
 the machine envelope, front loading access and optional top opening; its panels are currently omitted
 from the assembly at the user’s request for unobstructed inspection. Door interlocks,
 fluid containment and a complete conveyor are not implemented.
@@ -720,37 +710,13 @@ See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg) and [Z_DRIVE_REPORT.json](Z_DRIVE
 Block wipers: an end scraper at each end of every guide block (`WIPER-HG25-SCRAPER` on the four X blocks, `WIPER-HG15-SCRAPER` on the four Z and four Y blocks, 24 in all;
 `WayWiperCatalog`, added lengths assumed; BOM lines only, the block models do not carry them).
 
-The bellows figures in this paragraph describe the pre-P4/P5 configuration and are retained as the decision record; current protection is the fixed-sheet design below. Way covers (`machinekit.cover`, box covers of the lamella bellows row, 14 mm end walls and carriers, 2 mm gaps, opening 40 x 50 round the bare screw) measured on the
-posed machine by `HobberFrameChecks.coverFit`: X front (BF12 to the nut, stroke 64.8 mm) 28.7 mm free, 22 mm needed, flange 106 mm of the 110 mm channel: fits, but its wall
-has no host (the nut groove of the pad bar starts at x 205, 2 mm behind the BF12, the insert is 100 wide, the casting wall in front is a 12.5 mm strip); X rear (nut to BK12) -9 mm free,
-31 mm short; Z bottom 21.5 mm and Z top 23 mm free against 38 mm (4 folds for 200 mm), 16.5 and 15 mm short. Y has no room for a skin: the 28 mm between the saddle's plate and the
-swivel plate holds the rails, blocks and screw. The geometry that would make them fit: 31 mm more screw behind the nut's far stop (the bed 40 mm longer), 16.5 and 15 mm more at the two Z
-ends (a 20 mm taller column), and a purpose-made wall for the X front (an insert extended 14 mm forward with the channel front, or the pad bar milled with an upstand). The channel floor
-is the ground drive-seat insert over 100 of 110 mm, so no casting fall or drain was cut; gutters need a wider channel (at least 150 mm) and the deck ribs' inner faces, now on the channel walls, would move.
+Current protection uses seven X sheets (four sides, two lids and skirt), the Y module's split guards, and four Z rail bellows. The two broad fixed Z shields are deleted. X guard feet still stand on the ground drive bar pending XA's move onto inserts or a nonprecision bracket. All fixings follow BoltedFace joints. Fixed X nuts are fitted on the bench and reached through declared tool corridors; all four tool ports are capped. X end overlap includes5 mm overtravel; side overlap is6 mm.
 
-Phase P4 implements fixed lapped X shields and a moving skirt, rather than the
-bellows evaluated above. Nine steel sheets are individual, connected solids:
-four fixed side profiles, front/rear lids, the X skirt and two Z shields. Each
-formed role is cut from one 2 mm blank with R2 inside bends; the rear lid stays
-flat. No welding is required. The X ground pad is 100 mm wide (previously 80),
-matching its existing 100 mm insert and providing edge distance for guard
-threads. The castings and their inserts are unchanged. All mounting holes and
-hardware derive from BoltedFace joints; tool-access ports follow four assumed
-D10 / 2 mm-panel NBR plugs. Their nominal envelopes and oil compatibility are
-procurement requirements to qualify, not supplier data.
+The Z bellows cover210 mm including overtravel, fold into30 mm and use cropped H24 steel end plates. Fabric0.2 mm, packing ratio and seals are ASSUMED custom RFQ data, not supplier ratings. The end plates are relieved around the catalogue screw supports; the M4 bracket feet retain their full edge lands. Moving brackets are fitted to the saddle on the bench. Park Z high for lower end screws and low for upper end screws:32 derived driver corridors pass. Before saddle service, unbolt the moving ends and support them on the declared temporary straps. The saddle keeps its brackets; complete bellows then leave16 mm forward,100 mm outward and500 mm forward. The model checks internal overlap separately before applying each bought cover's internal clearance allowance. Full travel and end sealing remain release gates.
 
-The X lid ends clear the nut block at 5 mm overtravel, while the carriage skirt
-laps them by 14.5 mm at the front and 39.5 mm at the rear; side flat overlap is
-6 mm (10 mm projected edge overlap). The Z sheets shield the offset screw and
-exposed rail channels from Z282 to 750. Their roots and skirt tabs bolt from
-below into the existing carriage underside, preserving its two machining
-setups. Fixed lid nuts are tightened on the bench before the assembly is
-lowered onto the bed; the fixed feet are then tightened through the plugged
-ports with a long key. Fit the moving guards before lowering the carriage.
-Clear chips from the laps, refit all plugs and verify the minimum 2 mm moving
-gap throughout travel. The guards do not seal the machine: block wipers remain
-and the enclosure must contain oil mist. No drain is declared because the
-flat channel has no modelled fall or bore.
+Assembly tooling is a separate BOM category, outside machine mass and hardware counts. `HobberAssemblyTooling` validates X/Y/Z step references and exports `assembly-tooling.csv`, with ASSUMED EUR prices until quoted. It includes alignment arbors/height reference, replication kit, C mandrel, squareness and indicator references, AF4 key>=400 mm, low-profile keys, hoist/slings and bellows support straps. See ALIGNMENT.md for datums and measurement methods.
+
+The integrated Y remains a partial fit checkpoint: moving X/Y/Z202.23/29.80/63.63 kg; rotating head50.97 kg with COM(-75.8,34.6,77.0) mm from A output. Bearing tilt demand50.31 Nm has an UNKNOWN supplier rating; maximum gravity torque26.65 Nm is below87 Nm rated/204 Nm peak. The87 Nm brake is ASSUMED. Y Abbe87.8 mm versus76.2 mm before; scale acceptance stack0.24/0.22 mm requires accepted/replicated stock, since raw stock bound0.91 mm exceeds0.01 mm. Tilted Y-to-bed/tray fit, a valid Y stiffness/accuracy result, XA replicated seats/A6 qualification, and screw ingress are OPEN. The RFQ package describes the model and does not release those unresolved machine interfaces.
 
 Phase P5 puts the X nut flange on the motor side of its block. The physical
 block face is the datum, X232.5..248.5 at joint zero, and remains in the same
@@ -766,13 +732,7 @@ chip shields stay installed. At 5 mm linear overtravel, the whole nut envelope
 retains 25.5 mm race reserve and its barrel at least 32.5 mm. No source path for
 the former nut orientation or upward X removal remains.
 
-The eRob leaves with the complete Z saddle and head, rather than dismantling
-the head on the machine: the adapter output screws are behind the swivel plate.
-At X retract with Y/A centred and Z at joint zero, first remove the Y servo and
-shaft stub along their declared path; its connector envelope otherwise blocks
-the right Z guard. Unbolt each guard foot, move it forward 19, up 24, back 4,
-then outward 200 mm. The two guards have separately declared paths (no casting
-or sheet change). Release the Z nut block and all guide-block fixings from the
+The eRob leaves with the complete Z saddle and head. At X retract with Y/A centred and Z at zero, remove the Y servo/shaft if required by the declared head path. Release and support the four bellows moving ends on temporary straps; their mounting brackets stay on the saddle. Release the Z nut block and all guide-block fixings from the
 saddle, leaving the nut block on the braked screw and all four guide blocks on
 the rails. Support the unbolted reading head on the fixed Z scale while its arm
 leaves with the saddle. Disconnect cables and coolant, and support the complete

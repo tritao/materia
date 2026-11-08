@@ -81,6 +81,12 @@ class WayCoverMount extends MachineComponent {
     this.attachment = attachment == null ? null : {
       stock: attachment.stock.copy(), bolted: attachment.bolted.copy(), pinned: attachment.pinned.copy()
     };
+    var x0=-halfWidth,x1=halfWidth,y0=-below,y1=height,z0=-thickness,z1=0.0;
+    if(attachment!=null)for(b in attachment.stock) {
+      x0=Math.min(x0,b.x0);x1=Math.max(x1,b.x1);y0=Math.min(y0,b.y0);y1=Math.max(y1,b.y1);z0=Math.min(z0,b.z0);z1=Math.max(z1,b.z1);
+    }
+    addFacet(machinekit.component.ManufacturingRoute.milled(attachment==null?1:2,"fine",
+      [{name:"guard interfaces and holes; RFQ shop to confirm fixturing",tolerance:0.05,roughnessRa:3.2}],Math.max(x1-x0,Math.max(y1-y0,z1-z0))));
   }
 
   static final recipe = new machinekit.cache.Once<machinekit.component.ComponentType>();
@@ -96,7 +102,7 @@ class WayCoverMount extends MachineComponent {
       machinekit.component.ComponentRecipeSupport.text("attachment", "null")
     ], v -> new WayCoverMount(v.token("drawing"), v.number("halfWidth"), v.number("height"), v.number("thickness"),
       readBores(v.token("bores")), readCuts(v.token("cuts")), v.number("below"),
-      readAttachment(v.token("attachment"))), true).numbered(v -> v.token("drawing")));
+      readAttachment(v.token("attachment"))), true).versioned(2).numbered(v -> v.token("drawing")));
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues()

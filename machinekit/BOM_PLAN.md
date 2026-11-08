@@ -838,3 +838,8 @@ unit tests also passed.
 2. The bench mill declared fasteners from modeled patterns in B6. F1 replaced
    that with derivation from the parts' bolted faces (`JointFasteners`).
 3. B8 moves `SourcingPlan` and `SupplierOffer` to the sourcing layer.
+
+4. Hobber assembly tools are a separate `Tooling` BOM (`HobberAssemblyTooling`),
+   exported as `assembly-tooling.csv`, with ASSUMED EUR allowances until quoted.
+   They add no machine mass. Assembly steps reference tool IDs; a missing row
+   fails the hobber check. Alignment, replication and service tools are included.

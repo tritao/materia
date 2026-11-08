@@ -15,15 +15,11 @@ import machinekit.motion.NutBlock;
 /** Writes the machined and ground-stock parts of FlexsplineHobber for a machine shop or a ground-stock vendor: one STEP per part in
     its own frame (longest side along X, shortest along Z, minimum corner at the origin, holes cut), and machined-package.json with
     the route, stock, mass, holes (probed in the solid: present, through or blind), a tessellation for the drawings and the STEP
-    re-import volume. The parts are built directly (HobberSaddle designs, HobberDrives.nutBlock), the same constructors
+    re-import volume. The installed routed components and their joint machining are the source
     FlexsplineHobber installs. machined_package.py makes the drawings, the tables and the checks.
     Usage: hl main.hl <output dir>. */
 class MachinedPackageExport {
-  static final DESIGNS = [
-    "GE-X-carriage", "GE-Z-saddle", "GE-X-drive-pad", "GE-Z-drive-pad",
-    "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm", "GE-Y-saddle",
-    "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat", "GE-motor-cradle", "GE-outboard-carrier"
-  ];
+
 
   static function r(v:Float, digits:Int = 4):Float {
     var f = Math.pow(10, digits);
@@ -121,6 +117,7 @@ class MachinedPackageExport {
     toleranceClass: route.toleranceClass,
     stock: stockJson(route),
     sheet: route.sheet,
+    bar: route.bar,
     faces: [for (f in route.machinedFaces()) {name: f.name, tolerance: f.tolerance, roughnessRa: f.roughnessRa}]
   };
 
@@ -206,32 +203,34 @@ class MachinedPackageExport {
     var parts:Array<Dynamic> = [];
     // The parts of the built machine: the holes its bolted joints derive (BOM_PLAN F1) are cut into them.
     var machine = new FlexsplineHobber();
-    function member(designation:String):machinekit.component.MachineComponent {
-      for (entry in machine.components()) if (entry.component.designation == designation) return entry.component;
-      throw "FlexsplineHobber has no part " + designation;
+    HobberAssemblyTooling.writeCsv(dir+"/assembly-tooling.csv",machine);
+    // The installed assembly is the inventory. A new routed member cannot be
+    // forgotten by a second hand-maintained design list. BOM revision checking
+    // also prevents two different finished parts sharing one drawing number.
+    machine.billOfMaterials();
+    var grouped=new Map<String,{component:MachineComponent,quantity:Int,instance:String}>(),order:Array<String>=[];
+    for(entry in machine.components())if(ManufacturingRoute.of(entry.component)!=null) {
+      var key=entry.component.bom.partNumber,existing=grouped.get(key);
+      if(existing==null){grouped.set(key,{component:entry.component,quantity:1,instance:entry.id});order.push(key);}else existing.quantity++;
     }
-    for (design in DESIGNS) {
-      var saddle = cast(member("HOBBER-" + design), HobberSaddle);
-      parts.push(exportPart(dir + "/step", saddle, saddle.holes(), 1, design.substr(3) + ", " + ManufacturingRoute.of(saddle).process().split(",")[0]));
-      Sys.println("exported " + saddle.designation);
-    }
-    for (axis in HobberDrives.all()) {
-      var block = cast(member(HobberDrives.nutBlock(axis, new BallNut()).designation), NutBlock);
-      parts.push(exportPart(dir + "/step", block, block.holes(), 1, "Nut block, " + axis.id + " axis"));
-      Sys.println("exported " + block.designation);
-    }
-    parts.push(exportPart(dir + "/step", machine.spindle.arbor, [{id: "pull-stud-thread", kind: "tapped", thread: "M12",
-      diameter: 12.0, nominal: 12.0, fit: null, depth: 20.0, position: [0.0, 0, -48.4], direction: [0.0, 0, 1]}], 1, "BT30 hob arbor"));
-    for (id in ["outboard", "outboardSleeve", "outboardGland", "outboardCap", "outboardInnerSpacer"]) {
-      var part = machine.components().filter(m -> m.id == id)[0].component;
-      var holes = part.derivedRouteHoles();
-      if (id == "outboardGland") for (x in [-16.0, 16.0]) holes.push({id: x < 0 ? "spanner1" : "spanner2", kind: "bore", thread: null,
-        diameter: 2.0, nominal: 2.0, fit: null, depth: 2.0, position: [x, 0, 27], direction: [0.0, 0, -1]});
-      parts.push(exportPart(dir + "/step", part, holes, 1, part.description));
-    }
-    for (r in machinekit.hobbing.HobberChipCover.installations()) {
-      var part=cast(machine.components().filter(m->m.id==r.id)[0].component,machinekit.hobbing.HobberChipCover);
-      parts.push(exportPart(dir+"/step",part,part.derivedRouteHoles().concat(part.toolHoles()),1,part.description));
+    for(key in order) {
+      var item=grouped.get(key);if(item==null)throw "Missing routed part: "+key;
+      var part=item.component,holes=part.derivedRouteHoles();
+      if(Std.isOfType(part,HobberSaddle))holes=cast(part,HobberSaddle).holes();
+      else if(Std.isOfType(part,NutBlock))holes=cast(part,NutBlock).holes();
+      else if(Std.isOfType(part,machinekit.hobbing.HobberChipCover))holes=holes.concat(cast(part,machinekit.hobbing.HobberChipCover).toolHoles());
+      else if(Std.isOfType(part,machinekit.motion.ScrewLinearModulePart)) {
+        var modulePart=cast(part,machinekit.motion.ScrewLinearModulePart),s=modulePart.spec;
+        if(modulePart.role=="nutCarrier") {
+          var diameter=new BallNut().screwDiameter+2*(machinekit.motion.ScrewLinearModuleSpec.GAP+0.2);
+          holes.push({id:"screw-clearance",kind:"bore",thread:null,diameter:diameter,nominal:diameter,fit:null,depth:s.carrierThickness,
+            position:[s.centre-s.carrierThickness/2,0.0,s.axisHeight()],direction:[1.0,0,0]});
+        }
+      }
+      if(part==machine.spindle.arbor)holes.push({id:"pull-stud-thread",kind:"tapped",thread:"M12",diameter:12.0,nominal:12.0,fit:null,depth:20.0,position:[0.0,0,-48.4],direction:[0.0,0,1]});
+      if(item.instance=="outboardGland")for(x in [-16.0,16.0])holes.push({id:x<0?"spanner1":"spanner2",kind:"bore",thread:null,diameter:2.0,nominal:2.0,fit:null,depth:2.0,position:[x,0,27],direction:[0.0,0,-1]});
+      parts.push(exportPart(dir+"/step",part,holes,item.quantity,part.description));
+      Sys.println("exported "+part.designation+" x"+item.quantity);
     }
     var data = {
       machine: "FlexsplineHobber",

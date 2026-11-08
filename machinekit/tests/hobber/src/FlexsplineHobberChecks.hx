@@ -79,6 +79,7 @@ class FlexsplineHobberChecks {
     check(covers.indexOf("Xskirt") >= 0 && covers.indexOf("ZbellowsLeftLower-fixed") >= 0, "covers set derives from component metadata");
     Sys.println("Hobber groups: " + count + " members, no ungrouped members; " + selections.length + " derived sets");
     assertions += HobberXAssembly.check(machine);
+    assertions += HobberAssemblyTooling.check(machine);
     for(line in HobberFrameChecks.zBellowsTools(machine)){Sys.println(line);assertions++;}
     assertions += HobberDesignChecks.run(machine);
     assertions += HobberFrameChecks.run(machine);

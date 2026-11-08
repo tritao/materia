@@ -88,25 +88,34 @@ def face_text(face):
 
 
 def stock_cut(part, widths):
-    """Ground flat bar order: the bar's width is the standard width among the part's two other dimensions."""
+    """Order ground stock covering the finished profile; expose routed removal."""
     stock = part["route"]["stock"]
     if stock is None:
         return None
-    t = stock["thickness"]
-    dims = sorted(part["size"])
-    match = [d for d in dims if abs(d - t) < 1e-6]
-    if not match:
-        raise Check(f"{part['id']}: no side equals the stock thickness {t}")
+    t, dims = stock["thickness"], sorted(part["size"])
+    match = [d for d in dims if abs(d-t) < 1e-6]
+    if match:
+        finished_t = match[0]
+    elif part["route"]["faces"] and dims[0] <= t+1e-6:
+        finished_t = dims[0]
+    else:
+        raise Check(f"{part['id']}: finished profile does not fit the declared stock thickness {t}")
     rest = list(dims)
-    rest.remove(match[0])
+    rest.remove(finished_t)
+    result = {"thickness": t, "finishedThickness": finished_t, "row": stock["id"]}
     if stock.get("kind") == "plate":
-        # Ground plate: sawn to the part's two other sides; there is no standard width.
-        return {"width": min(rest), "thickness": t, "length": max(rest), "row": stock["id"], "plate": True}
-    candidates = [(w, l) for w, l in ((rest[0], rest[1]), (rest[1], rest[0])) if any(abs(w - s) < 1e-6 for s in widths)]
+        result.update(width=min(rest), length=max(rest), plate=True)
+        return result
+    candidates = []
+    for finished_w, length in ((rest[0],rest[1]),(rest[1],rest[0])):
+        for width in widths:
+            if abs(width-finished_w)<1e-6 or (part["route"]["faces"] and width>=finished_w-1e-6):
+                candidates.append((width*length,width,length,finished_w))
     if not candidates:
-        raise Check(f"{part['id']}: neither {rest} is a standard bar width")
-    w, l = max(candidates)
-    return {"width": w, "thickness": t, "length": l, "row": stock["id"]}
+        raise Check(f"{part['id']}: no standard bar width covers {rest}")
+    _,width,length,finished_w = min(candidates)
+    result.update(width=width,length=length,finishedWidth=finished_w)
+    return result
 
 
 def raw_block(part):
@@ -114,6 +123,9 @@ def raw_block(part):
 
 
 def blank_text(part):
+    if part["route"].get("bar"):
+        b = part["route"]["bar"]
+        return f"bright bar {fmt(b['width'])} x {fmt(b['thickness'])}, sawn to {fmt(b['length'])} mm"
     if part["route"]["kind"] == "FoldedSheet":
         f = part["route"]["sheet"]
         return f"sheet {fmt(f['thickness'])} mm; unfold STEP, R{fmt(f['insideRadius'])}"
@@ -130,6 +142,8 @@ def supplier_class(part):
         return "ground-stock vendor (cut to size) + CNC shop (holes and listed faces)" if part["route"]["faces"] else "ground-stock vendor"
     if kind == "Milled":
         return "CNC milling shop"
+    if kind == "SawnBar":
+        return "bright-bar supplier + drilling/reaming shop"
     if kind == "Turned":
         return "CNC lathe shop"
     if kind == "FoldedSheet":
@@ -172,6 +186,11 @@ def check_parts(data, directory, stock_widths):
                 errors.append(str(e))
         else:
             p["rawBlock"] = raw_block(p)
+        if route.get("bar"):
+            b = route["bar"]
+            blank = sorted([b["width"], b["thickness"], b["length"]])
+            if any(a > c + 1e-6 for a, c in zip(sorted(p["size"]), blank)):
+                errors.append(f"{pid}: finished part exceeds its declared bright-bar blank")
         lo, hi = [0, 0, 0], p["size"]
         for h in p["holes"]:
             if not h["present"]:
@@ -416,6 +435,14 @@ def notes_for(part):
         notes.append(f"3. Cut from ground flat {s['kind']} {fmt(part['stockCut']['width'])} x {fmt(s['thickness'])}: thickness ±{fmt(s['thicknessTolerance'], 3)}, "
                      f"flatness {fmt(s['flatness'], 3)}, parallelism {fmt(s['parallelism'], 3)} per 100 mm, Ra {fmt(s['roughnessRa'])}. Stock as bought (source: {s.get('source', 'n/a')}{', assumed' if s.get('assumed') else ''}); "
                      "broad faces stay as bought except those marked ground after cutting in the face table; sawn edges as cut.")
+        c = part["stockCut"]
+        if c["thickness"]-c["finishedThickness"] > 1e-6:
+            notes.append(f"Stock removal: {fmt(c['thickness']-c['finishedThickness'])} mm from thickness on the routed interface faces; verify final stack height.")
+        if c.get("finishedWidth") is not None and c["width"]-c["finishedWidth"] > 1e-6:
+            notes.append(f"Profile the {fmt(c['width'])} mm bought bar to the {fmt(c['finishedWidth'])} mm finished envelope; retain the listed datum faces.")
+    elif route.get("bar"):
+        b = route["bar"]
+        notes.append(f"3. {blank_text(part)}. {b['source']}" + (" ASSUMED stock data; confirm before ordering." if b.get("assumed") else ""))
     elif route["kind"] == "FoldedSheet":
         f = route["sheet"]
         notes.append(f"3. Cut and form one {fmt(f['thickness'])} mm sheet blank, {f['bends']} bends, inside radius {fmt(f['insideRadius'])} mm. "

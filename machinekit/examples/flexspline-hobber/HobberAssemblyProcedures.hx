@@ -223,6 +223,10 @@ class HobberAssemblyProcedures {
     result.push({id:"y-assembly",label:"Y: assemble and indicate the screw module",kind:Assembly,start:Assembled,
       steps:[for(i => step in machine.yModule.assemblySteps()) note("y"+i,"Y module stage "+(i+1),
         step.measurement+" Tools: "+step.tools.join(", ")+".",[for(part in step.parts) "Ymodule/"+part])],source:Generated("hobber")});
+    result.push({id:"z-assembly",label:"Z: assembly tooling and checked guard order",kind:Assembly,start:Assembled,
+      steps:[for(i=>step in HobberAssemblyTooling.zSteps(machine))note("z"+i,step.id,step.measurement+" Tools: "+step.tools.join(", ")+".",step.parts)],source:Generated("hobber")});
+    result.push({id:"datum-and-lifting-tools",label:"Datum and service lifting tooling",kind:Assembly,start:Assembled,
+      steps:[for(i=>step in HobberAssemblyTooling.steps(machine).filter(s->s.id=="C/B references"||s.id=="Head service lift"))note("tool"+i,step.id,step.measurement+" Tools: "+step.tools.join(", ")+".",step.parts)],source:Generated("hobber")});
     result.push(tensionBelt(machine));
     result.push(fitBt30Arbor());
     result.push(alignOutboard());

@@ -844,6 +844,7 @@ class HobberFrameChecks {
       Sys.println('  flange holes ${[for (h in nut.mountingHoles()) [Math.round(h.x * 10) / 10, Math.round(h.y * 10) / 10]]}, tap drill ${nut.mountingTapDrill()}, flange dia ${nut.flangeDiameter}, bolt circle ${nut.boltCircleDiameter}');
       Sys.println('  world: origin ${w(0, 0, 0)} x ${w(1, 0, 0)} y ${w(0, 1, 0)} z ${w(0, 0, 1)} base centre ${w(0, -b.centreHeight, b.thickness / 2)}');
     }
+    if(args.indexOf("tooling")>=0)HobberAssemblyTooling.check(machine);
     if(args.indexOf("bellows-travel")>=0) {
       // Expand only the validation snapshot to the declared Z overtravel.
       // The machine's operating limits and its saved design remain unchanged.

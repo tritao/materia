@@ -5,11 +5,11 @@ with a `ManufacturingRoute` facet (FRAME_PLAN H8). The exporter builds the insta
 
 ```sh
 # Run from the repository root in your task worktree.
-export HAXEON_COMPILER_SERVER=0; ulimit -s 65536
+source /media/joao/DATA1/claude-hobber-tools/env-fe.sh
 # the motor mounts' reference STEP (HZMotion) must be installed: build/suppliers/hzmotion, or MATERIA_HZMOTION_ROOT
 HL=machinekit/examples/flexspline-hobber/supplier-packages/machined
 OUT=$PWD/$HL/build                      # the exporter takes an absolute directory (haxeon run changes directory)
-./haxeon/scripts/haxeon run --project=$HL/haxeon.json -- $OUT     # about 15 s once built
+/media/joao/DATA1/claude-hobber-tools/run-fe.sh "$HL/haxeon.json" "$OUT"
 python3 $HL/machined_package.py $OUT
 ```
 
@@ -17,35 +17,25 @@ The exporter needs CadKit's native library at run time (the `haxeon run` flow se
 Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext` (poppler) is used for the read-back when present.
 `build/` is git-ignored.
 
-## Parts
+## Current inventory
 
-| Part | Process | Stock |
-|---|---|---|
-| `HOBBER-GE-X-carriage` | milled, 2 setups, fine | block |
-| `HOBBER-GE-Z-saddle` | milled, 2 setups, fine (pocket, bore and 16 screw holes for the eRob 110, R1) | block |
-| `HOBBER-GE-X-drive-pad` | one ground flat bar, 15 mm, under both supports (ground together: coplanar seats), holes of both, guard threads in edge lands | 100 x 15 |
-| `HOBBER-GE-Z-drive-pad` | one ground flat bar, 40 mm, under both supports, holes of both, cut by the mount's flange relief and the eRob housing envelope swept over the Z travel plus the 2 mm gap (`HobberZOffset.relief`) | 80 x 40 |
-| `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
-| `HOBBER-GE-Y-nut-seat` | milled from 19 mm bar, 1 setup: the seat plane (16 mm) and two key ribs 3.5 x 3 mm either side of the nut block's 20 mm base (the block is located against the screw thrust in both directions) | block |
-| `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 15 x 32, 2 M8 tapped through (the scale housing's screws; the JFT-40 housing is 32.2 wide, bolted by its side) | 32 x 15 |
-| `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
-| `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (Ø116 forward cartridge-clearance channel; spine for the Y scale head) | block |
-| `HOBBER-GE-outboard-carrier` | milled, 2 setups, fine; separate structural service interface, four derived M4 and two Ø4 H7 pins to the Y saddle | block |
-| `HOBBER-GE-swivel-plate` | ground steel plate, 15 mm (not aluminium: it carries the steel Y rails and the spindle seat), sawn to size, two faces ground after cutting, a 3 mm relief in the front face beside the Y scale housing (the head's path), holes (Y scale housing seat, 4 adapter-ring screws) | plate 15 |
-| `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
-| `HOBBER-GE-spindle-seat` | milled split-clamp block for the Ø80 g6 cartridge, 2 setups, tight | block |
-| `HOBBER-GE-motor-cradle` | milled steel, 2 setups, fine: 12 mm floor (8 mm ahead of y 195, extended forward to y 125 for the front bolt row at y 135) on the spindle seat block's top (4 × M8, 2 dowels, slit over the seat's), an 80 × 55 mm rest block (top ground flat: the seat of the shim pack under the servo body, FE 2026-11-06), 8 mm wall carrying the spindle servo's flange (Ø70 pilot slot, 4 × M6 in vertical slots, ±3 mm travel; nuts on the rear), M8 jack screw lug under the flange, one windowed 6 mm rib | block |
-| `HOB-ARBOR-BT30` | turned and ground in 2 setups, face key milled at the second setup; BT30 taper, Ø16 hob seat, M16x1 retaining thread, Ø15 journal; functional runout 0.002 (design requirement) | bar |
-| `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm (Y 20 mm), bore, holes; X and Z (part number ends `-P`) also 2 reamed Ø6 H7 dowel bores in the base end (the Y block has none: the seat's key locates it) | 60 x 16 |
+The installed assembly's `ManufacturingRoute` facets are the inventory; no parallel design list is maintained. Repeat parts aggregate by part number and physical machining revision. Bolts, counterbores and pins come from installed joints; functional arbor, gland and screw-clearance features remain explicit in their owning geometry.
 
-Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nut block per axis; a new route on a
-hobber member means adding it there.
+| Group | Current route |
+|---|---|
+| X carriage | bought ground20 mm plate; joint drilling and profiled clearances |
+| Four X ribs | sawn bright bar; the scale rib has its declared milled interface |
+| Y module | profiled ground base/carriage, standard rail riser bars, nut carrier, scale seat/head carrier and stops |
+| Head/Z interfaces | Z saddle, spindle split-clamp seat, servo cradle, outboard carrier and scale arm |
+| X/Z drive seats | existing ground bars are still in the model; XA fixture-replicated replacements remain OPEN |
+| Nut blocks and spindle/outboard | installed X/Z blocks, BT30 arbor, housing/sleeve/gland/cap/spacer |
+| Guards | seven X sheets, Y module covers/retainers and six Z bellows mounts (two finished mounting designs) |
 
-The P2 export also includes the installed outboard housing, floating sleeve, M36x1 gland, rear cap and ground inner spacer. Their separate routes preserve the indicated housing interface, matched bearing retention and thermal float. Bolt and dowel tables are derived from joints; the gland's two blind pin-spanner holes are functional tool features. See `b-align-outboard` for indication and pinning.
+Cast-in inserts and sole pads retain their casting-package manufacturing records; bought bellows and scales are not fabricated by this package. Z bellows use a custom, ASSUMED thin-fabric RFQ envelope, not a confirmed vendor product. Ground-stock data is ASSUMED until a supplier row is chosen; inspect finished interfaces and replicate failing faces before custom grinding.
 
-The P4 export adds nine chip shields: eight cut and formed 2 mm steel sheets (inside R2) and one flat rear lid. Routes carry thickness, bend count and radius separately from CNC setups. The STEP is the finished formed shape, not an unfolded blank; the sheet shop must develop the blank using its tooling and bend allowance. No welding. The Z saddle has two 6.5 mm-deep counterbores for its nut-block screw heads, keeping them clear of the guards.
+`assembly-tooling.csv` is a separate **Tooling** BOM category, excluded from machine quantities/mass. Each row carries an ASSUMED EUR price and the assembly steps that reference it. The exporter rejects an unknown tool reference. Tools include X/Y/Z drive arbors and the nut-bore height reference, replication kit, block-pad master, C/spindle mandrels, square/straightedge/level, indicators and bases, AF4 key>=400 mm, qualified low-profile keys, hoist/slings and bellows support straps. See `ALIGNMENT.md` and the generated X/Y/Z procedures.
 
-P5 installs the X nut block with its tapped flange face toward the motor; the carriage interface remains at X232.5..248.5 mm. The nut and screw withdraw rearward with the block and chip guards retained; see the generated `x-service-screw` procedure.
+This is a model RFQ package, **not a machine release**. The tilted Y-to-bed/tray fit, Y stiffness/accuracy qualification, XA replicated support seats/A6 qualification and Z screw ingress remain open in LINEAR_MODULE_PLAN.md. Part/drawing checks below validate the exported parts; they do not waive those machine-level gates.
 
 ## What is written
 
@@ -82,8 +72,7 @@ holes at assembly (procedure H7).
 - every hole of every table is in the solid (exporter probes with cylinders: the bore is empty at 0.98 r, the wall
   length of a 1.02 r probe matches the hole depth, so a missing, shifted, wider or shallower hole fails) and its mouth lies
   on the part; through or blind is measured, not assumed;
-- milled parts: at most 2 setups and at most 600 mm; ground stock: a side equals the stock thickness and the other
-  two give a standard bar width;
+- milled parts: at most 2 setups and at most 600 mm; ground stock: the finished profile fits its declared stock thickness and a standard bar width (or cut plate); routed removal allowances are listed; sawn bars contain the finished envelope;
 - the drawings read back: part number, overall dimensions, material, every hole id and coordinate and every face name
   are on the sheet and (with `pdftotext`) in the PDF.
 
