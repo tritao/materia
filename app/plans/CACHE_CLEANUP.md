@@ -91,3 +91,8 @@ Do one profile and fix what it shows, with a limit of 1.5 h. The digest (`89fab1
 - Narrower code identity for kernel queries. Lists and annotations were rejected.
 - Upstream work on OCCT's unstable serialization (the canonical-form passes).
 - A shared read-only cache.
+- Native loaders that open a path themselves, which `haxeon.build.InputFiles` cannot see (it notes reads made through `sys.io.File` and
+  `sys.FileSystem`; CadKit's STEP import reads the file in Haxe first, so it is covered): animkit `ak_asset_load_file`, robotkit
+  `rk_policy_create`, `rk_inference_create`/`_checked`/`_model_sha256` and `rk_recording_reader_open`, and the nativekit UI font, image
+  and audio loaders (`nkui_font_collection_add`, `nkui_image_load_file`, `nk_audio_clip_create_from_file`). None is used by a CAD
+  generator today. A generator that uses one must read the file in Haxe first (for its digest) or the output can be stale.
