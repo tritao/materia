@@ -202,22 +202,22 @@ class ProjectLoadingTests {
       check(files(preparedDirectory, ".mtrp").length == 1, "cold load caches portable preparation");
       check(files(artifacts, ".hl").length == 1, "cold load caches compiled code");
       check(files(artifacts, ".mtrg").length == 1, "declared deterministic output is cached");
-      check(files(root + "/cache/materia/project-tools", ".hl").length == 2, "both tools run as compiled executables");
-      check(hasPhase(coldControl, "Fingerprinting the project"), "cold load analyzes the module graph");
+      check(files(root + "/cache/materia/project-tools", ".hl").length == 1, "the build tool runs as a compiled executable");
+      check(hasPhase(coldControl, "Compiling the project"), "cold load compiles, and the compile reports its inputs");
       check(files(artifacts, ".inputs.json").length == 1, "cold load records the fingerprint's inputs");
       var warmControl = new ProjectLoadControl();
       var warmScene = MateriaProjectRunner.loadProject(manifest, null, warmControl);
       check(warmScene.recipeDocument == "first-v1", "warm output");
-      check(!hasPhase(warmControl, "Fingerprinting the project"), "warm load confirms the recorded fingerprint");
-      // A new module could change resolution: its directory listing changes, so the graph is analyzed again (same result here).
+      check(!hasPhase(warmControl, "Compiling the project"), "warm load confirms the recorded fingerprint without compiling");
+      // A new module could change resolution: its directory listing changes, so the program is compiled again (same fingerprint here, so the cached output is reused).
       File.saveContent(root + "/Unrelated.hx", "class Unrelated {}\n");
       var listingControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, listingControl).recipeDocument == "first-v1", "new module output");
-      check(hasPhase(listingControl, "Fingerprinting the project"), "a new module re-runs the analysis");
+      check(hasPhase(listingControl, "Compiling the project"), "a new module compiles again");
       File.saveContent(files(artifacts, ".inputs.json")[0], "{not json");
       var recordControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, recordControl).recipeDocument == "first-v1", "corrupt record output");
-      check(hasPhase(recordControl, "Fingerprinting the project"), "a corrupt fingerprint record is ignored");
+      check(hasPhase(recordControl, "Compiling the project"), "a corrupt fingerprint record is ignored");
       check(File.getContent(counter) == "x", "fingerprint records never change cached output");
       check(!hasPhase(warmControl, "Preparing geometry and physics"), "warm load skips preparation");
       check(
@@ -388,7 +388,7 @@ class ProjectLoadingTests {
         MateriaProjectRunner.loadProject(manifest, null, editControl).recipeDocument == "other-v2",
         "same-size source edit invalidates code and output"
       );
-      check(hasPhase(editControl, "Fingerprinting the project"), "a source edit fails fingerprint confirmation");
+      check(hasPhase(editControl, "Compiling the project"), "a source edit fails fingerprint confirmation");
       Reflect.deleteField(entry, "cache");
       File.saveContent(manifest, Json.stringify(project));
       var before = files(artifacts, ".mtrg").length;

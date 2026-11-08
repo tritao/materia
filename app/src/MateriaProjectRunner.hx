@@ -188,37 +188,13 @@ class MateriaProjectRunner {
     if (!FileSystem.exists(haxe)) throw 'Pinned Haxe compiler was not found at $haxe';
     var tools = projectToolsDirectory();
     if (control != null) control.phase("Checking for a cached build");
-    var buildCache = buildCachePrefix(
-      entry,
-      projectRoot,
-      manifestPath,
-      haxeonManifest,
-      fieldText(entry, "module"),
-      fieldText(entry, "function"),
-      haxe,
-      home,
-      tools,
-      control
-    );
-    // Compiled code is reusable even when the entrypoint's output is not deterministic. The document, when there is one, is an
-    // input like any other: its content joins the key, so an unchanged document hits and an edited one regenerates.
-    var cache = Reflect.hasField(entry, "cache") && buildCache != null ? buildCache + (recipeDocument == null ? "" : "."
-      + Sha256.encode(recipeDocument).substr(0, 16)) + ".mtrg" : null;
+    var location = buildCacheLocation(entry, projectRoot, manifestPath, haxeonManifest, fieldText(entry, "module"),
+      fieldText(entry, "function"), home, tools, recipeDocument);
+    var buildCache = location == null ? null : confirmedPrefix(location, home, tools, control);
     if (control != null) control.throwIfCancelled();
-    if (cache != null && FileSystem.exists(cache)) {
-      if (control != null) control.phase("Reading the cached build");
-      try {
-        var metadata = FileSystem.metadata(cache);
-        if (metadata == null || metadata.size > MAX_OUTPUT_BYTES) throw "Cached artifact is too large";
-        var cached = File.getBytes(cache);
-        SceneArtifact.decodeView(cached);
-        Sys.println("Materia project: reused its generated artifact");
-        return cached;
-      } catch (_:Dynamic) {
-        if (control != null) control.throwIfCancelled();
-        try FileSystem.deleteFile(cache) catch (_:Dynamic) {
-        }
-      }
+    if (buildCache != null) {
+      var reused = readCachedArtifact(outputCachePath(location, buildCache), control);
+      if (reused != null) return reused;
     }
     var tempRootValue = Sys.getEnv("TMPDIR");
     var temporaryRoot = ProjectPath.join([
@@ -248,12 +224,25 @@ class MateriaProjectRunner {
           fieldText(entry, "function"),
           outputPrefix,
           acceptsDocument,
+          location == null ? [] : location.inputs,
           control
         );
         if (control != null) control.throwIfCancelled();
-        if (compiledCache != null) try AtomicFile.writeBytes(compiledCache,
-          File.getBytes(outputPrefix + ".hl")) catch (error:Dynamic) Sys
-          .println("Materia project: could not save compiled generator: " + Std.string(error));
+        // The compile read the program and says what it read: that, not a separate analysis, is the fingerprint.
+        if (location != null) {
+          var learned = learnedPrefix(location, outputPrefix + ".record.json");
+          if (learned != null) {
+            buildCache = learned;
+            try AtomicFile.writeBytes(learned + ".hl", File.getBytes(outputPrefix + ".hl")) catch (error:Dynamic) Sys
+              .println("Materia project: could not save compiled generator: " + Std.string(error));
+            // The same fingerprint may already have an output (an earlier branch, or a change that did not alter the program).
+            var earlier = readCachedArtifact(outputCachePath(location, learned), control);
+            if (earlier != null) {
+              cleanupArtifacts(outputPrefix, temporaryRoot);
+              return earlier;
+            }
+          }
+        }
       }
       if (control != null) control.throwIfCancelled();
       Sys.println("Materia project: executing its entrypoint");
@@ -282,6 +271,7 @@ class MateriaProjectRunner {
       if (control != null) control.phase("Reading the geometry");
       SceneArtifact.decodeView(result);
       records = result;
+      var cache = location == null || buildCache == null ? null : outputCachePath(location, buildCache);
       if (cache != null) try AtomicFile.writeBytes(cache,
         result) catch (error:Dynamic) Sys.println("Materia project: could not save cache: " + Std.string(error));
     } catch (error:Dynamic) {
@@ -354,18 +344,18 @@ class MateriaProjectRunner {
     return files;
   }
 
-  static function buildCachePrefix(
+  /** Where an entrypoint's build is cached, and what it declares as inputs besides the modules the compile reads. */
+  static function buildCacheLocation(
     entry:Dynamic,
     projectRoot:String,
     manifestPath:String,
     haxeonManifest:String,
     module:String,
     functionName:String,
-    haxe:String,
     home:String,
     tools:String,
-    ?control:ProjectLoadControl
-  ):Null<String> {
+    recipeDocument:Null<String>
+  ):Null<BuildCacheLocation> {
     var inputs:Array<String> = [manifestPath];
     // Explicit non-source resources may supplement the compiler-derived module set.
     var declaration = Reflect.field(entry, "cache");
@@ -387,50 +377,70 @@ class MateriaProjectRunner {
     }
     var cacheDirectory = ProjectPath.join([cacheRoot, "materia", "generated-artifacts"]);
     if (!ensureCacheDirectory(cacheDirectory)) return null;
-    var arguments = [
-      haxeonManifest,
-      module,
-      functionName,
-      tools,
-      home,
-      Reflect.field(entry, "documentInput") == true ? "true" : "false"
-    ].concat(inputs);
-    // The fingerprint tool analyzes the entrypoint's whole module graph, which takes tens of seconds for a large machine.
-    // Its record of what that analysis read lets a repeat open confirm the same fingerprint by rehashing those files.
-    var recordPath = ProjectPath.join([
-      cacheDirectory,
-      digestHex(Sha256.make(Bytes.ofString("materia-fingerprint-record-v" + FINGERPRINT_RECORD_VERSION + "\n"
-        + arguments.join("\n")))) + ".inputs.json"
-    ]);
-    var confirmationStarted = Sys.time();
-    var confirmed = confirmFingerprint(recordPath, home, tools, control);
-    if (control != null) control.measure("Fingerprint confirmation", Sys.time() - confirmationStarted);
-    if (confirmed != null) {
-      Sys.println("Materia project: confirmed its fingerprint from recorded inputs");
-      return ProjectPath.join([cacheDirectory, confirmed]);
-    }
-    if (control != null) control.phase("Fingerprinting the project");
-    var output = runProjectTool(
-      "MateriaProjectFingerprint",
-      arguments,
-      haxe,
-      home,
-      tools,
-      "Could not fingerprint Materia project entrypoint",
-      control
-    );
-    var lines = output.split("\n");
-    var fingerprint = StringTools.trim(lines[0]);
-    if (!Sha256Digest.isHex(fingerprint)) throw "Project fingerprint has an invalid result";
-    var record = lines.length > 1 ? StringTools.trim(lines[1]) : "";
-    if (record.length > 0) try AtomicFile.writeBytes(recordPath, Bytes.ofString(record)) catch (error:Dynamic) Sys.println(
-      "Materia project: could not save fingerprint record: " + Std.string(error)
-    );
-    return ProjectPath.join([cacheDirectory, fingerprint]);
+    var documentInput = Reflect.field(entry, "documentInput") == true;
+    // What identifies the build besides its inputs: the same arguments give the same record.
+    var arguments = [haxeonManifest, module, functionName, tools, home, documentInput ? "true" : "false"].concat(inputs);
+    return {
+      directory: cacheDirectory,
+      recordPath: ProjectPath.join([
+        cacheDirectory,
+        digestHex(Sha256.make(Bytes.ofString("materia-fingerprint-record-v" + FINGERPRINT_RECORD_VERSION + "\n"
+          + arguments.join("\n")))) + ".inputs.json"
+      ]),
+      inputs: inputs,
+      outputCache: Reflect.hasField(entry, "cache"),
+      // The document is an input like any other: its content joins the output's key, so an unchanged document hits.
+      documentKey: recipeDocument == null ? "" : "." + Sha256.encode(recipeDocument).substr(0, 16)
+    };
   }
 
-  /** Must match MateriaProjectFingerprint.RECORD_VERSION. */
-  static inline var FINGERPRINT_RECORD_VERSION:Int = 1;
+  static function outputCachePath(location:BuildCacheLocation, prefix:String):Null<String>
+    return location.outputCache ? prefix + location.documentKey + ".mtrg" : null;
+
+  /** The cached output at `path`, or null (a missing, oversized or damaged one is removed). */
+  static function readCachedArtifact(path:Null<String>, control:Null<ProjectLoadControl>):Null<Bytes> {
+    if (path == null || !FileSystem.exists(path)) return null;
+    if (control != null) control.phase("Reading the cached build");
+    try {
+      var metadata = FileSystem.metadata(path);
+      if (metadata == null || metadata.size > MAX_OUTPUT_BYTES) throw "Cached artifact is too large";
+      var cached = File.getBytes(path);
+      SceneArtifact.decodeView(cached);
+      Sys.println("Materia project: reused its generated artifact");
+      return cached;
+    } catch (_:Dynamic) {
+      if (control != null) control.throwIfCancelled();
+      try FileSystem.deleteFile(path) catch (_:Dynamic) {
+      }
+      return null;
+    }
+  }
+
+  /** The cache prefix of the recorded fingerprint when everything its compile read is unchanged, else null (compile). */
+  static function confirmedPrefix(location:BuildCacheLocation, home:String, tools:String, ?control:ProjectLoadControl):Null<String> {
+    var confirmationStarted = Sys.time();
+    var confirmed = confirmFingerprint(location.recordPath, home, tools, control);
+    if (control != null) control.measure("Fingerprint confirmation", Sys.time() - confirmationStarted);
+    if (confirmed == null) return null;
+    Sys.println("Materia project: confirmed its fingerprint from recorded inputs");
+    return ProjectPath.join([location.directory, confirmed]);
+  }
+
+  /** The prefix the build just compiled belongs to; its record is kept so the next open can confirm it. */
+  static function learnedPrefix(location:BuildCacheLocation, recordFile:String):Null<String> {
+    if (!FileSystem.exists(recordFile)) throw "Project build did not report what it read";
+    var text = File.getContent(recordFile);
+    var record:Dynamic = Json.parse(text);
+    var fingerprint:Dynamic = Reflect.field(record, "fingerprint");
+    if (Reflect.field(record, "version") != FINGERPRINT_RECORD_VERSION || !Std.isOfType(fingerprint,
+      String) || !Sha256Digest.isHex(fingerprint)) throw "Project build reported an invalid record";
+    if (Reflect.field(record, "recordable") == true) try AtomicFile.writeBytes(location.recordPath,
+      Bytes.ofString(text)) catch (error:Dynamic) Sys.println("Materia project: could not save fingerprint record: " + Std.string(error));
+    return ProjectPath.join([location.directory, fingerprint]);
+  }
+
+  /** Must match MateriaProjectModuleBuild.RECORD_VERSION. */
+  static inline var FINGERPRINT_RECORD_VERSION:Int = 2;
   static final FINGERPRINT_OPTIONS = ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"];
 
   /**
@@ -527,7 +537,7 @@ class MateriaProjectRunner {
     }];
   }
 
-  /** Same rule as MateriaProjectFingerprint.listSourceDirectories: sorted subdirectory and `.hx` names, hidden excluded. */
+  /** Same rule as MateriaProjectModuleBuild.listSourceDirectories: sorted subdirectory and `.hx` names, hidden excluded. */
   static function sourceListingDigest(path:String):String {
     if (!FileSystem.exists(path) || !FileSystem.isDirectory(path)) return "missing";
     var names:Array<String> = [];
@@ -551,7 +561,7 @@ class MateriaProjectRunner {
   }
 
   static function cleanupArtifacts(outputPrefix:String, temporaryRoot:String):Void {
-    for (suffix in [".hl", ".mtrg", ".document.json", ".hl.functions", ".hl.hli", ".hl.live.json", ".hl.hlp"]) {
+    for (suffix in [".hl", ".mtrg", ".document.json", ".inputs.json", ".record.json", ".hl.functions", ".hl.hli", ".hl.live.json", ".hl.hlp"]) {
       var artifact = outputPrefix + suffix;
       if (FileSystem.exists(artifact)) FileSystem.deleteFile(artifact);
     }
@@ -569,11 +579,12 @@ class MateriaProjectRunner {
     functionName:String,
     outputPrefix:String,
     documentInput:Bool,
+    inputs:Array<String>,
     ?control:ProjectLoadControl
   ):Void {
     runProjectTool(
       "MateriaProjectModuleBuild",
-      [manifest, module, functionName, outputPrefix, home, documentInput ? "true" : "false"],
+      [manifest, module, functionName, outputPrefix, home, documentInput ? "true" : "false", tools].concat(inputs),
       haxe,
       home,
       tools,
@@ -967,4 +978,16 @@ typedef ProjectExecutionRequirement = {
   var entrypoint:String;
   var module:String;
   var reconcilesSavedRecipe:Bool;
+}
+
+private typedef BuildCacheLocation = {
+  /** The generated-artifacts directory. */
+  var directory:String;
+  /** Where the confirmable record of the last compile for these arguments is kept. */
+  var recordPath:String;
+  /** The declared input files (the project file and the cache's explicit inputs). */
+  var inputs:Array<String>;
+  /** Whether the entrypoint declares `"cache"`, which keeps its output too. */
+  var outputCache:Bool;
+  var documentKey:String;
 }

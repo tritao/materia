@@ -81,19 +81,22 @@ disposable, sit under the user's cache directory (`~/.cache/materia`):
 - **Compiled generators** (`generated-artifacts/<fingerprint>.hl`). The
   fingerprint hashes every source file and manifest of the resolved packages,
   the compiler and runtime, the native libraries' build stamps and the
-  compiler options. Any change compiles again. Computing it means analyzing
-  the entrypoint's whole module graph (about 30 s for the flexspline hobber),
-  so a **fingerprint record** (`<key>.inputs.json`) lists what that analysis
-  read: every module and input file with its content hash, the listing of
-  every source directory (so a new module that could change resolution is
-  noticed), the native libraries and the compiler options. A repeat open
-  rehashes those files and reuses the recorded fingerprint (a warm headless
-  hobber open loads its scene under 3 s after launch, down from about 40 s);
-  any difference, or a missing or unreadable record, runs the analysis again.
-- **Artifacts** (`generated-artifacts/<fingerprint>.mtrg`), only for
+  compiler options. Any change compiles again. The compile itself reports the
+  modules it read, and the build tool derives the fingerprint from them, so no
+  separate analysis of the module graph runs. A **fingerprint record**
+  (`<key>.inputs.json`) lists what the compile read: every module and input
+  file with its content hash, the listing of every source directory (so a new
+  module that could change resolution is noticed), the native libraries and the
+  compiler options. A repeat open rehashes those files and reuses the recorded
+  fingerprint without compiling (a warm headless hobber open loads its scene
+  under 3 s after launch); any difference, or a missing or unreadable record,
+  compiles again (about 12 s after a one-line edit of the hobber, the compiler
+  being incremental) and writes the new record.
+- **Artifacts** (`generated-artifacts/<fingerprint>.mtrg`, or
+  `<fingerprint>.<document hash>.mtrg` for a project opened with a recipe document), only for
   entrypoints that declare `"cache": {"inputs": [...]}`. That declaration is a
-  promise that the output is deterministic and depends only on the sources and
-  the listed files. Most examples make it.
+  promise that the output is deterministic and depends only on the sources, the
+  listed files and the document. Most examples make it.
 - **Prepared scenes** (`prepared-scenes`): packed vertex streams, mass
   properties and collision hulls derived from an artifact, keyed by the
   artifact's hash and the editor's build identity.
@@ -146,7 +149,7 @@ is code in the app itself, which depends on the kits directly.
 | Project manifest reading, compile and run | `app/src/MateriaProjectRunner.hx` |
 | Variants and legacy jobs | `ProjectVariants`, `ProjectJobs`, `ProjectVariantController` |
 | Source vs. prebuilt `.mtrg` | `ProjectSourceLoader` |
-| Generator build and fingerprint tools | `app/tools/MateriaProjectModuleBuild.hx`, `MateriaProjectFingerprint.hx` |
+| Generator build tool (also writes the fingerprint record) | `app/tools/MateriaProjectModuleBuild.hx` |
 | Scene artifact format | `materia.project.SceneArtifact` ([ProjectKit](../../../projectkit/README.md)) |
 | Assembly definition and state | `materia.assembly.AssemblyDefinition`, `AssemblyStateRecord` |
 | Loading and preparation | `ProjectArtifactLoader`, `ProjectScenePreparation`, `PreparedProjectCache` |
