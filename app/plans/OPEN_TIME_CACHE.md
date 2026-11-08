@@ -196,6 +196,8 @@ Profiled cold opens with `perf` (native, call stacks) and `haxeon run --profile=
 - `DiskStore` wrote each entry durably (fsync): 57 s over 7258 writes in an instrumented cold open. Writes are now unflushed temp + rename; entries carry a length frame so a torn one is a miss.
 - Canonicalising (write+read bytes) is only about 4 s of the 94 s of keyed-boolean time; OCCT's own booleans are the rest.
 
+- Booleans run with `SetRunParallel(true)`: on 119 captured slow operand pairs the same volume and face count, fuse 33 s -> 12 s, common 15.6 -> 10.1 s, cut 3.9 -> 3.5 s; scene keyed-boolean time 80 s -> 69 s; verify mode matched all 5849 recomputed booleans. Method: dump operands of slow booleans (temporary `CADKIT_DUMP_BOOLEANS` hook, removed), then a standalone C++ bench over the pairs (flags: history, non-destructive, OBB had no effect).
+
 Negative results (do not retry): `BRepCheck_Analyzer` in parallel mode (no gain under load, thread contention); canonicalisation tuning (4 s); Part.fuseAll is already a balanced tree.
 
 Profiling notes: the instrumented flavor probes functions that GCC finds in headers, including a prebuilt OCCT's inline accessors (10 billion calls, 2x slower). Build it with Clang: `CC=clang CXX=clang++ haxeon run --profile=instrument --profile-min-call=20 ...` (874 million dropped calls, 1.5x). The CMake tree identity includes CC/CXX, so this gets its own tree; a `-DCMAKE_CXX_COMPILER` argument alone does not reconfigure an existing tree. `hlprof-live export --format perfetto --output F` then sum B/E spans per name (the `report` subcommand only ranks samples).
