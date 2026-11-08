@@ -355,7 +355,7 @@ The Gantry picker, yaw picker, and welder enable this cache. Source contents,
 manifests, compiler options, declared inputs, and tool/native library metadata invalidate
 cached artifacts. Recipe edits always execute the generator with the new document.
 Caches live below `${XDG_CACHE_HOME:-$HOME/.cache}/materia`, in `project-tools` and
-`generated-artifacts`; stable generated entrypoints live in `project-sources`.
+`memo` (the cache store: compiled generators, fingerprint records and cached outputs share it with the kernel operation cache, under one size cap); stable generated entrypoints live in `project-sources`.
 Compiler workers use Haxeon's existing idle timeout and resident limits. Cancelling an
 open closes its helper connection, cancels that compiler transaction, and preserves the
 previous published bytecode. Unsupported hosts and `HAXEON_COMPILER_SERVER=0` use the

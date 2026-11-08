@@ -15,7 +15,7 @@ cat > "$fixture/b/GraphPreview.hx" <<'JSON'
 class GraphPreview {public static function preview():haxe.io.Bytes return haxe.io.Bytes.ofString(GraphDependency.value());}
 JSON
 cat > "$fixture/b/GraphDependency.hx" <<'JSON'
-class GraphDependency {public static function value():String return "first";}
+class GraphDependency {public static function value():String return "first" + (haxeon.build.CodeIdentity.ofModule("GraphDependency") == null ? "" : "");}
 JSON
 cp "$repo_root/haxeon/tests/ffi/host_error.hxi" "$fixture/fx.hxi"
 echo one > "$fixture/declared.txt"
@@ -33,18 +33,20 @@ fingerprint() { # prints the fingerprint the build reports
 same() { n=$((n+1)); test "$1" = "$2" || { echo "FAIL: $3 changed the fingerprint"; exit 1; }; }
 differs() { n=$((n+1)); test "$1" != "$2" || { echo "FAIL: $3 did not change the fingerprint"; exit 1; }; }
 first=$(fingerprint)
+# A program that reads code identities contains a module the compiler generates; the record must still be confirmable.
+n=$((n+1)); grep -q '"recordable":true' "$fixture/out.record.json" || { echo "FAIL: the record is not confirmable"; exit 1; }
 same "$first" "$(fingerprint)" "an unchanged repeat"
 clean=$(HAXEON_COMPILER_SERVER=0 fingerprint)
 same "$first" "$clean" "a clean (one-shot) compile instead of the incremental one"
 echo 'class Unrelated {public static function unused():Int return 1;}' > "$fixture/b/Unrelated.hx"
 same "$first" "$(fingerprint)" "a module nothing imports"
 rm "$fixture/b/Unrelated.hx"
-echo 'class GraphDependency {public static function value():String return "changed";}' > "$fixture/b/GraphDependency.hx"
+echo 'class GraphDependency {public static function value():String return "changed" + (haxeon.build.CodeIdentity.ofModule("GraphDependency") == null ? "" : "");}' > "$fixture/b/GraphDependency.hx"
 changed=$(fingerprint)
 differs "$first" "$changed" "editing an imported module"
-echo 'class GraphDependency {public static function value():String return "first";}' > "$fixture/b/GraphDependency.hx"
+echo 'class GraphDependency {public static function value():String return "first" + (haxeon.build.CodeIdentity.ofModule("GraphDependency") == null ? "" : "");}' > "$fixture/b/GraphDependency.hx"
 same "$first" "$(fingerprint)" "restoring the module"
-echo 'class GraphDependency {public static function value():String return "shadow";}' > "$fixture/a/GraphDependency.hx"
+echo 'class GraphDependency {public static function value():String return "shadow" + (haxeon.build.CodeIdentity.ofModule("GraphDependency") == null ? "" : "");}' > "$fixture/a/GraphDependency.hx"
 differs "$first" "$(fingerprint)" "a module in an earlier root shadowing an imported one"
 rm "$fixture/a/GraphDependency.hx"
 echo one-edited > "$fixture/declared.txt"

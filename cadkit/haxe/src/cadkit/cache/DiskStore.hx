@@ -6,7 +6,7 @@ import sys.FileSystem;
 import sys.io.File;
 
 /**
- * The disk store behind the kernel operation cache (`OpCache`): one file per entry in a directory, named by the SHA-256 of the full key, with a
+ * The disk store behind the kernel operation cache (`OpCache`) and the generated artifacts of Materia projects: one file per entry in a directory, named by the SHA-256 of the full key, with a
  * size cap and least-recently-used eviction (by file modification time, which a hit refreshes).
  *
  * Writes are atomic (temp file then rename), so concurrent writers and readers, in this or another process, see either the
@@ -134,6 +134,9 @@ class DiskStore {
     } catch (error:Dynamic) {
     }
   }
+
+  /** Drops one entry (a damaged one, for instance). */
+  public function remove(key:String):Void deleteQuietly(fileFor(key));
 
   /** Deletes every entry. */
   public function clear():Void {

@@ -3,6 +3,7 @@ import app.ProjectLoadControl;
 import app.PreparedProjectCache;
 import app.CadPreviewGeometry;
 import materia.project.SceneArtifact;
+import cadkit.cache.DiskStore;
 import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 import haxe.Json;
@@ -30,6 +31,30 @@ class ProjectLoadingTests {
       name,
       extension
     )) root + "/" + name];
+
+  /** The store's entries are `<sha256>.memo` files: an 8-byte frame, then the payload. Which kind one is shows in its first bytes. */
+  static function kindOf(path:String):String {
+    var bytes = File.getBytes(path);
+    if (bytes.length < 11) return "other";
+    if (bytes.get(8) == "{".code) return "record";
+    return bytes.get(8) == "H".code && bytes.get(9) == "L".code && bytes.get(10) == "B".code ? "generator" : "output";
+  }
+
+  static function stored(store:String, kind:String):Array<String> return [for (path in files(store, ".memo")) if (kindOf(path) == kind) path];
+
+  static function payload(path:String):Bytes {
+    var bytes = File.getBytes(path);
+    return bytes.sub(8, bytes.length - 8);
+  }
+
+  /** `text` as a well-formed store entry, so the damage a test plants is in the payload and not in the frame. */
+  static function framed(text:String):Bytes {
+    var body = Bytes.ofString(text), bytes = Bytes.alloc(8 + body.length);
+    bytes.setInt32(0, 0x4D454D31);
+    bytes.setInt32(4, body.length);
+    bytes.blit(8, body, 0, body.length);
+    return bytes;
+  }
 
   static function remove(root:String):Void {
     if (!FileSystem.exists(root)) return;
@@ -193,18 +218,19 @@ class ProjectLoadingTests {
         entrypoints: {preview: entry}
       };
       File.saveContent(manifest, Json.stringify(project));
-      var artifacts = root + "/cache/materia/generated-artifacts";
+      var artifacts = root + "/cache/materia/memo";
+      DiskStore.useProcess(new DiskStore(artifacts, 1e9));
       var coldControl = new ProjectLoadControl();
       var coldScene = MateriaProjectRunner.loadProject(manifest, null, coldControl);
       check(coldScene.recipeDocument == "first-v1", "cold output");
       check(hasPhase(coldControl, "Preparing geometry and physics"), "cold load prepares data");
       var preparedDirectory = root + "/cache/materia/prepared-scenes";
       check(files(preparedDirectory, ".mtrp").length == 1, "cold load caches portable preparation");
-      check(files(artifacts, ".hl").length == 1, "cold load caches compiled code");
-      check(files(artifacts, ".mtrg").length == 1, "declared deterministic output is cached");
+      check(stored(artifacts, "generator").length == 1, "cold load caches compiled code");
+      check(stored(artifacts, "output").length == 1, "declared deterministic output is cached");
       check(files(root + "/cache/materia/project-tools", ".hl").length == 1, "the build tool runs as a compiled executable");
       check(hasPhase(coldControl, "Compiling the project"), "cold load compiles, and the compile reports its inputs");
-      check(files(artifacts, ".inputs.json").length == 1, "cold load records the fingerprint's inputs");
+      check(stored(artifacts, "record").length == 1, "cold load records the fingerprint's inputs");
       var warmControl = new ProjectLoadControl();
       var warmScene = MateriaProjectRunner.loadProject(manifest, null, warmControl);
       check(warmScene.recipeDocument == "first-v1", "warm output");
@@ -214,7 +240,7 @@ class ProjectLoadingTests {
       var listingControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, listingControl).recipeDocument == "first-v1", "new module output");
       check(hasPhase(listingControl, "Compiling the project"), "a new module compiles again");
-      File.saveContent(files(artifacts, ".inputs.json")[0], "{not json");
+      File.saveBytes(stored(artifacts, "record")[0], framed("{not json"));
       var recordControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, recordControl).recipeDocument == "first-v1", "corrupt record output");
       check(hasPhase(recordControl, "Compiling the project"), "a corrupt fingerprint record is ignored");
@@ -237,7 +263,7 @@ class ProjectLoadingTests {
           "fresh native geometry ownership with matching mesh counts"
         );
       }
-      var artifactBytes = File.getBytes(files(artifacts, ".mtrg")[0]);
+      var artifactBytes = payload(stored(artifacts, "output")[0]);
       var digest = Sha256.make(artifactBytes), artifactHash = new StringBuf();
       var digits = "0123456789abcdef";
       for (i in 0...digest.length) {
@@ -365,16 +391,14 @@ class ProjectLoadingTests {
         MateriaProjectRunner.loadProject(manifest, "recipe-b").recipeDocument == "recipe-b-v1",
         "changed editable input"
       );
-      check(files(artifacts, ".hl").length == 1, "recipe changes reuse compiled code");
+      check(stored(artifacts, "generator").length == 1, "recipe changes reuse compiled code");
       check(File.getContent(counter) == "xxx", "each new editable input executes once");
       check(
         MateriaProjectRunner.loadProject(manifest, "recipe-a").recipeDocument == "recipe-a-v1",
         "unchanged editable input reopens"
       );
       check(File.getContent(counter) == "xxx", "unchanged editable input hits the output cache");
-      var plain = files(artifacts, ".mtrg");
-      plain.sort((a, b) -> a.length - b.length);
-      File.saveContent(plain[0], "corrupt");
+      for (path in stored(artifacts, "output")) File.saveBytes(path, framed("corrupt"));
       check(MateriaProjectRunner.loadProject(manifest).recipeDocument == "first-v1", "corrupt output regenerates");
       check(File.getContent(counter) == "xxxx", "corrupt output executes again");
       File.saveContent(data, "other");
@@ -391,12 +415,12 @@ class ProjectLoadingTests {
       check(hasPhase(editControl, "Compiling the project"), "a source edit fails fingerprint confirmation");
       Reflect.deleteField(entry, "cache");
       File.saveContent(manifest, Json.stringify(project));
-      var before = files(artifacts, ".mtrg").length;
+      var before = stored(artifacts, "output").length;
       MateriaProjectRunner.loadProject(manifest);
-      var compiled = files(artifacts, ".hl").length;
+      var compiled = stored(artifacts, "generator").length;
       MateriaProjectRunner.loadProject(manifest);
-      check(files(artifacts, ".hl").length == compiled, "uncached output still reuses compiled code");
-      check(files(artifacts, ".mtrg").length == before, "uncached generators never cache output");
+      check(stored(artifacts, "generator").length == compiled, "uncached output still reuses compiled code");
+      check(stored(artifacts, "output").length == before, "uncached generators never cache output");
       check(File.getContent(counter).length == 8, "uncached generator executes on each open");
       var control = new ProjectLoadControl();
       control.cancel();
@@ -421,12 +445,25 @@ class ProjectLoadingTests {
       check(MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument == "other-v2", "variant switch back hits");
       check(MateriaProjectRunner.loadProject(manifest, null, null, "other").recipeDocument == "alternate-v2", "variant hits");
       check(File.getContent(counter).length == runsBeforeVariants + 2, "each variant executes once, then reuses its output");
+      // Artifacts are store entries like any other: a store over its cap evicts them, and the next open regenerates the same output.
+      var runsBeforeEviction = File.getContent(counter).length;
+      var kept = MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument;
+      check(stored(artifacts, "output").length > 0 && stored(artifacts, "generator").length > 0 && stored(artifacts, "record").length > 0,
+        "the store holds an output, a generator and a record");
+      var tiny = new DiskStore(artifacts, 1.0);
+      tiny.evict();
+      check(files(artifacts, ".memo").length == 0, "a store over its cap evicts artifacts, generators and records");
+      var regenerated = MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument;
+      check(regenerated == kept, "after eviction the next open regenerates the same output");
+      check(File.getContent(counter).length == runsBeforeEviction + 1, "the evicted output was generated again");
     } catch (error:Dynamic) {
       Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      DiskStore.useProcess(null);
       remove(root);
       throw error;
     }
     Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    DiskStore.useProcess(null);
     remove(root);
     Sys.println("Project loading tests passed");
     return 0;

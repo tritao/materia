@@ -76,15 +76,17 @@ overrides layered over it, not as a copy of it (see
 ### Caching
 
 Opening the same project again should not rebuild it. Three caches, all
-disposable, sit under the user's cache directory (`~/.cache/materia`):
+disposable, sit under the user's cache directory (`~/.cache/materia`). The first
+two are entries of the one cache store (`memo`, shared with the kernel operation
+cache, capped by `MATERIA_MEMO_MAX_MB`, least recently used evicted first):
 
-- **Compiled generators** (`generated-artifacts/<fingerprint>.hl`). The
+- **Compiled generators** (store entry `generator/<fingerprint>`). The
   fingerprint hashes every source file and manifest of the resolved packages,
   the compiler and runtime, the native libraries' build stamps and the
   compiler options. Any change compiles again. The compile itself reports the
   modules it read, and the build tool derives the fingerprint from them, so no
   separate analysis of the module graph runs. A **fingerprint record**
-  (`<key>.inputs.json`) lists what the compile read: every module and input
+  (store entry `record/<build arguments>`) lists what the compile read: every module and input
   file with its content hash, the listing of every source directory (so a new
   module that could change resolution is noticed), the native libraries and the
   compiler options. A repeat open rehashes those files and reuses the recorded
@@ -92,8 +94,7 @@ disposable, sit under the user's cache directory (`~/.cache/materia`):
   under 3 s after launch); any difference, or a missing or unreadable record,
   compiles again (about 12 s after a one-line edit of the hobber, the compiler
   being incremental) and writes the new record.
-- **Artifacts** (`generated-artifacts/<fingerprint>.mtrg`, or
-  `<fingerprint>.<document hash>.mtrg` for a project opened with a recipe document), only for
+- **Artifacts** (store entry `output/<fingerprint>`, plus the document hash for a project opened with a recipe document), only for
   entrypoints that declare `"cache": {"inputs": [...]}`. That declaration is a
   promise that the output is deterministic and depends only on the sources, the
   listed files and the document. Most examples make it.
