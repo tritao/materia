@@ -9,7 +9,7 @@ export XDG_CACHE_HOME="$fixture/cache"
 mkdir -p "$fixture/a" "$fixture/b" "$fixture/app/tools" "$fixture/app/build/host/native/kit" "$fixture/cache"
 cp "$repo_root"/app/tools/*.hx "$fixture/app/tools/"
 cat > "$fixture/haxeon.json" <<'JSON'
-{"version":1,"package":{"name":"fingerprint-fixture"},"entry":"GraphPreview","sourceRoots":["a","b"],"target":"host"}
+{"version":1,"package":{"name":"fingerprint-fixture"},"entry":"GraphPreview","sourceRoots":["a","b"],"ffi":{"interfaces":["fx.hxi"]},"target":"host"}
 JSON
 cat > "$fixture/b/GraphPreview.hx" <<'JSON'
 class GraphPreview {public static function preview():haxe.io.Bytes return haxe.io.Bytes.ofString(GraphDependency.value());}
@@ -17,6 +17,7 @@ JSON
 cat > "$fixture/b/GraphDependency.hx" <<'JSON'
 class GraphDependency {public static function value():String return "first";}
 JSON
+cp "$repo_root/haxeon/tests/ffi/host_error.hxi" "$fixture/fx.hxi"
 echo one > "$fixture/declared.txt"
 echo native > "$fixture/app/build/host/native/kit/libkit.hdll"
 haxe="$repo_root/haxeon/.tools/haxe/haxe"
@@ -53,8 +54,12 @@ sed -i 's/"target":"host"/"target":"host","defines":["fingerprint-probe"]/' "$fi
 differs "$first" "$(fingerprint)" "editing the project manifest"
 sed -i 's/,"defines":\["fingerprint-probe"\]//' "$fixture/haxeon.json"
 same "$first" "$(fingerprint)" "restoring the manifest"
+sed -i 's/^}$/\textern fn another(value: i32) -> i32 @symbol("another_call");\n}/' "$fixture/fx.hxi"
+differs "$first" "$(fingerprint)" "editing an FFI interface"
+cp "$repo_root/haxeon/tests/ffi/host_error.hxi" "$fixture/fx.hxi"
+same "$first" "$(fingerprint)" "restoring the FFI interface"
 echo native-changed > "$fixture/app/build/host/native/kit/libkit.hdll"
 differs "$first" "$(fingerprint)" "a native library with another size"
 echo native > "$fixture/app/build/host/native/kit/libkit.hdll"
 differs "$first" "$(HAXEON_INLINE=0 fingerprint)" "a compiler option"
-echo "Fingerprint: $n checks (stable, clean = incremental, unrelated module ignored, module edit, shadowing module, declared input, manifest, native library, compiler option)."
+echo "Fingerprint: $n checks (stable, clean = incremental, unrelated module ignored, module edit, shadowing module, declared input, FFI interface, manifest, native library, compiler option)."
