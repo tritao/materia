@@ -660,12 +660,40 @@ class Shape {
   }
 
   /** Kept on disk under the construction keys of both inputs when they have them (`OpCache`); the result is then the canonical form. */
-  public function common(other:Shape):Shape return cadkit.cache.OpCache.boolean(
-    "common",
-    this,
-    other,
-    () -> commonDirect(other)
-  );
+  public function common(other:Shape):Shape {
+    // Shapes whose bounding boxes are apart share nothing: the answer is the empty shape, without a boolean (a large part of the
+    // common operations of a scene are overlap questions with this answer).
+    if (key != null && other.key != null && threadAttributes.length == 0 && other.threadAttributes.length == 0 && apartFrom(other)) {
+      var empty = Shape.compound([]).canonical();
+      empty.key = ShapeKey.op("common", "", [this, other]);
+      empty.gap = null;
+      return empty;
+    }
+    return cadkit.cache.OpCache.boolean("common", this, other, () -> commonDirect(other));
+  }
+
+  private var extent:Null<Array<Float>>;
+
+  /** The bounding box as [minX, minY, minZ, maxX, maxY, maxZ], measured once per shape; null when it cannot be measured. */
+  private function extentBox():Null<Array<Float>> {
+    if (extent == null) {
+      try {
+        var box = bounds(), low = box.get_min(), high = box.get_max();
+        extent = [low.get_x(), low.get_y(), low.get_z(), high.get_x(), high.get_y(), high.get_z()];
+      } catch (error:Dynamic) {
+        return null;
+      }
+    }
+    return extent;
+  }
+
+  /** True when the bounding boxes are separated by more than a micrometre on some axis, so the shapes cannot meet. */
+  private function apartFrom(other:Shape):Bool {
+    var a = extentBox(), b = other.extentBox();
+    if (a == null || b == null) return false;
+    for (axis in 0...3) if (a[axis] > b[axis + 3] + 1e-3 || b[axis] > a[axis + 3] + 1e-3) return true;
+    return false;
+  }
 
   private function commonDirect(other:Shape):Shape {
     if (threadAttributes.length > 0 || other.threadAttributes.length > 0) return operationShape(commonOperation(other));

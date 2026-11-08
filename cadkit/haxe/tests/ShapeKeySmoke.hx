@@ -915,6 +915,27 @@ class ShapeKeySmoke {
     check(base.subtractAll(order).shape.key != kept.shape.key, "the tool order is part of the key");
   }
 
+  /** `common` of shapes whose bounding boxes are apart is the empty shape without a native boolean. */
+  static function commonApart():Void {
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    var box = Part.box(10, 10, 10);
+    var far = Part.box(10, 10, 10).translated(new cadkit.modeling.Vector(30, 0, 0));
+    var empty = box.shape.common(far.shape);
+    var snapshot = OpCache.snapshot();
+    check(empty.key != null && empty.key == box.shape.common(far.shape).key, "an apart common is keyed, the same key each time");
+    check(snapshot.misses == 0 && snapshot.hits == 0, "and runs no boolean: " + snapshot.misses + "/" + snapshot.hits);
+    check(Math.abs(empty.volume()) < 1e-9 && empty.subshapeCount(CadKit.ShapeKind.Solid) == 0, "it is empty");
+    check(hex(empty.canonical().toBytes()) == hex(empty.toBytes()), "in canonical form");
+    var near = Part.box(10, 10, 10).translated(new cadkit.modeling.Vector(10, 0, 0));
+    var touching = box.shape.common(near.shape);
+    check(OpCache.snapshot().misses == 1, "boxes that touch still go to the kernel");
+    check(Math.abs(touching.volume()) < 1e-9, "and share no volume");
+    var overlapping = Part.box(10, 10, 10).translated(new cadkit.modeling.Vector(5, 0, 0));
+    check(Math.abs(box.shape.common(overlapping.shape).volume() - 500) < 1e-6, "overlapping boxes give their overlap");
+  }
+
   public static function main():Void run();
 
   public static function run():Void {
@@ -930,6 +951,7 @@ class ShapeKeySmoke {
     canonicalKeys();
     tessellation();
     cutMany();
+    commonApart();
     Sys.println("shape key smoke: " + passed + " checks passed");
   }
 }
