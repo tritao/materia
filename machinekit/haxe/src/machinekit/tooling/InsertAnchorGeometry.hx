@@ -38,7 +38,7 @@ typedef AnchorWindow = {
 enum InsertAnchorContext {
   FootprintOnly;
   /** `bodyKey` names `body`'s geometry, as `MachineComponent.geometryKey` of the casting it was realized from: equal
-   * keys must mean equal solids, so a persistent key also names the code that built the body (`CodeIdentity.ofObject`). A derivation in a keyed casting is remembered; null derives every time. */
+   * keys must mean equal solids. A derivation in a keyed casting is remembered; null derives every time. */
   Casting(body:Part, pose:materia.assembly.AssemblyRecord.AssemblyFrame, bodyKey:Null<String>);
 }
 
@@ -822,32 +822,7 @@ class InsertAnchorGeometry {
    * derives the same fixed inserts in every pass and once more for the lifting layout, and the result (or the reason none
    * fits) depends on nothing else. Only component values are kept; each caller gets its own copy.
    */
-  static final derived:machinekit.cache.Memo<InsertAnchorDerivation> = new machinekit.cache.Memo<InsertAnchorDerivation>("anchor-derivations", 512)
-    .persist(machinekit.cache.CodeIdentity.of("machinekit.tooling.InsertAnchorGeometry"), encodeDerivation, decodeDerivation);
-
-  static function encodeDerivation(value:InsertAnchorDerivation):haxe.io.Bytes {
-    var out = new haxe.io.BytesOutput();
-    switch value {
-      case Built(values):
-        out.writeByte(1);
-        machinekit.cache.Codecs.writeValues(out, values);
-      case Failed(reason):
-        out.writeByte(0);
-        machinekit.cache.Codecs.writeText(out, reason);
-    }
-    return out.getBytes();
-  }
-
-  static function decodeDerivation(bytes:haxe.io.Bytes):InsertAnchorDerivation {
-    var input = new haxe.io.BytesInput(bytes);
-    var value = switch input.readByte() {
-      case 1: Built(machinekit.cache.Codecs.readValues(input));
-      case 0: Failed(machinekit.cache.Codecs.readText(input));
-      default: throw "stored derivation has an unknown tag";
-    };
-    machinekit.cache.Codecs.finished(input, bytes);
-    return value;
-  }
+  static final derived:machinekit.cache.Memo<InsertAnchorDerivation> = new machinekit.cache.Memo<InsertAnchorDerivation>("anchor-derivations", 512);
 
   static function derivationKey(
     source:CastInsert,
@@ -859,9 +834,7 @@ class InsertAnchorGeometry {
       case FootprintOnly: "footprint";
       case Casting(_, pose, bodyKey): bodyKey == null ? null : bodyKey + "|" + haxe.Json.stringify(pose);
     };
-    // The derivation runs the source class's code too (insertSpec), which this module need not import.
-    var sourceCode = machinekit.cache.CodeIdentity.ofObject(source);
-    return where == null || sourceCode == null ? null : source.geometryKey() + "|code:" + sourceCode + "|" + haxe.Json.stringify(rule)
+    return where == null ? null : source.geometryKey() + "|" + haxe.Json.stringify(rule)
       + "|" + where + "|" + Std.string(liftingShareN);
   }
 

@@ -342,9 +342,8 @@ class AssemblyPreview {
   }
 
   /**
-   * The scene part of a component's preview. When the component is named by its recipe (`geometryKey`) and its class has a code
-   * identity, the key is that name plus the class's code identity, so an unchanged component costs nothing, not even building its
-   * solid; otherwise the solid is built and the part is keyed on its content (`part`).
+   * The scene part of a component's preview. When the component is named by its recipe (`geometryKey`), the key is that name, so a
+   * component seen before costs nothing, not even building its solid; otherwise the solid is built and the part is keyed on its content (`part`).
    */
   static function componentPart(
     id:String,
@@ -353,10 +352,9 @@ class AssemblyPreview {
     mass:MassProperties,
     maxGeometricFaces:Int
   ):SceneArtifactPart {
-    var code = machinekit.cache.CodeIdentity.ofObject(component);
     var geometry = component.geometryKey(ComponentDetail.Preview);
-    var key:Null<String> = code == null || StringTools.startsWith(geometry,
-      "instance|") ? null : geometry + "|code:" + code + "|" + massKey(mass) + "|" + maxGeometricFaces;
+    var key:Null<String> = StringTools.startsWith(geometry,
+      "instance|") ? null : geometry + "|" + massKey(mass) + "|" + maxGeometricFaces;
     var result = componentParts.get(
       key,
       () -> part(
@@ -378,31 +376,13 @@ class AssemblyPreview {
     "scene-component-part",
     256,
     value -> Reflect.copy(value)
-  ).persist(
-    machinekit.cache.CodeIdentity.of("machinekit.assembly.AssemblyPreview"),
-    encodePart,
-    decodePart
   );
 
   static final parts:machinekit.cache.Memo<SceneArtifactPart> = new machinekit.cache.Memo<SceneArtifactPart>(
     "scene-part",
     256,
     value -> Reflect.copy(value)
-  ).persist(
-    machinekit.cache.CodeIdentity.of("machinekit.assembly.AssemblyPreview"),
-    encodePart,
-    decodePart
   );
-
-  /** One part stored as a one-part scene artifact: the artifact format already is the exact form of every field. */
-  static function encodePart(value:SceneArtifactPart):haxe.io.Bytes return materia.project.SceneArtifact.encode({
-    lengthUnit: "mm",
-    metresPerUnit: LengthUnit.metresPerUnit("mm"),
-    parts: [value]
-  });
-
-  static function decodePart(bytes:haxe
-    .io.Bytes):SceneArtifactPart return materia.project.SceneArtifact.decode(bytes).parts[0];
 
   static function buildPart(
     id:String,

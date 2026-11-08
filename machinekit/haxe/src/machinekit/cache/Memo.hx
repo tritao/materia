@@ -1,7 +1,5 @@
 package machinekit.cache;
 
-import cadkit.cache.DiskStore;
-import haxe.io.Bytes;
 import sys.thread.Mutex;
 
 /**
@@ -42,9 +40,6 @@ class Memo<V> implements MemoTable {
   var missCount:Int;
   var evictionCount:Int;
   var computeSeconds:Float;
-  var diskHitCount:Int;
-  var disk:Null<MemoDisk<V>>;
-  var canonical:Null<V -> V>;
 
   /**
    * `copyOut` gives each caller its own value (identity when omitted: the value must then never be changed by anyone);
@@ -65,9 +60,6 @@ class Memo<V> implements MemoTable {
     missCount = 0;
     evictionCount = 0;
     computeSeconds = 0;
-    diskHitCount = 0;
-    disk = null;
-    canonical = null;
     Memos.register(this);
   }
 
@@ -76,81 +68,10 @@ class Memo<V> implements MemoTable {
     if (key == null) return compute();
     var found = lookup(key);
     if (found != null) return found.value;
-    var tier = disk;
-    var store = tier == null ? null : tier.store();
-    if (store == null) tier = null;
-    var diskKey:Null<String> = null;
-    var stored:Null<Bytes> = null;
-    if (tier != null) {
-      diskKey = tier.keyFor(name, key);
-      stored = store.read(diskKey);
-      if (stored != null && !DiskStore.verifying()) {
-        var decoded:Null<MemoFound<V>> = null;
-        try decoded = new MemoFound<V>(tier.decode(stored)) catch (error:Dynamic) {
-        }
-        if (decoded != null) {
-          count(true);
-          return keep(key, decoded.value, 0);
-        }
-        stored = null;
-      }
-    }
     var began = Sys.time();
     var value = compute();
-    if (canonical != null) value = canonical(value);
     var seconds = Sys.time() - began;
-    if (tier != null && diskKey != null) {
-      var encoded = tier.encode(value);
-      if (stored != null) {
-        if (!sameBytes(stored,
-          encoded)) throw 'persistent memo "$name" is stale for key "$key": the stored value differs from a recomputation (a dependency is missing from its code identity)';
-        count(true);
-      } else store.write(diskKey, encoded);
-    }
     return keep(key, value, seconds);
-  }
-
-  /**
-   * Every computed value passes through `fn` (which takes ownership of its argument) before it is kept, whether or not the
-   * persistent tier is on, so a miss and a hit give the same value. For native shapes `fn` is `Shape.canonical`: a shape
-   * restored from bytes differs from the one built in last-bit details, and results must not depend on the cache state.
-   */
-  public function canonicalize(fn:V -> V):Memo<V> {
-    canonical = fn;
-    return this;
-  }
-
-  /**
-   * Adds the persistent tier: a miss in memory is looked up on disk before it is computed, and a computed value is stored.
-   * `identity` names the code that computes the values (see `CodeIdentity`); an entry made under another identity is never
-   * read. `encode` and `decode` must round-trip exactly, since the cached scene has to equal an uncached one to the bit.
-   * With `MATERIA_MEMO_VERIFY=1` a disk hit is recomputed and compared, and any difference throws. The key also carries the native
-   * build (`Memos.nativeIdentity`). Does nothing when the process has no store (`MATERIA_MEMO=off`), the module is unknown
-   * (null identity) or no CadKit build sits beside the program.
-   */
-  public function persist(identity:Null<String>, encode:V -> Bytes, decode:Bytes -> V):Memo<V> {
-    // MATERIA_MEMO_COMPONENTS=off keeps the kernel's operation cache but not these code-identity memos (to measure what they add).
-    var native = identity == null || DiskStore.process() == null || Sys.getEnv("MATERIA_MEMO_COMPONENTS") == "off" ? null : Memos.nativeIdentity();
-    disk = identity == null || native == null ? null : new MemoDisk<V>(null, identity + "|" + native, encode, decode);
-    return this;
-  }
-
-  /** For tests: the same as `persist` with an explicit store. */
-  public function persistIn(store:DiskStore, identity:String, encode:V -> Bytes, decode:Bytes -> V):Memo<V> {
-    disk = new MemoDisk<V>(store, identity, encode, decode);
-    return this;
-  }
-
-  function count(disk:Bool):Void {
-    lock.acquire();
-    if (disk) diskHitCount++;
-    lock.release();
-  }
-
-  static function sameBytes(a:Bytes, b:Bytes):Bool {
-    if (a.length != b.length) return false;
-    for (index in 0...a.length) if (a.get(index) != b.get(index)) return false;
-    return true;
   }
 
   /** Whether `key` is kept (a hit is not counted). */
@@ -224,7 +145,6 @@ class Memo<V> implements MemoTable {
     missCount = 0;
     evictionCount = 0;
     computeSeconds = 0;
-    diskHitCount = 0;
     lock.release();
     if (release != null) for (value in dropped) release(value);
   }
@@ -238,8 +158,7 @@ class Memo<V> implements MemoTable {
       hits: hitCount,
       misses: missCount,
       evictions: evictionCount,
-      computeSeconds: computeSeconds,
-      diskHits: diskHitCount
+      computeSeconds: computeSeconds
     };
     lock.release();
     return result;
@@ -287,8 +206,6 @@ typedef MemoStats = {
   var evictions:Int;
   /** Time spent computing the values that missed, s (wall, summed over threads). */
   var computeSeconds:Float;
-  /** Misses answered from the persistent tier (they are also counted in `misses`). */
-  var diskHits:Int;
 }
 
 /** What the registry knows of a memo. */
@@ -310,25 +227,4 @@ private class MemoEntry<V> {
     newer = null;
     older = null;
   }
-}
-
-/** A memo's persistent tier: the store, the code identity, and the value codec. */
-private class MemoDisk<V> {
-  /** An explicit store (tests), else the process-wide one, looked up at each use so tests can point it elsewhere. */
-  final fixed:Null<DiskStore>;
-  final identity:String;
-  public final encode:V -> Bytes;
-  public final decode:Bytes -> V;
-
-  public function store():Null<DiskStore> return fixed == null ? DiskStore.process() : fixed;
-
-  public function new(fixed:Null<DiskStore>, identity:String, encode:V -> Bytes, decode:Bytes -> V) {
-    this.fixed = fixed;
-    this.identity = identity;
-    this.encode = encode;
-    this.decode = decode;
-  }
-
-  /** Everything a stored value depends on, as one text: format, memo, code and native identity, input key. */
-  public function keyFor(name:String, key:String):String return "memo/1\n" + name + "\n" + identity + "\n" + key;
 }

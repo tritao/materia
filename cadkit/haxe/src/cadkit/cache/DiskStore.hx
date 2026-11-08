@@ -6,7 +6,7 @@ import sys.FileSystem;
 import sys.io.File;
 
 /**
- * The persistent tier behind `Memo.persist`: one file per entry in a directory, named by the SHA-256 of the full key, with a
+ * The disk store behind the kernel operation cache (`OpCache`): one file per entry in a directory, named by the SHA-256 of the full key, with a
  * size cap and least-recently-used eviction (by file modification time, which a hit refreshes).
  *
  * Writes are atomic (temp file then rename), so concurrent writers and readers, in this or another process, see either the
@@ -16,7 +16,7 @@ import sys.io.File;
  * run faster.
  *
  * Environment: `MATERIA_MEMO_DIR` (directory; default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`),
- * `MATERIA_MEMO=off` (no persistent tier), `MATERIA_MEMO_MAX_MB` (cap, default 2048), `MATERIA_MEMO_VERIFY=1` (see `Memo`).
+ * `MATERIA_MEMO=off` (no persistent tier), `MATERIA_MEMO_MAX_MB` (cap, default 2048), `MATERIA_MEMO_VERIFY=1` (see `OpCache`).
  */
 class DiskStore {
   static final defaultCapMegabytes = 2048;

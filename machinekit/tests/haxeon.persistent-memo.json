@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "package": {"name": "machinekit-persistent-memo-tests"},
-  "entry": "PersistentMemoTests",
-  "sourceRoots": ["src"],
-  "dependencies": {"machinekit": {"path": ".."}},
-  "target": "host",
-  "outputDir": "build/persistent-memo"
-}
