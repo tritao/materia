@@ -124,13 +124,13 @@ class HobberYLayout {
     var s=moduleSpec(),raw=s.scaleHousing.geometry(),placed=machinekit.assembly.PosedParts.moved(raw,s.scalePose());raw.close();
     var bounds=machinekit.assembly.PosedParts.boxOf(placed);placed.close();return bounds;
   });
-  public static function sealBolts(front:Bool):Array<{x:Float,y:Float}> {
+  public static function sealBolts(upper:Bool):Array<{x:Float,y:Float}> {
     var s=moduleSpec(),points=window(6,6),out:Array<{x:Float,y:Float}>=[];
     for(i in 0...points.length) {
       var a=points[i],b=points[(i+1)%points.length],dx=b.x-a.x,dy=b.y-a.y,n=Std.int(Math.ceil(Math.sqrt(dx*dx+dy*dy)/150));
       for(j in 0...n) {
-        var t=(j+0.5)/n,x=a.x+t*dx,seam=1.5*machinekit.standard.SocketHeadCapScrew.catalog().get("M3").diameter+machinekit.motion.ScrewLinearModuleSpec.GAP;
-        for(shift in Math.abs(x-s.centre)<1e-8?[-seam,seam]:[0.0])if((x+shift<s.centre)==front)out.push({x:x+shift,y:a.y+t*dy});
+        var t=(j+0.5)/n,y=a.y+t*dy,seam=1.5*machinekit.standard.SocketHeadCapScrew.catalog().get("M3").diameter+machinekit.motion.ScrewLinearModuleSpec.GAP;
+        for(shift in Math.abs(y)<1e-8?[-seam,seam]:[0.0])if((y+shift>0)==upper)out.push({x:a.x+t*dx,y:y+shift});
       }
     }
     var housing=scaleBox(),screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M3"),margin=screw.headDiameter/2+machinekit.motion.ScrewLinearModuleSpec.GAP;

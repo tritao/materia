@@ -80,7 +80,9 @@ for k in range(6):
     C[:, k] = [u[m.master_dof(head, j)] for j in range(6)]
     residuals.append(float(np.linalg.norm(T.T@(K@u-f))/np.linalg.norm(T.T@f)))
     print('RHS',k,'relative residual',residuals[-1],flush=True)
-if max(residuals) > 1e-7 or np.max(np.abs(C-C.T)) > 1e-7*np.max(np.abs(C)):
+    if not np.isfinite(residuals[-1]) or residuals[-1] > 1e-7:
+        raise ValueError('FE convergence failed at RHS '+str(k)+': '+str(residuals[-1])+'; remaining RHS not run')
+if np.max(np.abs(C-C.T)) > 1e-7*np.max(np.abs(C)):
     raise ValueError('FE convergence/reciprocity failed: '+str(residuals))
 trans = (C[:3, :3]+C[:3, :3].T)/2
 values = np.linalg.eigvalsh(trans)*1000

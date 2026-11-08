@@ -70,7 +70,8 @@ class HobberFrameChecks {
   public static function integrity(machine:FlexsplineHobber, sweep:Bool, gap:Float = 2.0):Array<String> {
     var report = AssemblyIntegrity.check(machine, integrityOptions(machine, sweep, gap));
     for (item in report.diagnostics.items) if (item.code == "fasteners.edge-support") Sys.println(item.code + " " + item.message);
-    return [for (item in report.errors()) item.code + " " + item.message];
+    return [for (item in report.errors()) item.code + " " + item.message].concat(
+      [for(item in report.diagnostics.items)if(item.code=="fasteners.edge-support"&&item.message.indexOf("Ymodule/")>=0)item.code+" "+item.message]);
   }
 
   /** Every declared service path is checked against the parts left installed.
@@ -95,7 +96,7 @@ class HobberFrameChecks {
   public static function yModuleSeats(machine:FlexsplineHobber):Int {
     var s=machine.yModule.spec,members=machine.components(),count=0;
     var carriage=members.filter(m->m.id=="Ymodule/carriage")[0].component.geometry();
-    for(side in ["Front","Rear"]) {
+    for(side in ["Upper","Lower"]) {
       var lip=members.filter(m->m.id=="Ymodule/lip"+side)[0].component.geometry();
       var b=PosedParts.boxOf(lip),depth=0.1;
       var raw=cadkit.modeling.Part.box(b.maxX-b.minX+2,b.maxY-b.minY+2,depth);
@@ -111,6 +112,41 @@ class HobberFrameChecks {
       probe.close();
     }
     carriage.close();return count;
+  }
+
+  /** Conservative swept boxes of the retained head/nut envelopes. The body
+   * removal audit does not carry joint-derived hardware with its subassembly. */
+  public static function yGuardHardware(machine:FlexsplineHobber):Int {
+    var derived=machine.derivedFasteners();if(derived==null)throw "Missing guard hardware";
+    var module=machine.yModule,poses=module.solvedPoses(),count=0;
+    PosedParts.scope(cache->{
+      for(requirement in machine.serviceRemovals())switch requirement {
+        case ServiceRemoval(id,moving,steps,_,_) if(id=="yGuardUpperWithdrawal"||id=="yGuardLowerWithdrawal"):
+          var sign=id=="yGuardUpperWithdrawal"?1.0:-1.0,travel=steps[0].distance;
+          for(j in derived.joints)if(moving.contains(j.clampedMember)&&moving.contains(j.receivingMember)) {
+            var local=j.receivingMember.substr("Ymodule/".length),host=module.component(local),pose=poses.get(local);
+            if(pose==null)throw "Missing guard pose";
+            var face=host.fasteningFaces().filter(f->f.id==j.receivingFace)[0],frame=F.compose(pose,face.frame);
+            for(v in j.volumes)if(v.code=="fasteners.head-clearance")for(h in j.hostHoles) {
+              var raw=cadkit.modeling.Part.cylinderSpan(v.diameter/2,v.from,v.to,h.x,h.y),placed=PosedParts.moved(raw,frame);raw.close();
+              var b=PosedParts.boxOf(placed);placed.close();
+              var box=cadkit.modeling.Part.box(b.maxX-b.minX,b.maxY-b.minY+travel,b.maxZ-b.minZ);
+              var swept=box.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2+sign*travel/2,b.minZ));box.close();
+              var bounds=PosedParts.boxOf(swept);
+              for(other in module.components())if(!moving.contains("Ymodule/"+other.id)) {
+                var otherPose=poses.get(other.id);if(otherPose==null)throw "Missing mechanism pose";
+                if(PosedParts.apart(bounds,cache.box(other.component,otherPose),0))continue;
+                var part=cache.posed(other.component,otherPose),common=swept.intersect(part),volume=common.volume();common.close();part.close();
+                if(volume>0.001){swept.close();throw 'Y guard retained ${v.name} at ${h.x},${h.y} crosses ${other.id}: $volume mm3';}
+              }
+              swept.close();count++;
+            }
+          }
+        case _:
+      }
+    });
+    if(count==0)throw "No retained Y guard hardware checked";
+    return count;
   }
 
   /** Thickness of a cover end wall and of a carrier on the moving member, mm (the bench mill's `COVER_PLATE`). */
@@ -725,7 +761,7 @@ class HobberFrameChecks {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var moduleChecks=yModuleSeats(machine);
+    var moduleChecks=yModuleSeats(machine)+yGuardHardware(machine);
     var headReport = swivelLoad(machine);
     // A common translation of the entire machine cannot change head load on
     // the output face. This catches mixing posed COM with a construction datum.
@@ -808,6 +844,7 @@ class HobberFrameChecks {
     Sys.println('machine built: ${machine.components().length} members in ${Math.round(Sys.time() - began)} s (${Math.round(Sys.cpuTime())} s CPU)');
     if (args.indexOf("ymodule") >= 0) {
       Sys.println("Y host wiper footprint: "+yModuleSeats(machine)+" checks passed");
+      Sys.println("Y retained guard hardware: "+yGuardHardware(machine)+" swept envelopes clear");
       for(entry in machine.components())if(StringTools.startsWith(entry.id,"Ymodule/")) Sys.println(entry.id+" "+entry.component.massProperties().mass+" kg");
     }
     if (args.indexOf("memos") >= 0) for (line in machinekit.cache.Memos.report()) Sys.println(line);
@@ -878,6 +915,7 @@ class HobberFrameChecks {
         Sys.println(item.code + " " + item.message);
       for (e in report.errors()) Sys.println(e.code + " " + e.message);
       Sys.println('fastener fit: ${report.errors().length} errors');
+      for(item in report.diagnostics.items)if(item.code=="fasteners.edge-support"&&item.message.indexOf("Ymodule/")>=0)throw "Made Y module edge support: "+item.message;
       report.require();
     }
     if (args.indexOf("integrity") >= 0) {

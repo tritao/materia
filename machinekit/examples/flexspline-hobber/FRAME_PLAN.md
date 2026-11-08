@@ -190,7 +190,7 @@ Status: **complete** — P1–P5 accepted on branch `hobber-round-r5`; supplier 
 
 ## Phase Y: Y as a linear module (started 2026-11-07)
 
-Status: **LM0 complete; XC complete in three lean commits; XA partial; LM1 nominal module and LM2/LM3 model gates pass, stock/seal qualification open; LM4 underside guard/rail-clearance fit checkpoint: fastener fit0,6 wiper probes and enclosure48/112 pass,whole hobber fails7 service-only findings; LM5 drive sizing passes at Z65.15 kg, stiffness/accuracy qualification open; ZB partial: nominal mounting/tool/service gates pass; 24-pose travel0 ZB errors (new full sweep10 findings:3 deck/7 service), screw ingress open; LM6 tooling/routed RFQ export and hobber3325/module286 pass; release gates remain open** on `linear-module`.
+Status: **LM0/XC complete; XA partial; library module289 checks pass; LM4 upper/lower guard service, six wiper probes,32 carried-hardware envelopes and fastener fit0 pass, with0 Y made-edge findings; enclosure48/128 passes. Hobber3357 and the full requested sweep pass (0 errors in2217 s;18 root removal reports clear). LM5 drive sizing passes at Z65.30 kg, Y stiffness/accuracy remains unqualified; ZB screw ingress, XA replicated seats/A6 and29 other made-edge findings remain open. LM6 tooling and routed RFQ generation are implemented; the regenerated package passes46 designs/50 instances/90.22 kg** on `linear-module`.
 Keep the ground20 mm X deck, bolted bright-bar ribs and four corner sole pads.
 One bolts-only FE result:43.633 N/um /17.077 MN m/rad. Passing frame sweep0 errors,
 13 removals; trimmed hobber2453 PASS. XA then LM1-LM5,ZB,LM6 run lean (about90 min
@@ -198,20 +198,24 @@ per step, model gates, no FE unless a stiffness path changes). XA's motor bay, t
 21 alignment declarations and six service-tool corridors pass; hobber2633, hobbing1186,
 joint-fasteners,assembly-integrity and enclosure48 states/66 pairs/30 lid samples pass.
 The replicated X/Z drive seats, guard-foot relocation,29 made-part edge findings and A6/Z/wiper release remain open;
-the XA commit records this checked subset. The library module now passes286 checks across
+the XA commit records this checked subset. The library module now passes289 checks across
 20/80/200 mm strokes with sealed scales, split short guards and long-stroke bellows;
 modeled guard masses1.273/8.775/8.018 kg are assumptions, and end sealing/PU retention
 still require qualification. Short-module cable routing now stays below the roof, and its split guards withdraw
 longitudinally with declared head/motor prerequisites. The host-carriage interface is
 provided by the containing machine. The hobber now uses the actual Y module and its direct actuator/base interface.
-The host shields now seal to the carriage back face; the rail-derived clearance
-profile retains the made-hole edge lands through overtravel. The enclosure passes
-48 states/112 near pairs, but the rear guard/retainer withdrawal still catches the
-fixed mount and scale-head withdrawal catches a stop. Full sweep:10 findings
-(three small deck overlaps and seven service obstructions),2185 s. Stop driver access under the
-end hood, the final service split and valid Y stiffness/accuracy remain release gates.
+The host shields seal to the carriage back and now split across the guides. Park X
+retracted, Z high and Y/A centred: the upper half moves135 mm up; with the workholding
+mandrel cleared, the lower half moves202 mm down; each then moves108 mm forward.
+Both precision supports and the X skirt remain installed. Both guards come off before
+stop unbolting; the scale head needs the front-left stop off. Six full wiper-footprint
+probes,32 conservative carried head/nut sweeps and the focused guard paths pass.
+The lower attachment is two M5 at45 mm pitch on the existing base's full-thickness
+central land; all Y made-hole edge checks pass. The previous3 deck/7 service findings
+are closed in the model: hobber3357 and full sweep0 errors in2217 s;18 root removal reports clear. Valid Y stiffness/accuracy and
+shop stock/seal qualifications remain release gates.
 LM6 declares27 tooling rows separately from machine parts,89 checked sequence references,
-and regenerates46 routed machined RFQ parts (90.05 kg). Prices and custom bellows data
+and regenerates46 routed machined RFQ parts (90.22 kg). Prices and custom bellows data
 remain ASSUMED; the supplier package is not a machine-release claim.
 
 Y becomes an instance of the MachineKit screw linear module, planned in

@@ -16,8 +16,8 @@ class HobberYPart extends MachineComponent {
   static final recipe=new machinekit.cache.Once<ComponentType>();
   public final role:String;
   public final spec:ScrewLinearModuleSpec;
-  public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage","coverFront","coverRear","retainerFront","retainerRear","lipFront","lipRear"],"base")];
-  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(14).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->StringTools.startsWith(v.token("role"),"lip")?Buy(null,null,null):Make("ground stock / formed guard, joint drilling")));
+  public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage","coverUpper","coverLower","retainerUpper","retainerLower","lipUpper","lipLower"],"base")];
+  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(19).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->StringTools.startsWith(v.token("role"),"lip")?Buy(null,null,null):Make("ground stock / formed guard, joint drilling")));
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberYLayout.moduleSpec();
     super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,StringTools.startsWith(role,"lip")?"polyurethane PU":isGuard()?"stainless A2-70":"steel",false,v);
@@ -30,24 +30,35 @@ class HobberYPart extends MachineComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function machinable():Bool return !StringTools.startsWith(role,"lip");
   function isGuard():Bool return role!="base"&&role!="carriage";
-  function body():MachineComponent return isGuard()?new ScrewLinearModuleCover(spec.values().setToken("role",role)):new ScrewLinearModulePart(spec.values().setToken("role",role));
+  function body():MachineComponent return new ScrewLinearModulePart(spec.values().setToken("role",role));
   public static function actuatorPoint():{x:Float,y:Float,z:Float} return F.transformPoint(F.inverse(HobberYLayout.modulePose()),HobberSwivelLayout.OUTPUT_X,0,HobberZLayout.SEAT_Z);
+  public static function lowerGuardHalfWidth():Float {
+    var screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M5");
+    return (5+1.5)*screw.diameter+ScrewLinearModuleSpec.GAP;
+  }
+  public static function guardEdge(upper:Bool,into:Float):materia.assembly.AssemblyRecord.AssemblyFrame {
+    var s=HobberYLayout.moduleSpec(),bolt=machinekit.standard.SocketHeadCapScrew.catalog().get("M5");
+    var height=upper?s.baseThickness/2:s.baseThickness-bolt.diameter-ScrewLinearModuleSpec.GAP/2;
+    return BoltedFace.frameOf({x:actuatorPoint().x,y:(upper?1:-1)*s.baseWidth/2,z:height},{x:0.0,y:into,z:0},{x:1.0,y:0,z:0});
+  }
   override public function fasteningFaces():Array<BoltedFace> {
-    var out=body().fasteningFaces();
-    if(role=="base")out=out.filter(f->f.id!="guard-front-1"&&f.id!="guard-rear-1");
     if(isGuard()) {
-      var front=StringTools.endsWith(role,"Front"),cover=StringTools.startsWith(role,"cover"),z=HobberYLayout.guardRoof()-ScrewLinearModuleCover.SHEET;
-      out=out.filter(f->f.id!="seal"&&f.id!="edge-1");
+      var upper=StringTools.endsWith(role,"Upper"),cover=StringTools.startsWith(role,"cover"),z=HobberYLayout.guardRoof(),out:Array<BoltedFace>=[];
       if(cover) {
-        var edge=out.filter(f->f.id=="edge1")[0],span=(front?spec.centre-spec.baseMin:spec.baseMax-spec.centre);
-        out=[BoltedFace.clamped(edge.id,edge.frame,[{x:-span/2+12,y:0.0},{x:0.0,y:0.0},{x:span/2-12,y:0.0}],4.5,1,"M4",null,false,true)];
+        var span=spec.baseMax-spec.baseMin,holes=upper?[{x:-span/2+12,y:0.0},{x:0.0,y:0.0},{x:span/2-12,y:0.0}]:[{x:-22.5,y:0.0},{x:22.5,y:0.0}];
+        out.push(BoltedFace.clamped("edge",guardEdge(upper,upper?1:-1),holes,upper?4.5:5.5,1,upper?"M4":"M5",null,false,true));
       }
       if(!StringTools.startsWith(role,"lip")) {
-        var frame=ScrewLinearModulePart.plane(spec.centre,0,z,cover?1:-1),inverse=F.inverse(frame);
-        var holes=[for(p in HobberYLayout.sealBolts(front)){var at=F.transformPoint(inverse,p.x,p.y,z);{x:at.x,y:at.y};}];
+        var frame=ScrewLinearModulePart.plane(spec.centre,0,z,cover?-1:1),inverse=F.inverse(frame);
+        var holes=[for(p in HobberYLayout.sealBolts(upper)){var at=F.transformPoint(inverse,p.x,p.y,z);{x:at.x,y:at.y};}];
         out.push(cover?BoltedFace.through("seal",frame,holes,3.4,1,"M3",false):BoltedFace.clamped("seal",frame,holes,3.4,2,"M3",null,false,true));
       }
       return out;
+    }
+    var out=body().fasteningFaces();
+    if(role=="base") {
+      out=out.filter(f->!StringTools.startsWith(f.id,"guard-"));
+      for(upper in [true,false])out.push(BoltedFace.drilledToSuit("guard-"+(upper?"upper":"lower"),guardEdge(upper,upper?-1:1),upper?spec.baseMax-spec.baseMin:2*lowerGuardHalfWidth(),spec.baseThickness,8,16,BoltedFace.ThreadMaterial.Steel,upper?"M4":"M5"));
     }
     if(role=="base") {
       var at=actuatorPoint(),bolt=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
@@ -64,7 +75,7 @@ class HobberYPart extends MachineComponent {
     return out;
   }
   override public function pinnedFaces():Array<PinnedFace> {
-    var out=body().pinnedFaces();
+    var out:Array<PinnedFace>=isGuard()?[]:body().pinnedFaces();
     if(role=="carriage")for(face in HobberSaddle.yHeadPins())out.push(new PinnedFace(face.id,F.compose(HobberYLayout.headInModule(),face.frame),face.holes,face.diameter,face.depth,face.through,false,face.fit));
     return out;
   }
@@ -97,7 +108,7 @@ class HobberYPart extends MachineComponent {
       var high=s.riserY(1)+s.riserWidth/2+ScrewLinearModuleSpec.GAP;
       // The deck-sweep relief interrupts the long lower guard land. A
       // central tab inside the deck window retains it as part of this plate.
-      keep.push(box(at.x-rim/2,at.x+rim/2,-half,low+ScrewLinearModuleSpec.GAP,frameLow,frameHigh));
+      keep.push(box(at.x-lowerGuardHalfWidth(),at.x+lowerGuardHalfWidth(),-half,low+ScrewLinearModuleSpec.GAP,z0,z1));
       // A central output web joins the two full rail lands. Unloaded
       // material outside those paths is profiled from the ground blank.
       var web=ErobActuatorData.OUTPUT_PITCH_CIRCLE/2+1.5*m4.diameter+ScrewLinearModuleSpec.GAP;
@@ -147,7 +158,7 @@ class HobberYPart extends MachineComponent {
     return Solids.union(keep);
   }
   function guardGeometry():Part {
-    var s=spec,front=StringTools.endsWith(role,"Front"),cover=StringTools.startsWith(role,"cover"),lip=StringTools.startsWith(role,"lip"),z=HobberYLayout.guardRoof(),shape:Part;
+    var s=spec,upper=StringTools.endsWith(role,"Upper"),cover=StringTools.startsWith(role,"cover"),lip=StringTools.startsWith(role,"lip"),z=HobberYLayout.guardRoof(),shape:Part;
     if(cover) {
       var high=HobberYLayout.hoodRoof(),reach=s.carriageLength/2+s.stroke/2+s.overtravel+ScrewLinearModuleSpec.GAP;
       var left=s.centre-reach,right=s.centre+reach;
@@ -162,17 +173,23 @@ class HobberYPart extends MachineComponent {
       var stopCuts:Array<Part>=[];
       for(r in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(r,"stop")) {
         var foot=new ScrewLinearModulePart(s.values().setToken("role",r)).geometry(),raised=foot.translated(new Vector(0,0,HobberYLayout.stopLift()));
+        var b=PosedParts.boxOf(foot);
         stopCuts.push(foot);stopCuts.push(raised);
+        // Open each notch toward the split so the half slides outward
+        // without drawing a closed aperture over the stationary stop.
+        stopCuts.push(box(b.minX,b.maxX,Math.min(0,b.minY),Math.max(0,b.maxY),b.minZ,b.maxZ+HobberYLayout.stopLift()));
       }
       var mount=s.drive.fixed.geometry(),pose=s.drive.poses(s.axis(),s.screwLength).get("mount");
       if(pose==null)throw "Missing fixed support pose";
-      stopCuts.push(PosedParts.moved(mount,pose));mount.close();
+      var fixed=PosedParts.moved(mount,pose),bounds=PosedParts.boxOf(fixed);mount.close();
+      stopCuts.push(fixed);
+      stopCuts.push(box(bounds.minX,bounds.maxX,Math.min(0,bounds.minY),Math.max(0,bounds.maxY),bounds.minZ,bounds.maxZ));
       shape=Solids.cut(shape,stopCuts);
     } else {
-      var low=lip?z-1:z-3,high=lip?s.carriageBottom():z-1;
+      var low=lip?z+2:z,high=lip?s.carriageBottom():z+2;
       shape=Solids.cut(HobberYLayout.prism(HobberYLayout.window(lip?0:12,lip?0:12),low,high),[HobberYLayout.prism(HobberYLayout.window(-4,-4),low-1,high+1)]);
     }
-    var split=box(front?s.baseMin-2:s.centre,front?s.centre:s.baseMax+2,-s.baseWidth,s.baseWidth,-1,HobberYLayout.hoodRoof()+2),out=shape.intersect(split);split.close();shape.close();return out;
+    var split=box(s.baseMin-2,s.baseMax+2,upper?0:-s.baseWidth,upper?s.baseWidth:0,-1,HobberYLayout.hoodRoof()+2),out=shape.intersect(split);split.close();shape.close();return out;
   }
   override public function geometry(detail:ComponentDetail=Preview):Part {
     var shape=isGuard()?guardGeometry():body().geometry(detail);

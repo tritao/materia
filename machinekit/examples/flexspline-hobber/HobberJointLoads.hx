@@ -112,8 +112,10 @@ class HobberJointLoads {
     }
     for(end in ["Front","Rear"]) {
       for(side in ["Left","Right"])loads.push({label:"Y stop "+end+side,between:["Ymodule/stop"+end+side,"Ymodule/base"],shear:{peak:normal,momentary:crash}});
-      loads.push({label:"Y guard "+end,between:["Ymodule/cover"+end,"Ymodule/base"],shear:{peak:30.0,momentary:100.0}});
-      loads.push({label:"Y retainer "+end,between:["Ymodule/retainer"+end,"Ymodule/cover"+end],shear:{peak:10.0,momentary:20.0}});
+    }
+    for(side in ["Upper","Lower"]) {
+      loads.push({label:"Y guard "+side,between:["Ymodule/cover"+side,"Ymodule/base"],shear:{peak:30.0,momentary:100.0},torque:{peak:30*(ys.baseMax-ys.baseMin)/2000,momentary:100*(ys.baseMax-ys.baseMin)/2000}});
+      loads.push({label:"Y retainer "+side,between:["Ymodule/retainer"+side,"Ymodule/cover"+side],shear:{peak:10.0,momentary:20.0}});
     }
     for(pair in [["scaleSeat","base"],["scaleHousing","scaleSeat"],["scaleHead","scaleHeadCarrier"],["carriage","scaleHeadCarrier"]])loads.push({label:"Y scale "+pair[0],between:["Ymodule/"+pair[0],"Ymodule/"+pair[1]],shear:{peak:20.0,momentary:40.0}}); // ASSUMED scale/cable drag.
     // The spindle seat on the Y saddle's plate carries the weight of the seat, cradle and spindle (with the Y axis's 0.5 m/s2) and the cutting force; a jammed

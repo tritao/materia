@@ -46,12 +46,16 @@ class ScrewLinearModule extends AxisBuilder {
     for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop"))attach(role,made(role),F.identity(),"base");
     if(s.stroke<=20) {
       group("Chip guard");
-      for(front in [true,false]) {
-        var suffix=front?"Front":"Rear",cover="cover"+suffix,retainer="retainer"+suffix;
+      var suffixes=hostGuards==null?["Front","Rear"]:[for(key in hostGuards.keys())if(StringTools.startsWith(key,"cover"))key.substr(5)];
+      suffixes.sort((a,b)->Reflect.compare(a,b));
+      if(suffixes.length!=2)throw "Short module requires two guard halves";
+      for(suffix in suffixes) {
+        var cover="cover"+suffix,retainer="retainer"+suffix;
         var supplied=hostGuards==null?null:hostGuards.get(cover);
         if(supplied==null)supplied=new ScrewLinearModuleCover(s.values().setToken("role",cover));
         attach(cover,supplied,F.identity(),"base");
         var suppliedRetainer=hostGuards==null?null:hostGuards.get(retainer),lip="lip"+suffix,suppliedLip=hostGuards==null?null:hostGuards.get(lip);
+        if(hostGuards!=null&&(suppliedRetainer==null||suppliedLip==null))throw "Host guard requires its retainer and lip: "+suffix;
         attach(retainer,suppliedRetainer==null?new ScrewLinearModuleCover(s.values().setToken("role",retainer)):suppliedRetainer,F.identity(),cover);
         attach(lip,suppliedLip==null?new ScrewLinearModuleCover(s.values().setToken("role",lip)):suppliedLip,F.identity(),retainer);
       }
@@ -60,12 +64,14 @@ class ScrewLinearModule extends AxisBuilder {
     exposeConnector("mount","base","mount");exposeConnector("carriage","carriage","interface");
     // Deliberately no controller/drive choice in the mechanical library component.
     for(requirement in serviceRemovals())addDesignRequirement(requirement);
-    if(s.stroke<=20)for(front in [true,false]) {
+    if(s.stroke<=20&&hostGuards==null)for(front in [true,false]) {
       var suffix=front?"Front":"Rear";
       addDesignRequirement(machinekit.design.DesignRequirement.ServiceRemoval("guard"+suffix,["cover"+suffix,"retainer"+suffix,"lip"+suffix],
         [{direction:[front?-1.0:1.0,0,0],distance:(front?s.centre-s.baseMin:s.baseMax-s.centre)+20}],front?["scaleHead"]:["motor","motorShaft"],[]));
     }
   }
+  public function guardMembers():Array<String> return spec.stroke<=20?[for(m in components())if(StringTools.startsWith(m.id,"cover")||StringTools.startsWith(m.id,"retainer")||StringTools.startsWith(m.id,"lip"))m.id]:ScrewLinearModuleBellows.members(spec);
+  function guardSuffixes():Array<String> return [for(id in guardMembers())if(StringTools.startsWith(id,"cover"))id.substr(5)];
   function made(role:String):ScrewLinearModulePart return new ScrewLinearModulePart(spec.values().setToken("role",role));
   function blockPose(side:Int,row:Int):AssemblyFrame return AxisBuilder.orient(spec.centre+row*spec.blockSpacing/2,spec.railY(side),
     spec.baseThickness+spec.riserHeight+spec.guide.railHeight,[0.0,0,1],[1.0,0,0]);
@@ -75,18 +81,18 @@ class ScrewLinearModule extends AxisBuilder {
       {member:"scaleHousing",fastened:["scaleSeat"],faces:["base"]},
       {member:"carriage",fastened:["motorMount","floatingBearing"],faces:["foot"]}
     ];
-    if(spec.stroke<=20) {
+    if(spec.stroke<=20&&guardSuffixes().contains("Front")) {
       out.push({member:"coverFront",fastened:["stopFrontLeft","stopFrontRight"],faces:["base"]});
       out.push({member:"coverRear",fastened:["stopRearLeft","stopRearRight"],faces:["base"]});
     }
     if(spec.stroke>20)for(side in ["Front","Rear"])out.push({member:"mountFixed"+side,fastened:["stop"+side+"Left","stop"+side+"Right"],faces:["base"]});
     if(spec.stroke<=20) {
-      var guards=["coverFront","coverRear","retainerFront","retainerRear","lipFront","lipRear"];
+      var guards=guardMembers();
       var mechanism=[for(m in components())if(!guards.contains(m.id))m.id];
       // Tighten the precision mechanism before fitting shields. Retainer
       // hardware is tightened on the bench as a separate guard subassembly.
       for(guard in guards)out.push({member:guard,fastened:mechanism.filter(id->id!="base")});
-      for(id in mechanism)out.push({member:id,fastened:["retainerFront","retainerRear"],faces:["seal"]});
+      for(id in mechanism)out.push({member:id,fastened:guards.filter(id->StringTools.startsWith(id,"retainer")),faces:["seal"]});
     }
     return out;
   }
@@ -117,19 +123,19 @@ class ScrewLinearModule extends AxisBuilder {
     {parts:["nut","nutCarrier","carriage"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Indicate nut carrier to screw at BOTH ends of travel, tighten then match-drill and ream; do not pre-drill carrier dowels. Adjust block pads to coplanarity target."},
     {parts:["scaleSeat","scaleHousing","scaleHeadCarrier","scaleHead"],tools:["dial-indicator","magnetic-base","feeler-gauges","af3-low-profile-key","air-fitting-socket"],measurement:"Reference housing seat to guide edge. Indicate housing to 0.1 mm and head to 0.05 mm parallelism. Fit carrier face to measured stack (0.5 mm each-way allowance ASSUMED); set lateral offset within 0.2 mm, gap 1 +/-0.3 mm at the head; confirm the reading window and 75 mm cable bend. Head screws use the low-profile key from below and slide the head out longitudinally for service."},
     {parts:["stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Fit drawing dowels and verify both overtravel stops engage before screw support contact. Host must limit torque to the bought bearing rating."},
-    {parts:spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec),tools:["af2.5-key","af5.5-long-spanner","torque-driver","af3-low-profile-key","feeler-gauges"],measurement:spec.stroke<=20?"Preassemble the split covers and separate steel retainers with clip-in PU lips on the bench. Ordinary retainer nuts remain accessible after sliding off one cover; do not trap or glue them. Fit covers through base edge joints with the head temporarily off for the front cover and the motor/shaft off for the rear. Refit the motor on its pilot and adjust the head last. Covers withdraw longitudinally, leaving payload interfaces undisturbed. Check 10 mm minimum roof/carriage overlap and continuous lip contact through overtravel. Outward R75 cable, end sealing and clip profile require qualification.":"Install the declared bellows and separate flange mounts; through-tapped flange holes return on the bolted interface. Indicate the two mount planes parallel and check full travel before fitting guards. Catalogue row and cable envelope remain ASSUMED."}
+    {parts:guardMembers(),tools:["af2.5-key","af5.5-long-spanner","torque-driver","af3-low-profile-key","feeler-gauges"],measurement:spec.stroke<=20?"Preassemble the split covers and separate steel retainers with clip-in PU lips on the bench. Ordinary retainer nuts remain accessible after sliding off one cover; do not trap or glue them. Fit the declared base edge joints. Follow the containing machine's declared guard removal paths and prerequisites; the default longitudinal split requires the head off at the front and motor/shaft off at the rear. Host splits must leave precision supports installed for routine guard and wiper service. Check 10 mm minimum roof/carriage overlap and continuous lip contact through overtravel. Outward R75 cable, end sealing and clip profile require qualification.":"Install the declared bellows and separate flange mounts; through-tapped flange holes return on the bolted interface. Indicate the two mount planes parallel and check full travel before fitting guards. Catalogue row and cable envelope remain ASSUMED."}
   ];
   public function stopContacts():Array<{a:String,b:String}> {
     var out=[for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop")){a:"carriage",b:role}];
-    if(spec.stroke<=20)for(side in ["Front","Rear"])out.push({a:"carriage",b:"lip"+side});return out;
+    if(spec.stroke<=20)for(side in guardSuffixes())out.push({a:"carriage",b:"lip"+side});return out;
   }
   public function serviceRemovals():Array<machinekit.design.DesignRequirement> return [
     machinekit.design.DesignRequirement.ServiceRemoval("motor",["motor","motorShaft"],[{direction:[1.0,0,0],distance:spec.drive.motor.rating.shaftLength+10}],[],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("screw",["screw","coupling","nut"],[{direction:[1.0,0,0],distance:spec.baseMax+10}],
-      ["motor","motorShaft","motorMount","floatingRing"].concat(spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec)),[]),
+      ["motor","motorShaft","motorMount","floatingRing"].concat(guardMembers()),[]),
     machinekit.design.DesignRequirement.ServiceRemoval("scaleHead",["scaleHead"],[{direction:[-1.0,0,0],distance:spec.centre-spec.baseMin+spec.scaleHead.series.headLength+20}],[],[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.scaleStart()+spec.scaleHousing.overallLength()+20}],["scaleHead"].concat(spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec)),[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec),[])
+    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.scaleStart()+spec.scaleHousing.overallLength()+20}],["scaleHead"].concat(guardMembers()),[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],guardMembers(),[])
   ];
   /** Rated thrust / peak motor torque, plus the containing machine's declared
    * payload shear. Half thrust per guide is 2x equal sharing over four blocks. */
@@ -148,7 +154,7 @@ class ScrewLinearModule extends AxisBuilder {
     }
     if(spec.stroke>20)for(suffix in ["Front","Rear"])for(connection in [["mountFixed"+suffix,"base"],["mountMoving"+suffix,"carriage"],["bellows"+suffix+"-fixed","mountFixed"+suffix],["bellows"+suffix+"-moving","mountMoving"+suffix]])
       out.push({label:"Bellows "+connection[0],between:connection,shear:{peak:40.0,momentary:100.0},torque:{peak:5.0,momentary:10.0}}); // ASSUMED guard loads.
-    if(spec.stroke<=20)for(suffix in ["Front","Rear"]) {
+    if(spec.stroke<=20)for(suffix in guardSuffixes()) {
       out.push({label:"Guard "+suffix,between:["cover"+suffix,"base"],shear:{peak:30.0,momentary:100.0}});
       out.push({label:"Wiper retainer "+suffix,between:["retainer"+suffix,"cover"+suffix],shear:{peak:10.0,momentary:20.0}});
     }

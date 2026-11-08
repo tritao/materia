@@ -49,10 +49,19 @@ class HobberAssemblyTooling {
     {id:"Z4 column relation",parts:["Zplate","column/casting"],tools:["c-test-mandrel","square-granite","dial-indicator","magnetic-base","replication-kit"],measurement:"A6: indicate Z parallel to the C mandrel in two planes. Replicated sole/match-pin qualification remains OPEN; no pin or bond credit in slip/stiffness."},
     {id:"Z5 bellows",parts:[for(c in machine.zBellows)for(id in [c.fixedMember,c.movingMember])id],tools:["af2.5-key","torque-driver","feeler-gauges","bellows-support-straps"],measurement:"Park Z high for lower end screws and low for upper screws. Check>=2 mm external clearance through overtravel. For service support released ends, remove saddle, then withdraw complete covers along their checked paths."}
   ];
+  public static function ySteps(machine:FlexsplineHobber):Array<HobberToolStep> {
+    var out:Array<HobberToolStep>=[];
+    for(i=>s in machine.yModule.assemblySteps()) {
+      var measurement=s.measurement;
+      if(s.parts.contains("coverUpper"))measurement+=" For this host, park X at its retract limit and Z at its upper limit, centre Y and A, and clear the workholding mandrel before handling the lower guard. Withdraw the upper half upward; move the lower half down only by its declared profile-derived distance, then forward. Reverse these checked paths for installation. Both screw supports remain bolted and pinned. Release the clip-in PU lips clear of projecting head-interface fasteners before sliding the steel guards; qualify the assumed lip peel/clip process with the selected seal profile. The rigid-path and retained-hardware checks do not qualify elastomer strain. Remove both guards before unbolting a stop or reaching the wipers.";
+      out.push({id:"Y/"+(i+1),parts:[for(id in s.parts)"Ymodule/"+id],tools:s.tools,measurement:measurement});
+    }
+    return out;
+  }
   public static function steps(machine:FlexsplineHobber):Array<HobberToolStep> {
     var out:Array<HobberToolStep>=[];
     for(s in HobberXAssembly.steps())out.push({id:"X/"+s.id,parts:s.parts,tools:s.tools,measurement:s.measurement});
-    for(i=>s in machine.yModule.assemblySteps())out.push({id:"Y/"+(i+1),parts:[for(id in s.parts)"Ymodule/"+id],tools:s.tools,measurement:s.measurement});
+    out=out.concat(ySteps(machine));
     out=out.concat(zSteps(machine));
     out.push({id:"C/B references",parts:["table/platen","mandrel","spindleSeat","outboard"],tools:["c-test-mandrel","spindle-test-arbor","square-granite","dial-indicator","magnetic-base","pin-spanner","af22-thin-socket","bearing-puller"],measurement:"Use the datum and runout measurements in ALIGNMENT.md and b-align-outboard; qualify mandrel/arbor uncertainty before alignment."});
     out.push({id:"Head service lift",parts:["Zplate","swivel/housing"],tools:["shop-hoist","qualified-slings","bellows-support-straps"],measurement:"Qualify the saddle/head lifting arrangement and balance before releasing its joints; support the bellows ends independently."});
