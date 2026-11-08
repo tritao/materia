@@ -99,9 +99,9 @@ class HobberFrameChecks {
       var lip=members.filter(m->m.id=="Ymodule/lip"+side)[0].component.geometry();
       var b=PosedParts.boxOf(lip),depth=0.1;
       var raw=cadkit.modeling.Part.box(b.maxX-b.minX+2,b.maxY-b.minY+2,depth);
-      var slab=raw.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,s.carriageBottom()+s.carriageThickness));raw.close();
+      var slab=raw.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,s.carriageBottom()-depth));raw.close();
       var slice=lip.intersect(slab);slab.close();lip.close();
-      var expected=slice.volume(),probe=slice.translated(new cadkit.modeling.Vector(0,0,-depth));slice.close();
+      var expected=slice.volume(),probe=slice.translated(new cadkit.modeling.Vector(0,0,depth));slice.close();
       if(expected<=0)throw "Y wiper has no contact footprint";
       for(q in [-s.stroke/2-s.overtravel,0.0,s.stroke/2+s.overtravel]) {
         var moved=carriage.translated(new cadkit.modeling.Vector(q,0,0)),common=moved.intersect(probe);

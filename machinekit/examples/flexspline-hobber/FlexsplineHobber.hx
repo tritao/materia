@@ -298,9 +298,10 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     var e0 = HobberSwivelLayout.SPINDLE_ROTATION;
     group("Y axis");
     var yGuards=new Map<String,MachineComponent>();
-    for(role in ["coverFront","coverRear"])yGuards.set(role,new HobberYPart(new ComponentValues().setToken("role",role)));
+    for(role in ["coverFront","coverRear","retainerFront","retainerRear","lipFront","lipRear"])yGuards.set(role,new HobberYPart(new ComponentValues().setToken("role",role)));
     yModule=new ScrewLinearModule(HobberYLayout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")),yGuards);
     yModule.takeServiceRemoval("carriage");
+    yModule.takeServiceRemoval("guardFront");yModule.takeServiceRemoval("guardRear");
     includeAt("Ymodule",yModule,HobberYLayout.modulePose());
     fixExisting("Ymodule-mount","swivel/output","Ymodule/base",F.alongY(HobberSwivelLayout.OUTPUT_X,0,HobberZLayout.SEAT_Z,-1,0,0));
     group("B spindle");
@@ -553,6 +554,18 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     var carriageBundle=below("Ymodule/carriage").concat(["Ymodule/carriage"]).filter(id->!nutGroup.contains(id)&&!StringTools.startsWith(id,"Ymodule/block")&&id!="Ymodule/scaleHead");
     out.push(ServiceRemoval("yCarriageWithdrawal",carriageBundle,[{direction:worldDir(-1,0,0),distance:HobberYLayout.moduleSpec().carriageThickness+40}],
       ["Ymodule/coverFront","Ymodule/coverRear","Ymodule/retainerFront","Ymodule/retainerRear","Ymodule/lipFront","Ymodule/lipRear","Ymodule/scaleHead"],[{joint:"X",value:HobberXLayout.RETRACT}]));
+    var ys=HobberYLayout.moduleSpec();
+    for(front in [true,false]) {
+      var suffix=front?"Front":"Rear",stops=["Ymodule/stop"+suffix+"Left","Ymodule/stop"+suffix+"Right"];
+      for(id in stops) {
+        var role=id.substr("Ymodule/".length),part=new machinekit.motion.ScrewLinearModulePart(ys.values().setToken("role",role)),at=part.stopCentre();
+        out.push(ServiceRemoval("y"+role+"Withdrawal",[id],[{direction:worldDir(-1,0,0),distance:HobberYLayout.stopLift()},
+          {direction:worldDir(0,front?1:-1,0),distance:(front?at.x-ys.baseMin:ys.baseMax-at.x)+30+SERVICE_CLEARANCE}],[],[{joint:"X",value:HobberXLayout.RETRACT}]));
+      }
+      out.push(ServiceRemoval("yGuard"+suffix+"Withdrawal",["Ymodule/cover"+suffix,"Ymodule/retainer"+suffix,"Ymodule/lip"+suffix],
+        [{direction:worldDir(0,front?1:-1,0),distance:(front?ys.centre-ys.baseMin:ys.baseMax-ys.centre)+20}],
+        stops.concat(front?["Ymodule/scaleHead"]:["Ymodule/motor","Ymodule/motorShaft"]),[{joint:"X",value:HobberXLayout.RETRACT}]));
+    }
     var shaft = spindle.motor.rating.shaftLength;
     out.push(ServiceRemoval("bMotorWithdrawal", ["spindle/motor", "spindle/motorShaft", "spindle/motorEncoder"],
       [{direction: away(axisOf("spindle/motor", 0, 0, 1)), distance: shaft + 10 + SERVICE_CLEARANCE}], ["spindle/belt", "spindle/motorPulley"], []));

@@ -49,7 +49,7 @@ class HobberSaddle extends MachineComponent {
       "machinekit.hobbing.saddle",
       parameters(),
       v -> new HobberSaddle(v.token("design"), v)
-    ).versioned(2).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
+    ).versioned(3).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
       .procured(_ -> Make("steel fabrication and machining"))
       .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]));
   }
@@ -452,7 +452,10 @@ class HobberSaddle extends MachineComponent {
   }
 
   /** The four M8 that hold the seat to the Y saddle: y along the cartridge, z across it; 1.5 diameters from the seat's edges (z -50 and 58). */
-  static function seatBolts():Array<machinekit.component.BoltedFace.BoltHole> return [for (y in [95.0, 205.0]) for (z in [-38.0, 46.0]) {x: y, y: z}];
+  static function seatBolts():Array<machinekit.component.BoltedFace.BoltHole> return [for (y in [95.0, 205.0]) for (z in [-38.0, 46.0])
+    // Rear lower fixing moves inward one diameter to retain its full 1.5d
+    // carriage edge land above the derived rail/overtravel clearance floor.
+    {x: y==205.0&&z<0?y-8:y, y: z}];
 
   /** The spindle seat's extent along the spindle axis (work y) and the y of its three clamp screws. */
   public static function spindleSeatRange():{y0:Float, y1:Float, clampYs:Array<Float>} return {y0: SEAT_Y0, y1: SEAT_Y1, clampYs: [100.0, 150.0, 200.0]};
@@ -462,7 +465,8 @@ class HobberSaddle extends MachineComponent {
     var block = box(SEAT_X0, SEAT_X1, SEAT_Y0, SEAT_Y1, SEAT_LOW, SEAT_HALF);
     var tongue = box(SEAT_X0, SEAT_TONGUE_X1, SEAT_Y1 - 1, SEAT_TONGUE_Y1, SEAT_TONGUE_Z0, SEAT_HALF);
     var cuts = [boreY(SEAT_BORE / 2, SEAT_Y0 - 0.1, SEAT_Y1 + 0.1, 0, 0), box(-SEAT_SLIT / 2, SEAT_SLIT / 2, SEAT_Y0 - 0.1, CRADLE_FACE_Y - CRADLE_SLIT_END, 0, SEAT_HALF + 0.1)];
-    return withHoles(Solids.cut(Solids.union([block, tongue]), cuts), seatHoles(false).concat(cradleHoles(true)));
+    var blank=Solids.cut(Solids.union([block,tongue]),cuts),keep=HobberYLayout.headClearance(),trimmed=blank.intersect(keep);blank.close();keep.close();
+    return withHoles(trimmed,seatHoles(false).concat(cradleHoles(true)));
   }
 
   // ---- B motor cradle (FRAME_PLAN head redesign) -------------------------------------------------------------------------------

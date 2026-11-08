@@ -35,7 +35,7 @@ Cast-in inserts and sole pads retain their casting-package manufacturing records
 
 `assembly-tooling.csv` is a separate **Tooling** BOM category, excluded from machine quantities/mass. Each row carries an ASSUMED EUR price and the assembly steps that reference it. The exporter rejects an unknown tool reference. Tools include X/Y/Z drive arbors and the nut-bore height reference, replication kit, block-pad master, C/spindle mandrels, square/straightedge/level, indicators and bases, AF4 key>=400 mm, qualified low-profile keys, hoist/slings and bellows support straps. See `ALIGNMENT.md` and the generated X/Y/Z procedures.
 
-This is a model RFQ package, **not a machine release**. The tilted Y-to-bed/tray fit, Y stiffness/accuracy qualification, XA replicated support seats/A6 qualification and Z screw ingress remain open in LINEAR_MODULE_PLAN.md. Part/drawing checks below validate the exported parts; they do not waive those machine-level gates.
+This is a model RFQ package, **not a machine release**. The final Y service/swept fit and stop-driver access, Y stiffness/accuracy qualification, XA replicated support seats/A6 qualification and Z screw ingress remain open in LINEAR_MODULE_PLAN.md. Part/drawing checks below validate the exported parts; they do not waive those machine-level gates.
 
 ## What is written
 

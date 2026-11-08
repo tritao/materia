@@ -100,7 +100,7 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
   its supports cannot sit "outside the saddle's travel" on a plate shorter than the saddle (plate 230, saddle -130..222 mm, so about 400 mm). Decision needed: new drive family rows (maker data to source) or a different Y drive.
 - Spindle drive: belt strength (HTD5M 15 mm tight-side 375 N at the motor's peak torque) and the pulley/encoder parts are not checked against a maker's data; the first-mode estimate (`HobberFrameChecks.spindleDrive`) is analytic with stated joint assumptions, to be confirmed by an FE model of the cradle on the seat and an impact test.
 
-- eRob output bearing moment rating and brake holding torque (asked from ZeroErr): P3 corrects the pose datum: LM5 draft demand is 50.31 N m tilting at the output face and 26.65 N m about A, against an assumed 87 N m brake. The bearing rating remains unknown.
+- eRob output bearing moment rating and brake holding torque (asked from ZeroErr): P3 corrects the pose datum: LM5 follow-up demand is 51.01 N m tilting at the output face and 27.29 N m about A, against an assumed 87 N m brake. The bearing rating remains unknown.
 - Servo voltage class: the ELM2H is a 220 V motor, the rack is 400 V; the model uses an assumed winding (R4).
 - **Z screw offset (decided by the lead 2026-11-04, derived):** the eRob housing stands behind the Z saddle at y 0 where the Z screw used to be; the screw keeps off it by the derived least |y| (`HobberZOffset`, y +81 on the side of the Z moving mass's centre of mass, set by the BF12 support's 2 mm gap to the housing; the casting cover allows at most 82.5). The yaw moment on the Z blocks is checked in `HobberFrameChecks.zOffsetMoments`. Open: the Z scale moved to the -y channel wall; a centred screw would need the housing moved.
 - **Guard and service qualification:** P4 fixed shields and P5 rearward X / complete Z-module removals replace the earlier bellows and blocked-service open item; historical numbers remain in the Log. Qualify the four oil-compatible D10 / 2 mm-panel NBR plugs, the sheet shop's bend allowance, the long AF4 service key and the hoist/sling and temporary Z-reader support arrangements. These procurement/shop inputs remain assumed, not vendor-rated model fixtures.
@@ -190,7 +190,7 @@ Status: **complete** — P1–P5 accepted on branch `hobber-round-r5`; supplier 
 
 ## Phase Y: Y as a linear module (started 2026-11-07)
 
-Status: **LM0 complete; XC complete in three lean commits; XA partial; LM1 nominal module and LM2/LM3 model gates pass, stock/seal qualification open; LM4 actual Y module installed as a partial fit checkpoint; LM5 mass/drive/wiper corrections pass, full integrity and stiffness/accuracy qualification open; ZB partial: nominal mounting/tool/service gates pass; 24-pose travel0 ZB errors (46 Y findings), screw ingress open; LM6 tooling/routed RFQ export and hobber3325/module286 pass; release gates remain open** on `linear-module`.
+Status: **LM0 complete; XC complete in three lean commits; XA partial; LM1 nominal module and LM2/LM3 model gates pass, stock/seal qualification open; LM4 underside guard/rail-clearance fit checkpoint: fastener fit0,6 wiper probes and enclosure48/112 pass,whole hobber fails7 service-only findings; LM5 drive sizing passes at Z65.15 kg, stiffness/accuracy qualification open; ZB partial: nominal mounting/tool/service gates pass; 24-pose travel0 ZB errors (new full sweep10 findings:3 deck/7 service), screw ingress open; LM6 tooling/routed RFQ export and hobber3325/module286 pass; release gates remain open** on `linear-module`.
 Keep the ground20 mm X deck, bolted bright-bar ribs and four corner sole pads.
 One bolts-only FE result:43.633 N/um /17.077 MN m/rad. Passing frame sweep0 errors,
 13 removals; trimmed hobber2453 PASS. XA then LM1-LM5,ZB,LM6 run lean (about90 min
@@ -203,10 +203,15 @@ the XA commit records this checked subset. The library module now passes286 chec
 modeled guard masses1.273/8.775/8.018 kg are assumptions, and end sealing/PU retention
 still require qualification. Short-module cable routing now stays below the roof, and its split guards withdraw
 longitudinally with declared head/motor prerequisites. The host-carriage interface is
-provided by the containing machine. The hobber now uses the actual Y module and its direct actuator/base interface;
-its low-Z tilted swept fit and valid Y stiffness/accuracy result remain release gates.
+provided by the containing machine. The hobber now uses the actual Y module and its direct actuator/base interface.
+The host shields now seal to the carriage back face; the rail-derived clearance
+profile retains the made-hole edge lands through overtravel. The enclosure passes
+48 states/112 near pairs, but the rear guard/retainer withdrawal still catches the
+fixed mount and scale-head withdrawal catches a stop. Full sweep:10 findings
+(three small deck overlaps and seven service obstructions),2185 s. Stop driver access under the
+end hood, the final service split and valid Y stiffness/accuracy remain release gates.
 LM6 declares27 tooling rows separately from machine parts,89 checked sequence references,
-and regenerates46 routed machined RFQ parts (88.49 kg). Prices and custom bellows data
+and regenerates46 routed machined RFQ parts (90.05 kg). Prices and custom bellows data
 remain ASSUMED; the supplier package is not a machine-release claim.
 
 Y becomes an instance of the MachineKit screw linear module, planned in

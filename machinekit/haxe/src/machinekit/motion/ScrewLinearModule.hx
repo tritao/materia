@@ -51,8 +51,9 @@ class ScrewLinearModule extends AxisBuilder {
         var supplied=hostGuards==null?null:hostGuards.get(cover);
         if(supplied==null)supplied=new ScrewLinearModuleCover(s.values().setToken("role",cover));
         attach(cover,supplied,F.identity(),"base");
-        attach(retainer,new ScrewLinearModuleCover(s.values().setToken("role",retainer)),F.identity(),cover);
-        attach("lip"+suffix,new ScrewLinearModuleCover(s.values().setToken("role","lip"+suffix)),F.identity(),retainer);
+        var suppliedRetainer=hostGuards==null?null:hostGuards.get(retainer),lip="lip"+suffix,suppliedLip=hostGuards==null?null:hostGuards.get(lip);
+        attach(retainer,suppliedRetainer==null?new ScrewLinearModuleCover(s.values().setToken("role",retainer)):suppliedRetainer,F.identity(),cover);
+        attach(lip,suppliedLip==null?new ScrewLinearModuleCover(s.values().setToken("role",lip)):suppliedLip,F.identity(),retainer);
       }
     }
     if(s.stroke>20)ScrewLinearModuleBellows.install(this);
@@ -79,6 +80,14 @@ class ScrewLinearModule extends AxisBuilder {
       out.push({member:"coverRear",fastened:["stopRearLeft","stopRearRight"],faces:["base"]});
     }
     if(spec.stroke>20)for(side in ["Front","Rear"])out.push({member:"mountFixed"+side,fastened:["stop"+side+"Left","stop"+side+"Right"],faces:["base"]});
+    if(spec.stroke<=20) {
+      var guards=["coverFront","coverRear","retainerFront","retainerRear","lipFront","lipRear"];
+      var mechanism=[for(m in components())if(!guards.contains(m.id))m.id];
+      // Tighten the precision mechanism before fitting shields. Retainer
+      // hardware is tightened on the bench as a separate guard subassembly.
+      for(guard in guards)out.push({member:guard,fastened:mechanism.filter(id->id!="base")});
+      for(id in mechanism)out.push({member:id,fastened:["retainerFront","retainerRear"],faces:["seal"]});
+    }
     return out;
   }
   /** Every derived joint has one alignment instruction; unknown additions fail
