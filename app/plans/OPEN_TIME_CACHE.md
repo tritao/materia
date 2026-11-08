@@ -75,18 +75,18 @@ Two layers share one store (`cadkit.cache.DiskStore`, files named by the SHA-256
 
 | Variable | Effect |
 |---|---|
-| `MATERIA_MEMO_DIR` | Cache directory. Default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`. |
-| `MATERIA_MEMO=off` | No persistent tier. Results are identical, only slower. |
-| `MATERIA_MEMO_MAX_MB` | Size cap, default 2048. Least recently used entries are evicted past it. |
-| `MATERIA_MEMO_VERIFY=1` | Recompute every hit and fail on any difference (see below). |
-| `MATERIA_MEMO_SALT` | Extra text in the native identity. Set it after rebuilding OCCT or CadKit in a way the library hashes and OCCT version cannot see (same sizes, same version text). |
+| `MATERIA_CACHE_DIR` | Cache directory. Default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`. |
+| `MATERIA_CACHE=off` | No persistent tier. Results are identical, only slower. |
+| `MATERIA_CACHE_MAX_MB` | Size cap, default 2048. Least recently used entries are evicted past it. |
+| `MATERIA_CACHE_VERIFY=1` | Recompute every hit and fail on any difference (see below). |
+| `MATERIA_CACHE_SALT` | Extra text in the native identity. Set it after rebuilding OCCT or CadKit in a way the library hashes and OCCT version cannot see (same sizes, same version text). |
 
 **Clear and inspect.** Clear: delete the cache directory (it is only a cache). Inspect: `HOBBER_PHASES=1` on the hobber scene
 (`machinekit/examples/flexspline-hobber/haxeon.enclosure.json`) prints the build/fit/export times, one `MEMO` line per memo
 (hits, misses, how many came from disk, time spent computing) and `OPS` lines for the kernel cache (keyed and unkeyed
 booleans, history booleans that cannot be cached and why, queries).
 
-**Verify mode.** `MATERIA_MEMO_VERIFY=1` makes every disk hit recompute and compare bytes; a difference throws
+**Verify mode.** `MATERIA_CACHE_VERIFY=1` makes every disk hit recompute and compare bytes; a difference throws
 `persistent memo "<name>" is stale ...`. It means the key or the identity missed an input. To find missing dependencies across
 commits: fill the cache on one commit, switch to a commit that changed code, run with verify on. It is slow by design: use it as
 a gate, not in everyday runs.
@@ -228,3 +228,7 @@ Hobber `machine` entrypoint, the two project tools run as the editor runs them, 
 
 The generated artifacts (compiled generator, fingerprint record, cached output) are entries of `cadkit.cache.DiskStore` (`~/.cache/materia/memo`, the kernel cache's store), keyed `artifact/1\n<generator|record|output>\n...`, so they share its size cap (`MATERIA_MEMO_MAX_MB`), least-recently-used eviction and framed entries (`DiskStore.remove` added). `generated-artifacts/` and its handling are gone; the old directory was deleted. `DiskStore` is plain Haxe, so the app uses it without CadKit natives. `MATERIA_MEMO=off` now keeps no artifacts at all. `MATERIA_MEMO_VERIFY=1` regenerates a cached output and fails if the bytes differ. A compile that records modules reports the generated `CodeIdentityTable` by its file's digest (its text is rewritten by the compile, which had made the record unconfirmable for any program that reads identities; the fingerprint test now reads one). Headless open of the hobber (`OpenProbe`, the runner's `generateArtifact`): cold 135 s, warm reopen 0.2 s without compiling, digest `89fab112da0b8210`; with `MATERIA_MEMO_MAX_MB=1` the store ends empty and the next open regenerates the same digest.
 Found, not fixed: a generator run by the runner executes from a temporary directory with no `native/cadkit` beside it, so `NativeIdentity` is null and the kernel cache is off in editor-driven generation (the store held only the three artifact entries after a 135 s cold open). `haxeon run` is unaffected.
+
+### Stage 9g (2026-11-08): the kernel cache in editor-driven generation; MATERIA_CACHE_* names
+
+`NativeIdentity` now hashes the libcadkit library the loader mapped (`CodeIdentity.loadedLibrariesContent`, from `/proc/self/maps`), wherever it was found, and a null identity prints `kernel cache off: no native identity` on stderr. Before, a generator started by the runner (a temporary directory, libraries found through the library path) had no `native/cadkit` beside it, so the kernel cache was silently off in the editor: the store held 3 entries after a cold hobber open, now 2002. Headless hobber opens through `generateArtifact` (worktree): cold 118.7 s; warm 0.3 s without compiling; one-line `MineralCasting.hx` edit 44.2 s (about 12 s compile + the scene); digest `89fab112da0b8210` in all; `MATERIA_CACHE_VERIFY=1` clean. Regression test: the project-loading test runs a small CadKit generator through the runner; the generator fails without a native identity and the store must hold kernel entries (it fails on the previous `NativeIdentity`). The variables that govern the whole store were renamed (no aliases): `MATERIA_MEMO_DIR/_MAX_MB/_VERIFY/_SALT` and `MATERIA_MEMO=off` became `MATERIA_CACHE_DIR/_MAX_MB/_VERIFY/_SALT` and `MATERIA_CACHE=off` (the log above keeps the names of its time). Follow-up plan: `app/plans/CACHE_CLEANUP.md`.

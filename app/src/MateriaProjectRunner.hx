@@ -192,7 +192,7 @@ class MateriaProjectRunner {
       fieldText(entry, "function"), home, tools, recipeDocument);
     var fingerprint = location == null ? null : confirmedFingerprint(location, home, tools, control);
     if (control != null) control.throwIfCancelled();
-    // `MATERIA_MEMO_VERIFY=1` regenerates even a cached output and compares, which is the check that it is deterministic.
+    // `MATERIA_CACHE_VERIFY=1` regenerates even a cached output and compares, which is the check that it is deterministic.
     var stored:Null<Bytes> = null;
     if (fingerprint != null && location != null) {
       stored = readCachedArtifact(location, fingerprint, control);
@@ -369,7 +369,7 @@ class MateriaProjectRunner {
         inputs.push(resolveProjectPath(projectRoot, resource));
       }
     }
-    // One store for every cache entry (`MATERIA_MEMO=off` switches it off, and then nothing is kept).
+    // One store for every cache entry (`MATERIA_CACHE=off` switches it off, and then nothing is kept).
     var store = DiskStore.process();
     if (store == null) return null;
     var documentInput = Reflect.field(entry, "documentInput") == true;

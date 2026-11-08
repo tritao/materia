@@ -164,7 +164,7 @@ have not changed. Scripts that read additional data files must list those files
 in the entrypoint's `cache.inputs` array, relative to `materia.project.json`.
 Entrypoints without a `cache` declaration execute on every open. The cache is
 stored in the shared cache store under `$XDG_CACHE_HOME/materia/memo`, or `~/.cache/materia/memo`
-when `XDG_CACHE_HOME` is unset (capped by `MATERIA_MEMO_MAX_MB`, least recently used first). Only deterministic entrypoints should opt in;
+when `XDG_CACHE_HOME` is unset (capped by `MATERIA_CACHE_MAX_MB`, least recently used first). Only deterministic entrypoints should opt in;
 omit `cache` when output depends on the clock, environment, or undeclared inputs.
 
 Saving this view as a Materia scene keeps a relative reference to the project

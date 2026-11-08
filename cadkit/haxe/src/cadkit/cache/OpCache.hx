@@ -17,8 +17,8 @@ import haxe.io.Bytes;
  * must never depend on whether the cache was consulted. An unkeyed boolean (an input with no key) is computed and returned as
  * built, as it always was.
  *
- * Environment (see `DiskStore`): `MATERIA_MEMO=off` (no persistent tier), `MATERIA_MEMO_DIR`, `MATERIA_MEMO_MAX_MB`,
- * `MATERIA_MEMO_VERIFY=1` (a hit is recomputed and compared; a difference throws).
+ * Environment (see `DiskStore`): `MATERIA_CACHE=off` (no persistent tier), `MATERIA_CACHE_DIR`, `MATERIA_CACHE_MAX_MB`,
+ * `MATERIA_CACHE_VERIFY=1` (a hit is recomputed and compared; a difference throws).
  */
 class OpCache {
   /** No initialisers: this class is reached from other classes' static initialisation. */
@@ -173,8 +173,8 @@ class OpCache {
    * queries that do not depend on what was done to the shape's topology before (meshing it, for one) may use this: a query
    * whose answer changes with that history (a tessellation, a bounding box) is not a function of the key.
    *
-   * An unkeyed shape, `MATERIA_MEMO=off` or an unknown identity compute as always. `encode` and `decode` must round-trip
-   * exactly. With `MATERIA_MEMO_VERIFY=1` a stored answer is recomputed and compared; a difference throws.
+   * An unkeyed shape, `MATERIA_CACHE=off` or an unknown identity compute as always. `encode` and `decode` must round-trip
+   * exactly. With `MATERIA_CACHE_VERIFY=1` a stored answer is recomputed and compared; a difference throws.
    */
   public static function query<T>(
     name:String,

@@ -15,8 +15,8 @@ import sys.io.File;
  * key names everything the value depends on. A failed read or write is a miss, never an error: the cache only ever makes a
  * run faster.
  *
- * Environment: `MATERIA_MEMO_DIR` (directory; default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`),
- * `MATERIA_MEMO=off` (no persistent tier), `MATERIA_MEMO_MAX_MB` (cap, default 2048), `MATERIA_MEMO_VERIFY=1` (see `OpCache`).
+ * Environment: `MATERIA_CACHE_DIR` (directory; default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`),
+ * `MATERIA_CACHE=off` (no persistent tier), `MATERIA_CACHE_MAX_MB` (cap, default 2048), `MATERIA_CACHE_VERIFY=1` (see `OpCache`).
  */
 class DiskStore {
   static final defaultCapMegabytes = 2048;
@@ -64,13 +64,13 @@ class DiskStore {
   public static function verifying():Bool {
     var forced = verifyOverride;
     if (forced != null) return forced;
-    var value = Sys.getEnv("MATERIA_MEMO_VERIFY");
+    var value = Sys.getEnv("MATERIA_CACHE_VERIFY");
     return value != null && value != "" && value != "0";
   }
 
   static function fromEnvironment():Null<DiskStore> {
-    if (Sys.getEnv("MATERIA_MEMO") == "off") return null;
-    var directory = Sys.getEnv("MATERIA_MEMO_DIR");
+    if (Sys.getEnv("MATERIA_CACHE") == "off") return null;
+    var directory = Sys.getEnv("MATERIA_CACHE_DIR");
     if (directory == null || directory == "") {
       var cache = Sys.getEnv("XDG_CACHE_HOME");
       var home = Sys.getEnv("HOME");
@@ -79,7 +79,7 @@ class DiskStore {
       else return null;
     }
     var megabytes:Float = defaultCapMegabytes;
-    var text = Sys.getEnv("MATERIA_MEMO_MAX_MB");
+    var text = Sys.getEnv("MATERIA_CACHE_MAX_MB");
     if (text != null && text != "") {
       var parsed = Std.parseFloat(text);
       if (!Math.isNaN(parsed) && parsed >= 0) megabytes = parsed;

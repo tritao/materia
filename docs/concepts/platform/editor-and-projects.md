@@ -78,7 +78,7 @@ overrides layered over it, not as a copy of it (see
 Opening the same project again should not rebuild it. Three caches, all
 disposable, sit under the user's cache directory (`~/.cache/materia`). The first
 two are entries of the one cache store (`memo`, shared with the kernel operation
-cache, capped by `MATERIA_MEMO_MAX_MB`, least recently used evicted first):
+cache, capped by `MATERIA_CACHE_MAX_MB`, least recently used evicted first):
 
 - **Compiled generators** (store entry `generator/<fingerprint>`). The
   fingerprint hashes every source file and manifest of the resolved packages,
