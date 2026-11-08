@@ -60,6 +60,12 @@ class ScrewLinearModuleChecks {
       var host=new ScrewLinearModulePart(spec.values().setToken("role","carriage")),axis=new ScrewLinearModule(spec,null,host);
       check(axis.component("carriage")==host,"Containing machine supplies its carriage interface");
       check(axis.validate().length==0,"Module assembly validation");
+      for(requirement in axis.serviceRemovals())switch requirement {
+        case ServiceRemoval("screw",_,_,off,_):
+          var guards=size.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec);
+          check(guards.length>0&&guards.filter(id->!off.contains(id)).length==0,"Remove guards before withdrawing the screw and ball nut");
+        case _:
+      }
       var fasteners=axis.deriveFasteners();
       check(!fasteners.diagnostics.hasErrors(),"Joint-derived module hardware");
       check([for(method in axis.alignment())method].length==fasteners.joints.length,"Every module joint declares alignment");

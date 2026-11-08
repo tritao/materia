@@ -126,7 +126,7 @@ class ScrewLinearModule extends AxisBuilder {
   public function serviceRemovals():Array<machinekit.design.DesignRequirement> return [
     machinekit.design.DesignRequirement.ServiceRemoval("motor",["motor","motorShaft"],[{direction:[1.0,0,0],distance:spec.drive.motor.rating.shaftLength+10}],[],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("screw",["screw","coupling","nut"],[{direction:[1.0,0,0],distance:spec.baseMax+10}],
-      ["motor","motorShaft","motorMount","floatingRing"],[]),
+      ["motor","motorShaft","motorMount","floatingRing"].concat(spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec)),[]),
     machinekit.design.DesignRequirement.ServiceRemoval("scaleHead",["scaleHead"],[{direction:[-1.0,0,0],distance:spec.centre-spec.baseMin+spec.scaleHead.series.headLength+20}],[],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.scaleStart()+spec.scaleHousing.overallLength()+20}],["scaleHead"].concat(spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec)),[]),
     machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec),[])

@@ -302,6 +302,8 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     yModule=new ScrewLinearModule(HobberYLayout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")),yGuards);
     yModule.takeServiceRemoval("carriage");
     yModule.takeServiceRemoval("guardFront");yModule.takeServiceRemoval("guardRear");
+    // The long host end stop lies in the cable return's withdrawal path.
+    yModule.addServicePrerequisites("scaleHead",["stopFrontLeft"]);
     includeAt("Ymodule",yModule,HobberYLayout.modulePose());
     fixExisting("Ymodule-mount","swivel/output","Ymodule/base",F.alongY(HobberSwivelLayout.OUTPUT_X,0,HobberZLayout.SEAT_Z,-1,0,0));
     group("B spindle");
