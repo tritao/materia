@@ -571,10 +571,35 @@ ElementMapPtr with_face_roles(const TopoDS_Shape& shape, const ElementMap& names
     return result;
 }
 
+namespace {
+// Taking every face of a shape in turn restricts the names to one subshape per call, each against the same parent: the parent's
+// index maps are built once per parent, not once per call. The cache holds the parent, so its address cannot be reused while cached.
+// It is never destroyed (no OCCT teardown at thread exit).
+struct ParentIndex {
+    TopoDS_Shape parent;
+    ShapeIndex maps[4];
+    bool built[4] = {false, false, false, false};
+};
+
+const ShapeIndex& parent_index(const TopoDS_Shape& parent, ElementKind kind) {
+    static thread_local ParentIndex* cache = new ParentIndex();
+    if (cache->parent.IsNull() || !cache->parent.IsSame(parent)) {
+        *cache = ParentIndex();
+        cache->parent = parent;
+    }
+    const std::size_t slot = kind == ElementKind::Face ? 0 : kind == ElementKind::Edge ? 1 : kind == ElementKind::Vertex ? 2 : 3;
+    if (!cache->built[slot]) {
+        cache->maps[slot] = index_of(parent, kind);
+        cache->built[slot] = true;
+    }
+    return cache->maps[slot];
+}
+}  // namespace
+
 ElementMapPtr restrict_to(const TopoDS_Shape& parent, const ElementMap& names, const TopoDS_Shape& sub) {
     auto result = sized_for(sub);
     for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex, ElementKind::Solid}) {
-        const auto parentIndex = index_of(parent, kind);
+        const auto& parentIndex = parent_index(parent, kind);
         const auto subIndex = index_of(sub, kind);
         const auto& parentNames = names.names(parent, kind);
         const auto& parentAliases = names.aliases(kind);
