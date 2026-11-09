@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-linear-module-example"
+  },
+  "entry": "LinearModulePreview",
+  "sourceRoots": ["."],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

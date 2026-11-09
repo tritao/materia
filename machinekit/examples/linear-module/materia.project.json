@@ -1,0 +1,41 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Screw linear module",
+  "defaultEntrypoint": "standard",
+  "build": {
+    "system": "haxeon",
+    "manifest": "haxeon.json"
+  },
+  "entrypoints": {
+    "standard": {
+      "kind": "cad-preview",
+      "module": "LinearModulePreview",
+      "function": "standard",
+      "cache": {}
+    },
+    "hobber-y": {
+      "kind": "cad-preview",
+      "module": "LinearModulePreview",
+      "function": "hobberY",
+      "cache": {}
+    }
+  },
+  "defaultVariant": "standard",
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Standard module",
+      "entrypoint": "standard",
+      "kind": "configuration",
+      "summary": "Library default: HGH15 guides, 20 mm stroke, carriage plate up."
+    },
+    {
+      "id": "hobber-y",
+      "label": "Hobber Y module",
+      "entrypoint": "hobber-y",
+      "kind": "study",
+      "summary": "The hobber's Y module as fitted, laid flat."
+    }
+  ]
+}
