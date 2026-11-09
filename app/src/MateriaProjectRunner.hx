@@ -444,13 +444,12 @@ class MateriaProjectRunner {
   }
 
   /** Must match MateriaProjectModuleBuild.RECORD_VERSION. */
-  static inline var FINGERPRINT_RECORD_VERSION:Int = 4;
+  static inline var FINGERPRINT_RECORD_VERSION:Int = 5;
   static final FINGERPRINT_OPTIONS = ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"];
 
   /**
    * The recorded fingerprint when everything the fingerprint tool read is unchanged: the same contents of every analyzed
-   * module and hashed input, the same module-resolution directory listings (so no module appeared or vanished), the same
-   * compiler options and the same native binaries. Otherwise null, and the tool runs again. Any doubt (a missing or
+   * module and hashed input, the same compiler options and the same native binaries. Otherwise null, and the tool runs again. Any doubt (a missing or
    * malformed record, an unreadable file) also returns null: the record only ever skips work, never decides staleness.
    */
   static function confirmFingerprint(recordText:String, home:String, tools:String, ?control:ProjectLoadControl):Null<String> {
@@ -481,12 +480,6 @@ class MateriaProjectRunner {
           if (status != "") return stale(path);
         } else if (status == "" || (status != binary[2] + ":" + binary[3] + ":" + binary[4] && digestHex(Sha256.make(File.getBytes(path))) != binary[1]))
           return stale(path);
-      }
-      var directories = pairs(record, "directories");
-      if (directories == null || directories.length == 0) return stale("record directories");
-      for (directory in directories) {
-        if (control != null) control.throwIfCancelled();
-        if (directory.length != 2 || directory[1] != sourceListingDigest(directory[0])) return stale(directory[0] + "/");
       }
       var files = pairs(record, "files");
       if (files == null || files.length == 0) return stale("record files");
@@ -539,21 +532,6 @@ class MateriaProjectRunner {
   static function fileStatus(path:String):String {
     var metadata = FileSystem.exists(path) ? FileSystem.metadata(path) : null;
     return metadata == null ? "" : metadata.size + ":" + metadata.modified + ":" + metadata.changed;
-  }
-
-  /** Same rule as MateriaProjectModuleBuild.listSourceDirectories: sorted subdirectory and `.hx` names, hidden excluded. */
-  static function sourceListingDigest(path:String):String {
-    if (!FileSystem.exists(path) || !FileSystem.isDirectory(path)) return "missing";
-    var names:Array<String> = [];
-    for (entry in FileSystem.readDirectoryEntries(path)) {
-      var name = entry.name;
-      if (StringTools.startsWith(name, ".")) continue;
-      if (entry.isDirectory || (!StringTools.endsWith(name, ".hx")
-        && FileSystem.isDirectory(ProjectPath.join([path, name])))) names.push(name + "/");
-      else if (StringTools.endsWith(name, ".hx")) names.push(name);
-    }
-    names.sort(Reflect.compare);
-    return digestHex(Sha256.make(Bytes.ofString(names.join("\n"))));
   }
 
   static function ensureCacheDirectory(path:String):Bool {

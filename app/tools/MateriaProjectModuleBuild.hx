@@ -114,10 +114,8 @@ class MateriaProjectModuleBuild {
   }
 
   static var generatedSources:String;
-  /** Caches are outputs (Materia's and the compiler's); a source root that contains XDG_CACHE_HOME must not list them. */
-  static var cacheRoot:String;
   /** Must match MateriaProjectRunner.FINGERPRINT_RECORD_VERSION. */
-  static inline var RECORD_VERSION:Int = 4;
+  static inline var RECORD_VERSION:Int = 5;
   static final OPTIONS = ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"];
 
   /**
@@ -152,7 +150,6 @@ class MateriaProjectModuleBuild {
     var cache = Sys.getEnv("XDG_CACHE_HOME");
     if (cache == null || cache.length == 0) cache = Path.join([Sys.getEnv("HOME"), ".cache"]);
     generatedSources = Path.normalize(Path.join([FileSystem.fullPath(cache), "materia", "project-sources"]));
-    cacheRoot = Path.normalize(FileSystem.fullPath(cache));
     var parsed = CompilerArguments.parse(compilerArguments);
     var paths = new Map<String, Bool>();
     for (path in declared) add(paths, path);
@@ -175,8 +172,7 @@ class MateriaProjectModuleBuild {
       field(fields, row[1]);
       field(fields, row[2]);
     }
-    // The record lets the editor confirm this fingerprint without compiling: the same file contents and the same
-    // module-resolution directories (and binaries and options below) give the same compile and fingerprint.
+    // The record lets the editor confirm this fingerprint without compiling: the same file contents (and binaries and options below) give the same compile and fingerprint.
     var recordFiles:Array<Array<String>> = [];
     var hashedSources = new Map<String, Bool>();
     // Explicit sources (the entry module, the wrapper) are named relative to the request; library modules are absolute.
@@ -204,10 +200,6 @@ class MateriaProjectModuleBuild {
       field(fields, digest);
       recordFiles.push([path, digest]);
     }
-    var recordDirectories:Array<Array<String>> = [];
-    var visited = new Map<String, Bool>();
-    for (root in parsed.roots) listSourceDirectories(root, recordDirectories, visited);
-    for (root in parsed.packageRoots) listSourceDirectories(root.path, recordDirectories, visited);
     // Native code and tool binaries are not Haxe sources; their content invalidates generated geometry.
     var binaries = [
       Path.join([home, ".tools", "haxe", "haxe"]),
@@ -254,7 +246,6 @@ class MateriaProjectModuleBuild {
       recordable: recordable,
       options: [for (name in OPTIONS) [name, optionValue(name)]],
       files: recordFiles,
-      directories: recordDirectories,
       nativeRoot: nativeRoot,
       binaries: recordBinaries
     }));
@@ -272,34 +263,6 @@ class MateriaProjectModuleBuild {
   }
 
   static function optionValue(name:String):String return Sys.getEnv(name) == "0" ? "off" : "on";
-
-  /**
-   * Module resolution reads only directory names and `.hx` names, so a directory's sorted list of those (hidden entries
-   * excluded: they are never packages) changes whenever a module could appear or disappear. MateriaProjectRunner computes
-   * the same digest.
-   */
-  static function listSourceDirectories(root:String, out:Array<Array<String>>, visited:Map<String, Bool>):Void {
-    if (!FileSystem.exists(root) || !FileSystem.isDirectory(root)) {
-      out.push([Path.normalize(root), "missing"]);
-      return;
-    }
-    var absolute = FileSystem.fullPath(root);
-    if (visited.exists(absolute)) return;
-    visited.set(absolute, true);
-    var names:Array<String> = [];
-    var directories:Array<String> = [];
-    for (name in FileSystem.readDirectory(absolute)) {
-      if (StringTools.startsWith(name, ".")) continue;
-      var path = Path.join([absolute, name]);
-      if (FileSystem.isDirectory(path)) {
-        names.push(name + "/");
-        directories.push(path);
-      } else if (StringTools.endsWith(name, ".hx")) names.push(name);
-    }
-    names.sort(Reflect.compare);
-    out.push([absolute, ContentDigest.makeHex(haxe.io.Bytes.ofString(names.join("\n")))]);
-    for (path in directories) if (Path.normalize(path) != cacheRoot) listSourceDirectories(path, out, visited);
-  }
 
   /** A declared input of the request: it must exist, and joins the fingerprint by content. */
   static function declare(paths:Map<String, Bool>, path:String):Void {

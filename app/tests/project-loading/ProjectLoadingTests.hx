@@ -461,11 +461,11 @@ class ProjectLoadingTests {
       var warmScene = MateriaProjectRunner.loadProject(manifest, null, warmControl);
       check(warmScene.recipeDocument == "first-v1", "warm output");
       check(!hasPhase(warmControl, "Compiling the project"), "warm load confirms the recorded fingerprint without compiling");
-      // A new module could change resolution: its directory listing changes, so the program is compiled again (same fingerprint here, so the cached output is reused).
+      // A module nothing imports is not an input: a file matters once an import names it, and the importing file is in the record.
       File.saveContent(root + "/Unrelated.hx", "class Unrelated {}\n");
       var listingControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, listingControl).recipeDocument == "first-v1", "new module output");
-      check(hasPhase(listingControl, "Compiling the project"), "a new module compiles again");
+      check(!hasPhase(listingControl, "Compiling the project"), "a new module nothing imports does not compile again");
       File.saveBytes(stored(artifacts, "record")[0], framed("{not json"));
       var recordControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, recordControl).recipeDocument == "first-v1", "corrupt record output");

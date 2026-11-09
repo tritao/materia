@@ -47,8 +47,11 @@ differs "$first" "$changed" "editing an imported module"
 echo 'class GraphDependency {public static function value():String return "first" + (haxeon.build.CodeIdentity.ofModule("GraphDependency") == null ? "" : "");}' > "$fixture/b/GraphDependency.hx"
 same "$first" "$(fingerprint)" "restoring the module"
 echo 'class GraphDependency {public static function value():String return "shadow" + (haxeon.build.CodeIdentity.ofModule("GraphDependency") == null ? "" : "");}' > "$fixture/a/GraphDependency.hx"
-differs "$first" "$(fingerprint)" "a module in an earlier root shadowing an imported one"
+n=$((n+1))
+if (HAXEON_COMPILER_SERVER=0 fingerprint) > "$fixture/shadow.log" 2>&1; then echo "FAIL: a module held by two source roots was accepted"; exit 1; fi
+grep -q "two source roots" "$fixture/build.log" || { echo "FAIL: the two-roots error is not reported"; cat "$fixture/build.log"; exit 1; }
 rm "$fixture/a/GraphDependency.hx"
+same "$first" "$(fingerprint)" "removing the second copy of the module"
 echo one-edited > "$fixture/declared.txt"
 differs "$first" "$(fingerprint)" "editing a declared input file"
 echo one > "$fixture/declared.txt"
@@ -70,4 +73,4 @@ echo native > "$fixture/app/build/host/native/kit/libkit.hdll"
 touch -d '2001-01-01' "$fixture/app/build/host/native/kit/libkit.hdll"
 same "$first" "$(fingerprint)" "a native library rebuilt with identical content (new mtime)"
 differs "$first" "$(HAXEON_INLINE=0 fingerprint)" "a compiler option"
-echo "Fingerprint: $n checks (stable, clean = incremental, unrelated module ignored, module edit, shadowing module, declared input, FFI interface, manifest, native library content, rebuild with the same content, compiler option)."
+echo "Fingerprint: $n checks (stable, clean = incremental, unrelated module ignored, module edit, a module in two roots rejected, declared input, FFI interface, manifest, native library content, rebuild with the same content, compiler option)."

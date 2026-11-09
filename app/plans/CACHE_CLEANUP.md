@@ -62,23 +62,30 @@ between haxeon and Materia, and costs one read of the files.
   content, same size other content, restored content, new mtime with the same content.
 - The NativeIdentity regression test (the generator fails without an identity, the store must hold kernel entries) still passes.
 
-## CC3. A module resolves to exactly one file
+## CC3. A module resolves to exactly one file. DONE
 
-**Problem.** A new file in an earlier source root can shadow a module. The record lists directory contents for that reason, and
-the incremental-compile shadowing bug (`hasShadowedModule`) came from the same cause.
+**Check first.** Nothing shadows a module on purpose. A build of the hobber program (3358 modules, every source root) with a
+report of every module found in a second root printed nothing. Haxeon's stdlib overrides Haxe's std through the compiler's
+own lookup, not through a second source root, so no exception was needed.
 
-**Change.**
-- First, check whether anything shadows a module on purpose, apart from haxeon's stdlib overriding Haxe's std. If something does,
-  stop and report it.
-- Otherwise the compiler rejects a module name that exists in two roots. The stdlib override set is fixed and covered by the
-  compiler's own identity, so it stays allowed.
-- A new file then matters only once an import names it, and the importing file is already in the record. The record keeps file
-  contents only.
-- Delete the directory listings from the record and `hasShadowedModule`.
+**What was built.**
+- `ModuleSourceLoader.load` looks in every root and throws `Module "X" is in two source roots: A and B` when two different
+  files declare it. A file whose package declaration names another module still does not count (the existing rule).
+- The record (version 5) no longer lists source directories; `sourceListingDigest`, `listSourceDirectories`, the runner's check of
+  them, `Compiler.hasShadowedModule` and the `CompilerSession` reset it caused are deleted. A new file matters once an import names
+  it, and the importing file is in the record.
 
-**Gates.**
-- Compiler test: a duplicate module across roots is an error that names both files.
-- `test-fingerprint.sh` still passes, with its shadowing case changed to expect that error.
+**Known limit.** A persistent compiler session that already loaded module `X` does not look at the roots again, so a new
+`X` in another root is noticed by the next clean compile (which rejects it), not by an incremental one. The old reset hid
+this by recompiling; the project is invalid in that state either way, and a cached output of the valid project is not served
+for it by a clean build.
+
+**Also found.** `InputFiles` shared its lists between threads (the hobber generator reads files from `Parallel` workers); one
+cold open in about six died with `assert` inside `InputFiles.wrote`. The lists are now guarded by a mutex (only when recording).
+
+**Gates (passed).** `test-fingerprint.sh` (18 checks, now with a clean compile that rejects a module in two roots and accepts
+the project once the copy is removed); `CompilerInputsMain` (fresh session rejects the second copy); the project-loading test
+(a new module nothing imports does not recompile); hobber digest `89fab112da0b8210`, warm 0.2-0.3 s, verify clean.
 
 ## CC4. Verify as a standing gate
 
