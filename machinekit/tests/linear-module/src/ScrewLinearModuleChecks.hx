@@ -53,19 +53,12 @@ class ScrewLinearModuleChecks {
   public static function main():Void {
     var requested=Sys.args(),selected=0;
     for(size in [{profile:"HGH15CA",stroke:20.0,spacing:150.0,blocks:80.0},
-      {profile:"HGH15CA",stroke:80.0,spacing:150.0,blocks:100.0},
-      {profile:"HGH25CA",stroke:200.0,spacing:180.0,blocks:100.0}]) if(requested.length==0||requested.contains("stroke="+machinekit.component.Dimension.format(size.stroke))) {
+      {profile:"HGH15CA",stroke:30.0,spacing:150.0,blocks:80.0}]) if(requested.length==0||requested.contains("stroke="+machinekit.component.Dimension.format(size.stroke))) {
       selected++;
-      var spec=new ScrewLinearModuleSpec(size.profile,size.stroke,size.spacing,size.blocks);
+      var spec=size.stroke==30?machinekit.hobbing.HobberYLayout.moduleSpec():new ScrewLinearModuleSpec(size.profile,size.stroke,size.spacing,size.blocks);
       var host=new ScrewLinearModulePart(spec.values().setToken("role","carriage")),axis=new ScrewLinearModule(spec,null,host);
       check(axis.component("carriage")==host,"Containing machine supplies its carriage interface");
       check(axis.validate().length==0,"Module assembly validation");
-      for(requirement in axis.serviceRemovals())switch requirement {
-        case ServiceRemoval("screw",_,_,off,_):
-          var guards=size.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec);
-          check(guards.length>0&&guards.filter(id->!off.contains(id)).length==0,"Remove guards before withdrawing the screw and ball nut");
-        case _:
-      }
       var fasteners=axis.deriveFasteners();
       check(!fasteners.diagnostics.hasErrors(),"Joint-derived module hardware");
       check([for(method in axis.alignment())method].length==fasteners.joints.length,"Every module joint declares alignment");
@@ -82,7 +75,7 @@ class ScrewLinearModuleChecks {
       }
       Sys.println('Joint slip minimum factors normal $normalFactor / momentary $crashFactor; scale-only normal $scaleFactor (20/40 N ASSUMED).');
       for(finding in fasteners.diagnostics.items)Sys.println(finding.code+" "+finding.message);
-      Sys.println('Module ${size.profile} stroke ${size.stroke}: screw ${spec.screwLength}, rail ${spec.railLength}, risers ${spec.riserWidth} x ${spec.riserHeight}, carriage plane ${spec.carriageBottom()}, ${fasteners.count()} screws / ${fasteners.dowelCount()} pins.');
+      Sys.println('Module ${size.profile} stroke ${size.stroke}: screw ${spec.screwLength}, rail ${spec.railLength}, walls ${spec.wallWidth} x ${spec.wallHeight}, carriage plane ${spec.carriageBottom()}, ${fasteners.count()} screws / ${fasteners.dowelCount()} pins.');
       var report=AssemblyIntegrity.check(axis,{strict:true,runningGap:2.0,fittedBefore:axis.fittingOrder(),processContacts:axis.stopContacts()});
       for(finding in report.diagnostics.items)Sys.println(finding.code+" "+finding.message);
       check([for(finding in report.diagnostics.items)if(finding.code=="fasteners.edge-support")finding].length==0,"Made module parts pass edge support");
@@ -100,38 +93,21 @@ class ScrewLinearModuleChecks {
       check(spec.scaleHousing.measuringLength>=size.stroke+2*spec.overtravel,"Scale window covers overtravel");
       var lengths=SealedScaleData.series("JFT-40").lengths;
       check([for(length in lengths)if(length<spec.scaleHousing.measuringLength&&length>=size.stroke+2*spec.overtravel)length].length==0,"Smallest standard measuring length");
-      Sys.println('Scale ML ${spec.scaleHousing.measuringLength}, housing ${spec.scaleHousing.overallLength()}, seat 40 x ${spec.scaleSeatThickness()}, head normal stack ${fit.normalStack} / fit +/-${fit.normalFit}, gap stack ${fit.gapStack} / adjustment +/-${fit.gapAdjustment} mm; stack assumptions unqualified.');
-      var cache=new PosedParts(), carriage=axis.component("carriage");
-      for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop")) {
+      Sys.println('Scale ML ${spec.scaleHousing.measuringLength}, housing ${spec.scaleHousing.overallLength()}, outside wall ${spec.wallWidth} x ${spec.wallHeight}, head normal stack ${fit.normalStack} / fit +/-${fit.normalFit}, gap stack ${fit.gapStack} / adjustment +/-${fit.gapAdjustment} mm; stack assumptions unqualified.');
+      var cache=new PosedParts(), carriage=axis.component("nutCarrier");
+      for(role in ["stopFront","stopRear"]) {
         var coordinate=(StringTools.startsWith(role,"stopFront")?-1:1)*(size.stroke/2+spec.overtravel);
         var moving=cache.posed(carriage,F.translation(coordinate,0,0)), fixed=cache.posed(axis.component(role),F.identity());
         check(moving.shape.distance(fixed.shape)<0.001,"Hard stop contact at overtravel: "+role);
         var common=moving.intersect(fixed);check(common.volume()<0.001,"Stop has no penetration: "+role);
         common.close();moving.close();fixed.close();
       }
-      if(size.stroke<=20) {
-        check(ScrewLinearModuleCover.openingHalf(spec)>4,"Short cover leaves a payload aperture");
-        for(endpoint in [-size.stroke/2-spec.overtravel,size.stroke/2+spec.overtravel]) {
-          var plate=cache.posed(carriage,F.translation(endpoint,0,0));
-          for(side in ["Front","Rear"]) {
-            var lip=cache.posed(axis.component("lip"+side),F.identity()),common=plate.intersect(lip);
-            check(common.volume()<0.001,"Wiper has no rigid penetration at overtravel");check(plate.shape.distance(lip.shape)<0.001,"Wiper stays on the carriage at overtravel");common.close();lip.close();
-          }
-          plate.close();
-        }
-        Sys.println('Short guard: exposed payload aperture ${2*(ScrewLinearModuleCover.openingHalf(spec)-4)} x ${2*(ScrewLinearModuleCover.openingWidthHalf(spec)-4)} mm; overlap10, roof gap6; clip/end sealing unqualified.');
-      } else {
-        var plan=axis.coverPlan();if(plan==null)throw "Long module needs bellows sizing";
-        check(plan.compressed<=plan.space,"Bellows fits declared folded space");check(plan.extended>=size.stroke+2*spec.overtravel,"Bellows spans overtravel");
-        Sys.println('Long guard: ${plan.folds} folds, compressed ${plan.compressed} / space ${plan.space}, extended ${plan.extended}, outer ${plan.outerWidth()} x ${plan.outerHeight()}; catalogue row and retention ASSUMED.');
+      check(axis.components().filter(m->StringTools.startsWith(m.id,"wall")).length==2,"Two structural side walls");
+      for(id in ["wallLeft","wallRight"]) {
+        var wall=axis.component(id).geometry(),bounds=PosedParts.boxOf(wall);wall.close();
+        check(Math.abs(bounds.minX-spec.baseMin)<0.001&&Math.abs(bounds.maxX-spec.baseMax)<0.001,"Walls span full body length");
       }
-      var guardIds=size.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec);
-      var guardMass=0.0,rigidMovingGuardMass=0.0;
-      for(member in axis.components())if(guardIds.contains(member.id)) {
-        var mass=member.component.massProperties().mass;guardMass+=mass;
-        if(StringTools.startsWith(member.id,"mountMoving")||StringTools.endsWith(member.id,"-moving"))rigidMovingGuardMass+=mass;
-      }
-      Sys.println('Guard geometry mass $guardMass kg, rigid moving guards $rigidMovingGuardMass kg; bought PU/lamella density and geometry are ASSUMED, hardware excluded.');
+      for(member in axis.components())check(!StringTools.startsWith(member.id,"riser")&&!StringTools.startsWith(member.id,"lip")&&!StringTools.startsWith(member.id,"retainer"),"No replaced v1 parts");
       cache.close();
       var rebuilt=MachineAssembly.decode(axis.encode());
       check(rebuilt.components().length==axis.components().length,"Module round trip");
@@ -145,13 +121,7 @@ class ScrewLinearModuleChecks {
       var overState=new cadkit.modeling.AssemblyState(overDefinition);
       for(endpoint in [-size.stroke/2-spec.overtravel,size.stroke/2+spec.overtravel]) {
         overState.setJoint("travel",endpoint);overState.forwardKinematics();
-        var reading=overState.worldPose("scaleHead").x-overState.worldPose("scaleHousing").x;
-        if(size.stroke<=20)for(role in ["coverFront","coverRear"]) {
-          var headBody=new PosedParts();
-          var headShape=headBody.posed(spec.scaleHead,overState.worldPose("scaleHead")),guard=headBody.posed(axis.component(role),overState.worldPose(role));
-          var common=headShape.intersect(guard);check(common.volume()<0.001&&headShape.shape.distance(guard.shape)>=ScrewLinearModuleSpec.GAP-1e-6,"Outward cable keeps running gap through overtravel");
-          common.close();headShape.close();guard.close();headBody.close();
-        }
+        var reading=overState.worldPose("scaleHousing").x-overState.worldPose("scaleHead").x;
         check(reading>=spec.scaleHousing.startOffset()-1e-7&&reading<=spec.scaleHousing.startOffset()+spec.scaleHousing.measuringLength+1e-7,"Actual head stays inside reading window through overtravel");
       }
       for(x in [-size.stroke/2,size.stroke/2]){state.setJoint("travel",x);state.forwardKinematics();check(Math.abs(state.worldPose("carriage").x-x)<1e-7,"Carriage follows module travel");}

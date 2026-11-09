@@ -37,7 +37,7 @@ class HobberFemExport {
     }
     var hob=F.compose(poses.get("hob"),machine.hob.connector("centre").frame),s=machine.yModule.spec;
     var data={parts:parts,held:held,head:head,blocks:blocks,hob:point({x:hob.x,y:hob.y,z:hob.z}),
-      centre:s.centre,railStart:s.railStart(),railLength:s.railLength,riserWidth:s.riserWidth,railSpacing:s.railSpacing,riserCentres:[s.riserY(-1),s.riserY(1)],
+      centre:s.centre,railStart:s.railStart(),railLength:s.railLength,wallWidth:s.wallWidth,railSpacing:s.railSpacing,riserCentres:[s.wallY(-1),s.wallY(1)],
       baseThickness:s.baseThickness,carriageBottom:s.carriageBottom()};
     sys.io.File.saveContent(dir+"/y-module.json",haxe.Json.stringify(data,null,"  "));
     Sys.println("exported Y plate-path geometry and joint-derived boundary patches");

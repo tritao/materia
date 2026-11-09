@@ -19,7 +19,6 @@ class MotionComponents {
     registry.register(PillowBlock.recipeType());
     registry.register(PurchasedRotaryPart.recipeType());
     registry.register(ScrewLinearModulePart.recipeType());
-    registry.register(ScrewLinearModuleCover.recipeType());
     registry.register(LinearRail.recipeType());
     registry.register(LinearRailBlock.recipeType());
     registry.register(SfuNut.familyRecipeType());

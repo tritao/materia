@@ -238,7 +238,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
       || cutDistance > 100 || this.spec.faceWidth > 20) throw "gear/fixture exceeds hobber capacity";
     travel = [
       {id: "X", lower: minX, upper: HobberXLayout.RETRACT, initial: cutDistance},
-      {id: "Y", lower: -10, upper: 10, initial: 0},
+      {id: "Y", lower: -15, upper: 15, initial: 0},
       {id: "Z", lower: HobberZLayout.TRAVEL_MIN, upper: HobberZLayout.TRAVEL_MAX, initial: 0}
     ];
     group("X axis");
@@ -297,12 +297,8 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(HobberSwivelLayout.OUTPUT_X + 6, 0, HobberZLayout.SEAT_Z, 1, 0, 0));
     var e0 = HobberSwivelLayout.SPINDLE_ROTATION;
     group("Y axis");
-    var yGuards=new Map<String,MachineComponent>();
-    for(role in ["coverUpper","coverLower","retainerUpper","retainerLower","lipUpper","lipLower"])yGuards.set(role,new HobberYPart(new ComponentValues().setToken("role",role)));
-    yModule=new ScrewLinearModule(HobberYLayout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")),yGuards);
+    yModule=new ScrewLinearModule(HobberYLayout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")));
     yModule.takeServiceRemoval("carriage");
-    // The long host end stop lies in the cable return's withdrawal path.
-    yModule.addServicePrerequisites("scaleHead",["stopFrontLeft"]);
     includeAt("Ymodule",yModule,HobberYLayout.modulePose());
     fixExisting("Ymodule-mount","swivel/output","Ymodule/base",F.alongY(HobberSwivelLayout.OUTPUT_X,0,HobberZLayout.SEAT_Z,-1,0,0));
     group("B spindle");
@@ -514,32 +510,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     var nutGroup=below("Ymodule/nutCarrier").concat(["Ymodule/nutCarrier"]);
     var carriageBundle=below("Ymodule/carriage").concat(["Ymodule/carriage"]).filter(id->!nutGroup.contains(id)&&!StringTools.startsWith(id,"Ymodule/block")&&id!="Ymodule/scaleHead");
     out.push(ServiceRemoval("yCarriageWithdrawal",carriageBundle,[{direction:worldDir(-1,0,0),distance:HobberYLayout.moduleSpec().carriageThickness+40}],
-      ["Ymodule/coverUpper","Ymodule/coverLower","Ymodule/retainerUpper","Ymodule/retainerLower","Ymodule/lipUpper","Ymodule/lipLower","Ymodule/scaleHead"],[{joint:"X",value:HobberXLayout.RETRACT}]));
-    var ys=HobberYLayout.moduleSpec();
-    for(front in [true,false]) {
-      var suffix=front?"Front":"Rear",stops=["Ymodule/stop"+suffix+"Left","Ymodule/stop"+suffix+"Right"];
-      for(id in stops) {
-        var role=id.substr("Ymodule/".length),part=new machinekit.motion.ScrewLinearModulePart(ys.values().setToken("role",role)),at=part.stopCentre();
-        out.push(ServiceRemoval("y"+role+"Withdrawal",[id],[{direction:worldDir(-1,0,0),distance:HobberYLayout.stopLift()},
-          {direction:worldDir(0,front?1:-1,0),distance:(front?at.x-ys.baseMin:ys.baseMax-at.x)+30+SERVICE_CLEARANCE}],["Ymodule/coverUpper","Ymodule/coverLower","Ymodule/retainerUpper","Ymodule/retainerLower","Ymodule/lipUpper","Ymodule/lipLower"],[{joint:"X",value:HobberXLayout.RETRACT}]));
-      }
-    }
-    // Clear the workholding mandrel for the lower guard's forward handling
-    // path. Precision supports and the X skirt remain installed.
-    // Only the leading crossbars must pass the carriage's outside profile.
-    // The long wiper edges already start one opening half-width outward.
-    var opening=HobberYLayout.window(-4,-4),carriage=yModule.component("carriage").geometry();
-    var whole=machinekit.assembly.PosedParts.boxOf(carriage);
-    var strip=HobberYLayout.prism([{x:opening[0].x,y:-1000.0},{x:opening[1].x,y:-1000.0},{x:opening[1].x,y:1000.0},{x:opening[0].x,y:1000.0}],-1000,1000);
-    var outside=machinekit.component.Solids.cut(carriage,[strip]),edge=machinekit.assembly.PosedParts.boxOf(outside);outside.close();
-    for(upper in [true,false]) {
-      var suffix=upper?"Upper":"Lower",sign=upper?1.0:-1.0;
-      var across=(upper?Math.max(edge.maxY,whole.maxY-opening[2].y):Math.max(-edge.minY,-whole.minY+opening[0].y))+SERVICE_CLEARANCE;
-      out.push(ServiceRemoval("yGuard"+suffix+"Withdrawal",["Ymodule/cover"+suffix,"Ymodule/retainer"+suffix,"Ymodule/lip"+suffix],
-        [{direction:worldDir(0,0,sign),distance:across},
-         {direction:worldDir(-1,0,0),distance:ys.carriageThickness+HobberYLayout.hoodRoof()+SERVICE_CLEARANCE}],upper?[]:["mandrel"],
-        [{joint:"X",value:HobberXLayout.RETRACT},{joint:"Z",value:HobberZLayout.TRAVEL_MAX},{joint:Y,value:0},{joint:A,value:0}]));
-    }
+      ["Ymodule/scaleHead"],[{joint:"X",value:HobberXLayout.RETRACT}]));
     var shaft = spindle.motor.rating.shaftLength;
     out.push(ServiceRemoval("bMotorWithdrawal", ["spindle/motor", "spindle/motorShaft", "spindle/motorEncoder"],
       [{direction: away(axisOf("spindle/motor", 0, 0, 1)), distance: shaft + 10 + SERVICE_CLEARANCE}], ["spindle/belt", "spindle/motorPulley"], []));

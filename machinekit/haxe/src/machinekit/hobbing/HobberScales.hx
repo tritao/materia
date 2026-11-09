@@ -92,7 +92,7 @@ class HobberScales {
   /** Axis travel the scale must cover (lower, upper joint values), conservative: the design stroke, not the cut-dependent one. */
   public static function stroke(id:String):{lower:Float, upper:Float} return switch id {
     case "X": {lower: HobberXLayout.MIN, upper: HobberXLayout.RETRACT};
-    case "Y": {lower: -10.0, upper: 10.0};
+    case "Y": {lower: -15.0, upper: 15.0};
     case "Z": {lower: -10.0, upper: 190.0};
     default: throw 'No scale for axis $id';
   };
@@ -102,7 +102,7 @@ class HobberScales {
     var s=HobberYLayout.moduleSpec(),mount=HobberYLayout.modulePose();
     var hp=F.compose(mount,s.scalePose()),tp=F.compose(mount,s.scalePose(true));
     var normal=F.transformVector(hp,0,1,0),along=F.transformVector(hp,0,0,1),across=F.transformVector(hp,-1,0,0);
-    var body=new machinekit.motion.ScrewLinearModulePart(s.values().setToken("role","scaleSeat")).geometry(),b=machinekit.assembly.PosedParts.boxOf(body);body.close();
+    var body=new machinekit.motion.ScrewLinearModulePart(s.values().setToken("role","wallLeft")).geometry(),b=machinekit.assembly.PosedParts.boxOf(body);body.close();
     return {id:"Y",housing:s.scaleHousing,head:s.scaleHead,housingPose:hp,headPose:tp,toSeat:[normal.x,normal.y,normal.z],along:[along.x,along.y,along.z],across:[across.x,across.y,across.z],seatBar:worldBox(mount,[b.minX,b.maxX,b.minY,b.maxY,b.minZ,b.maxZ])};
   });
   public static function member(id:String,head:Bool=false):String return id=="Y"?"Ymodule/"+(head?"scaleHead":"scaleHousing"):id+(head?"scaleHead":"scale");

@@ -47,7 +47,6 @@ class HobberAssemblyTooling {
     var out:Array<HobberToolStep>=[];
     for(i=>s in machine.yModule.assemblySteps()) {
       var measurement=s.measurement;
-      if(s.parts.contains("coverUpper"))measurement+=" For this host, park X at its retract limit and Z at its upper limit, centre Y and A, and clear the workholding mandrel before handling the lower guard. Withdraw the upper half upward; move the lower half down only by its declared profile-derived distance, then forward. Reverse these checked paths for installation. Both screw supports remain bolted and pinned. Release the clip-in PU lips clear of projecting head-interface fasteners before sliding the steel guards; qualify the assumed lip peel/clip process with the selected seal profile. The rigid-path and retained-hardware checks do not qualify elastomer strain. Remove both guards before unbolting a stop or reaching the wipers.";
       out.push({id:"Y/"+(i+1),parts:[for(id in s.parts)"Ymodule/"+id],tools:s.tools,measurement:measurement});
     }
     return out;
