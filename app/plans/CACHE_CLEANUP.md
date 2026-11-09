@@ -107,14 +107,32 @@ When the model's operations change on purpose, set `BASELINE_HITS` to the warm h
 check; restored, it passes. The stale `machinekit/tests/haxeon.hob-probe.json` (its entry was deleted with the persistent tier) is
 removed.
 
-## CC5. Edit-loop Haxe work (performance, after CC1–CC4)
+## CC5. Edit-loop Haxe work (performance, after CC1–CC4). DONE: profiled, no change made
 
-After an edit, most of the hobber's roughly 32 s scene run is plain Haxe work, not geometry:
-- anchor derivations (10 s), where about a third of the parallel samples wait on the GC lock;
-- `InsertHoleCodec.snapshot` copying through JSON;
-- per-candidate allocation in the pattern search.
+**Profile (2026-11-09).** The scene run of the hobber with a warm kernel store and cold in-memory memos (what any code-edit open
+runs), under the HashLink sampler (`hl --diagnostics PORT` + `hlprof-live --rate 200`, `hlprof-report.py`). 9259 samples
+(7913 not idle), phases build 17 s / fit 6 s / export 12 s on a loaded machine. Inclusive shares:
+- `CadKit.shapePlaceOperationChecked` (reached through `PosedParts.moved` -> `Part.placed` -> `Location.applyOperation`): **20 %**.
+  Self time is OCCT's own traversal (`TopoDS_Iterator::updateCurrentShape`, `TopLoc_Location::Multiplied`,
+  `TopLoc_SListOfItemLocation::Assign`) inside `naming::propagate`, which rebuilds every element index of the moved shape.
+- `InsertAnchorGeometry.derive` 12.9 %: `InsertAnchorSelection.select` 27 % of that (3 % of the run), `InsertHoleCodec.snapshot` 17.8 %
+  of it (2 % of the run), the rest allocation and the GC lock. Inside `select` the self time is enum comparison
+  (`$enum-dynamic-order`) and exact-type checks.
+- `HobMesh` 10.6 %, `Memo.get` wrappers 45 % (inclusive only: they hold the work above).
+No Haxe function is over 3.5 % of the run by itself.
 
-Do one profile and fix what it shows, with a limit of 1.5 h. The digest (`89fab112da0b8210`) must not change.
+**Tried.** Placing posed parts with the shape-level `Location.apply` (no operation history) instead of `Part.placed`: the place
+samples fell from 1614 to about 1450 on a loaded machine (10 %, inside the noise), so the cost is the name propagation, not
+the history record. Reverted.
+
+**Why nothing was changed.** The two Haxe items the plan named are 2-3 % of the run each, and the GC-lock wait in the anchor
+derivations is allocation in the pattern search, which is spread over the whole search loop rather than one function. The one
+large item is native: a rigid placement keeps the topology, so its names could be carried index by index instead of through
+`naming::propagate` (rules for aliases, splits and generated roles are for operations that change topology). That is a change to
+CadKit's naming core with the topological-naming tests as its gate; it deserves its own step, not an afternoon inside a timebox.
+
+**Next, if wanted.** A rigid-placement fast path in `do_cad_shape_place` that reuses the source `ElementMap` (the digest
+`89fab112da0b8210` and `naming_smoke` as gates). Expected gain: most of the 20 %.
 
 ## Not now
 

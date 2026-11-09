@@ -247,3 +247,7 @@ Found, not fixed: a generator run by the runner executes from a temporary direct
 ### Stage 9k (2026-11-09): CC4, the standing verify gate
 
 `machinekit/tests/hobbing/src/CacheGateTests.hx` (workspace project `cache-gate`): a small hob built cold, warm and warm with verify on; zero unkeyed booleans, warm hits not below the baseline, verified bytes equal cold bytes, plus controls for an impure keyed operation and an unkeyed boolean. About 2 s of operations. Mutating the model to leave one cut unkeyed fails it. Details: `app/plans/CACHE_CLEANUP.md`, CC4.
+
+### Stage 9l (2026-11-09): CC5, profile of the edit-loop scene run
+
+One sampler profile of the warm-kernel, cold-memo hobber run: 20 % of samples are rigid shape placement (native name propagation), no Haxe function is above 3.5 %, anchor derivations are 12.9 % spread over the pattern search. A history-free placement did not help. No code changed; the placement fast path is written up in `app/plans/CACHE_CLEANUP.md`, CC5.
