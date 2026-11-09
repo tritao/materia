@@ -94,6 +94,40 @@
   and conditional cooling; casting-package refresh/large-face qualification; other unpublished supplier tolerances. These are recorded,
   not pursued in this timeboxed close-out. UI capture unavailable; use model tree evidence.
 
+## v2: module as one body (2026-11-09)
+
+**Why.** The first module reads as a kit of separate parts on a flat plate, and fitted to the hobber's Y axis (+-15 mm) it was
+sized like a long-stroke module: base 780 x 450, carriage 600 x 350, screw 410 mm, guards 782 mm wide, four U stops, seal lands,
+retainers and PU lips. The swivel head went from 39.2 to 52.7 kg on the eRob and the Y Abbe offset from 76 to 88 mm (LM5).
+
+**Reference (user, 2026-11-09).** An HZM200-style open module: a wide base plate with clamp flanges along its sides; two tall
+full-length side walls with the guide rails on top; an open channel between them with the ball screw centred on the floor; the
+motor end block (coupling window) at one end and the floating support at the other; a plain carriage plate spanning both rails.
+Optional flat top covers from the ends to the carriage.
+
+**Parts, all from the Structure rule (ground flat stock, location by part type).**
+- Base: ground plate; clamp or bolt flanges along both sides to the host.
+- Walls: two full-length ground bars, bolted and dowelled to the base; their tops carry the rails (reference edge on the inner
+  side); they replace the riser bars and form the body's sides.
+- Drive: HZMotion M60D-BK12 as the motor end block and BF12 at the other end, both on the base floor in the channel, screw
+  centred, indicated then pinned; hard stops on the floor at the channel ends (no separate U stops).
+- Carriage: plain ground plate spanning both rails, tapped host pattern; no seal lands.
+- Cover (optional): two flat top sheets from the ends to the carriage, overlapped by it, plus the block wipers. No retainers, no
+  PU lips.
+- Scale: housing on the outside face of one wall (ground, so parallel to the rail on top by construction); head on a small
+  bracket on the carriage; cable out at the motor end.
+
+**Hobber Y at compact proportions.** Carriage only as large as the spindle seat needs; body length = carriage + stroke +
+overtravel + the two supports. Hard gates: head (A rotating) mass <= 39.2 kg; no part wider than the old swivel plate; hobber,
+hobbing, module, joint-fastener, assembly-integrity and enclosure suites pass; the Z floating bar / eRob clearance >= 2 mm.
+
+**Steps** (lean: model checks only, no new FE, no new library features beyond this list, about 1.5 h each, one commit each):
+- **v2-a.** Rebuild `ScrewLinearModule` to this layout; delete the riser bars, U stops, seal lands, retainers and lips.
+  Module checks for the standard and the hobber sizes.
+- **v2-b.** Refit the hobber's Y axis at compact size; fix the Z floating bar clearance.
+- **v2-c.** Compare with LM0 (head mass and CoM, A tilt and gravity torque, Y Abbe, member and BOM counts) in one Log line;
+  update `machinekit/examples/linear-module` so both variants show the result.
+
 ## Log
 
 - 2026-11-07 LM0 (`fedf4ff0c`): before edits,hobber2345/hobbing1161; joint-fasteners,assembly-integrity,way-cover PASS; requested frames0 errors,13 services,269 members,68 joints246 screws26 pins. X carriage24.586824 kg; Y28.132885 kg; head39.16 kg; A tilt48.39 Nm, max gravity35.10 versus87 rated204 peak (brake87 ASSUMED). FE baseline/Abbe/budget details: examples/flexspline-hobber/LINEAR_MODULE_BASELINE.json.
