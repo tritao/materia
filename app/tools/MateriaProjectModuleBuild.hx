@@ -117,7 +117,7 @@ class MateriaProjectModuleBuild {
   /** Caches are outputs (Materia's and the compiler's); a source root that contains XDG_CACHE_HOME must not list them. */
   static var cacheRoot:String;
   /** Must match MateriaProjectRunner.FINGERPRINT_RECORD_VERSION. */
-  static inline var RECORD_VERSION:Int = 2;
+  static inline var RECORD_VERSION:Int = 4;
   static final OPTIONS = ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"];
 
   /**
@@ -165,7 +165,7 @@ class MateriaProjectModuleBuild {
     var ordered = [for (path in paths.keys()) path];
     ordered.sort(Reflect.compare);
     var fields = new StringBuf();
-    field(fields, "materia-generated-artifact-v4");
+    field(fields, "materia-generated-artifact-v5");
     // These options affect generated code even when source bytes are unchanged.
     for (name in OPTIONS) field(fields, name + ":" + optionValue(name));
     field(fields, args[1]);
@@ -208,8 +208,7 @@ class MateriaProjectModuleBuild {
     var visited = new Map<String, Bool>();
     for (root in parsed.roots) listSourceDirectories(root, recordDirectories, visited);
     for (root in parsed.packageRoots) listSourceDirectories(root.path, recordDirectories, visited);
-    // Native code and tool binaries are not Haxe sources. Their build stamps
-    // invalidate generated geometry without reading large shared libraries.
+    // Native code and tool binaries are not Haxe sources; their content invalidates generated geometry.
     var binaries = [
       Path.join([home, ".tools", "haxe", "haxe"]),
       build.HashLinkPath.executable(home),
@@ -232,17 +231,21 @@ class MateriaProjectModuleBuild {
     var recordBinaries:Array<Array<String>> = [];
     for (path in binaries) {
       if (!FileSystem.exists(path)) {
-        recordBinaries.push([path, "missing", ""]);
+        recordBinaries.push([path, "missing", "", "", ""]);
         continue;
       }
+      var digest = ContentDigest.makeHex(File.getBytes(path));
+      // Whole Unix seconds, as Haxeon's FileSystem.metadata reports them to the runner.
       var stat = FileSystem.stat(path);
-      // Whole Unix seconds, as Haxeon's FileSystem.metadata reports them to the editor.
-      recordBinaries.push([path, Std.string(stat.size), Std.string(Std.int(stat.mtime.getTime() / 1000.0))]);
-      // Empty files contain no executable native code.
-      if (stat.size == 0) continue;
+      recordBinaries.push([
+        path,
+        digest,
+        Std.string(stat.size),
+        Std.string(Std.int(stat.mtime.getTime() / 1000.0)),
+        Std.string(Std.int(stat.ctime.getTime() / 1000.0))
+      ]);
       field(fields, path);
-      field(fields, Std.string(stat.size));
-      field(fields, Std.string(stat.mtime.getTime()));
+      field(fields, digest);
     }
     var fingerprint = ContentDigest.makeHex(haxe.io.Bytes.ofString(fields.toString()));
     File.saveContent(outputPrefix + ".record.json", haxe.Json.stringify({

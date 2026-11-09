@@ -29,25 +29,38 @@ supplier file is served from a stale `.mtrg`.
 - Hobber: an unchanged reopen still takes well under a second. Touching one supplier STEP file regenerates the scene without a
   compile.
 
-## CC2. One native identity, written by the build
+## CC2. One native identity: the content of what is loaded. DONE
 
-**Problem.** Native code is identified in four ways: the CadKit library's content hash, the OCCT version text plus the names and
-sizes of its libraries, `MATERIA_*_SALT`, and the record's size and mtime stamps for toolchain binaries. The salt exists because
-none of them is complete.
+**Problem.** Native code was identified in four ways: the CadKit library's content hash, the OCCT version text plus the names and
+sizes of its libraries, `MATERIA_CACHE_SALT`, and the record's size and mtime stamps for toolchain binaries. The salt existed
+because none of them was complete.
 
-**Change.**
-- haxeon already fingerprints native build actions (`build/execution/ActionFingerprint.hx`). When it publishes a library, it
-  writes that fingerprint next to the library. `.haxeon-published` currently holds only the library name.
-- `NativeIdentity` reads the identity file next to each library the process actually loaded, found through `/proc/self/maps` as
-  now.
-- OCCT's identity is the hash in its prebuilt install, from a stamp file in the install. The directory name is not used.
-- The record uses the same identities for the native libraries and the toolchain binaries. Content is hashed only for a binary
-  that no build of ours produces.
-- Delete the salt, the size and mtime stamps, the `nativeBuild` fallback, and the OCCT names-and-sizes list.
+**What was built.** Content, everywhere, from one place.
+- `NativeIdentity` is the content hash of the CadKit library the loader mapped (`CodeIdentity.mappedLibraries`, from
+  `/proc/self/maps`), the `occt.identity` stamp of the OCCT install the mapped `libTK*` came from (next to its `lib` directory), and
+  the naming-scheme version. A missing CadKit library, OCCT stamp or OCCT library prints `kernel cache off: no native identity
+  (<what is missing>)` and turns the persistent tiers off.
+- `cadkit/scripts/build-occt-prefix.sh` writes `occt.identity` (a hash of the installed `libTK*` content) after installing, and
+  stamps an existing install that has none. The stamp of the prebuilt install was written once, without rebuilding.
+- The record (version 3) holds content digests, not size and mtime, for the native libraries and the toolchain binaries (Haxe,
+  HashLink, the runtime library), and the tool's identity hashes the Haxe compiler by content. Touching a file or rebuilding it
+  to the same bytes keeps the fingerprint; a change of one byte of the same size changes it.
+- Deleted: `MATERIA_CACHE_SALT`, `CodeIdentity.nativeBuild`, `CodeIdentity.loadedLibraries` (names and sizes), the stamp columns.
 
-**Gates.**
-- Fixture: rebuilding CadKit with a source change changes the identity. A rebuild with no change keeps it.
-- A missing identity file prints the "kernel cache off" line, and the regression test from the NativeIdentity fix still passes.
+**Why not the build-written identity this section first described.** Three facts in the code. (1) Haxeon's `native-cmake-publish`
+action sees only its own inputs; the fingerprint is computed by the executor over the action graph, so writing it next to the
+library means exposing the dependency chain's fingerprint to the publish script, a change to the executor. (2) The OCCT prebuilt
+install is outside the build graph; nothing in a build can say what it contains, so it needs a stamp from the script that makes it
+either way. (3) The Haxe compiler, `hl` and `haxeon_runtime.hdll` come from the bootstrap scripts, not from the build graph. Content
+hashing the loaded files is complete by construction (it cannot miss a rebuild whatever tool made it), needs no coordination
+between haxeon and Materia, and costs one read of the files.
+
+**Gates (passed).**
+- Fixture (`nativeIdentityTracksBuild` in the project-loading test): an identical copy of the CadKit library elsewhere keeps the
+  identity; the same size with one byte changed changes it; a copy of the OCCT install with the same stamp keeps it, another stamp
+  changes it, no stamp turns the kernel cache off with the message. `test-fingerprint.sh` (17 checks) covers the record: other
+  content, same size other content, restored content, new mtime with the same content.
+- The NativeIdentity regression test (the generator fails without an identity, the store must hold kernel entries) still passes.
 
 ## CC3. A module resolves to exactly one file
 

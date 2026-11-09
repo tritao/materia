@@ -444,7 +444,7 @@ class MateriaProjectRunner {
   }
 
   /** Must match MateriaProjectModuleBuild.RECORD_VERSION. */
-  static inline var FINGERPRINT_RECORD_VERSION:Int = 2;
+  static inline var FINGERPRINT_RECORD_VERSION:Int = 4;
   static final FINGERPRINT_OPTIONS = ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"];
 
   /**
@@ -468,15 +468,19 @@ class MateriaProjectRunner {
       if (binaries == null || !Std.isOfType(nativeRoot, String)) return stale("record binaries");
       // The tool's own binaries (compiler, VM, runtime) are stamped where the fingerprint tool recorded them, so a
       // relocated VM never needs to be rediscovered here; only the package native libraries are listed again.
-      var recordedPaths = [for (binary in binaries) binary.length == 3 ? binary[0] : ""];
+      var recordedPaths = [for (binary in binaries) binary.length == 5 ? binary[0] : ""];
       var listed = nativeLibraryPaths(nativeRoot);
       var recordedNative = [for (path in recordedPaths) if (path != "" && StringTools.startsWith(path, nativeRoot + "/")) path];
       if (recordedPaths.indexOf("") >= 0 || recordedNative.length != listed.length) return stale("native library set");
       for (path in listed) if (recordedPaths.indexOf(path) < 0) return stale("native library set");
-      var current = stamps(recordedPaths);
-      for (index in 0...current.length) {
-        var expected = binaries[index], actual = current[index];
-        if (expected[1] != actual[1] || expected[2] != actual[2]) return stale(actual[0]);
+      // The content digest is the identity. The recorded file status (size, modification and change time) only lets an unchanged
+      // file skip being read again; any difference reads it and compares digests.
+      for (binary in binaries) {
+        var path = binary[0], status = fileStatus(path);
+        if (binary[1] == "missing") {
+          if (status != "") return stale(path);
+        } else if (status == "" || (status != binary[2] + ":" + binary[3] + ":" + binary[4] && digestHex(Sha256.make(File.getBytes(path))) != binary[1]))
+          return stale(path);
       }
       var directories = pairs(record, "directories");
       if (directories == null || directories.length == 0) return stale("record directories");
@@ -531,11 +535,10 @@ class MateriaProjectRunner {
     return paths;
   }
 
-  static function stamps(paths:Array<String>):Array<Array<String>> {
-    return [for (path in paths) {
-      var metadata = FileSystem.exists(path) ? FileSystem.metadata(path) : null;
-      metadata == null ? [path, "missing", ""] : [path, Std.string(metadata.size), Std.string(metadata.modified)];
-    }];
+  /** `size:modified:changed` of a file, or "" when it is missing (ModuleBuild.fileStatus writes the same text). */
+  static function fileStatus(path:String):String {
+    var metadata = FileSystem.exists(path) ? FileSystem.metadata(path) : null;
+    return metadata == null ? "" : metadata.size + ":" + metadata.modified + ":" + metadata.changed;
   }
 
   /** Same rule as MateriaProjectModuleBuild.listSourceDirectories: sorted subdirectory and `.hx` names, hidden excluded. */
@@ -627,9 +630,8 @@ class MateriaProjectRunner {
     sources.sort(Reflect.compare);
     var identity = new StringBuf();
     identity.add("materia-project-tool-v1:" + mainClass + "\n");
-    var compilerStamp = FileSystem.metadata(haxe);
-    if (compilerStamp == null) throw "Could not inspect the pinned Haxe compiler";
-    identity.add(haxe + ":" + compilerStamp.size + ":" + compilerStamp.modified + "\n");
+    if (!FileSystem.exists(haxe)) throw "Could not inspect the pinned Haxe compiler";
+    identity.add(haxe + ":" + digestHex(Sha256.make(File.getBytes(haxe))) + "\n");
     for (source in sources) {
       if (control != null) control.throwIfCancelled();
       identity.add(source + ":" + digestHex(Sha256.make(File.getBytes(source))) + "\n");

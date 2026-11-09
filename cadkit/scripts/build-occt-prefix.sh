@@ -30,7 +30,13 @@ if [[ "$print_only" == 1 ]]; then
 	echo "$prefix"
 	exit 0
 fi
+# The install's identity: the content of its libraries, which is what a cached CadKit result depends on. NativeIdentity reads it.
+stamp_prefix() {
+	(cd "$prefix/lib" && find . -maxdepth 1 -name 'libTK*' ! -type l | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -d' ' -f1) > "$prefix/occt.identity"
+	echo "OCCT identity $(cat "$prefix/occt.identity")"
+}
 if [[ -d "$prefix/lib/cmake/opencascade" ]]; then
+	[[ -f "$prefix/occt.identity" ]] || stamp_prefix
 	echo "OCCT $revision is already installed at $prefix"
 	exit 0
 fi
@@ -62,4 +68,5 @@ cmake -S "$repo_root/cadkit/third_party/occt" -B "$build" -G Ninja \
 	-DUSE_XLIB=OFF
 cmake --build "$build" --parallel "$jobs"
 cmake --install "$build"
+stamp_prefix
 echo "Installed OCCT $revision at $prefix"

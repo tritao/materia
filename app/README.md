@@ -349,7 +349,7 @@ source inputs using the same request as compilation; source lists are unnecessar
 The data files a generator reads (supplier CAD, tables) need no declaration either: the run notes every file it reads
 through the standard library and the runner keeps that list with the output, regenerating when any of them changed.
 The module-graph analysis behind the fingerprint is recorded beside the cache as
-`<key>.inputs.json` (file hashes, source-directory listings, native library stamps,
+`<key>.inputs.json` (file hashes, source-directory listings, native library and toolchain contents,
 compiler options); a repeat open confirms the fingerprint by rehashing those files
 instead of re-analyzing, and falls back to the analysis on any difference.
 The Gantry picker, yaw picker, and welder enable this cache. Source contents,

@@ -65,6 +65,124 @@ class ProjectLoadingTests {
    * once ran with the cache silently off. The generator fails when it has no native identity, and the store must hold
    * kernel-operation entries after the open.
    */
+  /** A CadKit generator project in `root` (see kernelCacheInGeneration); it also writes its native identity to MATERIA_IDENTITY_OUT. */
+  static function kernelFixture(root:String, installation:String):String {
+    var config:Dynamic = {
+      version: 1,
+      sourceRoots: ["."],
+      target: "host",
+      dependencies: {projectkit: {path: installation + "/projectkit"}, cadkit: {path: installation + "/cadkit"}}
+    };
+    Reflect.setField(config, "package", {name: "kernel-cache-fixture"});
+    File.saveContent(root + "/haxeon.json", Json.stringify(config));
+    File.saveContent(root + "/KernelPreview.hx", 'import haxe.io.Bytes;\nimport materia.project.SceneArtifact;\n'
+      + 'class KernelPreview { public static function preview():Bytes {\n'
+      + 'var drilled = cadkit.Shape.box(10, 10, 10).cut(cadkit.Shape.box(4, 4, 20));\n'
+      + 'if (drilled.volume() < 1) throw "no geometry";\n'
+      + 'var identity = cadkit.cache.NativeIdentity.get();\n'
+      + 'if (identity == null) throw "kernel cache off: no native identity";\n'
+      + 'var out = Sys.getEnv("MATERIA_IDENTITY_OUT"); if (out != null) sys.io.File.saveContent(out, identity);\n'
+      + 'var vertices = Bytes.alloc(96); var coordinates = [0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];\n'
+      + 'for (i in 0...12) vertices.setDouble(i * 8, coordinates[i]);\n'
+      + 'var indices = Bytes.alloc(48); var triangles = [0,2,1,0,1,3,0,3,2,1,2,3];\n'
+      + 'for (i in 0...12) indices.setInt32(i * 4, triangles[i]);\n'
+      + 'var part:materia.project.SceneArtifact.SceneArtifactPart = {id: "tetra", name: "Tetra", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12, '
+      + 'vertices: vertices, normals: Bytes.alloc(96), indices: indices, faceRanges: []};\n'
+      + 'return SceneArtifact.encode({metresPerUnit: 1.0, parts: [part]}); }}\n');
+    var entry:Dynamic = {kind: "cad-preview", module: "KernelPreview", cache: {}};
+    Reflect.setField(entry, "function", "preview");
+    var manifest = root + "/materia.project.json";
+    File.saveContent(manifest, Json.stringify({
+      format: "materia.project",
+      version: 1,
+      defaultEntrypoint: "preview",
+      build: {system: "haxeon", manifest: "haxeon.json"},
+      entrypoints: {preview: entry}
+    }));
+    return manifest;
+  }
+
+  /** Opens the fixture with a fresh store and returns the native identity its generator saw. */
+  static function nativeIdentityOf(root:String, installation:String, name:String):String {
+    var directory = root + "/" + name;
+    FileSystem.createDirectory(directory);
+    var manifest = kernelFixture(directory, installation);
+    Sys.putEnv("XDG_CACHE_HOME", directory + "/cache");
+    Sys.putEnv("MATERIA_IDENTITY_OUT", directory + "/identity.txt");
+    DiskStore.useProcess(new DiskStore(directory + "/cache/materia/memo", 1e9));
+    MateriaProjectRunner.loadProject(manifest);
+    DiskStore.useProcess(null);
+    return File.getContent(directory + "/identity.txt");
+  }
+
+  static function copyFile(from:String, to:String):Void File.saveBytes(to, File.getBytes(from));
+
+  /**
+   * The native identity is the content of the loaded CadKit library and the OCCT install's `occt.identity`: a library with other
+   * content (same size too) changes it, an identical copy elsewhere keeps it, another OCCT stamp changes it, and an OCCT install
+   * without a stamp turns the kernel cache off with a message.
+   */
+  static function nativeIdentityTracksBuild(installation:String):Void {
+    var temporary = Sys.getEnv("TMPDIR");
+    if (temporary == null || temporary.length == 0) temporary = "/tmp";
+    var root = temporary + "/materia-native-identity-test-" + Sys.getPid() + "-" + Std.random(1000000000);
+    FileSystem.createDirectory(root);
+    var previousCache = Sys.getEnv("XDG_CACHE_HOME"), previousLibraries = Sys.getEnv("LD_LIBRARY_PATH");
+    try {
+      var cadkit:Null<String> = null, occt:Null<String> = null;
+      for (directory in (previousLibraries == null ? "" : previousLibraries).split(":")) {
+        if (directory == "" || !FileSystem.exists(directory) || !FileSystem.isDirectory(directory)) continue;
+        if (cadkit == null && FileSystem.exists(directory + "/libcadkit-core.so")) cadkit = directory + "/libcadkit-core.so";
+        if (occt == null && FileSystem.exists(directory + "/libTKernel.so")) occt = directory;
+      }
+      var occtDirectory = Sys.getEnv("CADKIT_OCCT_DIR");
+      if (occt == null && occtDirectory != null) occt = occtDirectory + "/lib";
+      check(cadkit != null && occt != null, "the library path names the CadKit library and the OCCT libraries");
+      function libraries(directory:String):Void Sys.putEnv("LD_LIBRARY_PATH", directory + (previousLibraries == null ? "" : ":" + previousLibraries));
+      // The same bytes in two places.
+      FileSystem.createDirectory(root + "/one");
+      FileSystem.createDirectory(root + "/two");
+      var cadkitLibrary:String = cadkit;
+      copyFile(cadkitLibrary, root + "/one/libcadkit-core.so");
+      copyFile(cadkitLibrary, root + "/two/libcadkit-core.so");
+      libraries(root + "/one");
+      var identity = nativeIdentityOf(root, installation, "a");
+      libraries(root + "/two");
+      check(nativeIdentityOf(root, installation, "b") == identity, "an identical copy of the CadKit library keeps the native identity");
+      // Same size, other content (an unused byte of the file changes: the first byte after the ELF identification).
+      var bytes = File.getBytes(cadkitLibrary);
+      bytes.set(bytes.length - 1, bytes.get(bytes.length - 1) ^ 1);
+      FileSystem.createDirectory(root + "/three");
+      File.saveBytes(root + "/three/libcadkit-core.so", bytes);
+      libraries(root + "/three");
+      check(nativeIdentityOf(root, installation, "c") != identity, "a CadKit library with other content changes the native identity");
+      // Another OCCT stamp, and none, on a copy of the install (the shared one is in use by other processes).
+      var occtLibraries:String = occt, prefix = haxe.io.Path.directory(occtLibraries);
+      check(FileSystem.exists(prefix + "/occt.identity"), "the OCCT install has an identity stamp (" + prefix + "/occt.identity)");
+      FileSystem.createDirectory(root + "/occt");
+      check(Sys.command("cp", ["-a", occtLibraries, root + "/occt/lib"]) == 0, "copied the OCCT libraries");
+      File.saveContent(root + "/occt/occt.identity", File.getContent(prefix + "/occt.identity"));
+      Sys.putEnv("LD_LIBRARY_PATH", root + "/one:" + root + "/occt/lib:" + previousLibraries);
+      check(nativeIdentityOf(root, installation, "d") == identity, "a copy of the OCCT install with the same stamp keeps the native identity");
+      File.saveContent(root + "/occt/occt.identity", "another build\n");
+      check(nativeIdentityOf(root, installation, "e") != identity, "another OCCT stamp changes the native identity");
+      FileSystem.deleteFile(root + "/occt/occt.identity");
+      var message:Null<String> = null;
+      try nativeIdentityOf(root, installation, "f") catch (error:Dynamic) message = Std.string(error);
+      check(message != null && message.indexOf("no native identity") >= 0, "an OCCT install without a stamp turns the kernel cache off: " + message);
+    } catch (error:Dynamic) {
+      Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      Sys.putEnv("LD_LIBRARY_PATH", previousLibraries);
+      DiskStore.useProcess(null);
+      remove(root);
+      throw error;
+    }
+    Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    Sys.putEnv("LD_LIBRARY_PATH", previousLibraries);
+    DiskStore.useProcess(null);
+    remove(root);
+  }
+
   static function kernelCacheInGeneration(installation:String):Void {
     var temporary = Sys.getEnv("TMPDIR");
     if (temporary == null || temporary.length == 0) temporary = "/tmp";
@@ -73,36 +191,7 @@ class ProjectLoadingTests {
     var previousCache = Sys.getEnv("XDG_CACHE_HOME");
     Sys.putEnv("XDG_CACHE_HOME", root + "/cache");
     try {
-      var config:Dynamic = {
-        version: 1,
-        sourceRoots: ["."],
-        target: "host",
-        dependencies: {projectkit: {path: installation + "/projectkit"}, cadkit: {path: installation + "/cadkit"}}
-      };
-      Reflect.setField(config, "package", {name: "kernel-cache-fixture"});
-      File.saveContent(root + "/haxeon.json", Json.stringify(config));
-      File.saveContent(root + "/KernelPreview.hx", 'import haxe.io.Bytes;\nimport materia.project.SceneArtifact;\n'
-        + 'class KernelPreview { public static function preview():Bytes {\n'
-        + 'var drilled = cadkit.Shape.box(10, 10, 10).cut(cadkit.Shape.box(4, 4, 20));\n'
-        + 'if (drilled.volume() < 1) throw "no geometry";\n'
-        + 'if (cadkit.cache.NativeIdentity.get() == null) throw "kernel cache off: no native identity";\n'
-        + 'var vertices = Bytes.alloc(96); var coordinates = [0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];\n'
-        + 'for (i in 0...12) vertices.setDouble(i * 8, coordinates[i]);\n'
-        + 'var indices = Bytes.alloc(48); var triangles = [0,2,1,0,1,3,0,3,2,1,2,3];\n'
-        + 'for (i in 0...12) indices.setInt32(i * 4, triangles[i]);\n'
-        + 'var part:materia.project.SceneArtifact.SceneArtifactPart = {id: "tetra", name: "Tetra", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12, '
-        + 'vertices: vertices, normals: Bytes.alloc(96), indices: indices, faceRanges: []};\n'
-        + 'return SceneArtifact.encode({metresPerUnit: 1.0, parts: [part]}); }}\n');
-      var entry:Dynamic = {kind: "cad-preview", module: "KernelPreview", cache: {}};
-      Reflect.setField(entry, "function", "preview");
-      var manifest = root + "/materia.project.json";
-      File.saveContent(manifest, Json.stringify({
-        format: "materia.project",
-        version: 1,
-        defaultEntrypoint: "preview",
-        build: {system: "haxeon", manifest: "haxeon.json"},
-        entrypoints: {preview: entry}
-      }));
+      var manifest = kernelFixture(root, installation);
       var store = root + "/cache/materia/memo";
       DiskStore.useProcess(new DiskStore(store, 1e9));
       MateriaProjectRunner.loadProject(manifest);
@@ -603,6 +692,7 @@ class ProjectLoadingTests {
     DiskStore.useProcess(null);
     remove(root);
     kernelCacheInGeneration(installation);
+    nativeIdentityTracksBuild(installation);
     generatorInputs(installation);
     Sys.println("Project loading tests passed");
     return 0;
