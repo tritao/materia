@@ -87,14 +87,25 @@ cold open in about six died with `assert` inside `InputFiles.wrote`. The lists a
 the project once the copy is removed); `CompilerInputsMain` (fresh session rejects the second copy); the project-loading test
 (a new module nothing imports does not recompile); hobber digest `89fab112da0b8210`, warm 0.2-0.3 s, verify clean.
 
-## CC4. Verify as a standing gate
+## CC4. Verify as a standing gate. DONE
 
 **Problem.** Verify mode only catches a missing dependency when someone runs it.
 
-**Change.** Add one small reference model to the normal suite. It runs cold, then warm with verify on. It also checks keyed
-boolean coverage: zero unkeyed booleans, and a hit count no lower than the recorded baseline.
+**What was built.** `machinekit/tests/hobbing/src/CacheGateTests.hx` (manifest `haxeon.cache-gate.json`, workspace project
+`cache-gate`, tag `cadkit`) builds a small hob (`HobSolid.build`: ten keyed booleans, gashes fused into a bored cylinder) three
+times into a fresh store: cold, warm, warm with verify on. It checks:
+- zero unkeyed booleans and zero unkeyed history booleans on the cold run (a boolean that loses its key fails the gate);
+- the warm run has no misses and at least `BASELINE_HITS` (10) hits, and the same bytes as the cold run;
+- the verified run recomputes every hit (`verified >= hits`) with the same bytes;
+- two controls: an operation made impure on purpose is caught by verify, and a boolean on an unkeyed shape is counted.
+When the model's operations change on purpose, set `BASELINE_HITS` to the warm hit count the test prints.
 
-**Gate.** The test fails when a keyed operation is made impure on purpose, and when a boolean goes unkeyed.
+**Cost.** About 2 s of operations (cold 0.9 s, warm 0.3 s, verify 1.0 s) plus the compile of the test project. The first model
+(module 1, 40 teeth, two starts, default tolerances) took 27 s; coarser surface and edge tolerances kept the same ten booleans.
+
+**Gate (passed).** Marking the input of the model's final cut unkeyed in `HobSolid` made the test fail on the history-boolean
+check; restored, it passes. The stale `machinekit/tests/haxeon.hob-probe.json` (its entry was deleted with the persistent tier) is
+removed.
 
 ## CC5. Edit-loop Haxe work (performance, after CC1–CC4)
 

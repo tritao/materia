@@ -14,6 +14,7 @@
 		{ "path": "humankit/tests/haxeon.json", "name": "humankit" },
 		{ "path": "humankit/sim/tests/haxeon.json", "name": "humankit-sim", "tags": ["mujoco"] },
 		{ "path": "machinekit/tests/haxeon.json", "name": "machinekit", "tags": ["cadkit"], "shards": 4 },
+		{ "path": "machinekit/tests/hobbing/haxeon.cache-gate.json", "name": "cache-gate", "tags": ["cadkit"] },
 		{ "path": "manufacturingkit/tests/haxeon.json", "name": "manufacturingkit" },
 		{ "path": "motionkit/tests/haxeon.json", "name": "motionkit", "shards": 4 },
 		{ "path": "motionkit/tests/planner/haxeon.json", "name": "motionkit-planner" },

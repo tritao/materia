@@ -243,3 +243,7 @@ Found, not fixed: a generator run by the runner executes from a temporary direct
 ### Stage 9j (2026-11-09): CC3, a module resolves to exactly one file
 
 `ModuleSourceLoader` rejects a module held by two source roots; no existing module was (checked on the hobber program). Source directory listings, `hasShadowedModule` and the session reset are deleted; the record is version 5. `InputFiles` got a mutex: its lists were shared between the generator's worker threads and a cold hobber open died once in six with `assert` in `InputFiles.wrote`. Details and the known incremental-session limit: `app/plans/CACHE_CLEANUP.md`, CC3.
+
+### Stage 9k (2026-11-09): CC4, the standing verify gate
+
+`machinekit/tests/hobbing/src/CacheGateTests.hx` (workspace project `cache-gate`): a small hob built cold, warm and warm with verify on; zero unkeyed booleans, warm hits not below the baseline, verified bytes equal cold bytes, plus controls for an impure keyed operation and an unkeyed boolean. About 2 s of operations. Mutating the model to leave one cut unkeyed fails it. Details: `app/plans/CACHE_CLEANUP.md`, CC4.
