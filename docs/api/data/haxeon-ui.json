@@ -298,6 +298,10 @@
      "name": "Color",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/Color.hx",
+     "implements": [
+      "Hashable",
+      "Diffable"
+     ],
      "doc": "Immutable normalized RGBA color value.",
      "fields": [
       {
@@ -735,6 +739,10 @@
      "name": "Insets",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/Insets.hx",
+     "implements": [
+      "Hashable",
+      "Diffable"
+     ],
      "doc": "Immutable four-sided inset value.",
      "fields": [
       {
@@ -863,7 +871,11 @@
      "name": "LayoutAxis",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/LayoutAxis.hx",
-     "doc": "One Haxe-owned axis policy encoded into a layout transaction. Immutable, so styles and copies share instances.",
+     "implements": [
+      "Hashable",
+      "Diffable"
+     ],
+     "doc": "One immutable axis policy encoded into a layout transaction.",
      "fields": [
       {
        "name": "sizing",
@@ -934,6 +946,36 @@
        "signature": "():LayoutAxis",
        "static": true,
        "doc": "Fills the parent's available size on this axis without consuming main-axis grow space."
+      }
+     ]
+    },
+    {
+     "name": "LayoutChanges",
+     "kind": "class",
+     "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/LayoutChanges.hx",
+     "doc": "Native inputs and child lists invalidated by the retained tree comparison or announced geometry feedback.",
+     "fields": [
+      {
+       "name": "inputs",
+       "kind": "var",
+       "signature": ":IntIndex",
+       "final": true
+      },
+      {
+       "name": "children",
+       "kind": "var",
+       "signature": ":IntIndex",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():Void"
       }
      ]
     },
@@ -1365,7 +1407,7 @@
        "name": "textStyle",
        "kind": "var",
        "signature": ":TextStyle",
-       "doc": "Most nodes never show text, so a node allocates its own text and paragraph style on first use. Anything that reads\nthese for every node must use `peekTextStyle` and `peekParagraphStyle`, which allocate nothing."
+       "doc": "Most nodes never show text, so absent values use shared immutable defaults. Reading these properties allocates\nnothing; assigning a complete style stores its value inline in the optional slot."
       },
       {
        "name": "paragraphStyle",
@@ -1394,7 +1436,7 @@
        "name": "measureVersion",
        "kind": "var",
        "signature": ":Int",
-       "doc": "Invalidates native intrinsic measurement when no content object is attached."
+       "doc": "Intrinsic input version. Sampled from an attached provider before submit; otherwise set by its caller."
       },
       {
        "name": "contentRevision",
@@ -1429,13 +1471,19 @@
        "name": "peekTextStyle",
        "kind": "method",
        "signature": "():TextStyle",
-       "doc": "Read-only view of the text style: the node's own, or a shared default that must never be changed. Allocates nothing."
+       "doc": "Text style value: the node's own, or the shared immutable default. Allocates nothing."
       },
       {
        "name": "peekParagraphStyle",
        "kind": "method",
        "signature": "():ParagraphStyle",
-       "doc": "Read-only view of the paragraph style: the node's own, or a shared default that must never be changed. Allocates nothing."
+       "doc": "Paragraph style value: the node's own, or the shared immutable default. Allocates nothing."
+      },
+      {
+       "name": "copyTextStylesTo",
+       "kind": "method",
+       "signature": "(target:LayoutNode):Void",
+       "doc": "Copy immutable typography into a comparison prior without allocating default styles for boxes."
       },
       {
        "name": "add",
@@ -1591,6 +1639,12 @@
      "doc": "Batched bridge from a Haxe-owned render tree to NativeKit layout/rendering.",
      "fields": [
       {
+       "name": "verifyTransactions",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Compare the retained native tree with a full encode after every submit while retention verification is enabled."
+      },
+      {
        "name": "create",
        "kind": "method",
        "signature": "():LayoutSession",
@@ -1611,8 +1665,14 @@
       {
        "name": "submit",
        "kind": "method",
-       "signature": "(root:LayoutNode, frame:LayoutFrame):Array<ResolvedLayoutItem>",
+       "signature": "(root:LayoutNode, frame:LayoutFrame, ?changes:LayoutChanges, ?forceFull:Bool):Array<ResolvedLayoutItem>",
        "doc": "Submits one render tree and returns geometry for the complete resolved frame."
+      },
+      {
+       "name": "verifyTree",
+       "kind": "method",
+       "signature": "(root:LayoutNode):Void",
+       "doc": "Compare a retained native tree against its complete Haxe input, without replacing the native tree."
       },
       {
        "name": "hitTest",
@@ -1747,7 +1807,10 @@
      "name": "LayoutStyle",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/LayoutStyle.hx",
-     "doc": "Haxe-owned layout, paint, visibility, and transform data.",
+     "implements": [
+      "Diffable"
+     ],
+     "doc": "Haxe-owned mutable layout, paint, visibility, and transform inputs. Field masks are generated from the\ndeclaration; the scalar cache fingerprint is explicit and is not a map-key hash.",
      "fields": [
       {
        "name": "width",
@@ -1917,7 +1980,7 @@
        "name": "copy",
        "kind": "method",
        "signature": "():LayoutStyle",
-       "doc": "Returns an independent style value for compositional widget builders."
+       "doc": "Returns an independent style value for compositional widget builders: every field, generated from the declaration."
       }
      ]
     },
@@ -1927,6 +1990,37 @@
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/LayoutTransaction.hx",
      "doc": "Encodes a retained Haxe node tree into the single native frame payload.",
      "fields": [
+      {
+       "name": "updatedCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "removedCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "parentCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "orderedNodes",
+       "kind": "method",
+       "signature": "():Array<LayoutNode>"
+      },
+      {
+       "name": "previousPosition",
+       "kind": "method",
+       "signature": "(id:Int):Int"
+      },
+      {
+       "name": "commit",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Acknowledge only a successful native submit; encoding or a failed submit does not advance the base."
+      },
       {
        "name": "new",
        "kind": "method",
@@ -1947,7 +2041,7 @@
       {
        "name": "encodeInto",
        "kind": "method",
-       "signature": "(root:LayoutNode):Bytes",
+       "signature": "(root:LayoutNode, ?changes:LayoutChanges, ?captureContentVersions:Bool):Bytes",
        "doc": "Encodes into reusable storage and returns the backing byte buffer."
       },
       {
@@ -2114,38 +2208,71 @@
      "name": "ParagraphStyle",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/ParagraphStyle.hx",
+     "implements": [
+      "Hashable"
+     ],
      "doc": "Semantic paragraph inputs shared by all NativeKit text APIs.",
      "fields": [
       {
        "name": "wrap",
        "kind": "var",
-       "signature": ":TextWrap"
+       "signature": ":TextWrap",
+       "final": true
       },
       {
        "name": "alignment",
        "kind": "var",
-       "signature": ":TextAlignment"
+       "signature": ":TextAlignment",
+       "final": true
       },
       {
        "name": "lineHeight",
        "kind": "var",
-       "signature": ":Null<Float>"
+       "signature": ":Null<Float>",
+       "final": true
       },
       {
        "name": "direction",
        "kind": "var",
-       "signature": ":TextDirection"
+       "signature": ":TextDirection",
+       "final": true
       },
       {
        "name": "tabWidth",
        "kind": "var",
        "signature": ":Int",
+       "final": true,
        "doc": "Tab stops in space advances; zero preserves the shaper default."
       },
       {
        "name": "new",
        "kind": "method",
        "signature": "(?wrap:TextWrap, ?alignment:TextAlignment, ?lineHeight:Null<Float>, ?direction:TextDirection, ?tabWidth:Int):Void"
+      },
+      {
+       "name": "withWrap",
+       "kind": "method",
+       "signature": "(value:TextWrap):ParagraphStyle"
+      },
+      {
+       "name": "withAlignment",
+       "kind": "method",
+       "signature": "(value:TextAlignment):ParagraphStyle"
+      },
+      {
+       "name": "withLineHeight",
+       "kind": "method",
+       "signature": "(?value:Float):ParagraphStyle"
+      },
+      {
+       "name": "withDirection",
+       "kind": "method",
+       "signature": "(value:TextDirection):ParagraphStyle"
+      },
+      {
+       "name": "withTabWidth",
+       "kind": "method",
+       "signature": "(value:Int):ParagraphStyle"
       }
      ]
     },
@@ -2246,6 +2373,9 @@
      "name": "Rect",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/Rect.hx",
+     "implements": [
+      "Hashable"
+     ],
      "doc": "Immutable axis-aligned rectangle.",
      "fields": [
       {
@@ -2667,7 +2797,7 @@
       {
        "name": "decode",
        "kind": "method",
-       "signature": "(bytes:Bytes, offset:Int):ResolvedLayoutItem",
+       "signature": "(bytes:Bytes, offset:Int, ?previous:ResolvedLayoutItem):ResolvedLayoutItem",
        "static": true
       }
      ]
@@ -2729,7 +2859,7 @@
       {
        "name": "fromNativeSurface",
        "kind": "method",
-       "signature": "(surface:PlatformSurface):Surface",
+       "signature": "(surface:haxeon.platform.Surface):Surface",
        "static": true
       }
      ]
@@ -2765,6 +2895,9 @@
      "name": "TextCaret",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/TextLayout.hx",
+     "implements": [
+      "Equatable"
+     ],
      "doc": "Visual geometry for a text caret.",
      "fields": [
       {
@@ -2890,14 +3023,12 @@
       {
        "name": "textStyle",
        "kind": "var",
-       "signature": ":TextStyle",
-       "final": true
+       "signature": ":TextStyle"
       },
       {
        "name": "paragraphStyle",
        "kind": "var",
-       "signature": ":ParagraphStyle",
-       "final": true
+       "signature": ":ParagraphStyle"
       },
       {
        "name": "dispose",
@@ -3052,6 +3183,9 @@
      "name": "TextMetrics",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/TextLayout.hx",
+     "implements": [
+      "Equatable"
+     ],
      "doc": "Bounds returned by TextLayout.measure.",
      "fields": [
       {
@@ -3195,27 +3329,43 @@
      "name": "TextStyle",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/TextStyle.hx",
+     "implements": [
+      "Hashable"
+     ],
      "doc": "Semantic font and inline-spacing inputs shared by all NativeKit text APIs.",
      "fields": [
       {
        "name": "font",
        "kind": "var",
-       "signature": ":FontFamily"
+       "signature": ":FontFamily",
+       "final": true
       },
       {
        "name": "fontSize",
        "kind": "var",
-       "signature": ":Float"
+       "signature": ":Float",
+       "final": true
       },
       {
        "name": "letterSpacing",
        "kind": "var",
-       "signature": ":Float"
+       "signature": ":Float",
+       "final": true
       },
       {
        "name": "new",
        "kind": "method",
        "signature": "(?fontSize:Float, ?font:FontFamily, ?letterSpacing:Float):Void"
+      },
+      {
+       "name": "withFontSize",
+       "kind": "method",
+       "signature": "(value:Float):TextStyle"
+      },
+      {
+       "name": "withLetterSpacing",
+       "kind": "method",
+       "signature": "(value:Float):TextStyle"
       }
      ]
     },
@@ -3250,6 +3400,10 @@
      "name": "Transform2D",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/Transform2D.hx",
+     "implements": [
+      "Hashable",
+      "Diffable"
+     ],
      "doc": "Six-value affine transform using x'=a*x+c*y+tx and y'=b*x+d*y+ty.",
      "fields": [
       {
@@ -3532,6 +3686,13 @@
        "signature": ":Bool"
       },
       {
+       "name": "retained",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true,
+       "doc": "Whether advancing it only edits nodes on screen (RetainedAnimation), so it needs no rebuild."
+      },
+      {
        "name": "cancel",
        "kind": "method",
        "signature": "():Void",
@@ -3559,6 +3720,12 @@
        "name": "activeCount",
        "kind": "var",
        "signature": ":Int"
+      },
+      {
+       "name": "rebuildingCount",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Animations that change the view now; retained updates and pending deadlines do not rebuild it."
       },
       {
        "name": "needsFrame",
@@ -3686,6 +3853,15 @@
        "signature": "(deltaSeconds:Float):Bool"
       }
      ]
+    },
+    {
+     "name": "RetainedAnimation",
+     "kind": "interface",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/animation/RetainedAnimation.hx",
+     "implements": [
+      "Animation"
+     ],
+     "doc": "An animation that only changes nodes already on screen, announcing each change with BuildContext.willEditRetained. Its frames\nlay out and paint those nodes without rebuilding the view, so it does not count as pending build work."
     },
     {
      "name": "SpringController",
@@ -3881,8 +4057,7 @@
       {
        "name": "commandContext",
        "kind": "var",
-       "signature": ":CommandContext",
-       "doc": "Invocation context shared by command-bound widgets in this frame."
+       "signature": ":CommandContext"
       },
       {
        "name": "styleResolver",
@@ -3936,6 +4111,18 @@
        "doc": "How many times pruneKeyCaches walked the caches, rather than finding nothing changed."
       },
       {
+       "name": "updateInPlace",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "When false, pointer and focus changes rebuild every cache that holds the widget, as before widgets updated themselves\n(selfUpdating) and hover that no rule matches was ignored. Tests turn it off to build a reference tree to compare the\nupdated one against."
+      },
+      {
+       "name": "bypassRetention",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "While set, retained caches build their subtree afresh instead of reusing it; UiContext.verifyRetention sets it."
+      },
+      {
        "name": "inheritedStyle",
        "kind": "var",
        "signature": ":Null<ComputedStyle>",
@@ -3948,6 +4135,40 @@
        "doc": "Revision fingerprint used to classify style work before the next submission."
       },
       {
+       "name": "buildFeedbackPass",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Which build of the current submit this is: 0 for the frame's first build, then one more for every feedback\nrebuild. Views that request feedback from geometry use it to settle within a bounded number of passes."
+      },
+      {
+       "name": "patchRequestRevision",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Bumped by requestPatch; a different value from the submitted one means a frame is due."
+      },
+      {
+       "name": "hasPendingPatches",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "onPatched",
+       "kind": "var",
+       "signature": ":Null<(RenderNode) -> Void>",
+       "doc": "Called with the root of each rebuilt subtree once a patch has put it in the tree. A patch builds outside the view, so a view\nwrapper that moves nodes after building (TooltipOverlayHost lifts tooltips) uses this to do the same for what the patch made."
+      },
+      {
+       "name": "retainedEditRevision",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Bumped by each first edit of a node between frames; a different value from the submitted one means a frame is due."
+      },
+      {
+       "name": "hasRetainedEdits",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(stateStore:StateStore, ?fonts:FontCollection, ?textInput:TextInputBridge, ?clipboard:ClipboardService, ?theme:Theme, ?gestures:GestureArena, ?animations:AnimationScheduler, ?styleSheet:StyleSheet, ?interactionStates:InteractionStateStore, ?commands:CommandRegistry):Void"
@@ -3957,6 +4178,12 @@
        "kind": "method",
        "signature": "(?context:CommandContext):Void",
        "doc": "Updates the context passed to command-bound widgets."
+      },
+      {
+       "name": "commandFlags",
+       "kind": "method",
+       "signature": "(registry:CommandRegistry, id:String):Int",
+       "doc": "Command presentation changes only when its enabled or checked result changes."
       },
       {
        "name": "setTheme",
@@ -3987,6 +4214,12 @@
        "kind": "method",
        "signature": "(target:StyleTarget, ?local:LayoutStyle, ?localTextColor:haxeon.ui.Color):ComputedStyle",
        "doc": "Resolves one node against the active inherited style and current layers."
+      },
+      {
+       "name": "hoverRebuilds",
+       "kind": "method",
+       "signature": "(node:RenderNode):Bool",
+       "doc": "Whether a change of this node's hover, alone, can change what its widget built. A widget reads hover to resolve its style, so\nunless a stylesheet rule matches the node on hover it builds the same; one that does more with hover updates itself\n(selfUpdating). Custom paint that reads hover as it paints is repainted by the frame instead (UiContext)."
       },
       {
        "name": "hasHoverStyle",
@@ -4039,6 +4272,28 @@
        "name": "beginFrame",
        "kind": "method",
        "signature": "():Void"
+      },
+      {
+       "name": "requestBuildFeedback",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Resolved constraints changed which children a view must build; settle them before publishing the frame."
+      },
+      {
+       "name": "requestBuildFeedbackBeforeLayout",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Requests a rebuild before another layout pass can consume geometry from a view the callback just changed."
+      },
+      {
+       "name": "consumeBuildFeedbackBeforeLayout",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "consumeBuildFeedback",
+       "kind": "method",
+       "signature": "():Bool"
       },
       {
        "name": "requestLayoutFeedback",
@@ -4094,8 +4349,8 @@
       {
        "name": "selfUpdating",
        "kind": "method",
-       "signature": "(id:WidgetId, build:() -> RenderNode):RenderNode",
-       "doc": "Builds a widget so that it can rebuild just itself later. `build` must be re-runnable: it creates the widget's whole\nsubtree and is called again, in the same scope and inherited style, when the widget asks for a patch. The widget\nthen keeps its own changing state out of the revision that ancestors' caches watch (State.updateQuietly)."
+       "signature": "(id:WidgetId, build:() -> RenderNode, ?buildsFromHover:Bool):RenderNode",
+       "doc": "Builds a widget so that it can rebuild just itself later, on a pointer change or when it asks (requestPatch). `build` must\nbe re-runnable: it creates the widget's whole subtree and is called again, in the same scope and inherited style. The\nrebuild is reconciled with the node returned here (RenderNode.reconcile): the node stays, with the listeners, style\nchanges and children callers added to it after this call, and takes the style, state, semantics, callbacks and children of\nthe new build. So `build` must not leave state in closures that outlives the build, other than through the nodes it makes,\nand a closure that captures the root resolves it through RenderNode.latest when it runs: reconcile keeps the old root.\nA widget that changes its own tracked state during interaction invalidates the subtrees that read it. Set\nbuildsFromHover=false when hover is read only by style resolution or live paint."
       },
       {
        "name": "requestPatch",
@@ -4104,10 +4359,87 @@
        "doc": "Asks for the widget to be rebuilt in place at the start of the next frame and for that frame to run. Returns false when\nthe widget was never built as self-updating, so the caller falls back to an ordinary state update."
       },
       {
+       "name": "requestReactivePatch",
+       "kind": "method",
+       "signature": "(id:WidgetId):Bool",
+       "doc": "Queues a maybe-stale reactive reader; its sources are checked before the widget is rebuilt."
+      },
+      {
+       "name": "queuePatch",
+       "kind": "method",
+       "signature": "(id:WidgetId):Bool",
+       "doc": "Queues the patch without asking for a frame; the caller already has one running. False when the widget is not self-updating."
+      },
+      {
+       "name": "canPatch",
+       "kind": "method",
+       "signature": "(node:RenderNode):Bool",
+       "doc": "Whether this mounted node is a self-updating widget, so a pointer change can be met by rebuilding just it."
+      },
+      {
+       "name": "updatingOwner",
+       "kind": "method",
+       "signature": "(node:RenderNode):Null<RenderNode>",
+       "doc": "The node itself or its nearest ancestor that updates itself: the one to rebuild when this node's pointer state changes."
+      },
+      {
+       "name": "updatingBuild",
+       "kind": "method",
+       "signature": "(node:RenderNode):Null<SelfUpdatingBuild>",
+       "doc": "The self-updating build for a node, while it is registered and current."
+      },
+      {
+       "name": "rearm",
+       "kind": "method",
+       "signature": "(id:WidgetId, entry:SelfUpdatingBuild):Bool",
+       "doc": "Registers a cached widget again when its retained subtree returns. During a full build an unclaimed ID still\nbelongs only to the previous frame, so a cached variant can replace that registration. An ID already claimed by\nthis build, or an ID in an in-place patch, cannot be taken from a different live node.\n\nValidation can be requested without registering anything, so a cache with several updaters either rearms all of\nthem or leaves the current registrations alone when any dependency no longer matches."
+      },
+      {
        "name": "applyPatches",
        "kind": "method",
+       "signature": "(?topology:RenderTreeTopology):Void",
+       "doc": "Rebuilds the pending self-updating widgets and reconciles them with the retained tree; runs after beginFrame, before the root builds."
+      },
+      {
+       "name": "updatingStatesChanged",
+       "kind": "method",
+       "signature": "(entry:SelfUpdatingBuild):Bool"
+      },
+      {
+       "name": "retainUpdatingState",
+       "kind": "method",
+       "signature": "(entry:SelfUpdatingBuild):Void",
+       "doc": "Hidden dock caches keep the latest patched resources alive without rearming unmounted widgets."
+      },
+      {
+       "name": "beginLayoutSubmission",
+       "kind": "method",
        "signature": "():Void",
-       "doc": "Rebuilds the pending self-updating widgets and swaps them into the retained tree; runs after beginFrame, before the root builds."
+       "doc": "Start the lifetime of geometry feedback priors after event edits for this submission have been captured."
+      },
+      {
+       "name": "willEditRetained",
+       "kind": "method",
+       "signature": "(node:RenderNode):Void",
+       "doc": "Call just before changing a node of the submitted tree in place, outside a build: its style, hit testing or paint. The next\nframe compares the node against how it was now and lays out and paints the change, without rebuilding the view. Repeated\ncalls for the same node before that frame keep the first state."
+      },
+      {
+       "name": "comparisonPrior",
+       "kind": "method",
+       "signature": "(node:RenderNode):RenderNode",
+       "doc": "Input normalization runs after fingerprint checks, but its prior still belongs to the pre-feedback phase."
+      },
+      {
+       "name": "editAnnounced",
+       "kind": "method",
+       "signature": "(node:RenderNode):Bool",
+       "doc": "Whether `node` was announced with willEditRetained since the last frame."
+      },
+      {
+       "name": "takeRetainedEdits",
+       "kind": "method",
+       "signature": "(mounted:Map<Int, RenderNode>):Void",
+       "doc": "Hands the frame comparison the prior state of edited nodes still in the submitted tree, and forgets the rest."
       },
       {
        "name": "patchedPriors",
@@ -4131,6 +4463,12 @@
        "kind": "method",
        "signature": "(mounted:Map<Int, RenderNode>, mountedHash:Int):Void",
        "doc": "Drops the cached IDs and key paths of widgets that are no longer mounted. `mountedHash` summarizes which nodes are\nmounted (any hash of their IDs in tree order will do). A cache entry only becomes stale when the mounted nodes change,\nso with the same hash and the same cached IDs since the last walk there is nothing to find, and the walk, which hashes\nthe path of every cached key, is skipped. Scopes that hold no widget are created and dropped again by a build, a few\nevery frame, and are left until `SCOPE_GROWTH_PRUNE` of them have collected: they only cache path strings. A change that\ngoes unnoticed (a hash collision, or state released for a widget that stays unmounted) only leaves an entry cached until\nthe next change."
+      },
+      {
+       "name": "releaseRetained",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Drops the self-updating builders, which hold the build closures of the retained tree; the next frame builds afresh."
       },
       {
        "name": "dispose",
@@ -4167,27 +4505,68 @@
        "signature": "(id:WidgetId, initial:T):State<T>"
       },
       {
+       "name": "lazyState",
+       "kind": "method",
+       "signature": "(id:WidgetId, create:() -> T):State<T>",
+       "doc": "Like `state`, but calls `create` only when the state is first initialized, so later builds allocate no discarded value."
+      },
+      {
        "name": "stateUsageMarker",
        "kind": "method",
        "signature": "():Int",
        "doc": "Captures state usage so a retained subtree can keep its resources mounted."
       },
       {
-       "name": "stateIdsUsedSince",
+       "name": "trackReads",
        "kind": "method",
-       "signature": "(marker:Int):Array<Int>",
-       "doc": "Returns state IDs touched after a retained subtree build marker."
+       "signature": "(run:() -> T):T",
+       "doc": "Runs a build or getter as a read-only reactive tracking scope."
       },
       {
-       "name": "stateRevisions",
+       "name": "dependencyMarker",
        "kind": "method",
-       "signature": "(ids:Array<Int>):Array<Int>",
-       "doc": "Current change revisions of the given widget states, for detecting changes inside a retained subtree."
+       "signature": "():Int",
+       "doc": "Marks the current dependency log for a retained subtree."
+      },
+      {
+       "name": "dependenciesSince",
+       "kind": "method",
+       "signature": "(marker:Int, ?target:Dependencies):Dependencies",
+       "doc": "Captures tracked reads since the marker into a reusable retained dependency record."
+      },
+      {
+       "name": "captureRootDependencies",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Replaces the root subscriptions after a successful full build."
+      },
+      {
+       "name": "rootDependenciesDirty",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "retainDependencies",
+       "kind": "method",
+       "signature": "(dependencies:Dependencies):Void",
+       "doc": "Records a reused subtree's reads again, so an enclosing cache depends on them too."
+      },
+      {
+       "name": "resetObserved",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Called as a frame starts: the log only links reads to the subtrees built in one frame."
+      },
+      {
+       "name": "stateIdsUsedSince",
+       "kind": "method",
+       "signature": "(marker:Int, ?previous:Array<Int>):Array<Int>",
+       "doc": "Returns state IDs touched after a retained subtree build marker."
       },
       {
        "name": "retainStateIds",
        "kind": "method",
-       "signature": "(ids:Array<Int>):Void",
+       "signature": "(ids:Array<Int>, ?bubbleToEnclosingBuild:Bool):Void",
        "doc": "Keeps state-backed resources alive for a retained subtree this frame."
       },
       {
@@ -4207,6 +4586,70 @@
        "kind": "method",
        "signature": "(id:WidgetId, create:() -> T, dispose:(T) -> Void):State<T>",
        "doc": "Lazily creates resource-backed state and releases it when its widget unmounts."
+      }
+     ]
+    },
+    {
+     "name": "BuiltNode",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/RenderNode.hx",
+     "doc": "What a builder made on a node, as taken by RenderNode.snapshotBuilt and kept up to date by RenderNode.reconcile.",
+     "fields": [
+      {
+       "name": "prior",
+       "kind": "var",
+       "signature": ":Null<RenderNode>",
+       "doc": "Reused by later patches; comparison consumes it before the next patch takes another snapshot."
+      },
+      {
+       "name": "style",
+       "kind": "var",
+       "signature": ":LayoutStyle",
+       "final": true,
+       "doc": "The style as the builder left it, before callers changed the node: the base of the next build's difference."
+      },
+      {
+       "name": "children",
+       "kind": "var",
+       "signature": ":Array<RenderNode>",
+       "final": true,
+       "doc": "The children the builder made; others may have added more."
+      },
+      {
+       "name": "semantics",
+       "kind": "var",
+       "signature": ":Null<Semantics>"
+      },
+      {
+       "name": "handlers",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "How many of each list of callbacks the builder made; callers append theirs after."
+      },
+      {
+       "name": "outsidePointerDownHandlers",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "resolvedHandlers",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "paintHandlers",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "decorations",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(style:LayoutStyle, children:Array<RenderNode>, ?semantics:Semantics):Void"
       }
      ]
     },
@@ -4422,6 +4865,27 @@
      ]
     },
     {
+     "name": "CommandContextState",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/CommandContextState.hx",
+     "implements": [
+      "Observable"
+     ],
+     "doc": "Observable holder for the immutable invocation context active in a build frame.",
+     "fields": [
+      {
+       "name": "value",
+       "kind": "var",
+       "signature": ":CommandContext"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
      "name": "CommandParameters",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/CommandParameters.hx",
@@ -4498,6 +4962,9 @@
      "name": "CommandRegistry",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/CommandRegistry.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Ordered application command registry. The last active scope wins, making\nviewport, text-editor, and modal scopes able to override global shortcuts.",
      "fields": [
       {
@@ -4505,11 +4972,6 @@
        "kind": "var",
        "signature": ":String",
        "static": true
-      },
-      {
-       "name": "revision",
-       "kind": "var",
-       "signature": ":Int"
       },
       {
        "name": "onInvoked",
@@ -4639,12 +5101,6 @@
        "kind": "method",
        "signature": "(key:Int, modifiers:Int, ?context:CommandContext, ?pathScopes:Array<String>, ?repeated:Bool, ?shortcutFilter:(String) -> Bool):CommandResult",
        "doc": "Dispatches through focused-node scopes before the registry's active scopes.\nThe supplied path is ordered from root to focused node; the deepest scope\ntherefore wins without mutating the registry's persistent scope stack.\nAn optional filter can leave the winning enabled command's keys to an input\nwidget. A filtered command never exposes a lower-priority binding."
-      },
-      {
-       "name": "refresh",
-       "kind": "method",
-       "signature": "():Void",
-       "doc": "Invalidates command-bound views after external predicate state changes."
       },
       {
        "name": "installHistoryCommands",
@@ -4841,6 +5297,79 @@
      ]
     },
     {
+     "name": "Dependencies",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/Dependencies.hx",
+     "extends": [
+      "ReactiveDependencySet"
+     ],
+     "doc": "Reusable tracked field and signal dependencies owned by a retained computation.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?captureOnly:Bool):Void"
+      },
+      {
+       "name": "setInvalidationOwner",
+       "kind": "method",
+       "signature": "(?context:BuildContext, ?build:SelfUpdatingBuild):Void"
+      },
+      {
+       "name": "ownedBy",
+       "kind": "method",
+       "signature": "(build:SelfUpdatingBuild):Bool",
+       "doc": "A reused dependency record belongs to its most recent updater."
+      },
+      {
+       "name": "replaceSlice",
+       "kind": "method",
+       "signature": "(source:Dependencies, marker:Int):Void",
+       "doc": "Copies a frame-local slice into this retained record, reusing its subscriptions."
+      },
+      {
+       "name": "addAll",
+       "kind": "method",
+       "signature": "(other:Dependencies):Void"
+      },
+      {
+       "name": "current",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "trackedSourcesDirty",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "onMaybeStale",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "onInvalidated",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "truncate",
+       "kind": "method",
+       "signature": "(marker:Int):Void"
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
      "name": "EventDispatcher",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/EventDispatcher.hx",
@@ -4906,9 +5435,15 @@
        "doc": "Installs the host bridge for physical window/surface pointer capture."
       },
       {
+       "name": "releaseTree",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Lets go of the render tree without dispatching to it: drops the root, the picker and the hover paths, and clears the\nhover state those nodes held. Pointer locations, presses and captures stay by ID, so the next setRoot settles them\nagainst the rebuilt tree."
+      },
+      {
        "name": "setRoot",
        "kind": "method",
-       "signature": "(?root:RenderNode):Void"
+       "signature": "(?root:RenderNode, ?nodesById:Map<Int, RenderNode>):Void"
       },
       {
        "name": "pointerMove",
@@ -4998,7 +5533,7 @@
       {
        "name": "cursorShape",
        "kind": "method",
-       "signature": "(?pointerId:Int):UiCursorShape",
+       "signature": "(?pointerId:Int):haxeon.ui.core.CursorShape",
        "doc": "Returns the deepest cursor intent for the hovered or captured pointer path."
       }
      ]
@@ -5023,6 +5558,12 @@
        "name": "rebuild",
        "kind": "method",
        "signature": "(?root:RenderNode):Void"
+      },
+      {
+       "name": "releaseTree",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Lets go of the render tree but keeps focus by ID, so the next rebuild restores it if the widget is still there."
       },
       {
        "name": "focus",
@@ -5233,12 +5774,39 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(root:RenderNode):Void"
+       "signature": "(root:RenderNode, context:BuildContext, ?boundary:RenderNode, ?trackBuilds:Bool):Void"
+      },
+      {
+       "name": "statesChanged",
+       "kind": "method",
+       "signature": "(context:BuildContext):Bool"
+      },
+      {
+       "name": "buildsChanged",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether a tracked updater rebuilt after capture."
+      },
+      {
+       "name": "appendStateIds",
+       "kind": "method",
+       "signature": "(?ids:Array<Int>, ?previous:Array<Int>):Null<Array<Int>>"
+      },
+      {
+       "name": "retainState",
+       "kind": "method",
+       "signature": "(context:BuildContext):Void"
       },
       {
        "name": "matches",
        "kind": "method",
-       "signature": "(context:BuildContext):Bool"
+       "signature": "(context:BuildContext, ?register:Bool, ?dependenciesChecked:Bool):Bool"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Releases the cache's ownership without disturbing updaters still mounted or cached elsewhere."
       }
      ]
     },
@@ -5420,7 +5988,7 @@
       {
        "name": "apply",
        "kind": "method",
-       "signature": "(shape:UiCursorShape):Void",
+       "signature": "(shape:haxeon.ui.core.CursorShape):Void",
        "doc": "Best-effort application; cursor decoration must not break input delivery."
       },
       {
@@ -5564,12 +6132,6 @@
        "doc": "Whether a widget recorded interaction state on this node. Structural nodes that never read it have no reason to rebuild\nwhen the pointer moves over them, so cache validation ignores them."
       },
       {
-       "name": "hoverPaintOnly",
-       "kind": "var",
-       "signature": ":Bool",
-       "doc": "Opt-in contract: hover changes only custom paint, or have no visual effect.\nUiContext still rejects this path when a matching stylesheet hover rule exists."
-      },
-      {
        "name": "styleType",
        "kind": "var",
        "signature": ":Null<String>"
@@ -5646,6 +6208,12 @@
        "doc": "Revision of paint/text content consumed by retained scene caches."
       },
       {
+       "name": "paintRevision",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Display-list invalidation independent of native layout content."
+      },
+      {
        "name": "geometryRevision",
        "kind": "var",
        "signature": ":Int",
@@ -5667,7 +6235,7 @@
        "name": "replacedBy",
        "kind": "var",
        "signature": ":Null<RenderNode>",
-       "doc": "Set when this node was rebuilt in place: the node that took its place. Retained caches that still hold this one follow it."
+       "doc": "The canonical instance for this identity, after replacement or reconciliation; caches and callbacks follow it."
       },
       {
        "name": "invalidatePaint",
@@ -5678,7 +6246,8 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(id:WidgetId, ?kind:LayoutVisualKind, ?style:LayoutStyle):Void"
+       "signature": "(id:WidgetId, ?kind:LayoutVisualKind, ?style:LayoutStyle, ?sharedLayout:LayoutNode):Void",
+       "doc": "`sharedLayout` is for stand-ins that compare as the node they stand for (snapshotForCompare); it is never submitted."
       },
       {
        "name": "setStyleIdentity",
@@ -5702,13 +6271,43 @@
        "kind": "method",
        "signature": "(node:RenderNode):RenderNode",
        "static": true,
-       "doc": "This node, or the node that finally took its place if it was rebuilt in place (possibly more than once)."
+       "doc": "This node's live instance. A callback may capture a build root and resolve it here when it runs."
       },
       {
        "name": "replaceWith",
        "kind": "method",
        "signature": "(next:RenderNode):RenderNode",
        "doc": "Puts `next` where this node is in its parent, in the render tree and the layout tree, and detaches this node."
+      },
+      {
+       "name": "fingerprint",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "A hash of what this node shows and how it lays out, from what the frame comparison reads. A debug check compares it\nacross frames to find changes to the submitted tree that nobody announced (UiContext.verifyRetentionEvery)."
+      },
+      {
+       "name": "snapshotForCompare",
+       "kind": "method",
+       "signature": "(?shareLayout:Bool, ?reuse:RenderNode):RenderNode",
+       "doc": "A detached copy of what the frame comparison reads from this node (style, layout inputs, hit testing, semantics, revisions,\nparent and child order), taken before the node is changed in place so the change is still seen as one."
+      },
+      {
+       "name": "snapshotBuilt",
+       "kind": "method",
+       "signature": "():BuiltNode",
+       "doc": "What a builder made on this node when it returned it, to be taken before callers decorate the node: a later rebuild\n(reconcile) replaces just that and leaves the listeners, paint callbacks, children and style changes callers add after."
+      },
+      {
+       "name": "canReconcile",
+       "kind": "method",
+       "signature": "(fresh:RenderNode):Bool",
+       "doc": "Whether `fresh`, a new build of this node, can be applied to it in place. A box a caller or the frame promoted to a custom\none (decorations, paint) still takes a box build; any other change of kind needs a replacement."
+      },
+      {
+       "name": "reconcile",
+       "kind": "method",
+       "signature": "(fresh:RenderNode, built:BuiltNode, ?topology:RenderTreeTopology):RenderNode",
+       "doc": "The one way a widget's rebuild reaches the node it built before. Applies `fresh`, the node the builder just made, to this\none, which stays in the tree with everything callers attached after `built` was taken:\n\n- style: only the properties the builder changed between the two builds (`built` is updated to the new build);\n- computed style, interaction state and semantics (unless a caller replaced them);\n- listeners, outside-pointer, geometry and paint callbacks and decorations the builder made, replaced by the new build's;\n- children the builder made, each swapped for its new build in the same place (a new build's callbacks refer to the nodes it\nmade, so those must be the ones in the tree); surplus ones are removed and further ones inserted after the last.\n\nProperties of the node other than these (focusable, enabled, cursor, tab index, command scope) come from the widget\ninstance, which a rebuild keeps. Returns a stand-in for the node as it was, for the frame comparison."
       },
       {
        "name": "localToGlobal",
@@ -5790,6 +6389,13 @@
        "doc": "Adds a decoration. Supplying a cache key opts it into retained display\nlist reuse; the key must include any external inputs read by the\ndecoration that are not represented by computed style or geometry."
       },
       {
+       "name": "styleFieldsClassified",
+       "kind": "method",
+       "signature": "():Bool",
+       "static": true,
+       "doc": "Whether every LayoutStyle field invalidates something when it changes: a new field must join a group above."
+      },
+      {
        "name": "find",
        "kind": "method",
        "signature": "(id:WidgetId):Null<RenderNode>"
@@ -5798,6 +6404,45 @@
        "name": "walk",
        "kind": "method",
        "signature": "(visit:(RenderNode) -> Void):Void"
+      }
+     ]
+    },
+    {
+     "name": "RenderTreeTopology",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/RenderTreeTopology.hx",
+     "doc": "Exact topology of a published frame. Rebuilding reparents retained nodes, so their old parent/children cannot be read live.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "append",
+       "kind": "method",
+       "signature": "(node:RenderNode):Void"
+      },
+      {
+       "name": "parent",
+       "kind": "method",
+       "signature": "(id:Int):Int"
+      },
+      {
+       "name": "childPosition",
+       "kind": "method",
+       "signature": "(parent:Int, child:Int):Int",
+       "doc": "Original child slot when a retained builder has already reparented the live child into its new root."
+      },
+      {
+       "name": "sameChildren",
+       "kind": "method",
+       "signature": "(node:RenderNode):Bool"
       }
      ]
     },
@@ -5857,13 +6502,34 @@
      ]
     },
     {
+     "name": "RetainedVariants",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/RetainedVariants.hx",
+     "implements": [
+      "View"
+     ],
+     "doc": "Retains a bounded set of explicitly keyed alternatives under one stable parent.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(key:String, variant:String, builder:(BuildContext) -> View, ?revision:() -> String, ?capacity:Int, ?resetChangedOnReturn:Bool):Void"
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(context:BuildContext):RenderNode"
+      }
+     ]
+    },
+    {
      "name": "RetainedView",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/RetainedView.hx",
      "implements": [
       "View"
      ],
-     "doc": "Reuses a stable render subtree while an application-owned revision key is unchanged.",
+     "doc": "Reuses a render subtree while its tracked signals, Observable fields and interaction state remain current.",
      "fields": [
       {
        "name": "new",
@@ -5926,9 +6592,128 @@
      ]
     },
     {
+     "name": "SelfUpdatingBuild",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/BuildContext.hx",
+     "doc": "How a self-updating widget rebuilds; retained caches hold the ones in their subtree (see InteractionStateSnapshot).",
+     "fields": [
+      {
+       "name": "idValue",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "build",
+       "kind": "var",
+       "signature": ":() -> RenderNode",
+       "final": true
+      },
+      {
+       "name": "scope",
+       "kind": "var",
+       "signature": ":KeyScope",
+       "final": true
+      },
+      {
+       "name": "styleParent",
+       "kind": "var",
+       "signature": ":Null<ComputedStyle>",
+       "final": true
+      },
+      {
+       "name": "textStyleStack",
+       "kind": "var",
+       "signature": ":Array<ResolvedTextStyle>",
+       "final": true
+      },
+      {
+       "name": "dependencies",
+       "kind": "var",
+       "signature": ":Null<UpdatingDependencies>"
+      },
+      {
+       "name": "root",
+       "kind": "var",
+       "signature": ":Null<RenderNode>"
+      },
+      {
+       "name": "pending",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "reactivePending",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "forcePending",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "buildsFromHover",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "epoch",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "buildRevision",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Advances for every completed build, including quiet in-place patches."
+      },
+      {
+       "name": "built",
+       "kind": "var",
+       "signature": ":Null<BuiltNode>",
+       "doc": "What the builder last made on `root`, before callers decorated it: rebuilds replace just that (RenderNode.reconcile)."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:WidgetId, build:() -> RenderNode, scope:KeyScope, ?styleParent:ComputedStyle, textStyleStack:Array<ResolvedTextStyle>):Void"
+      },
+      {
+       "name": "retainSnapshot",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "releaseSnapshot",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "attachRegistration",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "detachRegistration",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "releaseAll",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Retained snapshots and the registry are the only owners of an updater's subscriptions."
+      }
+     ]
+    },
+    {
      "name": "Shortcut",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/Shortcut.hx",
+     "implements": [
+      "Hashable"
+     ],
      "doc": "A normalized key/modifier chord used by application commands.",
      "fields": [
       {
@@ -5963,7 +6748,12 @@
       {
        "name": "equals",
        "kind": "method",
-       "signature": "(?other:Shortcut):Bool"
+       "signature": "(other:Shortcut):Bool"
+      },
+      {
+       "name": "hash",
+       "kind": "method",
+       "signature": "():Int"
       },
       {
        "name": "toString",
@@ -6012,29 +6802,16 @@
       "T"
      ],
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/State.hx",
-     "doc": "Stable handle to one value in a UiContext's persistent state store.",
+     "extends": [
+      "Signal<T>"
+     ],
+     "doc": "Stable signal handle for one value in a UiContext's persistent state store.",
      "fields": [
       {
        "name": "id",
        "kind": "var",
        "signature": ":WidgetId",
        "final": true
-      },
-      {
-       "name": "value",
-       "kind": "var",
-       "signature": ":T"
-      },
-      {
-       "name": "update",
-       "kind": "method",
-       "signature": "(value:T):T"
-      },
-      {
-       "name": "updateQuietly",
-       "kind": "method",
-       "signature": "(value:T):T",
-       "doc": "Sets the value without bumping any revision, for a widget that rebuilds itself in place (see\nBuildContext.selfUpdating): cached subtrees around it stay valid because nothing outside it reads this state."
       }
      ]
     },
@@ -6045,9 +6822,9 @@
      "doc": "Haxe-owned per-widget state retained while views are rebuilt.",
      "fields": [
       {
-       "name": "revision",
+       "name": "frameActive",
        "kind": "var",
-       "signature": ":Int"
+       "signature": ":Bool"
       },
       {
        "name": "new",
@@ -6075,7 +6852,7 @@
       {
        "name": "initialize",
        "kind": "method",
-       "signature": "(id:WidgetId, initial:Dynamic):Void"
+       "signature": "(id:WidgetId, initial:T):Void"
       },
       {
        "name": "beginFrame",
@@ -6092,13 +6869,23 @@
       {
        "name": "usedIdsSince",
        "kind": "method",
-       "signature": "(marker:Int):Array<Int>",
+       "signature": "(marker:Int, ?previous:Array<Int>):Array<Int>",
        "doc": "Returns state IDs first touched after a usage marker."
+      },
+      {
+       "name": "beginUsage",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "finishUsage",
+       "kind": "method",
+       "signature": "(marker:Int):Void"
       },
       {
        "name": "retain",
        "kind": "method",
-       "signature": "(ids:Array<Int>):Void",
+       "signature": "(ids:Array<Int>, ?recordUsage:Bool):Void",
        "doc": "Keeps state-backed resources for a retained, temporarily detached subtree."
       },
       {
@@ -6112,18 +6899,6 @@
        "kind": "method",
        "signature": "():Void",
        "doc": "Releases resource-backed state that was absent from the completed tree."
-      },
-      {
-       "name": "idsChangedSince",
-       "kind": "method",
-       "signature": "(since:Int):Array<Int>",
-       "doc": "IDs of the states set after `since` (a value of `revision`), in no particular order."
-      },
-      {
-       "name": "valueRevision",
-       "kind": "method",
-       "signature": "(id:Int):Int",
-       "doc": "Revision at which this state last changed; zero if it never has been set since creation."
       },
       {
        "name": "contains",
@@ -6464,6 +7239,18 @@
        "doc": "Application layout to window logical coordinates for platform geometry."
       },
       {
+       "name": "verifyRetentionEvery",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Debug check that retention is invisible. Every `verifyRetentionEvery` frames that did work, the view is built again from\nscratch, bypassing every retained cache, patch and in-place edit, and must give the same tree; see verifyRetention. 0 turns\nit off. The environment variable HAXEON_UI_VERIFY_RETENTION sets it when the context is created."
+      },
+      {
+       "name": "onRetentionMismatch",
+       "kind": "var",
+       "signature": ":Null<(String) -> Void>",
+       "doc": "Called with the difference when a check fails; by default the check throws it."
+      },
+      {
        "name": "needsAnimationFrame",
        "kind": "var",
        "signature": ":Bool"
@@ -6518,7 +7305,7 @@
       {
        "name": "attachPlatformSurface",
        "kind": "method",
-       "signature": "(surface:PlatformSurface):Void",
+       "signature": "(surface:haxeon.platform.Surface):Void",
        "doc": "Attaches the host surface used by platform text-input synchronization."
       },
       {
@@ -6546,6 +7333,18 @@
        "doc": "Submits a lazily built view and reuses the prior tree when the complete\ncaller-provided build key and all framework revisions are unchanged."
       },
       {
+       "name": "verifyRetention",
+       "kind": "method",
+       "signature": "(build:() -> View, frame:LayoutFrame):Null<String>",
+       "doc": "Builds the view again from scratch, with every retained cache, patch and in-place edit bypassed and no time passing, and\ncompares the result with the tree that was live. Returns null when they match, or the first lines that differ. Hover and\npress flags are not compared: routing writes them onto live nodes that no widget built from them. The rebuilt tree stays\nlive, which is harmless when they match."
+      },
+      {
+       "name": "releaseRetained",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Lets go of the retained render tree and everything that holds its nodes or their handler closures: the root, the\nnode maps, the hit-test picker, hover paths, focus order, in-flight gestures and self-updating builders. Interaction\nstate that holds no code stays: focus by ID, pointer presses and captures by ID, widget state, the key caches and the\nnative paint lists (repainted, not reused, by the next frame). Until the next submit, input finds no target and the\ncontext must not be rendered; the next submit builds the whole tree afresh. A live host calls this before a patch that\ndrops functions, so stored closures only the old tree held no longer reach them."
+      },
+      {
        "name": "getDiagnosticStage",
        "kind": "method",
        "signature": "():Int"
@@ -6553,7 +7352,7 @@
       {
        "name": "updateAccessibility",
        "kind": "method",
-       "signature": "(surface:PlatformSurface):Void",
+       "signature": "(surface:haxeon.platform.Surface):Void",
        "doc": "Connects this frame's semantic projection to a NativeKit platform surface."
       },
       {
@@ -6759,6 +7558,13 @@
        "signature": ":Int",
        "static": true,
        "doc": "Resolved transforms, clips, bounds, or paint order must be refreshed."
+      },
+      {
+       "name": "NativeInputs",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "Work that changes a serialized native node; build/child membership is compared separately."
       },
       {
        "name": "fromStyleImpact",
@@ -7454,6 +8260,39 @@
      ]
     },
     {
+     "name": "UpdatingDependencies",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/BuildContext.hx",
+     "doc": "Dependencies of a composite or stateful updater; leaf controls need no additional capture record.",
+     "fields": [
+      {
+       "name": "allStateIds",
+       "kind": "var",
+       "signature": ":Null<Array<Int>>"
+      },
+      {
+       "name": "stateIds",
+       "kind": "var",
+       "signature": ":Null<Array<Int>>"
+      },
+      {
+       "name": "observed",
+       "kind": "var",
+       "signature": ":Null<Dependencies>"
+      },
+      {
+       "name": "children",
+       "kind": "var",
+       "signature": ":Null<InteractionStateSnapshot>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
      "name": "View",
      "kind": "interface",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/View.hx",
@@ -7470,6 +8309,9 @@
      "name": "ViewportCamera",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/ViewportCamera.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Camera state shared by GPU viewport widgets and application overlays.",
      "fields": [
       {
@@ -7677,6 +8519,69 @@
      ]
     },
     {
+     "name": "RenderCost",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/debug/RenderCost.hx",
+     "doc": "Opt-in render diagnostics; counters and formatting are untouched on ordinary frames.",
+     "fields": [
+      {
+       "name": "enabled",
+       "kind": "var",
+       "signature": ":Bool",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "callbacks",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "encode",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "renderable",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "nativeCall",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "time",
+       "kind": "method",
+       "signature": "():Float",
+       "static": true
+      },
+      {
+       "name": "begin",
+       "kind": "method",
+       "signature": "():Void",
+       "static": true
+      },
+      {
+       "name": "submit",
+       "kind": "method",
+       "signature": "(started:Float, viewStarted:Float, nativeStarted:Float, nativeEnded:Float, ended:Float, nodes:Int):Void",
+       "static": true
+      },
+      {
+       "name": "render",
+       "kind": "method",
+       "signature": "(started:Float, nativeStarted:Float, ended:Float, nodes:Int):Void",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "UiFrameMetrics",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/debug/UiFrameMetrics.hx",
@@ -7799,6 +8704,13 @@
        "signature": ":Int",
        "final": true,
        "doc": "Nodes whose previous resolved geometry object was retained."
+      },
+      {
+       "name": "buildPasses",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "Internal submit passes used to settle geometry, reactive state, and interaction feedback."
       },
       {
        "name": "submitSeconds",
@@ -7928,7 +8840,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(frameNumber:Int, nodeCount:Int, styleResolutions:Int, styleCacheHits:Int, styleCacheMisses:Int, cachedStyleCount:Int, styleChangedNodes:Int, styleUnchangedNodes:Int, styleInvalidationFlags:Int, layoutInvalidatedNodes:Int, textLayoutInvalidatedNodes:Int, paintInvalidatedNodes:Int, compositeInvalidatedNodes:Int, semanticsInvalidatedNodes:Int, hitGeometryInvalidatedNodes:Int, submitSeconds:Float, ?nativeLayoutSubmitted:Bool, ?nativeLayoutReused:Bool, ?resolvedGeometryChangedNodes:Int, ?resolvedGeometryReusedNodes:Int):Void"
+       "signature": "(frameNumber:Int, nodeCount:Int, styleResolutions:Int, styleCacheHits:Int, styleCacheMisses:Int, cachedStyleCount:Int, styleChangedNodes:Int, styleUnchangedNodes:Int, styleInvalidationFlags:Int, layoutInvalidatedNodes:Int, textLayoutInvalidatedNodes:Int, paintInvalidatedNodes:Int, compositeInvalidatedNodes:Int, semanticsInvalidatedNodes:Int, hitGeometryInvalidatedNodes:Int, submitSeconds:Float, ?nativeLayoutSubmitted:Bool, ?nativeLayoutReused:Bool, ?resolvedGeometryChangedNodes:Int, ?resolvedGeometryReusedNodes:Int, ?buildPasses:Int):Void"
       },
       {
        "name": "completeRender",
@@ -7996,7 +8908,7 @@
       {
        "name": "dump",
        "kind": "method",
-       "signature": "(?root:RenderNode, ?focused:WidgetId):String",
+       "signature": "(?root:RenderNode, ?focused:WidgetId, ?ignoredInteractionStates:Int):String",
        "static": true
       }
      ]
@@ -8285,6 +9197,41 @@
      ]
     },
     {
+     "name": "UiStyleInvalidationFrame",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/debug/UiStyleInvalidationMetrics.hx",
+     "doc": "Reused comparison inputs keep the frame visitor's capture fixed as the native boundary gains data.",
+     "fields": [
+      {
+       "name": "context",
+       "kind": "var",
+       "signature": ":BuildContext",
+       "final": true
+      },
+      {
+       "name": "changes",
+       "kind": "var",
+       "signature": ":LayoutChanges",
+       "final": true
+      },
+      {
+       "name": "topology",
+       "kind": "var",
+       "signature": ":RenderTreeTopology"
+      },
+      {
+       "name": "preserveRevisions",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(context:BuildContext, changes:LayoutChanges, topology:RenderTreeTopology):Void"
+      }
+     ]
+    },
+    {
      "name": "UiStyleInvalidationMetrics",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/debug/UiStyleInvalidationMetrics.hx",
@@ -8293,77 +9240,73 @@
       {
        "name": "styleChangedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "styleUnchangedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "invalidationFlags",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "layoutInvalidatedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "textLayoutInvalidatedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "paintInvalidatedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "compositeInvalidatedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "semanticsInvalidatedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "hitGeometryInvalidatedNodes",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":Int"
       },
       {
        "name": "treeChanged",
        "kind": "var",
        "signature": ":Bool",
-       "final": true,
        "doc": "Whether the retained node topology changed since the previous submit."
       },
       {
        "name": "nativeLayoutRequired",
        "kind": "var",
        "signature": ":Bool",
-       "final": true,
        "doc": "Whether this frame requires a fresh native layout/render snapshot."
       },
       {
        "name": "compare",
        "kind": "method",
-       "signature": "(?previous:RenderNode, ?current:RenderNode, ?previousById:Map<Int, RenderNode>, ?currentById:Map<Int, RenderNode>, ?priorOverrides:Map<Int, RenderNode>):UiStyleInvalidationMetrics",
+       "signature": "(?previous:RenderNode, ?current:RenderNode, ?previousById:Map<Int, RenderNode>, ?currentById:Map<Int, RenderNode>, ?priorOverrides:Map<Int, RenderNode>, ?frame:UiStyleInvalidationFrame):UiStyleInvalidationMetrics",
        "static": true,
-       "doc": "Compares current nodes against the prior submitted tree without touching layout."
+       "doc": "Classifies current nodes against their prior submitted inputs."
+      },
+      {
+       "name": "collectLayoutEdits",
+       "kind": "method",
+       "signature": "(current:Map<Int, RenderNode>, priors:Map<Int, RenderNode>, changes:LayoutChanges):Void",
+       "static": true,
+       "doc": "Classify announced edits made by geometry callbacks against their existing comparison priors."
       }
      ]
     }
@@ -8458,6 +9401,13 @@
        "static": true
       },
       {
+       "name": "copyExcluding",
+       "kind": "method",
+       "signature": "(node:DockNode, excluded:Array<String>):DockNode",
+       "static": true,
+       "doc": "Copies a layout while omitting selected panels, normalizing each node in the same traversal."
+      },
+      {
        "name": "normalize",
        "kind": "method",
        "signature": "(node:DockNode):DockNode",
@@ -8534,6 +9484,9 @@
      "name": "DockPanelDescriptor",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/docking/DockPanelDescriptor.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "View-independent metadata for one registered dock panel.",
      "fields": [
       {
@@ -8673,13 +9626,15 @@
      "name": "DockWorkspaceModel",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/docking/DockWorkspaceModel.hx",
-     "doc": "Mutable dock layout and panel metadata. Mutations increment revision and\nnotify listeners so mounted workspaces can invalidate a frame.",
+     "implements": [
+      "Observable"
+     ],
+     "doc": "Mutable dock layout and panel metadata. Observable fields invalidate views;\nlisteners remain for persistence and other non-view side effects.",
      "fields": [
       {
        "name": "panels",
        "kind": "var",
-       "signature": ":Map<String, DockPanelDescriptor>",
-       "final": true
+       "signature": ":Map<String, DockPanelDescriptor>"
       },
       {
        "name": "root",
@@ -8695,11 +9650,6 @@
        "name": "activePanelId",
        "kind": "var",
        "signature": ":Null<String>"
-      },
-      {
-       "name": "revision",
-       "kind": "var",
-       "signature": ":Int"
       },
       {
        "name": "listenerCount",
@@ -8886,7 +9836,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(root:DockNode, ?activePanelId:String, ?version:Int):Void"
+       "signature": "(root:DockNode, ?activePanelId:String, ?version:Int, ?excludedPanels:Array<String>):Void"
       }
      ]
     },
@@ -8947,6 +9897,9 @@
      "name": "EditHistory",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/editing/EditHistory.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Reversible editor history with transactions and drag/coalescing hooks.",
      "fields": [
       {
@@ -9167,6 +10120,9 @@
      "name": "EditorDocument",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/editing/EditorDocument.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Document-owned history and savepoint state for editor applications.",
      "fields": [
       {
@@ -10278,45 +11234,39 @@
     },
     {
      "name": "UiHostLifecycle",
-     "kind": "abstract",
+     "kind": "enum",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/host/UiHostSession.hx",
-     "underlying": "Int",
+     "doc": "Named states of a hosted application's lifetime; no numeric boundary representation.",
      "fields": [
       {
        "name": "Starting",
-       "kind": "var",
-       "signature": ":Int",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "LoadingResources",
-       "kind": "var",
-       "signature": ":Int",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Running",
-       "kind": "var",
-       "signature": ":Int",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Stopping",
-       "kind": "var",
-       "signature": ":Int",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Stopped",
-       "kind": "var",
-       "signature": ":Int",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Failed",
-       "kind": "var",
-       "signature": ":Int",
-       "static": true
+       "kind": "case",
+       "signature": ""
       }
      ]
     },
@@ -10987,6 +11937,9 @@
      "name": "ComponentLab",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/lab/ComponentLab.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Interactive Storybook-style surface backed by ordinary UIKit views.",
      "fields": [
       {
@@ -11091,6 +12044,9 @@
      "name": "PlotModel",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/plotting/PlotModel.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Shared plotting model with explicit or data-derived ranges.",
      "fields": [
       {
@@ -11150,10 +12106,10 @@
        "signature": "():Void"
       },
       {
-       "name": "revision",
+       "name": "trackPaintData",
        "kind": "method",
-       "signature": "():Int",
-       "doc": "Includes child series revisions so streaming data invalidates plots."
+       "signature": "():Void",
+       "doc": "Reads every paint input while a reactive effect captures the model and series fields."
       },
       {
        "name": "range",
@@ -11228,6 +12184,9 @@
      "name": "PlotSeries",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/plotting/PlotSeries.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Application-owned samples and presentation for one plot line.",
      "fields": [
       {
@@ -11258,11 +12217,6 @@
        "name": "visible",
        "kind": "var",
        "signature": ":Bool"
-      },
-      {
-       "name": "revision",
-       "kind": "var",
-       "signature": ":Int"
       },
       {
        "name": "pointCount",
@@ -11543,7 +12497,7 @@
       {
        "name": "readValue",
        "kind": "method",
-       "signature": "(context:CommandContext):PropertyValue"
+       "signature": "():PropertyValue"
       },
       {
        "name": "validateValue",
@@ -11685,6 +12639,20 @@
      ]
     },
     {
+     "name": "PropertyEditResultTools",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/properties/PropertyEditResultTools.hx",
+     "doc": "Queries the case of a property edit result without comparing its payload.",
+     "fields": [
+      {
+       "name": "isApplied",
+       "kind": "method",
+       "signature": "(result:PropertyEditResult):Bool",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "PropertyEditorExtension",
      "kind": "interface",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/properties/PropertyEditorExtension.hx",
@@ -11781,6 +12749,9 @@
      "name": "PropertyInspectorSection",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/properties/PropertyInspectorSection.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Stable grouping of descriptors rendered by a shared property inspector.",
      "fields": [
       {
@@ -11881,7 +12852,8 @@
      "name": "PropertyReader",
      "kind": "typedef",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/properties/PropertyDescriptorOptions.hx",
-     "alias": "(CommandContext) -> PropertyValue"
+     "alias": "() -> PropertyValue",
+     "doc": "Model reads track their own Observable sources; invocation context belongs to edits."
     },
     {
      "name": "PropertyRecordField",
@@ -13185,6 +14157,13 @@
        "kind": "method",
        "signature": "(other:Semantics):Bool",
        "doc": "Whether this value equals `other`'s. Two values from the same source are compared by revision without reading\neither: a deferred value reads its source as it is now, so reading one set at an older revision would compare the\ncurrent value with itself."
+      },
+      {
+       "name": "same",
+       "kind": "method",
+       "signature": "(?left:Semantics, ?right:Semantics):Bool",
+       "static": true,
+       "doc": "Whether two accessible descriptions are the same to a consumer. Written out by hand rather than generated (haxeon.Equality)\nbecause the value is compared through `sameValue`, which does not read a deferred source, and the source and its revision\nare not fields to compare. Every other field must be listed here: the structural test in RestyleInPlaceTests changes each\nfield in turn and requires the difference to be seen."
       }
      ]
     },
@@ -13582,6 +14561,9 @@
      "name": "SettingsStore",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/settings/SettingsStore.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Current setting values over the registry's defaults, saved as JSON.\n\nOnly values that differ from their default are kept and saved, so changing\na default in code reaches everyone who never touched that setting. Saved\nvalues whose setting is not defined in this build are kept and written back\nunchanged, because another build or a module that loads later may define\nthem. A saved value that no longer fits its setting falls back to the\ndefault. Every change saves at once unless it happens inside batch().\n\nThe same file also keeps application state that is not a setting, such as\nrecently opened files: JSON-compatible values under a key, never shown in\nthe settings dialog and never validated.",
      "fields": [
       {
@@ -13829,7 +14811,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/BlurEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Gaussian blur described by its standard deviation in logical pixels.",
      "fields": [
@@ -13853,17 +14835,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "inkOverflow",
@@ -13949,7 +14931,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/BrightnessEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Multiplicative RGB brightness adjustment.",
      "fields": [
@@ -13967,17 +14949,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "describe",
@@ -13991,7 +14973,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/ColorMatrixEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Four-channel color matrix in row-major 4x5 form.",
      "fields": [
@@ -14021,17 +15003,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "describe",
@@ -14041,38 +15023,10 @@
      ]
     },
     {
-     "name": "ComputedProperty",
-     "kind": "class",
-     "params": [
-      "T"
-     ],
-     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/ComputedStyle.hx",
-     "doc": "One resolved property value and its optional cascade provenance.",
-     "fields": [
-      {
-       "name": "value",
-       "kind": "var",
-       "signature": ":T",
-       "final": true
-      },
-      {
-       "name": "source",
-       "kind": "var",
-       "signature": ":Null<StyleSource>",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(value:T, ?source:StyleSource):Void"
-      }
-     ]
-    },
-    {
      "name": "ComputedStyle",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/ComputedStyle.hx",
-     "doc": "Authoritative Haxe-side result of style resolution.",
+     "doc": "Authoritative Haxe-side result of style resolution. Values remain in their typed declarations.",
      "fields": [
       {
        "name": "matchingRules",
@@ -14083,62 +15037,153 @@
        "name": "new",
        "kind": "method",
        "signature": "(?from:ComputedStyle):Void",
-       "doc": "With `from`, the new style reads `from`'s storage and detaches it on the first mutation, as `fork` does."
+       "doc": "With `from`, storage is shared until either style is changed."
       },
       {
-       "name": "set",
+       "name": "setDeclaration",
        "kind": "method",
-       "signature": "(property:StyleProperty<T>, value:T, ?source:StyleSource):Void"
+       "signature": "(value:StyleValue, ?source:StyleSource):Void",
+       "doc": "Stores an immutable typed declaration."
+      },
+      {
+       "name": "setColor",
+       "kind": "method",
+       "signature": "(property:StyleColorProperty, value:Color, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setInsets",
+       "kind": "method",
+       "signature": "(property:StyleInsetsProperty, value:Insets, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setAxis",
+       "kind": "method",
+       "signature": "(property:StyleAxisProperty, value:LayoutAxis, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setMatrix",
+       "kind": "method",
+       "signature": "(property:StyleTransformProperty, value:Transform2D, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setNumber",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Float>, value:Float, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setInteger",
+       "kind": "method",
+       "signature": "(property:StylePropertyBase, value:Int, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setBoolean",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Bool>, value:Bool, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setDecorations",
+       "kind": "method",
+       "signature": "(value:DecorationChain, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setEffects",
+       "kind": "method",
+       "signature": "(property:StyleProperty<EffectChain>, value:EffectChain, ?source:StyleSource):Void"
+      },
+      {
+       "name": "setMask",
+       "kind": "method",
+       "signature": "(value:Mask, ?source:StyleSource):Void"
       },
       {
        "name": "has",
        "kind": "method",
-       "signature": "(property:StyleProperty<T>):Bool"
-      },
-      {
-       "name": "get",
-       "kind": "method",
-       "signature": "(property:StyleProperty<T>):T"
-      },
-      {
-       "name": "getReadOnly",
-       "kind": "method",
-       "signature": "(property:StyleProperty<T>):T",
-       "doc": "Reads the effective value without copying it; callers must not mutate the result."
-      },
-      {
-       "name": "sharesValuesWith",
-       "kind": "method",
-       "signature": "(?other:ComputedStyle):Bool",
-       "doc": "True when both styles read the same value storage (cache forks do until one mutates), so no value can differ."
-      },
-      {
-       "name": "peek",
-       "kind": "method",
-       "signature": "(property:StyleProperty<T>):T",
-       "doc": "Reads a value without the defensive copy `get` makes; the caller must not mutate it."
-      },
-      {
-       "name": "property",
-       "kind": "method",
-       "signature": "(property:StyleProperty<T>):ComputedProperty<T>"
+       "signature": "(property:StylePropertyBase):Bool"
       },
       {
        "name": "source",
        "kind": "method",
-       "signature": "(property:StyleProperty<T>):Null<StyleSource>"
+       "signature": "(property:StylePropertyBase):Null<StyleSource>"
+      },
+      {
+       "name": "getColor",
+       "kind": "method",
+       "signature": "(property:StyleColorProperty):Color"
+      },
+      {
+       "name": "getInsets",
+       "kind": "method",
+       "signature": "(property:StyleInsetsProperty):Insets"
+      },
+      {
+       "name": "getAxis",
+       "kind": "method",
+       "signature": "(property:StyleAxisProperty):LayoutAxis"
+      },
+      {
+       "name": "getMatrix",
+       "kind": "method",
+       "signature": "(property:StyleTransformProperty):Transform2D"
+      },
+      {
+       "name": "getNumber",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Float>):Float"
+      },
+      {
+       "name": "getInteger",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Int>):Int"
+      },
+      {
+       "name": "getBoolean",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Bool>):Bool"
+      },
+      {
+       "name": "getDecorations",
+       "kind": "method",
+       "signature": "():DecorationChain"
+      },
+      {
+       "name": "getDecorationsReadOnly",
+       "kind": "method",
+       "signature": "():DecorationChain"
+      },
+      {
+       "name": "getEffects",
+       "kind": "method",
+       "signature": "(property:StyleProperty<EffectChain>):EffectChain"
+      },
+      {
+       "name": "getEffectsReadOnly",
+       "kind": "method",
+       "signature": "(property:StyleProperty<EffectChain>):EffectChain"
+      },
+      {
+       "name": "getMask",
+       "kind": "method",
+       "signature": "():Mask"
+      },
+      {
+       "name": "getMaskReadOnly",
+       "kind": "method",
+       "signature": "():Mask"
+      },
+      {
+       "name": "sharesValuesWith",
+       "kind": "method",
+       "signature": "(?other:ComputedStyle):Bool"
       },
       {
        "name": "recordMatch",
        "kind": "method",
-       "signature": "(source:StyleSource):Void",
-       "doc": "Records every matching rule, including rules whose declarations were overridden."
+       "signature": "(source:StyleSource):Void"
       },
       {
        "name": "matchingStyleRules",
        "kind": "method",
-       "signature": "():Array<StyleSource>",
-       "doc": "Returns a stable copy for inspectors and external tooling."
+       "signature": "():Array<StyleSource>"
       },
       {
        "name": "entries",
@@ -14159,14 +15204,12 @@
       {
        "name": "fork",
        "kind": "method",
-       "signature": "():ComputedStyle",
-       "doc": "Fast copy used by style caches; map storage is detached only on mutation."
+       "signature": "():ComputedStyle"
       },
       {
        "name": "cachedInheritedKey",
        "kind": "method",
-       "signature": "():Null<String>",
-       "doc": "Shared across style-cache forks; set() detaches it before mutation."
+       "signature": "():Null<String>"
       },
       {
        "name": "rememberInheritedKey",
@@ -14180,7 +15223,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/ContrastEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Multiplicative RGB contrast adjustment.",
      "fields": [
@@ -14198,17 +15241,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "describe",
@@ -14222,7 +15265,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/CustomEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Typed value for a native renderer-owned custom shader effect.",
      "fields": [
@@ -14253,17 +15296,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "inkOverflow",
@@ -14281,6 +15324,9 @@
      "name": "CustomEffectDefinition",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/CustomEffectDefinition.hx",
+     "implements": [
+      "Equatable"
+     ],
      "doc": "Renderer-owned contract for one custom effect implementation.\n\nThe ID is stable within the native renderer registration that implements\nit. Haxe carries only this typed contract; shader source, pipelines, and\nbackend-specific mapping remain native concerns.",
      "fields": [
       {
@@ -14293,12 +15339,6 @@
        "name": "name",
        "kind": "var",
        "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "parameterTypes",
-       "kind": "var",
-       "signature": ":Array<EffectParameterType>",
        "final": true
       },
       {
@@ -14316,10 +15356,20 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(id:Int, name:String, parameterTypes:Array<EffectParameterType>, ?overflow:InkOverflow):Void"
+       "signature": "(id:Int, name:String, parameterTypes:Array<EffectParameterType>, ?overflow:Null<InkOverflow>):Void"
       },
       {
-       "name": "isEqual",
+       "name": "parameterCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "parameterTypeAt",
+       "kind": "method",
+       "signature": "(index:Int):EffectParameterType"
+      },
+      {
+       "name": "equals",
        "kind": "method",
        "signature": "(other:CustomEffectDefinition):Bool"
       },
@@ -14334,7 +15384,7 @@
      "name": "Decoration",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/Decoration.hx",
-     "doc": "Rendering-independent decoration value painted after layout resolves geometry.\n\nDecorations deliberately follow the same value-object contract as Effect:\nbuilt-ins override copy/equality/interpolation, while custom decorations can\ninherit the identity/discrete defaults without any runtime type inspection.",
+     "doc": "Rendering-independent decoration value painted after layout resolves geometry.\n\nDecorations deliberately follow the same value-object contract as VisualEffect:\nbuilt-ins override copy/equality/interpolation, while custom decorations can\ninherit the identity/discrete defaults without any runtime type inspection.",
      "fields": [
       {
        "name": "kind",
@@ -14450,58 +15500,49 @@
     },
     {
      "name": "DecorationKind",
-     "kind": "abstract",
+     "kind": "enum",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/DecorationKind.hx",
-     "underlying": "String",
      "doc": "Typed decoration families understood by the style and paint systems.",
      "fields": [
       {
        "name": "Background",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Gradient",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Image",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "NineSlice",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Border",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Outline",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Shadow",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Custom",
-       "kind": "var",
-       "signature": ":String",
-       "static": true,
+       "kind": "case",
+       "signature": "",
        "doc": "A user-defined renderer-owned decoration."
       }
      ]
@@ -14511,7 +15552,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/DropShadowEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Subtree alpha shadow; distinct from the lightweight ShadowDecoration.",
      "fields": [
@@ -14547,17 +15588,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "inkOverflow",
@@ -14568,93 +15609,6 @@
        "name": "describe",
        "kind": "method",
        "signature": "():String"
-      }
-     ]
-    },
-    {
-     "name": "Effect",
-     "kind": "class",
-     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/Effect.hx",
-     "doc": "Rendering-independent description of one post-layout visual effect.\n\nConcrete effects own typed parameters and value behavior. They do not know\nhow those parameters become render passes, shaders, or intermediate targets.",
-     "fields": [
-      {
-       "name": "kind",
-       "kind": "var",
-       "signature": ":EffectKind",
-       "final": true
-      },
-      {
-       "name": "isEqual",
-       "kind": "method",
-       "signature": "(other:Effect):Bool"
-      },
-      {
-       "name": "interpolate",
-       "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect",
-       "doc": "Interpolates compatible effects and uses a discrete midpoint otherwise."
-      },
-      {
-       "name": "discrete",
-       "kind": "method",
-       "signature": "(left:Effect, right:Effect, amount:Float):Effect",
-       "static": true
-      },
-      {
-       "name": "copy",
-       "kind": "method",
-       "signature": "():Effect"
-      },
-      {
-       "name": "inkOverflow",
-       "kind": "method",
-       "signature": "():InkOverflow"
-      },
-      {
-       "name": "describe",
-       "kind": "method",
-       "signature": "():String"
-      },
-      {
-       "name": "toString",
-       "kind": "method",
-       "signature": "():String"
-      },
-      {
-       "name": "requireFinite",
-       "kind": "method",
-       "signature": "(value:Float, message:String):Float",
-       "static": true
-      },
-      {
-       "name": "requireNonNegative",
-       "kind": "method",
-       "signature": "(value:Float, message:String):Float",
-       "static": true
-      },
-      {
-       "name": "interpolateFloat",
-       "kind": "method",
-       "signature": "(left:Float, right:Float, amount:Float):Float",
-       "static": true
-      },
-      {
-       "name": "copyColor",
-       "kind": "method",
-       "signature": "(value:Color):Color",
-       "static": true
-      },
-      {
-       "name": "equalColor",
-       "kind": "method",
-       "signature": "(left:Color, right:Color):Bool",
-       "static": true
-      },
-      {
-       "name": "interpolateColor",
-       "kind": "method",
-       "signature": "(left:Color, right:Color, amount:Float):Color",
-       "static": true
       }
      ]
     },
@@ -14667,13 +15621,13 @@
       {
        "name": "effects",
        "kind": "var",
-       "signature": ":Array<Effect>",
+       "signature": ":Array<VisualEffect>",
        "final": true
       },
       {
        "name": "new",
        "kind": "method",
-       "signature": "(?effects:Array<Effect>):Void"
+       "signature": "(?effects:Array<VisualEffect>):Void"
       },
       {
        "name": "empty",
@@ -14684,7 +15638,7 @@
       {
        "name": "of",
        "kind": "method",
-       "signature": "(effects:Array<Effect>):EffectChain",
+       "signature": "(effects:Array<VisualEffect>):EffectChain",
        "static": true
       },
       {
@@ -14737,58 +15691,49 @@
     },
     {
      "name": "EffectKind",
-     "kind": "abstract",
+     "kind": "enum",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/EffectKind.hx",
-     "underlying": "String",
      "doc": "Typed effect families understood by the native compositor.",
      "fields": [
       {
        "name": "Blur",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Brightness",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Contrast",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Saturate",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "HueRotate",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "ColorMatrix",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "DropShadow",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Custom",
-       "kind": "var",
-       "signature": ":String",
-       "static": true,
+       "kind": "case",
+       "signature": "",
        "doc": "A renderer-owned shader/effect registration."
       }
      ]
@@ -14797,6 +15742,9 @@
      "name": "EffectParameter",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/EffectParameter.hx",
+     "implements": [
+      "Equatable"
+     ],
      "doc": "One typed value supplied to a custom effect registration.",
      "fields": [
       {
@@ -14806,9 +15754,33 @@
        "final": true
       },
       {
-       "name": "values",
+       "name": "componentCount",
        "kind": "var",
-       "signature": ":Array<Float>",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "w",
+       "kind": "var",
+       "signature": ":Float",
        "final": true
       },
       {
@@ -14836,19 +15808,19 @@
        "static": true
       },
       {
-       "name": "copy",
+       "name": "valueAt",
        "kind": "method",
-       "signature": "():EffectParameter"
+       "signature": "(index:Int):Float"
       },
       {
-       "name": "isEqual",
+       "name": "equals",
        "kind": "method",
        "signature": "(other:EffectParameter):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:EffectParameter, amount:Float):EffectParameter"
+       "signature": "(?other:EffectParameter, amount:Float):EffectParameter"
       },
       {
        "name": "describe",
@@ -14859,34 +15831,29 @@
     },
     {
      "name": "EffectParameterType",
-     "kind": "abstract",
+     "kind": "enum",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/EffectParameterType.hx",
-     "underlying": "String",
      "doc": "Component shape used by a renderer-owned custom effect parameter.",
      "fields": [
       {
        "name": "Float",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Vec2",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Vec4",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       },
       {
        "name": "Color",
-       "kind": "var",
-       "signature": ":String",
-       "static": true
+       "kind": "case",
+       "signature": ""
       }
      ]
     },
@@ -14894,12 +15861,18 @@
      "name": "EffectParameterTypeUtil",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/EffectParameterTypeUtil.hx",
-     "doc": "Operations kept separate because Haxeon treats enum abstracts as constants.",
+     "doc": "Explicit parameter metadata and display labels, independent of enum representation.",
      "fields": [
       {
        "name": "componentCount",
        "kind": "method",
        "signature": "(type:EffectParameterType):Int",
+       "static": true
+      },
+      {
+       "name": "label",
+       "kind": "method",
+       "signature": "(type:EffectParameterType):String",
        "static": true
       }
      ]
@@ -15326,7 +16299,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/HueRotateEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Hue rotation in degrees.",
      "fields": [
@@ -15350,17 +16323,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "describe",
@@ -15420,6 +16393,9 @@
      "name": "InkOverflow",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/InkOverflow.hx",
+     "implements": [
+      "Hashable"
+     ],
      "doc": "Extra paint extent requested by a visual effect, in logical pixels.\n\nThis is deliberately a value type. It describes the geometry contract\nbetween style and rendering without exposing render targets or GPU state to\nthe Haxe style system.",
      "fields": [
       {
@@ -15460,13 +16436,8 @@
       {
        "name": "added",
        "kind": "method",
-       "signature": "(other:InkOverflow):InkOverflow",
+       "signature": "(?other:InkOverflow):InkOverflow",
        "doc": "Adds sequential effect extents."
-      },
-      {
-       "name": "isEqual",
-       "kind": "method",
-       "signature": "(other:InkOverflow):Bool"
       },
       {
        "name": "toString",
@@ -15574,7 +16545,8 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Mask):Bool"
+       "signature": "(other:Mask):Bool",
+       "doc": "By hand: the image is compared by identity, which the generated equality does not do for a plain class."
       },
       {
        "name": "describe",
@@ -15756,7 +16728,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/SaturateEffect.hx",
      "extends": [
-      "Effect"
+      "VisualEffect"
      ],
      "doc": "Multiplicative color saturation adjustment.",
      "fields": [
@@ -15774,17 +16746,17 @@
       {
        "name": "isEqual",
        "kind": "method",
-       "signature": "(other:Effect):Bool"
+       "signature": "(other:VisualEffect):Bool"
       },
       {
        "name": "interpolate",
        "kind": "method",
-       "signature": "(other:Effect, amount:Float):Effect"
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect"
       },
       {
        "name": "copy",
        "kind": "method",
-       "signature": "():Effect"
+       "signature": "():VisualEffect"
       },
       {
        "name": "describe",
@@ -15862,6 +16834,64 @@
        "name": "describe",
        "kind": "method",
        "signature": "():String"
+      }
+     ]
+    },
+    {
+     "name": "StyleAxisProperty",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleProperty.hx",
+     "extends": [
+      "StylePropertyBase"
+     ],
+     "fields": [
+      {
+       "name": "defaultValue",
+       "kind": "var",
+       "signature": ":LayoutAxis",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, defaultValue:LayoutAxis, inherited:Bool, impact:StyleImpact, ?equalValue:(LayoutAxis, LayoutAxis) -> Bool):Void"
+      },
+      {
+       "name": "sameAxis",
+       "kind": "method",
+       "signature": "(left:LayoutAxis, right:LayoutAxis):Bool"
+      }
+     ]
+    },
+    {
+     "name": "StyleColorProperty",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleProperty.hx",
+     "extends": [
+      "StylePropertyBase"
+     ],
+     "doc": "A color property retains its typed comparison and interpolation callbacks.",
+     "fields": [
+      {
+       "name": "defaultValue",
+       "kind": "var",
+       "signature": ":Color",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, defaultValue:Color, inherited:Bool, impact:StyleImpact, ?interpolate:(Color, Color, Float) -> Color, ?equalValue:(Color, Color) -> Bool):Void"
+      },
+      {
+       "name": "sameColor",
+       "kind": "method",
+       "signature": "(left:Color, right:Color):Bool"
+      },
+      {
+       "name": "interpolateColor",
+       "kind": "method",
+       "signature": "(left:Color, right:Color, amount:Float):Color"
       }
      ]
     },
@@ -16040,6 +17070,33 @@
      ]
     },
     {
+     "name": "StyleInsetsProperty",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleProperty.hx",
+     "extends": [
+      "StylePropertyBase"
+     ],
+     "doc": "Typed value properties avoid erasing struct comparisons to Dynamic.",
+     "fields": [
+      {
+       "name": "defaultValue",
+       "kind": "var",
+       "signature": ":Insets",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, defaultValue:Insets, inherited:Bool, impact:StyleImpact, ?equalValue:(Insets, Insets) -> Bool):Void"
+      },
+      {
+       "name": "sameInsets",
+       "kind": "method",
+       "signature": "(left:Insets, right:Insets):Bool"
+      }
+     ]
+    },
+    {
      "name": "StyleInspectionEntry",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleInspectionEntry.hx",
@@ -16077,64 +17134,21 @@
      ]
     },
     {
-     "name": "StyleInterpolator",
-     "kind": "class",
-     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleTransitionAnimation.hx",
-     "doc": "Haxeon-friendly interpolation implementation for the metadata-supported values.",
-     "fields": [
-      {
-       "name": "interpolate",
-       "kind": "method",
-       "signature": "(propertyName:String, from:Dynamic, to:Dynamic, amount:Float):Dynamic",
-       "static": true
-      }
-     ]
-    },
-    {
      "name": "StyleProperty",
      "kind": "class",
      "params": [
       "T"
      ],
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleProperty.hx",
+     "extends": [
+      "StylePropertyBase"
+     ],
      "doc": "Metadata and layout bridge for one typed style property.",
      "fields": [
-      {
-       "name": "name",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "slot",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true,
-       "doc": "Dense index among all properties, so a computed style stores its values in arrays instead of hashing names."
-      },
-      {
-       "name": "copiedOnRead",
-       "kind": "var",
-       "signature": ":Bool",
-       "final": true,
-       "doc": "Values of this property are mutable objects that a computed style hands out as copies."
-      },
       {
        "name": "defaultValue",
        "kind": "var",
        "signature": ":T",
-       "final": true
-      },
-      {
-       "name": "inherited",
-       "kind": "var",
-       "signature": ":Bool",
-       "final": true
-      },
-      {
-       "name": "impact",
-       "kind": "var",
-       "signature": ":StyleImpact",
        "final": true
       },
       {
@@ -16146,14 +17160,14 @@
       {
        "name": "Width",
        "kind": "var",
-       "signature": ":StyleProperty<LayoutAxis>",
+       "signature": ":StyleAxisProperty",
        "static": true,
        "final": true
       },
       {
        "name": "Height",
        "kind": "var",
-       "signature": ":StyleProperty<LayoutAxis>",
+       "signature": ":StyleAxisProperty",
        "static": true,
        "final": true
       },
@@ -16265,7 +17279,7 @@
       {
        "name": "Padding",
        "kind": "var",
-       "signature": ":StyleProperty<Insets>",
+       "signature": ":StyleInsetsProperty",
        "static": true,
        "final": true
       },
@@ -16279,7 +17293,7 @@
       {
        "name": "Background",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true
       },
@@ -16335,7 +17349,7 @@
       {
        "name": "Transform",
        "kind": "var",
-       "signature": ":StyleProperty<Transform2D>",
+       "signature": ":StyleTransformProperty",
        "static": true,
        "final": true
       },
@@ -16356,7 +17370,7 @@
       {
        "name": "BorderColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true
       },
@@ -16370,7 +17384,7 @@
       {
        "name": "OutlineColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true
       },
@@ -16384,7 +17398,7 @@
       {
        "name": "ShadowColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true
       },
@@ -16459,7 +17473,7 @@
       {
        "name": "ProgressTrackColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true,
        "doc": "Paint inputs used by the retained custom progress renderer."
@@ -16467,14 +17481,14 @@
       {
        "name": "ProgressFillColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true
       },
       {
        "name": "SliderTrackColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true,
        "doc": "Paint inputs used by the retained custom slider renderer."
@@ -16482,21 +17496,21 @@
       {
        "name": "SliderFillColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true
       },
       {
        "name": "SliderThumbColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true
       },
       {
        "name": "TextColor",
        "kind": "var",
-       "signature": ":StyleProperty<Color>",
+       "signature": ":StyleColorProperty",
        "static": true,
        "final": true,
        "doc": "Inherited typography/paint inputs are computed here and applied by text widgets."
@@ -16518,7 +17532,13 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(name:String, defaultValue:T, inherited:Bool, impact:StyleImpact, ?interpolate:(T, T, Float) -> T, ?readLayout:(LayoutStyle) -> T, ?writeLayout:(LayoutStyle, T) -> Void, ?equalValue:(T, T) -> Bool):Void"
+       "signature": "(name:String, defaultValue:T, inherited:Bool, impact:StyleImpact, ?interpolate:(T, T, Float) -> T):Void"
+      },
+      {
+       "name": "allocateSlot",
+       "kind": "method",
+       "signature": "(name:String):Int",
+       "static": true
       },
       {
        "name": "slotCount",
@@ -16528,31 +17548,62 @@
        "doc": "How many slots exist so far; every property created later gets a higher one."
       },
       {
-       "name": "read",
-       "kind": "method",
-       "signature": "(style:LayoutStyle):T"
-      },
-      {
-       "name": "write",
-       "kind": "method",
-       "signature": "(style:LayoutStyle, value:T):Void"
-      },
-      {
-       "name": "isEqual",
-       "kind": "method",
-       "signature": "(left:T, right:T):Bool"
-      },
-      {
-       "name": "hasLayoutBinding",
-       "kind": "method",
-       "signature": "():Bool"
-      },
-      {
        "name": "all",
        "kind": "method",
-       "signature": "():Array<StyleProperty<Dynamic>>",
+       "signature": "():Array<StylePropertyBase>",
        "static": true,
        "doc": "Stable registry used by default construction, local-style projection, and inspection."
+      }
+     ]
+    },
+    {
+     "name": "StylePropertyBase",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleProperty.hx",
+     "doc": "Metadata shared by typed style properties.",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "slot",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "Dense index among all properties, so a computed style stores its values in arrays instead of hashing names."
+      },
+      {
+       "name": "copiedOnRead",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true,
+       "doc": "Values of this property are mutable objects that a computed style hands out as copies."
+      },
+      {
+       "name": "inherited",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "impact",
+       "kind": "var",
+       "signature": ":StyleImpact",
+       "final": true
+      },
+      {
+       "name": "hasInterpolation",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, slot:Int, inherited:Bool, impact:StyleImpact, hasInterpolation:Bool):Void"
       }
      ]
     },
@@ -16587,6 +17638,13 @@
        "doc": "Number of entries currently held by this resolver's bounded cache."
       },
       {
+       "name": "localFieldsHandled",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true,
+       "doc": "The LayoutStyle fields the last applyLocal checked: every one, unless a new field has no style property yet."
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(?scheduler:AnimationScheduler):Void"
@@ -16607,6 +17665,13 @@
        "name": "resolve",
        "kind": "method",
        "signature": "(target:StyleTarget, ?parent:ComputedStyle, ?theme:StyleSheet, ?application:StyleSheet, ?local:LayoutStyle, ?environment:StyleEnvironment, ?localTextColor:Color):ComputedStyle"
+      },
+      {
+       "name": "valueKeysComplete",
+       "kind": "method",
+       "signature": "():Bool",
+       "static": true,
+       "doc": "The typed declaration keys spell out fields of Color, LayoutAxis, Insets and Transform2D. Hashes can collide, so\nthese text keys cannot be replaced by a hash alone. A new field fails this check until its key is updated."
       }
      ]
     },
@@ -16877,12 +17942,12 @@
       {
        "name": "transition",
        "kind": "method",
-       "signature": "(property:StyleProperty<T>, duration:Float, ?easing:Int):StyleTransition"
+       "signature": "(property:StylePropertyBase, duration:Float, ?easing:Int):StyleTransition"
       },
       {
        "name": "transitionFor",
        "kind": "method",
-       "signature": "(property:StyleProperty<Dynamic>):Null<StyleTransition>"
+       "signature": "(property:StylePropertyBase):Null<StyleTransition>"
       }
      ]
     },
@@ -17090,6 +18155,32 @@
      ]
     },
     {
+     "name": "StyleTransformProperty",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleProperty.hx",
+     "extends": [
+      "StylePropertyBase"
+     ],
+     "fields": [
+      {
+       "name": "defaultValue",
+       "kind": "var",
+       "signature": ":Transform2D",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, defaultValue:Transform2D, inherited:Bool, impact:StyleImpact, ?equalValue:(Transform2D, Transform2D) -> Bool):Void"
+      },
+      {
+       "name": "sameTransform",
+       "kind": "method",
+       "signature": "(left:Transform2D, right:Transform2D):Bool"
+      }
+     ]
+    },
+    {
      "name": "StyleTransition",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/style/StyleTransition.hx",
@@ -17098,7 +18189,7 @@
       {
        "name": "property",
        "kind": "var",
-       "signature": ":StyleProperty<Dynamic>",
+       "signature": ":StylePropertyBase",
        "final": true
       },
       {
@@ -17116,7 +18207,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(property:Dynamic, duration:Float, ?easing:Int):Void"
+       "signature": "(property:StylePropertyBase, duration:Float, ?easing:Int):Void"
       }
      ]
     },
@@ -17127,12 +18218,12 @@
      "implements": [
       "Animation"
      ],
-     "doc": "Scheduler adapter for one dynamically typed style interpolation.",
+     "doc": "Scheduler adapter for typed style interpolation.",
      "fields": [
       {
        "name": "new",
        "kind": "method",
-       "signature": "(from:Dynamic, to:Dynamic, duration:Float, easing:Int, propertyName:String, onUpdate:(Dynamic) -> Void, onComplete:() -> Void, ?interpolate:(Dynamic, Dynamic, Float) -> Dynamic):Void"
+       "signature": "(from:StyleValue, to:StyleValue, duration:Float, easing:Int, onUpdate:(StyleValue) -> Void, onComplete:() -> Void):Void"
       },
       {
        "name": "advance",
@@ -17150,24 +18241,165 @@
       {
        "name": "property",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":StylePropertyBase",
        "final": true
       },
       {
-       "name": "value",
-       "kind": "var",
-       "signature": ":Dynamic",
-       "final": true
+       "name": "applyTo",
+       "kind": "method",
+       "signature": "(style:ComputedStyle, ?source:StyleSource):Void",
+       "doc": "Applies a declaration without exposing its value as Dynamic."
       },
       {
-       "name": "new",
+       "name": "inspect",
        "kind": "method",
-       "signature": "(property:Dynamic, value:Dynamic):Void"
+       "signature": "():Dynamic",
+       "doc": "Materializes the value for inspection or other explicitly dynamic consumers."
       },
       {
-       "name": "of",
+       "name": "sameAs",
        "kind": "method",
-       "signature": "(property:StyleProperty<T>, value:T):StyleValue",
+       "signature": "(other:StyleValue):Bool",
+       "doc": "Compares two declarations according to their property's value semantics."
+      },
+      {
+       "name": "key",
+       "kind": "method",
+       "signature": "():String",
+       "doc": "Collision-free cache key for this property's current value."
+      },
+      {
+       "name": "interpolateTo",
+       "kind": "method",
+       "signature": "(other:StyleValue, amount:Float):StyleValue",
+       "doc": "Produces a typed interpolated declaration for a property that supports transitions."
+      },
+      {
+       "name": "copyForRead",
+       "kind": "method",
+       "signature": "():StyleValue",
+       "doc": "Copies mutable reference values when a computed style is copied."
+      },
+      {
+       "name": "inspectForRead",
+       "kind": "method",
+       "signature": "():Dynamic",
+       "doc": "Copies exposed reference values at the dynamic inspection boundary."
+      },
+      {
+       "name": "colorOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):Color",
+       "static": true
+      },
+      {
+       "name": "insetsOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):Insets",
+       "static": true
+      },
+      {
+       "name": "axisOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):LayoutAxis",
+       "static": true
+      },
+      {
+       "name": "matrixOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):Transform2D",
+       "static": true
+      },
+      {
+       "name": "numberOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):Float",
+       "static": true
+      },
+      {
+       "name": "integerOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):Int",
+       "static": true
+      },
+      {
+       "name": "booleanOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):Bool",
+       "static": true
+      },
+      {
+       "name": "decorationsOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):DecorationChain",
+       "static": true
+      },
+      {
+       "name": "effectsOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):EffectChain",
+       "static": true
+      },
+      {
+       "name": "maskOf",
+       "kind": "method",
+       "signature": "(value:StyleValue):Mask",
+       "static": true
+      },
+      {
+       "name": "defaults",
+       "kind": "method",
+       "signature": "():Array<StyleValue>",
+       "static": true,
+       "doc": "Immutable built-in defaults, constructed once and reused by every resolution."
+      },
+      {
+       "name": "number",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Float>, value:Float):StyleValue",
+       "static": true,
+       "doc": "Creates a typed declaration for an arbitrary property of the corresponding kind."
+      },
+      {
+       "name": "color",
+       "kind": "method",
+       "signature": "(property:StyleColorProperty, value:Color):StyleValue",
+       "static": true
+      },
+      {
+       "name": "boolean",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Bool>, value:Bool):StyleValue",
+       "static": true
+      },
+      {
+       "name": "integer",
+       "kind": "method",
+       "signature": "(property:StyleProperty<Int>, value:Int):StyleValue",
+       "static": true
+      },
+      {
+       "name": "integerProperty",
+       "kind": "method",
+       "signature": "(property:StylePropertyBase, value:Int):StyleValue",
+       "static": true
+      },
+      {
+       "name": "axis",
+       "kind": "method",
+       "signature": "(property:StyleAxisProperty, value:LayoutAxis):StyleValue",
+       "static": true
+      },
+      {
+       "name": "insets",
+       "kind": "method",
+       "signature": "(property:StyleInsetsProperty, value:Insets):StyleValue",
+       "static": true
+      },
+      {
+       "name": "matrix",
+       "kind": "method",
+       "signature": "(property:StyleTransformProperty, value:Transform2D):StyleValue",
        "static": true
       },
       {
@@ -17252,6 +18484,12 @@
        "name": "padding",
        "kind": "method",
        "signature": "(value:Insets):StyleValue",
+       "static": true
+      },
+      {
+       "name": "transform",
+       "kind": "method",
+       "signature": "(value:Transform2D):StyleValue",
        "static": true
       },
       {
@@ -17357,6 +18595,12 @@
        "static": true
       },
       {
+       "name": "effectProperty",
+       "kind": "method",
+       "signature": "(property:StyleProperty<EffectChain>, value:EffectChain):StyleValue",
+       "static": true
+      },
+      {
        "name": "backdropEffects",
        "kind": "method",
        "signature": "(value:EffectChain):StyleValue",
@@ -17396,6 +18640,93 @@
        "name": "sliderThumbColor",
        "kind": "method",
        "signature": "(value:Color):StyleValue",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "VisualEffect",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/style/VisualEffect.hx",
+     "doc": "Rendering-independent description of one post-layout visual effect.\n\nConcrete effects own typed parameters and value behavior. They do not know\nhow those parameters become render passes, shaders, or intermediate targets.",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":EffectKind",
+       "final": true
+      },
+      {
+       "name": "isEqual",
+       "kind": "method",
+       "signature": "(other:VisualEffect):Bool"
+      },
+      {
+       "name": "interpolate",
+       "kind": "method",
+       "signature": "(other:VisualEffect, amount:Float):VisualEffect",
+       "doc": "Interpolates compatible effects and uses a discrete midpoint otherwise."
+      },
+      {
+       "name": "discrete",
+       "kind": "method",
+       "signature": "(left:VisualEffect, right:VisualEffect, amount:Float):VisualEffect",
+       "static": true
+      },
+      {
+       "name": "copy",
+       "kind": "method",
+       "signature": "():VisualEffect"
+      },
+      {
+       "name": "inkOverflow",
+       "kind": "method",
+       "signature": "():InkOverflow"
+      },
+      {
+       "name": "describe",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "toString",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "requireFinite",
+       "kind": "method",
+       "signature": "(value:Float, message:String):Float",
+       "static": true
+      },
+      {
+       "name": "requireNonNegative",
+       "kind": "method",
+       "signature": "(value:Float, message:String):Float",
+       "static": true
+      },
+      {
+       "name": "interpolateFloat",
+       "kind": "method",
+       "signature": "(left:Float, right:Float, amount:Float):Float",
+       "static": true
+      },
+      {
+       "name": "copyColor",
+       "kind": "method",
+       "signature": "(value:Color):Color",
+       "static": true
+      },
+      {
+       "name": "equalColor",
+       "kind": "method",
+       "signature": "(?left:Color, ?right:Color):Bool",
+       "static": true
+      },
+      {
+       "name": "interpolateColor",
+       "kind": "method",
+       "signature": "(left:Color, right:Color, amount:Float):Color",
        "static": true
       }
      ]
@@ -17709,7 +19040,7 @@
       {
        "name": "buttonLabelColor",
        "kind": "method",
-       "signature": "(enabled:Bool, background:Color, ?preferred:Color):Color",
+       "signature": "(enabled:Bool, ?background:Color, ?preferred:Color):Color",
        "doc": "Resolve the foreground against the actual state background, including custom fills."
       },
       {
@@ -18888,6 +20219,17 @@
        "doc": "Opt in for launcher lists whose primary click invokes the selected item."
       },
       {
+       "name": "selectionProvider",
+       "kind": "var",
+       "signature": ":Null<() -> Int>",
+       "doc": "Optional observed owner selection; -1 clears it. Only input notifies the owner."
+      },
+      {
+       "name": "onScroll",
+       "kind": "var",
+       "signature": ":Null<(UiEvent) -> Void>"
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(key:String, model:ListViewModel, ?viewportStyle:LayoutStyle, ?controller:ScrollController, ?viewportHeight:Float, ?selectedIndex:Int, ?onSelectionChanged:(Int) -> Void, ?onItemActivated:(Int) -> Void, ?virtualization:VirtualizationPolicy, ?itemMetadata:ListViewItemMetadata):Void"
@@ -18933,7 +20275,7 @@
      "name": "ListViewModel",
      "kind": "interface",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/collections/ListViewModel.hx",
-     "doc": "Application-owned data source for ListView.\n\nKeys must remain stable for an item while it is present in the model. The\nrevision is incremented by the model when count, keys, extents, or item\ncontent change. `extentRevisionAt` must change whenever `extentAt` can\nreturn a different value for that item. `estimatedExtent` is used for\nunmeasured items; declare `extentIsUniform` when it is exact for every item\nso the list can skip all extent callbacks. `totalExtent` may return an\nexact content height when the model can provide one cheaply; return null\nwhen only the sparse estimate is available. Variable-height models should\nexpect anchor corrections as rows are seen.",
+     "doc": "Application-owned data source for ListView.\n\nKeys must remain stable for an item while it is present in the model. Models\nwith mutable data should implement Observable; tracked reads then invalidate\nthe retained list when count, keys, extents or item content change.\n`extentRevisionAt` changes whenever `extentAt` can return a different value\nfor that item. `estimatedExtent` is used for\nunmeasured items; declare `extentIsUniform` when it is exact for every item\nso the list can skip all extent callbacks. `totalExtent` may return an\nexact content height when the model can provide one cheaply; return null\nwhen only the sparse estimate is available. Variable-height models should\nexpect anchor corrections as rows are seen.",
      "fields": [
       {
        "name": "count",
@@ -18974,11 +20316,6 @@
        "name": "buildItem",
        "kind": "method",
        "signature": "(index:Int):View"
-      },
-      {
-       "name": "revision",
-       "kind": "method",
-       "signature": "():Int"
       }
      ]
     },
@@ -19269,6 +20606,12 @@
        "signature": ":Null<(String) -> Void>"
       },
       {
+       "name": "onActivate",
+       "kind": "var",
+       "signature": ":Null<(String, UiEvent) -> Bool>",
+       "doc": "Enter or double-click on any row, branches included. Return true to consume the activation; false (or unset) keeps the default toggle/open."
+      },
+      {
        "name": "onItemActivatedWithEvent",
        "kind": "var",
        "signature": ":Null<(String, UiEvent) -> Void>",
@@ -19366,6 +20709,18 @@
        "doc": "Align leaf content in the disclosure column instead of reserving arrow space."
       },
       {
+       "name": "multiSelect",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Shift-click selects a range and Control/Super-click toggles rows; plain clicks select one row."
+      },
+      {
+       "name": "selectionProvider",
+       "kind": "var",
+       "signature": ":Null<() -> Null<String>>",
+       "doc": "Optional observed primary selection. Null clears selection; absent keys render unselected. Only input notifies the owner."
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(key:String, model:TreeViewModel, ?viewportStyle:LayoutStyle, ?controller:ScrollController, ?viewportHeight:Float, ?selectedKey:String, ?expandedKeys:Array<String>, ?onSelectionChanged:(String) -> Void, ?onItemActivated:(String) -> Void, ?onExpandedChanged:(String, Bool) -> Void, ?virtualization:VirtualizationPolicy):Void"
@@ -19381,6 +20736,30 @@
        "kind": "method",
        "signature": "(?nextKey:String, ?notify:Bool):Bool",
        "doc": "Selects a visible node. Null clears selection; notify=false synchronizes without a callback."
+      },
+      {
+       "name": "isSelected",
+       "kind": "method",
+       "signature": "(nodeKey:String):Bool",
+       "doc": "True for the focused row and every row a multi-selection added."
+      },
+      {
+       "name": "selectedKeys",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "doc": "Selected visible keys in tree order."
+      },
+      {
+       "name": "extendSelection",
+       "kind": "method",
+       "signature": "(nodeKey:String, ?notify:Bool):Bool",
+       "doc": "Selects the visible rows from the anchor to a row; the anchor stays for later ranges."
+      },
+      {
+       "name": "toggleSelection",
+       "kind": "method",
+       "signature": "(nodeKey:String, ?notify:Bool):Bool",
+       "doc": "Adds or removes one row, keeping the rest of the selection."
       },
       {
        "name": "setExpanded",
@@ -19403,12 +20782,6 @@
        "name": "isExpanded",
        "kind": "method",
        "signature": "(nodeKey:String):Bool"
-      },
-      {
-       "name": "refreshBranches",
-       "kind": "method",
-       "signature": "(nodeKeys:Array<String>, modelRevision:Int):Bool",
-       "doc": "Refreshes visible branches after model data changes, without rebuilding unrelated branches."
       },
       {
        "name": "scrollTo",
@@ -19446,12 +20819,6 @@
        "signature": "(start:Int, count:Int):Array<TreeRootMetadata>"
       },
       {
-       "name": "rootKeyAt",
-       "kind": "method",
-       "signature": "(index:Int):String",
-       "doc": "@deprecated Implement rootRange; retained for source migration only."
-      },
-      {
        "name": "childCount",
        "kind": "method",
        "signature": "(parentKey:String):Int"
@@ -19487,11 +20854,6 @@
        "name": "buildItem",
        "kind": "method",
        "signature": "(key:String):View"
-      },
-      {
-       "name": "revision",
-       "kind": "method",
-       "signature": "():Int"
       }
      ]
     },
@@ -20328,7 +21690,8 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/controls/BinaryControl.hx",
      "implements": [
-      "View"
+      "View",
+      "Observable"
      ],
      "doc": "Shared Haxe implementation for checkbox and switch-style boolean controls.",
      "fields": [
@@ -20589,8 +21952,7 @@
       {
        "name": "style",
        "kind": "var",
-       "signature": ":LayoutStyle",
-       "final": true
+       "signature": ":LayoutStyle"
       },
       {
        "name": "placeholder",
@@ -21169,6 +22531,16 @@
      "doc": "Internal popup/list kernel shared by Select and ComboBox.",
      "fields": [
       {
+       "name": "selectedValue",
+       "kind": "var",
+       "signature": ":Dynamic"
+      },
+      {
+       "name": "activeIndex",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(options:Array<SelectOption<Dynamic>>, visibleIndices:Array<Int>, selectedValue:Dynamic, activeIndex:Int, rootX:Float, rootY:Float, triggerX:Float, triggerY:Float, triggerWidth:Float, triggerHeight:Float, fallbackWidth:Float, fallbackHeight:Float, onSelect:(Int) -> Void, onClose:() -> Void, onActive:(Int) -> Void, isEnabled:(Int) -> Bool, nextEnabled:(Int, Int) -> Int):Void"
@@ -21361,6 +22733,56 @@
        "name": "build",
        "kind": "method",
        "signature": "(context:BuildContext):RenderNode"
+      }
+     ]
+    },
+    {
+     "name": "SpinnerClock",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/controls/SpinnerPainter.hx",
+     "implements": [
+      "DelayedAnimation",
+      "RetainedAnimation"
+     ],
+     "doc": "Spinner phase advanced in fixed steps. Between steps nothing on screen changes, so the host sleeps until the next step\ninstead of drawing every display refresh, and a step only repaints the spinner's own custom paint (it has no paint cache\nkey), so its frames rebuild nothing. An editor waiting on a long background job therefore idles near zero CPU.",
+     "fields": [
+      {
+       "name": "StepsPerSecond",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "doc": "Visible steps per second; smooth enough for an indeterminate indicator."
+      },
+      {
+       "name": "phase",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "speed",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "steps",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Steps taken; each one is a visible change."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(speed:Float):Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(deltaSeconds:Float):Bool"
+      },
+      {
+       "name": "delaySeconds",
+       "kind": "method",
+       "signature": "():Float"
       }
      ]
     },
@@ -21858,19 +23280,6 @@
      "alias": "(BuildContext) -> View"
     },
     {
-     "name": "DockPanelCacheKeyBuilder",
-     "kind": "typedef",
-     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/docking/DockPanelContent.hx",
-     "alias": "() -> String"
-    },
-    {
-     "name": "DockPanelCacheKeyHasher",
-     "kind": "typedef",
-     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/docking/DockPanelContent.hx",
-     "alias": "(KeyHash) -> Void",
-     "doc": "Adds the panel's revision inputs to a key hash, in place of building a string. Do not reset the hash."
-    },
-    {
      "name": "DockPanelContent",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/docking/DockPanelContent.hx",
@@ -21885,34 +23294,41 @@
       {
        "name": "build",
        "kind": "var",
-       "signature": ":DockPanelBuilder",
-       "final": true
+       "signature": ":Null<DockPanelBuilder>",
+       "final": true,
+       "doc": "Builds the panel when it has no `buildWithWidth`."
       },
       {
        "name": "buildWithWidth",
        "kind": "var",
        "signature": ":Null<WidthAwareDockPanelBuilder>",
        "final": true,
-       "doc": "Optional builder for panels that adapt to their dock pane width."
+       "doc": "Builder for panels that adapt to their dock pane width; used in place of `build` when given."
       },
       {
-       "name": "cacheKey",
+       "name": "observed",
        "kind": "var",
-       "signature": ":Null<DockPanelCacheKeyBuilder>",
-       "final": true,
-       "doc": "Optional application-owned revision key enabling retained panel trees."
+       "signature": ":Bool",
+       "doc": "Retain the panel by the observable fields and signals its build reads (and the widget state it uses),\nwith no key: a read cannot be left out of a key that does not exist. See `observing`."
       },
       {
-       "name": "cacheKeyHash",
-       "kind": "var",
-       "signature": ":Null<DockPanelCacheKeyHasher>",
-       "final": true,
-       "doc": "Allocation-free alternative to `cacheKey`; when both are given this one is used."
+       "name": "observing",
+       "kind": "method",
+       "signature": "(panelId:String, build:DockPanelBuilder, ?buildWithWidth:WidthAwareDockPanelBuilder):DockPanelContent",
+       "static": true,
+       "doc": "A panel retained by what its build observes; the preferred way to make a panel retained."
+      },
+      {
+       "name": "observingWithWidth",
+       "kind": "method",
+       "signature": "(panelId:String, buildWithWidth:WidthAwareDockPanelBuilder):DockPanelContent",
+       "static": true,
+       "doc": "Like `observing`, for a panel that is always built at its pane width."
       },
       {
        "name": "new",
        "kind": "method",
-       "signature": "(panelId:String, build:DockPanelBuilder, ?buildWithWidth:WidthAwareDockPanelBuilder, ?cacheKey:DockPanelCacheKeyBuilder, ?cacheKeyHash:DockPanelCacheKeyHasher):Void"
+       "signature": "(panelId:String, ?build:DockPanelBuilder, ?buildWithWidth:WidthAwareDockPanelBuilder):Void"
       }
      ]
     },
@@ -22049,6 +23465,9 @@
      "name": "DockWorkspaceInteraction",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/docking/DockWorkspaceInteraction.hx",
+     "implements": [
+      "Observable"
+     ],
      "doc": "Shared tab-drag controller that translates pointer geometry into model docks.",
      "fields": [
       {
@@ -22068,25 +23487,9 @@
        "signature": ":Null<DockDropPreview>"
       },
       {
-       "name": "revision",
-       "kind": "var",
-       "signature": ":Int"
-      },
-      {
-       "name": "listenerCount",
-       "kind": "var",
-       "signature": ":Int"
-      },
-      {
        "name": "new",
        "kind": "method",
        "signature": "(model:DockWorkspaceModel):Void"
-      },
-      {
-       "name": "listen",
-       "kind": "method",
-       "signature": "(callback:() -> Void):() -> Void",
-       "doc": "Registers a change listener and returns a cleanup callback."
       },
       {
        "name": "beginFrame",
@@ -22249,6 +23652,12 @@
        "name": "build",
        "kind": "method",
        "signature": "(context:BuildContext):RenderNode"
+      },
+      {
+       "name": "buildWithId",
+       "kind": "method",
+       "signature": "(context:BuildContext, id:haxeon.ui.core.WidgetId):RenderNode",
+       "doc": "Build with an ID already claimed by a self-updating owner."
       }
      ]
     },
@@ -22823,9 +24232,22 @@
        "final": true
       },
       {
+       "name": "isHeading",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(key:String, label:String, ?onSelect:() -> Void, ?enabled:Bool, ?shortcut:String, ?separatorBefore:Bool):Void"
+       "signature": "(key:String, label:String, ?onSelect:() -> Void, ?enabled:Bool, ?shortcut:String, ?separatorBefore:Bool, ?isHeading:Bool):Void"
+      },
+      {
+       "name": "section",
+       "kind": "method",
+       "signature": "(key:String, label:String, ?separatorBefore:Bool):MenuItem",
+       "static": true,
+       "doc": "A non-interactive section label, excluded from menu keyboard navigation."
       }
      ]
     },
@@ -22951,7 +24373,7 @@
      "implements": [
       "View"
      ],
-     "doc": "Hover-triggered tooltip layered above its anchor with persistent Haxe state.",
+     "doc": "Informational tooltip layered above its anchor. Content never participates in pointer hit testing.",
      "fields": [
       {
        "name": "placement",
@@ -23052,11 +24474,11 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/overlays/TooltipHoverDelay.hx",
      "implements": [
-      "Animation"
+      "DelayedAnimation"
      ],
      "fields": [
       {
-       "name": "delaySeconds",
+       "name": "durationSeconds",
        "kind": "var",
        "signature": ":Float"
       },
@@ -23079,6 +24501,11 @@
        "name": "advance",
        "kind": "method",
        "signature": "(deltaSeconds:Float):Bool"
+      },
+      {
+       "name": "delaySeconds",
+       "kind": "method",
+       "signature": "():Float"
       },
       {
        "name": "dispose",
@@ -23271,7 +24698,8 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/properties/PropertyEditor.hx",
      "implements": [
-      "View"
+      "View",
+      "Observable"
      ],
      "doc": "Descriptor-driven inspector that routes edits through the active document.",
      "fields": [
@@ -23305,35 +24733,19 @@
        "signature": ":Int"
       },
       {
-       "name": "enabled",
-       "kind": "var",
-       "signature": ":Bool"
-      },
-      {
-       "name": "labelWidth",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "stackedRows",
-       "kind": "var",
-       "signature": ":Bool"
-      },
-      {
-       "name": "searchQuery",
-       "kind": "var",
-       "signature": ":String"
-      },
-      {
-       "name": "showCategories",
-       "kind": "var",
-       "signature": ":Bool",
-       "doc": "When false, category headers are supplied by an outer inspector."
-      },
-      {
        "name": "new",
        "kind": "method",
        "signature": "(key:String, descriptors:Array<PropertyDescriptor>, ?style:LayoutStyle, ?registry:PropertyEditorRegistry):Void"
+      },
+      {
+       "name": "configure",
+       "kind": "method",
+       "signature": "(enabled:Bool, labelWidth:Float, stackedRows:Bool, searchQuery:String):Void"
+      },
+      {
+       "name": "showCategoryHeaders",
+       "kind": "method",
+       "signature": "(value:Bool):Void"
       },
       {
        "name": "applyValue",
@@ -23472,10 +24884,10 @@
        "signature": "(sectionId:String):Bool"
       },
       {
-       "name": "contentRevision",
+       "name": "isPristine",
        "kind": "method",
-       "signature": "():Int",
-       "doc": "Revision of transient editor state that must invalidate a retained panel."
+       "signature": "():Bool",
+       "doc": "Whether discarding and rebuilding this inspector would keep all of its transient user state unchanged."
       },
       {
        "name": "errorFor",
@@ -23555,9 +24967,9 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/scroll/ScrollController.hx",
      "implements": [
-      "haxeon.ui.animation.Animation"
+      "haxeon.ui.animation.RetainedAnimation"
      ],
-     "doc": "Haxe-owned scroll offsets and resolved viewport/content metrics.",
+     "doc": "Haxe-owned scroll offsets and resolved viewport/content metrics. Its smooth scrolling frames need no rebuild of their own: each\noffset change goes to the bound callback, which moves content in place or asks for a rebuild itself.",
      "fields": [
       {
        "name": "animationDuration",
@@ -23598,6 +25010,11 @@
        "name": "contentHeight",
        "kind": "var",
        "signature": ":Float"
+      },
+      {
+       "name": "hasMetrics",
+       "kind": "var",
+       "signature": ":Bool"
       },
       {
        "name": "maxScrollX",
@@ -23676,6 +25093,12 @@
        "doc": "Shows an interactive overlay scrollbar when vertical content overflows."
       },
       {
+       "name": "contentFollowsOffset",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Set when the content builds from the scroll offset, as virtualized rows do: scrolling then rebuilds the view. Otherwise\nthe content is moved in place and nothing is rebuilt."
+      },
+      {
        "name": "fillViewport",
        "kind": "var",
        "signature": ":Bool",
@@ -23742,9 +25165,10 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/scroll/ScrollbarVisibilityController.hx",
      "implements": [
-      "DelayedAnimation"
+      "DelayedAnimation",
+      "RetainedAnimation"
      ],
-     "doc": "Mount-owned scrollbar visibility, independent of scroll geometry and paint.",
+     "doc": "Mount-owned scrollbar visibility, independent of scroll geometry and paint. Its changes edit the scrollbar's nodes in place\n(BuildContext.willEditRetained), so its frames rebuild nothing.",
      "fields": [
       {
        "name": "opacity",
@@ -23851,7 +25275,8 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/settings/SettingsPanel.hx",
      "implements": [
-      "View"
+      "View",
+      "Observable"
      ],
      "doc": "Editor-settings browser: a filter and Advanced switch over a category tree,\nwith the selected category's settings in a sectioned inspector.\n\nKeep one panel for as long as the dialog is open; it holds the filter,\nselection and inspector state between frames. Every state change calls\nonChanged so the host can rebuild.",
      "fields": [
@@ -23923,6 +25348,11 @@
        "name": "new",
        "kind": "method",
        "signature": "(key:String, store:SettingsStore, ?onChanged:() -> Void):Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
       },
       {
        "name": "hasUnsavedChanges",
@@ -24025,7 +25455,8 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/settings/ShortcutsPanel.hx",
      "implements": [
-      "View"
+      "View",
+      "Observable"
      ],
      "doc": "Lists every command with its shortcuts and lets the user rebind them.\n\nCommands are grouped by the first part of their ID (\"editor.save\" under\nEditor). Clicking a shortcut records the next key chord: Escape cancels,\nand modifier keys alone keep waiting. A chord another command in the same\nscope used is moved to this one, and the panel says so.",
      "fields": [
@@ -24270,6 +25701,18 @@
        "signature": ":Float"
       },
       {
+       "name": "customOrder",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "True once the user has moved a destination; the saved order then overrides the default one."
+      },
+      {
+       "name": "customDestinations",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "True when the user hid a destination or moved one, including destinations not registered now."
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "():Void"
@@ -24316,15 +25759,45 @@
        "signature": "(id:String, value:Bool):Bool"
       },
       {
+       "name": "moveMode",
+       "kind": "method",
+       "signature": "(id:String, ?before:String):Bool",
+       "doc": "Move a destination before another one, or to the end when `before` is null. Returns false when nothing moved."
+      },
+      {
+       "name": "setDefaultOrder",
+       "kind": "method",
+       "signature": "(compare:(SidebarMode, SidebarMode) -> Int):Void",
+       "doc": "Replace the default order, such as a layout preset's; a user's saved order still wins. Does not notify."
+      },
+      {
+       "name": "resetOrder",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Forget the user's order and return to the default one."
+      },
+      {
        "name": "encode",
        "kind": "method",
        "signature": "():String"
       },
       {
+       "name": "encodeDestinations",
+       "kind": "method",
+       "signature": "():String",
+       "doc": "The user's own destination choices alone, which destinations show and their order, without the selection, width\nor sidebar visibility; an application can keep them once for every window."
+      },
+      {
+       "name": "restoreDestinations",
+       "kind": "method",
+       "signature": "(value:String):Bool",
+       "doc": "Apply choices from encodeDestinations, keeping the selection where it is still shown. Parses atomically."
+      },
+      {
        "name": "restore",
        "kind": "method",
        "signature": "(value:String):Bool",
-       "doc": "Parse atomically. Legacy layouts migrate using the saved active destination's width."
+       "doc": "Parse atomically. Legacy layouts migrate using the saved active destination's width; layouts before\nversion 3 carry no order and restore the default one."
       }
      ]
     }
@@ -25029,14 +26502,12 @@
       {
        "name": "textStyle",
        "kind": "var",
-       "signature": ":TextStyle",
-       "final": true
+       "signature": ":TextStyle"
       },
       {
        "name": "paragraphStyle",
        "kind": "var",
-       "signature": ":ParagraphStyle",
-       "final": true
+       "signature": ":ParagraphStyle"
       },
       {
        "name": "paragraphCount",
@@ -25063,29 +26534,29 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(fonts:FontCollection, value:String, width:Float, textStyle:TextStyle, paragraphStyle:ParagraphStyle, ?offsetMap:TextDocument):Void"
+       "signature": "(fonts:FontCollection, value:String, width:Float, textStyle:TextStyle, paragraphStyle:ParagraphStyle, ?offsetMap:TextDocumentBuffer):Void"
       },
       {
        "name": "update",
        "kind": "method",
-       "signature": "(value:String, nextWidth:Float, nextTextStyle:TextStyle, nextParagraphStyle:ParagraphStyle, ?offsetMap:TextDocument):Void",
+       "signature": "(value:String, nextWidth:Float, nextTextStyle:TextStyle, nextParagraphStyle:ParagraphStyle, ?offsetMap:TextDocumentBuffer):Void",
        "doc": "Updates only paragraph resources whose text or shaping inputs changed."
       },
       {
        "name": "updateDocument",
        "kind": "method",
-       "signature": "(nextOffsets:TextDocument, nextWidth:Float, nextTextStyle:TextStyle, nextParagraphStyle:ParagraphStyle):Void",
+       "signature": "(nextOffsets:TextDocumentBuffer, nextWidth:Float, nextTextStyle:TextStyle, nextParagraphStyle:ParagraphStyle):Void",
        "doc": "Updates retained paragraph layouts directly from the segmented document."
       },
       {
        "name": "setText",
        "kind": "method",
-       "signature": "(value:String, ?offsetMap:TextDocument):Void"
+       "signature": "(value:String, ?offsetMap:TextDocumentBuffer):Void"
       },
       {
        "name": "setTextAfterEdit",
        "kind": "method",
-       "signature": "(nextOffsets:TextDocument, oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int, oldDocumentLength:Int):Void",
+       "signature": "(nextOffsets:TextDocumentBuffer, oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int, oldDocumentLength:Int):Void",
        "doc": "Updates the affected chunk window while preserving all other boundaries.\nChunks grow locally to the hard paragraph bound before being split."
       },
       {
@@ -25533,14 +27004,12 @@
       {
        "name": "textStyle",
        "kind": "var",
-       "signature": ":TextStyle",
-       "final": true
+       "signature": ":TextStyle"
       },
       {
        "name": "paragraphStyle",
        "kind": "var",
-       "signature": ":ParagraphStyle",
-       "final": true
+       "signature": ":ParagraphStyle"
       },
       {
        "name": "renderMeasurement",
@@ -25562,7 +27031,7 @@
       {
        "name": "breakHistoryGroup",
        "kind": "method",
-       "signature": "():Void"
+       "signature": "(?deferUntilResolved:Bool):Void"
       },
       {
        "name": "undo",
@@ -25582,7 +27051,7 @@
       {
        "name": "syncExternal",
        "kind": "method",
-       "signature": "(value:String):Bool"
+       "signature": "(value:String, ?deferHistoryClear:Bool):Bool"
       },
       {
        "name": "configurePresentation",
@@ -25593,7 +27062,13 @@
       {
        "name": "syncDocument",
        "kind": "method",
-       "signature": "(document:TextDocument):Bool"
+       "signature": "(document:TextDocument, ?deferHistoryClear:Bool):Bool"
+      },
+      {
+       "name": "finishBuildSynchronization",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Finishes a document synchronization deferred by a tracked widget build."
       },
       {
        "name": "updateLayout",
@@ -25627,12 +27102,12 @@
       {
        "name": "documentOffsets",
        "kind": "method",
-       "signature": "():TextDocument"
+       "signature": "():TextDocumentBuffer"
       },
       {
        "name": "setRenderColor",
        "kind": "method",
-       "signature": "(color:Color):Void"
+       "signature": "(?color:Color):Void"
       },
       {
        "name": "documentLength",
@@ -25659,7 +27134,7 @@
       {
        "name": "setAnchoredSelection",
        "kind": "method",
-       "signature": "(value:TextSelection):Bool",
+       "signature": "(value:TextSelection, ?deferHistoryBreak:Bool):Bool",
        "doc": "Imports an external anchored selection only when its logical value differs."
       },
       {
@@ -25675,7 +27150,7 @@
       {
        "name": "placeCaret",
        "kind": "method",
-       "signature": "(offset:Int, extend:Bool, ?affinity:Int):Bool",
+       "signature": "(offset:Int, extend:Bool, ?affinity:Int, ?deferHistoryBreak:Bool):Bool",
        "doc": "Places a caret and optionally extends the existing anchored selection."
       },
       {

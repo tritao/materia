@@ -22,7 +22,98 @@
      "name": "TextDocument",
      "kind": "class",
      "file": "haxeon/packages/editor/src/haxeon/editor/TextDocument.hx",
-     "doc": "Editable UTF-8 text with code-point, UTF-16, and paragraph indexes per segment.",
+     "implements": [
+      "Observable"
+     ],
+     "doc": "Caller-owned editable text whose public revision participates in reactive builds.",
+     "fields": [
+      {
+       "name": "revision",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "codepointCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "utf8ByteLength",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "utf16Length",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "text",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(value:String):Void"
+      },
+      {
+       "name": "replace",
+       "kind": "method",
+       "signature": "(start:Int, end:Int, replacement:String):Bool"
+      },
+      {
+       "name": "editSince",
+       "kind": "method",
+       "signature": "(previous:Int):Null<TextDocumentEdit>"
+      },
+      {
+       "name": "sliceCodepoints",
+       "kind": "method",
+       "signature": "(start:Int, end:Int):String"
+      },
+      {
+       "name": "utf8OffsetForCodepoint",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "utf16OffsetForCodepoint",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "codepointOffsetForUtf8",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "codepointOffsetForUtf16",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "paragraphCount",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "paragraphIndexAtOffset",
+       "kind": "method",
+       "signature": "(position:Int):Int"
+      },
+      {
+       "name": "paragraphRangeAtIndex",
+       "kind": "method",
+       "signature": "(number:Int):TextRange"
+      }
+     ]
+    },
+    {
+     "name": "TextDocumentBuffer",
+     "kind": "class",
+     "file": "haxeon/packages/editor/src/haxeon/editor/TextDocument.hx",
+     "doc": "Text storage and indexes used by a widget's private editor state.",
      "fields": [
       {
        "name": "revision",
@@ -54,6 +145,11 @@
        "name": "new",
        "kind": "method",
        "signature": "(value:String):Void"
+      },
+      {
+       "name": "get_text",
+       "kind": "method",
+       "signature": "():String"
       },
       {
        "name": "replace",
