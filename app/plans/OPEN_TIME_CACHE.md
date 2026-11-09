@@ -251,3 +251,5 @@ Found, not fixed: a generator run by the runner executes from a temporary direct
 ### Stage 9l (2026-11-09): CC5, profile of the edit-loop scene run
 
 One sampler profile of the warm-kernel, cold-memo hobber run: 20 % of samples are rigid shape placement (native name propagation), no Haxe function is above 3.5 %, anchor derivations are 12.9 % spread over the pattern search. A history-free placement did not help. No code changed; the placement fast path is written up in `app/plans/CACHE_CLEANUP.md`, CC5.
+
+Follow-up to 9l (same day): rigid placement no longer runs the validity check per placement (per-handle `valid` flag), carries names by index (`naming::carry_rigid`, compared against `propagate` on the whole hobber scene first) and posed parts keep no operation history. Share of samples in `PosedParts.moved` 20 % -> 6.7 %; digest unchanged. See CC5 in `CACHE_CLEANUP.md`.

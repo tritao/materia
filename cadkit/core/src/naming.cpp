@@ -559,6 +559,21 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
     return output;
 }
 
+ElementMapPtr carry_rigid(const NamedShape& input, const TopoDS_Shape& result) {
+    auto output = sized_for(result);
+    for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex, ElementKind::Solid}) {
+        const auto& names = input.names->names(input.shape, kind);
+        auto& tracked = output->tracked(kind);
+        if (names.size() != tracked.size()) throw std::runtime_error("a rigid move changed the number of elements");
+        tracked = names;
+    }
+    output->face_aliases = input.names->aliases(ElementKind::Face);
+    output->solid_aliases = input.names->aliases(ElementKind::Solid);
+    output->face_aliases.resize(output->faces.size());
+    output->solid_aliases.resize(output->solids.size());
+    return output;
+}
+
 ElementMapPtr with_face_roles(const TopoDS_Shape& shape, const ElementMap& names,
                               const std::vector<std::pair<TopoDS_Shape, std::string>>& roles) {
     auto result = copy_of(names);

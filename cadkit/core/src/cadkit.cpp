@@ -147,6 +147,8 @@ struct ShapeEntry {
     // Null until first asked for: shapes from operations without a naming
     // adapter yet get weak index names then.
     naming::ElementMapPtr names;
+    // The shape passed BRepCheck_Analyzer, here or where it was made: a rigid move of it needs no second check.
+    bool valid = false;
 };
 
 struct MeshData {
@@ -306,7 +308,7 @@ OperationEntry* lookup_operation_locked(cad_operation handle) {
     return &entry;
 }
 
-cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::ElementMapPtr names = nullptr) {
+cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::ElementMapPtr names = nullptr, bool valid = false) {
     if (out_shape == nullptr) {
         return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
     }
@@ -320,6 +322,7 @@ cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::Elemen
             auto& entry = g_shapes[slot - 1];
             entry.shape.emplace(std::move(shape));
             entry.names = std::move(names);
+            entry.valid = valid;
             *out_shape = encode_handle(HandleKind::Shape, slot, entry.generation);
             return CAD_OK;
         }
@@ -332,6 +335,7 @@ cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::Elemen
         auto& entry = g_shapes.back();
         entry.shape.emplace(std::move(shape));
         entry.names = std::move(names);
+        entry.valid = valid;
         slot = static_cast<std::uint16_t>(g_shapes.size());
         *out_shape = encode_handle(HandleKind::Shape, slot, entry.generation);
         return CAD_OK;
@@ -4378,6 +4382,18 @@ TopoDS_Shape model_shape(cad_shape handle) {
     if (result != CAD_OK) throw ModelingFailure{result, g_last_error};
     return shape;
 }
+// Whether the shape behind `handle` is known to be valid; `mark_valid` records a check that passed.
+bool shape_known_valid(cad_shape handle) {
+    std::lock_guard lock(g_shapes_mutex);
+    auto* entry = lookup_locked(handle);
+    return entry != nullptr && entry->valid;
+}
+
+void mark_shape_valid(cad_shape handle) {
+    std::lock_guard lock(g_shapes_mutex);
+    if (auto* entry = lookup_locked(handle)) entry->valid = true;
+}
+
 naming::NamedShape model_named(cad_shape handle) {
     naming::NamedShape shape;
     auto result = copy_named_shape(handle, shape);
@@ -4423,21 +4439,21 @@ template<class F> cad_result model_output(cad_shape* output, F action, naming::E
 
 namespace {
 template<class F> cad_result model_record(cad_shape* output, cad_operation* history, F action,
-                                          naming::ElementMapPtr* names = nullptr) {
+                                          naming::ElementMapPtr* names = nullptr, bool already_valid = false) {
     if (output) *output = 0;
     if (history) *history = 0;
     return model_guard([&]() {
         require_model(output != nullptr || history != nullptr, "result output must not be null");
         OperationData data;
         auto shape = action(history ? &data : nullptr);
-        if (shape.IsNull() || !BRepCheck_Analyzer(shape).IsValid())
+        if (shape.IsNull() || (!already_valid && !BRepCheck_Analyzer(shape).IsValid()))
             return fail(CAD_ERROR_OPERATION_FAILED, "modeling operation produced invalid topology");
         if (history) {
             data.result = shape;
             data.result_names = names ? *names : nullptr;
             return insert_operation(std::move(data), history);
         }
-        return insert_shape(shape, output, names ? *names : nullptr);
+        return insert_shape(shape, output, names ? *names : nullptr, true);
     });
 }
 }
@@ -4613,14 +4629,19 @@ static cad_result do_cad_shape_place(cad_shape handle, cad_vec3 origin, cad_vec3
         transform.SetValues(dx.X(),dy.X(),dz.X(),p.X(), dx.Y(),dy.Y(),dz.Y(),p.Y(), dx.Z(),dy.Z(),dz.Z(),p.Z());
         auto named = model_named(handle);
         const auto& source = named.shape;
+        // A rigid move of a valid shape is valid, so each source is checked once, not once per placement.
+        if (!shape_known_valid(handle)) {
+            require_model(BRepCheck_Analyzer(source).IsValid(), "modeling operation produced invalid topology");
+            mark_shape_valid(handle);
+        }
         // A proper rigid placement preserves geometry and tolerances through TopLoc.
         // Copying the geometry can invalidate trimmed STEP faces after translation.
         BRepBuilderAPI_Transform operation(source, transform, false);
         if (record) collect_operation_history(operation, source, nullptr, *record);
-        naming::AlgorithmHistory<BRepBuilderAPI_Transform> naming_history(operation);
-        names = naming::propagate({named}, &naming_history, operation.Shape());
+        // The move is rigid and does not copy: the result's elements are the source's, in the same order.
+        names = naming::carry_rigid(named, operation.Shape());
         return operation.Shape();
-    }, &names);
+    }, &names, true);
 }
 extern "C" CADKIT_API cad_result cad_shape_place(cad_shape handle, cad_vec3 origin, cad_vec3 x, cad_vec3 z, cad_shape* output) {
     return do_cad_shape_place(handle, origin, x, z, output, nullptr);

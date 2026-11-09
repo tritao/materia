@@ -107,7 +107,7 @@ When the model's operations change on purpose, set `BASELINE_HITS` to the warm h
 check; restored, it passes. The stale `machinekit/tests/haxeon.hob-probe.json` (its entry was deleted with the persistent tier) is
 removed.
 
-## CC5. Edit-loop Haxe work (performance, after CC1–CC4). DONE: profiled, no change made
+## CC5. Edit-loop Haxe work (performance, after CC1–CC4). DONE: profiled; placement made cheap
 
 **Profile (2026-11-09).** The scene run of the hobber with a warm kernel store and cold in-memory memos (what any code-edit open
 runs), under the HashLink sampler (`hl --diagnostics PORT` + `hlprof-live --rate 200`, `hlprof-report.py`). 9259 samples
@@ -121,18 +121,19 @@ runs), under the HashLink sampler (`hl --diagnostics PORT` + `hlprof-live --rate
 - `HobMesh` 10.6 %, `Memo.get` wrappers 45 % (inclusive only: they hold the work above).
 No Haxe function is over 3.5 % of the run by itself.
 
-**Tried.** Placing posed parts with the shape-level `Location.apply` (no operation history) instead of `Part.placed`: the place
-samples fell from 1614 to about 1450 on a loaded machine (10 %, inside the noise), so the cost is the name propagation, not
-the history record. Reverted.
-
-**Why nothing was changed.** The two Haxe items the plan named are 2-3 % of the run each, and the GC-lock wait in the anchor
-derivations is allocation in the pattern search, which is spread over the whole search loop rather than one function. The one
-large item is native: a rigid placement keeps the topology, so its names could be carried index by index instead of through
-`naming::propagate` (rules for aliases, splits and generated roles are for operations that change topology). That is a change to
-CadKit's naming core with the topological-naming tests as its gate; it deserves its own step, not an afternoon inside a timebox.
-
-**Next, if wanted.** A rigid-placement fast path in `do_cad_shape_place` that reuses the source `ElementMap` (the digest
-`89fab112da0b8210` and `naming_smoke` as gates). Expected gain: most of the 20 %.
+**Placement, followed up the same day.** The 20 % was three costs in `do_cad_shape_place`, each removed:
+- `model_record` ran `BRepCheck_Analyzer` on every result. A rigid move of a valid shape is valid, so the shape table now keeps a
+  `valid` flag per handle: a source is checked once (then marked) and its placed copies are inserted as valid.
+- `naming::propagate` matched every element through a history. `naming::carry_rigid` copies the names by index (the moved shape
+  has the source's elements in the source's order). Before keeping it, the scene ran with both computed and compared (faces, edges,
+  vertices, solids, aliases) on every placement of the hobber: no difference. `naming_smoke` now also asserts that a placed shape
+  has the source's names in order.
+- `PosedParts.moved` used `Part.placed`, which records an operation history nobody reads for a posed part; it now places the shape
+  (`Location.apply`), which records none.
+The share of samples in `PosedParts.moved` fell from 20 % to 6.7 % (1614 -> about 1090 samples on a loaded machine; the
+absolute change is within load noise, the share is not). Digest `89fab112da0b8210` unchanged, verify clean. Gates run: the five
+CadKit C++ smokes (core, modeling, planar, naming, shape-bytes), the shape-key and shape-bytes Haxe tests, `cache-gate`, and
+`machinekit/tests/hobbing`.
 
 ## Not now
 

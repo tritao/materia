@@ -112,6 +112,9 @@ void check_carried() {
     assert(cad_shape_mirror(block, cad_vec3{0, 0, 0}, cad_vec3{1, 0, 0}, &mirrored) == CAD_OK);
     assert(cad_shape_clone(block, &cloned) == CAD_OK);
     assert(cad_shape_place(block, cad_vec3{1, 2, 3}, cad_vec3{0, 1, 0}, cad_vec3{0, 0, 1}, &placed) == CAD_OK);
+    // A placement keeps the names by position as well: the placed shape's elements are the source's, in order.
+    assert(names(placed, CAD_SHAPE_FACE) == faces);
+    assert(names(placed, CAD_SHAPE_EDGE) == edges);
     for (auto shape : {moved, turned, mirrored, cloned, placed}) {
         assert(name_set(shape, CAD_SHAPE_FACE) == std::set<std::string>(faces.begin(), faces.end()));
         assert(name_set(shape, CAD_SHAPE_EDGE) == std::set<std::string>(edges.begin(), edges.end()));
