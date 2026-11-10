@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "hobber-enclosure-checks"
+  },
+  "entry": "HobberEnclosureChecks",
+  "sourceRoots": ["machine", "scenes", "checks", "studies", "tests/hobber/src"],
+  "dependencies": {
+    "machinekit": {
+      "path": "../../machinekit"
+    },
+    "processkit": {
+      "path": "../../processkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/enclosure-run"
+}

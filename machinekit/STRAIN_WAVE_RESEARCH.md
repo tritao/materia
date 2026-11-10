@@ -3,7 +3,7 @@
 Background for modelling strain-wave (harmonic) gears in MachineKit: how they
 work, the equations we need, papers, open-source code and data. Compiled
 2026-10-17. This is reference material, not a plan. The flexspline hobbing machine plan is
-`machinekit/examples/flexspline-hobber/docs/PLAN.md`.
+`machines/flexspline-hobber/docs/PLAN.md`.
 
 Today a strain-wave gearhead is a `Gearbox` with a ratio and an assumed
 efficiency of 0.85 (`machinekit/motion/Gearbox.hx`, `robotics/CobotJoint.hx`,

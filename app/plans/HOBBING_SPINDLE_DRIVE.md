@@ -43,9 +43,9 @@ now the cartridge encoder, while `hob-motor` is the servo's own encoder), the at
 - G4 — Regression implemented; acceptance incomplete. Actual app Cutting succeeds, but the required tending gate
   has pre-existing joint-limit and door-jam recovery faults. It must not be reported as passing.
   - `app/tests/haxeon.json`: final full suite passed, exit 0 (`hob-drive-stable-app-tests.log`).
-  - `machinekit/tests/hobber/haxeon.json`: final full suite passed, 2333 assertions
+  - `machines/flexspline-hobber/tests/hobber/haxeon.json`: final full suite passed, 2333 assertions
     (`hob-drive-supported-belt-hobber-tests.log`).
-  - `machinekit/tests/hobbing/haxeon.json`: final repeat passed, 1161 assertions, including two stationary belt-path checks
+  - `machines/flexspline-hobber/tests/hobbing/haxeon.json`: final repeat passed, 1161 assertions, including two stationary belt-path checks
     (`hob-drive-stable-hobbing-tests.log`).
   - `machinekit/examples/bench-mill/haxeon.frame-tests.json`: final repeat passed, 917 assertions
     (`hob-drive-stable-bench-tests.log`).

@@ -26,7 +26,7 @@
 		"../cnc-router/CncRouter.hx",
 		"TendingEndEffectorPreview.hx"
 	],
-	"sourceRoots": [".", "../bench-mill", "../../../machines/casting-shop", "../cnc-router", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
+	"sourceRoots": [".", "../bench-mill", "../../../machines/casting-shop", "../cnc-router", "../../../machines/flexspline-hobber/machine", "../../../machines/flexspline-hobber/scenes", "../../../machines/flexspline-hobber/checks", "../../../machines/flexspline-hobber/studies"],
 	"dependencies": {
 		"processkit": {"path": "../../../processkit"},
 		"collisionkit-native": {"path": "../../../collisionkit/native"},

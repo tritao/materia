@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "flexspline-supplier-package-export"
+  },
+  "entry": "SupplierPackageExport",
+  "sourceRoots": [".", "../machine", "../scenes", "../checks", "../studies"],
+  "dependencies": {
+    "gearkit": {
+      "path": "../../../gearkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

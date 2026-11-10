@@ -30,7 +30,7 @@ result like an inspection room: diameters, roundness, wall thickness, runout, fi
 **Target parts:** the turned blanks of the strain-wave chain, up to about Ø90 × 60 mm:
 - the flexspline cup blank, soft-turned, then hard-turned to its thin wall after heat treatment.
   Its bore is the hobbing datum, so this lathe feeds the flexspline hobber
-  (`examples/flexspline-hobber/PLAN.md`);
+  (`machines/flexspline-hobber/PLAN.md`);
 - the circular-spline ring blank;
 - later, the wave-generator cam by non-round turning (X following C).
 
@@ -129,7 +129,7 @@ separately.
 - Stock: `RingStock` core (`ring.cpp`, `rake.cpp`), `HobbingSweep`, `KienzleMaterial`,
   `RingCompliance`.
 
-**Conventions.** Plan format and working rules as in `examples/flexspline-hobber/PLAN.md`.
+**Conventions.** Plan format and working rules as in `machines/flexspline-hobber/PLAN.md`.
 Registration:
 - `machinekit/tests/src/MachineKitSmoke.hx`, plus the example in `machinekit/tests/haxeon.json`
   `sourceRoots`;

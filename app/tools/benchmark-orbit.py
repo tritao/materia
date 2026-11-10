@@ -154,7 +154,7 @@ def main():
     parser.add_argument("--msaa", type=int, choices=(1, 2, 4), default=4)
     parser.add_argument("--frame-object", help="frame a scene object before orbiting (for close-zoom checks)")
     parser.add_argument("--project", type=Path,
-                        default=ROOT / "machinekit/examples/flexspline-hobber/materia.project.json",
+                        default=ROOT / "machines/flexspline-hobber/materia.project.json",
                         help="project to orbit (default: flexspline hobber)")
     parser.add_argument("--launcher", default="", help="optional command prefix, e.g. 'heavy-run --slots 4 --need 4G --'")
     parser.add_argument("--skip-build", action="store_true", help="reuse the built application and native libraries")

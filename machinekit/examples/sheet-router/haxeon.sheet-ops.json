@@ -4,7 +4,7 @@
     "name": "sheet-router-cabinet-checks"
   },
   "entry": "SheetRouterSheetChecks",
-  "sourceRoots": [".", "../../tests/src", "../press-brake", "..", "../robot-arm", "../cnc-router", "../mobile-base", "../robot-welder", "../corexy", "../printer", "../bench-mill", "../cobot-arm", "../machine-tending", "../../tests/mobile-welder/src", "../gantry-picker", "../track-arm", "../overhead-arm", "../robot-screwdriver", "../gantry-welder", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
+  "sourceRoots": [".", "../../tests/src", "../press-brake", "..", "../robot-arm", "../cnc-router", "../mobile-base", "../robot-welder", "../corexy", "../printer", "../bench-mill", "../cobot-arm", "../machine-tending", "../../tests/mobile-welder/src", "../gantry-picker", "../track-arm", "../overhead-arm", "../robot-screwdriver", "../gantry-welder", "../../../machines/flexspline-hobber/machine", "../../../machines/flexspline-hobber/scenes", "../../../machines/flexspline-hobber/checks", "../../../machines/flexspline-hobber/studies"],
   "dependencies": {
     "collisionkit-native": {
       "path": "../../../collisionkit/native"

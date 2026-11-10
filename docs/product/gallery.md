@@ -376,14 +376,14 @@ hob shift, in a guarded enclosure. Play scenarios show the doors, a coarse
 cut, or loading, cutting and unloading a cup. The machine panel shows the
 blank, clamped and finished part. It uses supplier rail CAD that a
 preparation script downloads first (see the
-[example README](../../machinekit/examples/flexspline-hobber/README.md)).
+[example README](../../machines/flexspline-hobber/README.md)).
 
 Concepts: [Stock and material removal](../concepts/process/stock.md),
 [Specialized models](../concepts/modelling/specialized-models.md),
 [Toolpaths](../concepts/process/toolpaths.md).
 
 ```sh
-./app/run-built.sh --project=./machinekit/examples/flexspline-hobber/materia.project.json
+./app/run-built.sh --project=./machines/flexspline-hobber/materia.project.json
 ```
 
 ### Sheet metal press brake

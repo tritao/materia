@@ -22,7 +22,7 @@
     "MillCastingDetails.hx",
     "MillLiftingPattern.hx"
   ],
-  "sourceRoots": ["../../../machines/casting-shop", ".", "../cnc-router", "../../tests/src", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
+  "sourceRoots": ["../../../machines/casting-shop", ".", "../cnc-router", "../../tests/src", "../../../machines/flexspline-hobber/machine", "../../../machines/flexspline-hobber/scenes", "../../../machines/flexspline-hobber/checks", "../../../machines/flexspline-hobber/studies"],
   "dependencies": {
     "robotkit-autonomy": {
       "path": "../../../robotkit/autonomy"

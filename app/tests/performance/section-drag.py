@@ -14,7 +14,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
 VIEWS = (
-    ("socket", "see-inside", "machinekit/examples/flexspline-hobber/build/socket-fixture/socket-fixture-assembled.mtrg"),
+    ("socket", "see-inside", "machines/flexspline-hobber/build/socket-fixture/socket-fixture-assembled.mtrg"),
     ("gripper", "jaw-detail", "machinekit/examples/dh-gripper/build/pgc-custom-fingers.mtrg"),
 )
 

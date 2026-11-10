@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "package": {
+    "name": "flexspline-casting-package-export"
+  },
+  "entry": "CastingPackageExport",
+  "sourceRoots": [".", "../../machine", "../../scenes", "../../checks", "../../studies"],
+  "dependencies": {
+    "machinekit": {
+      "path": "../../../../machinekit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

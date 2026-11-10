@@ -29,7 +29,7 @@ on it.
   inspection, `ErrorBudget`. No strain-wave or cycloidal tooth code.
 - `gearkit/TOOTH_DESIGN_PLAN.md`: plan for flexspline deformation, circular-spline envelope, meshing
   analysis and a `StrainWaveDesign` output. Not implemented as far as the plan says.
-- `machinekit/examples/flexspline-hobber`: hobber design and simulation, target ISO 1328 class 5-6
+- `machines/flexspline-hobber`: hobber design and simulation, target ISO 1328 class 5-6
   at module 0.2-0.5. `examples/circular-spline-skiver/PLAN.md`: sibling skiving machine, plan only.
 - `machinekit/STRAIN_WAVE_RESEARCH.md`: papers, open code, manufacturing routes, supplier prices.
 - `machinekit/PRECISION_ROTARY_PLAN.md`: direct-drive rotary table and test bench; the bench
@@ -340,7 +340,7 @@ Each phase ends with something that runs and a stated check.
 
 - `machinekit/STRAIN_WAVE_RESEARCH.md`, `gearkit/TOOTH_DESIGN_PLAN.md`, `gearkit/METROLOGY.md`
 - `machinekit/PRECISION_ROTARY_PLAN.md`, `machinekit/TRANSMISSION_PLAN.md`
-- `machinekit/examples/flexspline-hobber/`, `examples/circular-spline-skiver/PLAN.md`
+- `machines/flexspline-hobber/`, `examples/circular-spline-skiver/PLAN.md`
 - `machinekit/examples/cobot-arm/` (`README.md`, `actuator-selection.json`, `reference-sources.json`)
 - `materia-internal/drive/docs/requirements.md` and `docs/adr/0005-product-and-platform-decisions.md`
 - Benchmarks (unverified, from resellers): OpenArm 2.0 / DAMIAO actuators, ZeroErr eRob

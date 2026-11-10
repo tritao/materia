@@ -32,7 +32,7 @@ class HobArbor extends MachineComponent {
       "BT30 hob arbor",
       "HOB-ARBOR-BT30",
       parameters(),
-      "machinekit/examples/flexspline-hobber/docs/PLAN.md (assumed reference design)"
+      "machines/flexspline-hobber/docs/PLAN.md (assumed reference design)"
     );
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

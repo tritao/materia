@@ -102,7 +102,7 @@ and trace superposition within the stated tolerance. Runtime is about 51–55 s,
 using 126 MiB. Run it with:
 
 ```
-machinekit/examples/flexspline-hobber/checks/check-quick.sh errors
+machines/flexspline-hobber/checks/check-quick.sh errors
 ```
 
 The full reference-part source budget, measured HB7 source-disable studies and
@@ -146,7 +146,7 @@ the band is outside the sleeve or contact is not seated, mandrel stiffness is
 zero and the cup wall's own RingCompliance governs. The reference blank currently
 models the annular toothed rim, not a detailed cup-bottom structure.
 
-Run `machinekit/tests/hobber/build/host/main.hl support-sensitivity` with the
+Run `machines/flexspline-hobber/tests/hobber/build/host/main.hl support-sensitivity` with the
 HashLink/native environment from the quick runner, or use the reference-force
 runner for a report driven by its measured load statistics. The standalone case
 uses a provisional assumed design load Fc=100 N, Fr=36.4 N: this is not a safe
@@ -221,7 +221,7 @@ combined cut at the reference **0.000025 mm sweep tolerance / 8 threads**, in
 
 ### Complete hobber reference study
 
-`machinekit/examples/flexspline-hobber/checks/check-reference-budget.sh all` runs baseline,
+`machines/flexspline-hobber/checks/check-reference-budget.sh all` runs baseline,
 13 installed sources and combined cuts on the HB8 feed trajectory, at 8 threads,
 0.000025 mm sweep / 0.0000015625 mm path tolerances, 0.0015 mm radial / 0.04 mm
 axial sampling. Each completed inspection is saved before the next case. Progress,

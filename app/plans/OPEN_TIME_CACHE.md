@@ -81,7 +81,7 @@ Two layers share one store (`cadkit.cache.DiskStore`, files named by the SHA-256
 | `MATERIA_CACHE_VERIFY=1` | Recompute every hit and fail on any difference (see below). |
 
 **Clear and inspect.** Clear: delete the cache directory (it is only a cache). Inspect: `HOBBER_PHASES=1` on the hobber scene
-(`machinekit/examples/flexspline-hobber/haxeon.enclosure.json`) prints the build/fit/export times, one `MEMO` line per memo
+(`machines/flexspline-hobber/haxeon.enclosure.json`) prints the build/fit/export times, one `MEMO` line per memo
 (hits, misses, how many came from disk, time spent computing) and `OPS` lines for the kernel cache (keyed and unkeyed
 booleans, history booleans that cannot be cached and why, queries).
 
@@ -246,7 +246,7 @@ Found, not fixed: a generator run by the runner executes from a temporary direct
 
 ### Stage 9k (2026-11-09): CC4, the standing verify gate
 
-`machinekit/tests/hobbing/src/CacheGateTests.hx` (workspace project `cache-gate`): a small hob built cold, warm and warm with verify on; zero unkeyed booleans, warm hits not below the baseline, verified bytes equal cold bytes, plus controls for an impure keyed operation and an unkeyed boolean. About 2 s of operations. Mutating the model to leave one cut unkeyed fails it. Details: `app/plans/CACHE_CLEANUP.md`, CC4.
+`machines/flexspline-hobber/tests/hobbing/src/CacheGateTests.hx` (workspace project `cache-gate`): a small hob built cold, warm and warm with verify on; zero unkeyed booleans, warm hits not below the baseline, verified bytes equal cold bytes, plus controls for an impure keyed operation and an unkeyed boolean. About 2 s of operations. Mutating the model to leave one cut unkeyed fails it. Details: `app/plans/CACHE_CLEANUP.md`, CC4.
 
 ### Stage 9l (2026-11-09): CC5, profile of the edit-loop scene run
 

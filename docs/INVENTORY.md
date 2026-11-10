@@ -288,13 +288,13 @@ section; it does not copy them.
 | examples/dh-gripper/README.md | keep | Supplier reference example. |
 | examples/enclosure-kit/README.md | keep | Example entry. |
 | examples/eoat/README.md | keep | Example entry. |
-| examples/flexspline-hobber/ENCLOSURE.md | internal | Design record; later `docs/machines/flexspline-hobber/`. |
-| examples/flexspline-hobber/HOB_GEOMETRY.md | internal | Design record. |
-| examples/flexspline-hobber/MACHINE_DESIGN.md | internal | Design record; later `docs/machines/flexspline-hobber/`. |
-| examples/flexspline-hobber/PARTS.md | internal | Assumed parts register. |
-| examples/flexspline-hobber/PLAN.md | internal | 2,741-line plan. |
-| examples/flexspline-hobber/README.md | keep | Example entry. |
-| examples/flexspline-hobber/SOCKET_FIXTURE.md | internal | Coupon record. |
+| machines/flexspline-hobber/ENCLOSURE.md | internal | Design record; later `docs/machines/flexspline-hobber/`. |
+| machines/flexspline-hobber/HOB_GEOMETRY.md | internal | Design record. |
+| machines/flexspline-hobber/MACHINE_DESIGN.md | internal | Design record; later `docs/machines/flexspline-hobber/`. |
+| machines/flexspline-hobber/PARTS.md | internal | Assumed parts register. |
+| machines/flexspline-hobber/PLAN.md | internal | 2,741-line plan. |
+| machines/flexspline-hobber/README.md | keep | Example entry. |
+| machines/flexspline-hobber/SOCKET_FIXTURE.md | internal | Coupon record. |
 | examples/foam-cutter/PLAN.md | internal | Plan. No README for the example. |
 | examples/gantry-picker/README.md | keep | Example entry; the tutorial covers it. |
 | examples/lathe/PLAN.md | internal | Plan. |

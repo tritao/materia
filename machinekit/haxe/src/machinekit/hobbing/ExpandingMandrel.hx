@@ -8,7 +8,7 @@ import machinekit.component.ComponentRecipeSupport as P;
     Pressure naming: `oilPressure`/`maxOilPressure` are the pressures of the oil inside the sleeve (MPa range, set
     by the air-to-oil booster). They are NOT the contact pressure on the cup bore, which is `contactPressureMin/Max`
     (0.5-1.5 MPa): the sleeve wall and the loading clearance absorb most of the oil pressure.
-    Derivations and evidence: examples/flexspline-hobber/workholding/loads/README.md (sections 1-3) and
+    Derivations and evidence: machines/flexspline-hobber/workholding/loads/README.md (sections 1-3) and
     workholding/fem/README.md (cases 1-2). */
 class ExpandingMandrel extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
@@ -77,7 +77,7 @@ class ExpandingMandrel extends MachineComponent {
       "Hydraulic expanding mandrel",
       "HYDRAULIC-MANDREL-59",
       parameters(),
-      "machinekit/examples/flexspline-hobber/docs/PLAN.md (assumed reference design)"
+      "machines/flexspline-hobber/docs/PLAN.md (assumed reference design)"
     );
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

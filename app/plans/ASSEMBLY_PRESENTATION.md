@@ -210,7 +210,7 @@ replacement without changing the generated record or engineering state. Native
 coverage includes these authoring invariants and the complete viewport-coordinate
 regression suite. Reviewed captures show the
 [offset handle](../../machinekit/examples/dh-gripper/images/presentation-offset-handle.png)
-and the [failed withdrawal](../../machinekit/examples/flexspline-hobber/images/socket-fixture-failed.png).
+and the [failed withdrawal](../../machines/flexspline-hobber/images/socket-fixture-failed.png).
 
 ### AP4 — Procedures
 Implementation status: shared transport, active instructions/evidence, referenced

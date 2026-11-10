@@ -3,7 +3,7 @@
 	"package": { "name": "machinekit-motor-shaft-example" },
 	"entry": "MotorShaftBearingsPreview",
 	"sources": ["MotorShaftBearings.hx", "MotorShaftBearingsPreview.hx"],
-	"sourceRoots": [".", "flexspline-hobber/machine", "flexspline-hobber/scenes", "flexspline-hobber/checks", "flexspline-hobber/studies"],
+	"sourceRoots": [".", "../../machines/flexspline-hobber/machine", "../../machines/flexspline-hobber/scenes", "../../machines/flexspline-hobber/checks", "../../machines/flexspline-hobber/studies"],
 	"dependencies": {
 		"projectkit": { "path": "../../projectkit" },
 		"cadkit": { "path": "../../cadkit" },

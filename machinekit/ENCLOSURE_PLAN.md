@@ -322,7 +322,7 @@ process assessment are assumed. Reported dimensions are CAD-derived.
 
 Open the new hobber `materia.enclosed.project.json`: **enclosed** shows the shell,
 **inspection** hides enclosure occurrences. Outputs and the focused acceptance
-command are documented in `examples/flexspline-hobber/ENCLOSURE.md` in that
+command are documented in `machines/flexspline-hobber/ENCLOSURE.md` in that
 worktree. The normal project and its cutting preview are untouched.
 
 Acceptance covers 48 machine/door states, exact near-pair intersections,

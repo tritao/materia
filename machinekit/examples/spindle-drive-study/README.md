@@ -33,7 +33,7 @@ and efficiency are provisional requirements, not established cutting demands.
 They must eventually be checked against tool diameter, material, engagement,
 feed, spindle thermal limits and the actual electrical supply.
 
-The [hobber reference](../flexspline-hobber/docs/PLAN.md#reference-numbers-assumed-until-checked-against-a-datasheet-or-a-measurement)
+The [hobber reference](../../../machines/flexspline-hobber/docs/PLAN.md#reference-numbers-assumed-until-checked-against-a-datasheet-or-a-measurement)
 is m=0.3, 200 teeth, 60 mm pitch diameter, a single-start 32 mm hob with 12 gashes,
 3000 rpm reference cutting speed, and an 8000 rpm maximum. It already calls for
 a direct-drive spindle around 1.5 kW, a direct-drive C table and load-side ring

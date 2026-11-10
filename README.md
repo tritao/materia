@@ -13,19 +13,19 @@ start.
 
 | Directory | Purpose |
 | --- | --- |
-| [`app/`](app/) | Reference editor shell and Component Lab host |
-| [`haxeon/`](haxeon/) | Haxe-compatible compiler, HashLink runtime, and project CLI |
-| [`haxeon/vendor/nativekit/`](haxeon/vendor/nativekit/) | Windows, surfaces, input, GPU, and native runtime services |
-| [`haxeon/packages/ui/`](haxeon/packages/ui/) | Retained UI layout, text, rendering, styles, and Haxe widgets |
-| [`scenekit/`](scenekit/) | Retained scene data, rendering, picking, and interaction |
-| [`simkit/`](simkit/) | Deterministic simulation orchestration and physics integration |
-| [`sensorkit/`](sensorkit/) | Backend-independent sensor scheduling and measurement models |
-| [`robotkit/`](robotkit/) | Complete robotics layer: runtime, protocol, world orchestration, and hosts |
-| [`motionkit/`](motionkit/) | Transport-neutral trajectories, machine-axis views, and motion planning |
-| [`automationkit/`](automationkit/) | Facility, mission, task, fleet, and traffic models above RobotKit |
-| [`cadkit/`](cadkit/) | Headless CAD core and C ABI above Open CASCADE |
-| [`animkit/`](animkit/) | glTF character import and skeletal animation above ozz-animation |
-| [`humankit/`](humankit/) | Standard humanoid skeleton, pose landmarks, and bone attachments above AnimKit |
+| [`app/`](app) | Reference editor shell and Component Lab host |
+| [`haxeon/`](haxeon) | Haxe-compatible compiler, HashLink runtime, and project CLI |
+| [`haxeon/vendor/nativekit/`](haxeon/vendor/nativekit) | Windows, surfaces, input, GPU, and native runtime services |
+| [`haxeon/packages/ui/`](haxeon/packages/ui) | Retained UI layout, text, rendering, styles, and Haxe widgets |
+| [`scenekit/`](scenekit) | Retained scene data, rendering, picking, and interaction |
+| [`simkit/`](simkit) | Deterministic simulation orchestration and physics integration |
+| [`sensorkit/`](sensorkit) | Backend-independent sensor scheduling and measurement models |
+| [`robotkit/`](robotkit) | Complete robotics layer: runtime, protocol, world orchestration, and hosts |
+| [`motionkit/`](motionkit) | Transport-neutral trajectories, machine-axis views, and motion planning |
+| [`automationkit/`](automationkit) | Facility, mission, task, fleet, and traffic models above RobotKit |
+| [`cadkit/`](cadkit) | Headless CAD core and C ABI above Open CASCADE |
+| [`animkit/`](animkit) | glTF character import and skeletal animation above ozz-animation |
+| [`humankit/`](humankit) | Standard humanoid skeleton, pose landmarks, and bone attachments above AnimKit |
 
 NativeKit is pinned by Haxeon under `haxeon/vendor/nativekit`; its managed
 platform and GPU APIs live in `haxeon/packages/platform` and
@@ -145,7 +145,7 @@ submodule pointer in Materia so fresh recursive clones remain buildable.
 ## License
 
 Materia is licensed under the [Apache License 2.0](LICENSE); see also
-[NOTICE](NOTICE). Documentation in [`docs/`](docs/) is licensed under
+[NOTICE](NOTICE). Documentation in [`docs/`](docs) is licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Submodules and
 vendored dependencies keep their own licenses. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for how contributions are licensed and

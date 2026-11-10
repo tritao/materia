@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "cadbridge-mujoco-tests"},
   "entry": "tests.EndEffectorContactMuJoCo",
-  "sourceRoots": ["src", "../../../../machinekit/examples", "../../../../machinekit/examples/flexspline-hobber/machine", "../../../../machinekit/examples/flexspline-hobber/scenes", "../../../../machinekit/examples/flexspline-hobber/checks", "../../../../machinekit/examples/flexspline-hobber/studies"],
+  "sourceRoots": ["src", "../../../../machinekit/examples", "../../../../machines/flexspline-hobber/machine", "../../../../machines/flexspline-hobber/scenes", "../../../../machines/flexspline-hobber/checks", "../../../../machines/flexspline-hobber/studies"],
   "dependencies": {
     "haxeon-platform": {"path": "../../../../haxeon/packages/platform"},
     "robotkit": {"path": "../../.."},

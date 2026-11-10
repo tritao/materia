@@ -1,0 +1,7 @@
+{
+  "version": 1, "package": {"name": "machinekit-hobber-accuracy"},
+  "entry": "HobberAccuracyChecks",
+  "sourceRoots": ["src", "../../machine", "../../scenes", "../../checks", "../../studies"],
+  "dependencies": {"toolpathkit-motion": {"path": "../../../../toolpathkit/motion"}, "machinekit": {"path": "../../../../machinekit"}, "stockkit": {"path": "../../../../stockkit"}, "camkit": {"path": "../../../../camkit"}, "gearkit": {"path": "../../../../gearkit"}},
+  "target": "host", "outputDir": "build/accuracy"
+}

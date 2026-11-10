@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-hobber-parts-tests"},
+  "entry": "HobberPartTests",
+  "sourceRoots": ["src", "../../machine", "../../scenes", "../../checks", "../../studies"],
+  "dependencies": {"machinekit": {"path": "../../../../machinekit"}},
+  "target": "host",
+  "outputDir": "build"
+}

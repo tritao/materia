@@ -5805,7 +5805,7 @@ typedef CubeRun = {
   static function checkHobberInteractive(root:String, loading:Bool = false):Void {
     tests.HobbingHandlingTests.run();
     var scene = Sys.getEnv("HOBBER_GUI_SCENE");
-    if (scene == null) scene = root + "/machinekit/examples/flexspline-hobber/" + "hobber.scene.json";
+    if (scene == null) scene = root + "/machines/flexspline-hobber/" + "hobber.scene.json";
     var fonts = FontCollection.create();
     fonts.add(root + "/haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
     var editor = new ReferenceEditorApp(fonts, "/tmp/hobber-interactive-" + Sys.getPid() + ".json");
@@ -5943,7 +5943,7 @@ typedef CubeRun = {
 
   /** HB6 acceptance: generation, derived drives and a short zero-command MuJoCo hold. */
   static function checkFlexsplineHobber(root:String):Void {
-    var manifest = FileSystem.fullPath(root + "/machinekit/examples/flexspline-hobber/materia.project.json");
+    var manifest = FileSystem.fullPath(root + "/machines/flexspline-hobber/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition = generated.assemblyDefinition;
     if (definition == null) throw "hobber has no assembly definition";

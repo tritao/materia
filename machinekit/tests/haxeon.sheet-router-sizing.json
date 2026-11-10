@@ -4,7 +4,7 @@
     "name": "machinekit-sheet-router-sizing-tests"
   },
   "entry": "SheetRouterSizingChecks",
-  "sourceRoots": ["src", "../examples/press-brake", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base", "../examples/robot-welder", "../examples/corexy", "../examples/printer", "../examples/bench-mill", "../examples/cobot-arm", "../examples/machine-tending", "mobile-welder/src", "../examples/gantry-picker", "../examples/track-arm", "../examples/overhead-arm", "../examples/robot-screwdriver", "../examples/gantry-welder", "../examples/sheet-router", "../examples/flexspline-hobber/machine", "../examples/flexspline-hobber/scenes", "../examples/flexspline-hobber/checks", "../examples/flexspline-hobber/studies"],
+  "sourceRoots": ["src", "../examples/press-brake", "../examples", "../examples/robot-arm", "../examples/cnc-router", "../examples/mobile-base", "../examples/robot-welder", "../examples/corexy", "../examples/printer", "../examples/bench-mill", "../examples/cobot-arm", "../examples/machine-tending", "mobile-welder/src", "../examples/gantry-picker", "../examples/track-arm", "../examples/overhead-arm", "../examples/robot-screwdriver", "../examples/gantry-welder", "../examples/sheet-router", "../../machines/flexspline-hobber/machine", "../../machines/flexspline-hobber/scenes", "../../machines/flexspline-hobber/checks", "../../machines/flexspline-hobber/studies"],
   "dependencies": {
     "collisionkit-native": {
       "path": "../../collisionkit/native"

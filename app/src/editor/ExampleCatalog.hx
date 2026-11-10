@@ -106,7 +106,7 @@ typedef ExampleEntry = {
       title: "Flexspline hobber",
       description: ["Six-axis precision hobbing machine", "with cast-in steel mounting inserts"],
       tag: "Editable project",
-      kind: Project("machinekit/examples/flexspline-hobber/materia.project.json")
+      kind: Project("machines/flexspline-hobber/materia.project.json")
     },
     {
       id: "mill",

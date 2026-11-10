@@ -949,7 +949,7 @@ direction, or the parent Z direction for a new offset. Simulation disables editi
 
 ## Unified hobber scene
 
-`machinekit/examples/flexspline-hobber/hobber.scene.json` opens one enclosed
+`machines/flexspline-hobber/hobber.scene.json` opens one enclosed
 machine with a detailed tool and cup. The viewport's Play scenario controls
 select Idle / doors, Cutting (default), or Load / cut / unload. Pause before
 changing scenarios; selecting another resets the runtime and stock without

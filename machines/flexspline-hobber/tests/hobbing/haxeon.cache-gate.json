@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-cache-gate-tests"},
+  "entry": "CacheGateTests",
+  "sourceRoots": ["src", "../../machine", "../../scenes", "../../checks", "../../studies"],
+  "dependencies": {"machinekit": {"path": "../../../../machinekit"}},
+  "target": "host",
+  "outputDir": "build/cache-gate"
+}

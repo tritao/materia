@@ -24,7 +24,7 @@ class SwivelHousing extends MachineComponent {
       "Swivel-head housing",
       "SWIVEL-HOUSING",
       parameters(),
-      "machinekit/examples/flexspline-hobber/docs/PLAN.md (assumed reference design)"
+      "machines/flexspline-hobber/docs/PLAN.md (assumed reference design)"
     );
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

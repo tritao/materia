@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "package": {
+    "name": "hobber-enclosure-preview"
+  },
+  "entry": "HobberEnclosurePreview",
+  "sourceRoots": ["machine", "scenes", "checks", "studies", "../casting-shop"],
+  "dependencies": {
+    "machinekit": {
+      "path": "../../machinekit"
+    },
+    "processkit": {
+      "path": "../../processkit"
+    },
+    "camkit": {
+      "path": "../../camkit"
+    },
+    "cnckit": {
+      "path": "../../cnckit"
+    },
+    "toolpathkit": {
+      "path": "../../toolpathkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/enclosure-run"
+}

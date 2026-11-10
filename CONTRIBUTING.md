@@ -5,7 +5,7 @@ Thanks for helping. A few basics:
 ## License of contributions
 
 Materia is licensed under the [Apache License 2.0](LICENSE). Documentation in
-[`docs/`](docs/) is licensed under
+[`docs/`](docs) is licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). By contributing, you
 agree that your contribution is licensed under the same terms.
 

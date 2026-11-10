@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "package": {
+    "name": "flexspline-machined-package-export"
+  },
+  "entry": "MachinedPackageExport",
+  "sourceRoots": [".", "../../machine", "../../scenes", "../../checks", "../../studies"],
+  "dependencies": {
+    "machinekit": {
+      "path": "../../../../machinekit"
+    },
+    "toolpathkit-motion": {
+      "path": "../../../../toolpathkit/motion"
+    },
+    "stockkit": {
+      "path": "../../../../stockkit"
+    },
+    "camkit": {
+      "path": "../../../../camkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

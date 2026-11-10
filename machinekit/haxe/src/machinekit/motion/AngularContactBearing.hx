@@ -39,7 +39,7 @@ class AngularContactBearing extends MachineComponent {
       "Angular-contact precision bearing",
       "AC-BEARING-25-62-17",
       parameters(),
-      "machinekit/examples/flexspline-hobber/docs/PLAN.md (assumed reference design)"
+      "machines/flexspline-hobber/docs/PLAN.md (assumed reference design)"
     );
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

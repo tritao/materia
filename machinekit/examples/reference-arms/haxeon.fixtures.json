@@ -4,7 +4,7 @@
     "name": "reference-arm-fixture-export"
   },
   "entry": "FixtureExport",
-  "sourceRoots": [".", "../bench-mill", "../cnc-router", "build/assets", "../machine-tending", "../../../machines/casting-shop", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
+  "sourceRoots": [".", "../bench-mill", "../cnc-router", "build/assets", "../machine-tending", "../../../machines/casting-shop", "../../../machines/flexspline-hobber/machine", "../../../machines/flexspline-hobber/scenes", "../../../machines/flexspline-hobber/checks", "../../../machines/flexspline-hobber/studies"],
   "dependencies": {
     "robotkit-autonomy": {
       "path": "../../../robotkit/autonomy"

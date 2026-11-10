@@ -346,7 +346,7 @@ ISO 16090-1 (machining centres), ISO 14119 (interlocking with guard locking), IS
   faults, safe reset. The limits are model parameters, not qualified values.
 - `machinekit/ENCLOSURE_PLAN.md`: the enclosure kit and generator, door and guard interface (EN-D4).
 - `examples/bench-mill/DRILL_TAP_PLAN.md`: drill-tap requirements, DT8 enclosure and services.
-- `examples/flexspline-hobber/ENCLOSURE.md`: fitted hobber enclosure, guard checks, separate
+- `machines/flexspline-hobber/ENCLOSURE.md`: fitted hobber enclosure, guard checks, separate
   electrical rack.
 - RobotKit safety types: `SafetyPhase`, `SafetyState`, `StoppingEnvelope`, `LoadSafetyConfiguration`.
 - NativeKit: GTK3 Linux backend, a GLES3 GPU runtime, `platform-parity.md` with a "Not

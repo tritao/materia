@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "flexspline-spindle-package-export"
+  },
+  "entry": "SpindlePackageExport",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../../../../machinekit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

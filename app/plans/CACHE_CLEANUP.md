@@ -91,7 +91,7 @@ the project once the copy is removed); `CompilerInputsMain` (fresh session rejec
 
 **Problem.** Verify mode only catches a missing dependency when someone runs it.
 
-**What was built.** `machinekit/tests/hobbing/src/CacheGateTests.hx` (manifest `haxeon.cache-gate.json`, workspace project
+**What was built.** `machines/flexspline-hobber/tests/hobbing/src/CacheGateTests.hx` (manifest `haxeon.cache-gate.json`, workspace project
 `cache-gate`, tag `cadkit`) builds a small hob (`HobSolid.build`: ten keyed booleans, gashes fused into a bored cylinder) three
 times into a fresh store: cold, warm, warm with verify on. It checks:
 - zero unkeyed booleans and zero unkeyed history booleans on the cold run (a boolean that loses its key fails the gate);
@@ -133,7 +133,7 @@ No Haxe function is over 3.5 % of the run by itself.
 The share of samples in `PosedParts.moved` fell from 20 % to 6.7 % (1614 -> about 1090 samples on a loaded machine; the
 absolute change is within load noise, the share is not). Digest `89fab112da0b8210` unchanged, verify clean. Gates run: the five
 CadKit C++ smokes (core, modeling, planar, naming, shape-bytes), the shape-key and shape-bytes Haxe tests, `cache-gate`, and
-`machinekit/tests/hobbing`.
+`machines/flexspline-hobber/tests/hobbing`.
 
 ## Not now
 

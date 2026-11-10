@@ -48,7 +48,7 @@ Work that is partly done and still moving.
   flexsplines that cuts and grades the teeth in simulation; precision
   acceptance is still open.
   See [Specialized models](../concepts/modelling/specialized-models.md).
-  <!-- machinekit/examples/flexspline-hobber/docs/PLAN.md (HB1–HB11 mostly done; HB12 planned) -->
+  <!-- machines/flexspline-hobber/docs/PLAN.md (HB1–HB11 mostly done; HB12 planned) -->
 - **Machine enclosures.** One enclosure generator for every machine: it clears
   the axes, contains the process and interlocks the doors. The hobber is first.
   See [Machine components](../concepts/modelling/machine-components.md).

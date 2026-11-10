@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "entry": "HobberTrayProposalPreview",
+  "sourceRoots": ["machine", "scenes", "checks", "studies"],
+  "dependencies": {
+    "machinekit": {
+      "path": "../../machinekit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/tray-proposal-run"
+}

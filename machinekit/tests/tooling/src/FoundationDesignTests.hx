@@ -456,7 +456,7 @@ class FoundationDesignTests {
       foundations.push({id: "hobber-column", part: new hobber.MineralCastColumn()});
     }
     var baseline:Dynamic = haxe.Json.parse(sys.io.File.getContent(root
-      + "/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
+      + "/../../../../../machines/flexspline-hobber/checks/evidence/BASELINE_FOUNDATIONS.json"));
     if (baseline.format != "machinekit.foundation-baseline"
       || baseline.version != 3) throw "Unsupported foundation migration baseline";
     var frozenRows:Array<Dynamic> = cast baseline.currentBeforeMigration;
@@ -590,7 +590,7 @@ class FoundationDesignTests {
         "Exact native volumes; box-only sections are Unsupported for non-box socket recesses and embedded anchor hardware, never approximated."
       );
       sys.io.File.saveContent(
-        root + "/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json",
+        root + "/../../../../../machines/flexspline-hobber/checks/evidence/BASELINE_FOUNDATIONS.json",
         haxe.Json.stringify(baseline, null, "  ") + "\n"
       );
     }

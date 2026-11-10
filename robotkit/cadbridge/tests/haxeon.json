@@ -4,7 +4,7 @@
     "name": "cadbridge-tests"
   },
   "entry": "tests.CadBridgeTests",
-  "sourceRoots": ["src", "../../../machinekit/examples", "../../../machinekit/examples/mobile-base", "../../../machinekit/examples/robot-arm", "../../../machinekit/examples/flexspline-hobber/machine", "../../../machinekit/examples/flexspline-hobber/scenes", "../../../machinekit/examples/flexspline-hobber/checks", "../../../machinekit/examples/flexspline-hobber/studies"],
+  "sourceRoots": ["src", "../../../machinekit/examples", "../../../machinekit/examples/mobile-base", "../../../machinekit/examples/robot-arm", "../../../machines/flexspline-hobber/machine", "../../../machines/flexspline-hobber/scenes", "../../../machines/flexspline-hobber/checks", "../../../machines/flexspline-hobber/studies"],
   "dependencies": {
     "haxeon-platform": {
       "path": "../../../haxeon/packages/platform"

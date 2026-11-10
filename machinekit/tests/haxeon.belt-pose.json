@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-belt-pose-tests"},
   "entry": "BeltPoseTests",
-  "sourceRoots": ["src", "../examples/corexy", "../examples/flexspline-hobber/machine", "../examples/flexspline-hobber/scenes", "../examples/flexspline-hobber/checks", "../examples/flexspline-hobber/studies"],
+  "sourceRoots": ["src", "../examples/corexy", "../../machines/flexspline-hobber/machine", "../../machines/flexspline-hobber/scenes", "../../machines/flexspline-hobber/checks", "../../machines/flexspline-hobber/studies"],
   "dependencies": {"machinekit": {"path": ".."}, "projectkit": {"path": "../../projectkit"}, "cadkit": {"path": "../../cadkit"}},
   "target": "host",
   "outputDir": "build/belt-pose"

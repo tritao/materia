@@ -21,7 +21,7 @@ them.
    - the future circular-spline skiving machine;
    - CadKit parts for the cobot joints.
 
-**Why now:** the hobber (`machinekit/examples/flexspline-hobber/docs/PLAN.md`) proves we can cut a
+**Why now:** the hobber (`machines/flexspline-hobber/docs/PLAN.md`) proves we can cut a
 tooth to class 5–6. This plan decides **which tooth is worth cutting**. Background and sources:
 `machinekit/STRAIN_WAVE_RESEARCH.md` (deformation equations, Liu 2025, Ishikawa S-tooth,
 full-conjugate and cycloid profiles, `pancake_swgb_designer` envelope method).

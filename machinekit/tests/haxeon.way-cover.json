@@ -4,7 +4,7 @@
 		"name": "machinekit-way-cover-tests"
 	},
 	"entry": "WayCoverTests",
-	"sourceRoots": ["src", "../examples/flexspline-hobber/machine", "../examples/flexspline-hobber/scenes", "../examples/flexspline-hobber/checks", "../examples/flexspline-hobber/studies"],
+	"sourceRoots": ["src", "../../machines/flexspline-hobber/machine", "../../machines/flexspline-hobber/scenes", "../../machines/flexspline-hobber/checks", "../../machines/flexspline-hobber/studies"],
 	"dependencies": {
 		"cadkit": {
 			"path": "../../cadkit"

@@ -90,7 +90,7 @@ import sys.FileSystem;
     );
     var hobber = ExampleCatalog.find("flexspline-hobber");
     check(
-      hobber != null && FileSystem.exists("machinekit/examples/flexspline-hobber/materia.project.json"),
+      hobber != null && FileSystem.exists("machines/flexspline-hobber/materia.project.json"),
       "hobber project exists"
     );
     browser.selectCategory("All");

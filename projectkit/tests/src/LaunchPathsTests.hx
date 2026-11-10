@@ -40,10 +40,10 @@ class LaunchPathsTests {
 
       // A path that does not exist still resolves, so the message can name it (it used to print "null").
       Sys.putEnv(LaunchPaths.variable, "/work/repo");
-      var missing = LaunchPaths.existing("machinekit/examples/flexspline-hobber/materia.project.json");
+      var missing = LaunchPaths.existing("machines/flexspline-hobber/materia.project.json");
       same(
         missing,
-        "/work/repo/machinekit/examples/flexspline-hobber/materia.project.json",
+        "/work/repo/machines/flexspline-hobber/materia.project.json",
         "a missing project file is named by its resolved path"
       );
       assertions++;
