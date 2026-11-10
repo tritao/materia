@@ -407,6 +407,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   public function preparePresentationFrame():Void {
     updatePresentation();
     updatePresentationCamera();
+    applyPendingViewCamera();
   }
   function updatePresentation():Void {
     var controller = presentation;
@@ -654,6 +655,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   @:unobservable var clipBoundsRevision:String = "";
   @:unobservable var focusDepthKey:String = "";
   @:unobservable var focusDepth:Float = 0.0;
+  @:unobservable var pendingViewState:Null<app.editor.ViewportState> = null;
   final linkMarkerPath = new PathBuilder();
   final sensorMarkerPath = new PathBuilder();
   final sensorRayPath = new PathBuilder();
@@ -1627,14 +1629,104 @@ class EditorPerspectiveViewport implements View implements Observable {
     );
   }
 
+  /** This viewport's camera, size, lens and presentation cursor; the host adds what is open. */
+  public function viewState():app.editor.ViewportState {
+    var state:app.editor.ViewportState = {
+      format: app.editor.ViewportState.ViewportStates.FORMAT,
+      target: [camera.targetX, camera.targetY, camera.targetZ],
+      yaw: camera.yaw,
+      pitch: camera.pitch,
+      distance: camera.distance,
+      width: viewportWidth,
+      height: viewportHeight,
+      inspectionZoom: inspectionZoom
+    };
+    var controller = presentation;
+    if (controller != null) {
+      var cursor = controller.cursor;
+      var recorded:app.editor.ViewportState.ViewportPresentationState = {
+        view: cursor.view,
+        explode: cursor.explode,
+        step: cursor.step,
+        progress: cursor.progress
+      };
+      if (cursor.procedure != null) recorded.procedure = cursor.procedure;
+      state.presentation = recorded;
+    }
+    return state;
+  }
+
+  /**
+   * Restores a recorded presentation cursor now and the camera once the
+   * presentation has framed that view, so its own framing cannot override it.
+   */
+  public function applyViewState(state:app.editor.ViewportState):Void {
+    var recorded = state.presentation;
+    if (recorded != null) {
+      var controller = presentation;
+      if (controller == null) throw "The viewport state records a presentation, but none is open";
+      if (!controller.restoreCursor(new PresentationCursor(recorded.view, recorded.explode, recorded.procedure,
+        recorded.step, recorded.progress))) throw 'The open presentation has no view ${recorded.view} at that step';
+      presentationCameraDirty = true;
+      presentationTarget = null;
+      clearHover();
+    }
+    inspectionZoom = state.inspectionZoom;
+    lightingRevision++;
+    pendingViewState = state;
+    if (presentation == null) applyPendingViewCamera();
+    host.requestFrame();
+  }
+
+  /** True until a pending view state's camera has been applied. */
+  public function viewStatePending():Bool return pendingViewState != null;
+
+  function applyPendingViewCamera():Void {
+    var state = pendingViewState;
+    if (state == null) return;
+    if (presentation != null && (presentationResult == null || presentationCameraDirty)) return;
+    camera.setAngle(state.yaw, state.pitch);
+    camera.setTarget(state.target[0], state.target[1], state.target[2], state.distance);
+    orbitPivot = null;
+    pendingViewState = null;
+  }
+
+  /**
+   * Depth of the displayed scene from this camera, rendered at `width` x `height`
+   * with that aspect and with the near plane fitted for that size.
+   */
+  public function captureDepth(width:Int, height:Int):app.editor.ViewportDepth {
+    ensureRenderer();
+    var target = renderer;
+    if (target == null) throw "The viewport has no renderer to capture depth with";
+    var shownWidth = viewportWidth, shownHeight = viewportHeight;
+    updateViewportSize(width, height);
+    var fov = !readOnly ? PerspectiveCamera.FOV_Y : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom));
+    var result:app.editor.ViewportDepth;
+    try {
+      fitCameraClipRange();
+      var view = prepareRenderView(camera.viewProjection(aspect(), -1, -1, readOnly ? fov : 0));
+      var window = target.captureDepth(scene.renderSnapshot(), view, width, height);
+      var focus = centreFocusDepth();
+      result = new app.editor.ViewportDepth(width, height, window, camera.clipNear, camera.clipFar, fov,
+        focus > 0.0 ? focus : camera.distance, SceneRenderer.depthBits());
+    } catch (error:Dynamic) {
+      updateViewportSize(shownWidth, shownHeight);
+      fitCameraClipRange();
+      throw error;
+    }
+    updateViewportSize(shownWidth, shownHeight);
+    fitCameraClipRange();
+    return result;
+  }
+
   /**
    * View depth of the surface under the view centre, or zero when the centre
-   * shows background. Refreshed only when the camera or displayed scene moves.
+   * shows background. A hit is reused until the camera or displayed scene moves.
    */
   function centreFocusDepth():Float {
     var key = clipBoundsRevision + ":" + camera.revision;
     if (key == focusDepthKey) return focusDepth;
-    focusDepthKey = key;
     focusDepth = 0.0;
     var eye = camera.eyePosition(), back = camera.viewDirection();
     var view = sectionView(scene.configureRenderView(
@@ -1646,9 +1738,13 @@ class EditorPerspectiveViewport implements View implements Observable {
       null,
       cosmeticThreadsVisible
     ));
-    var hit = scene.pickHitRayWithView(view, eye[0], eye[1], eye[2], -back[0], -back[1], -back[2]);
-    if (hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z))
-      focusDepth = Math.max(0.0, -((hit.x - eye[0]) * back[0] + (hit.y - eye[1]) * back[1] + (hit.z - eye[2]) * back[2]));
+    var hit = scene.surfaceHitRayWithView(view, eye[0], eye[1], eye[2], -back[0], -back[1], -back[2]);
+    // Only hits are cached: the spatial index can lag a freshly opened scene without a
+    // revision change, so a miss is retried on the next fit instead of sticking.
+    if (hit != null) {
+      focusDepth = Math.max(0.0, -((hit[0] - eye[0]) * back[0] + (hit[1] - eye[1]) * back[1] + (hit[2] - eye[2]) * back[2]));
+      focusDepthKey = key;
+    }
     return focusDepth;
   }
 

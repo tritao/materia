@@ -31,12 +31,15 @@ class PresentationController implements Observable {
     return sourceRecord == record && sourceDefinition == definition;
   public function matchesDefinition(definition:AssemblyDefinition):Bool return sourceDefinition == definition;
   public function retainCursor(previous:PresentationController):Void {
-    var old = previous.cursor;
-    if (record.views.filter(v -> v.id == old.view).length == 0) return;
-    if (old.procedure != null
-      && record.procedures.filter(p -> p.id == old.procedure && p.steps.length >= old.step).length == 0) return;
-    cursor = new PresentationCursor(old.view, old.explode, old.procedure, old.step, old.progress);
-    animating = previous.animating;
+    if (restoreCursor(previous.cursor)) animating = previous.animating;
+  }
+  /** Adopts a cursor if this record still has its view and procedure step; returns whether it did. */
+  public function restoreCursor(next:PresentationCursor):Bool {
+    if (record.views.filter(v -> v.id == next.view).length == 0) return false;
+    if (next.procedure != null
+      && record.procedures.filter(p -> p.id == next.procedure && p.steps.length >= next.step).length == 0) return false;
+    cursor = new PresentationCursor(next.view, next.explode, next.procedure, next.step, next.progress);
+    return true;
   }
   public function reset():Void {
     animating = false;

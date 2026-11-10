@@ -1871,6 +1871,26 @@ class EditorScene implements Observable {
       worldPoint
     );
 
+  /**
+   * World point (metres) where a ray first meets any displayed surface, selectable
+   * or not (generated children, presentation-only nodes), or null on a miss.
+   */
+  public function surfaceHitRayWithView(
+    view:SceneView,
+    originX:Float,
+    originY:Float,
+    originZ:Float,
+    directionX:Float,
+    directionY:Float,
+    directionZ:Float
+  ):Null<Array<Float>> {
+    refreshPresentationIfStale();
+    var hit = spatial.pickRayWithView(view, originX, originY, originZ, directionX, directionY, directionZ);
+    var x = hit.worldX(), y = hit.worldY(), z = hit.worldZ();
+    if (hit.node().stableValue() == 0 || !Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z)) return null;
+    return [x, y, z];
+  }
+
   /** As `pickRayWithView`, with the world point that was hit (metres). */
   public function pickHitRayWithView(
     view:SceneView,

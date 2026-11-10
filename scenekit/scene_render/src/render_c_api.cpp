@@ -847,6 +847,31 @@ nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_render_executor_capture_depth(
+    nkscene_render_executor executor_handle, nkscene_render_plan plan_handle,
+    nkscene_snapshot snapshot_handle, uint32_t width, uint32_t height, uint8_t *depth,
+    uint64_t depth_size) {
+    if (!width || !height || !depth ||
+        depth_size != static_cast<uint64_t>(width) * height * sizeof(float))
+        return NKS_ERROR_INVALID_ARGUMENT;
+    const auto snapshot = nkscene::resolve_snapshot_handle(snapshot_handle);
+    if (!snapshot)
+        return NKS_ERROR_INVALID_HANDLE;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto executor = state.executors.get(nkscene::unpack_handle(executor_handle));
+    const auto plan = state.plans.get(nkscene::unpack_handle(plan_handle));
+    if (!executor || !plan)
+        return NKS_ERROR_INVALID_HANDLE;
+    std::vector<float> captured;
+    if (executor->capture_depth(*plan, *snapshot, width, height, captured) != NKGPU_OK)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    if (captured.size() * sizeof(float) != depth_size)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    std::memcpy(depth, captured.data(), depth_size);
+    return NKS_OK;
+}
+
 nkscene_result NKS_CALL nkscene_render_executor_render_image_id(
     nkscene_render_executor executor_handle, nkscene_render_plan plan_handle,
     nkscene_snapshot snapshot_handle, uint32_t width, uint32_t height, float clear_red,

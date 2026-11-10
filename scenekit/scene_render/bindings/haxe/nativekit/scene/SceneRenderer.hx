@@ -101,6 +101,33 @@ class SceneRenderer {
   }
 
   /**
+   * Window depth (0 near .. 1 far; 1 is also background) of the depth-tested pick
+   * pass, one float32 per pixel, rows from the top down.
+   */
+  public function captureDepth(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int):Bytes {
+    ensureLive();
+    if (width <= 0 || height <= 0 || width > Std.int(536870911 / height)) throw "Depth capture dimensions are invalid";
+    prepare(snapshot, view, null);
+    var depth = Bytes.alloc(width * height * 4);
+    var captured = NativeKitSceneRender.nkscene_render_executor_capture_depth(
+      executor.borrow(),
+      planOwner.borrow(),
+      snapshot.nativeHandle(),
+      width,
+      height,
+      depth,
+      depth.length
+    );
+    if (captured != 0) {
+      var last = NativeKitSceneRender.nkscene_render_executor_get_last_result(executor.borrow());
+      checkScene(last.status, "sceneRenderer.captureDepth");
+      checkGpu(last.out_result, "sceneRenderer.captureDepth");
+    }
+    checkScene(captured, "sceneRenderer.captureDepth");
+    return depth;
+  }
+
+  /**
 	 * Sets how many samples rendered images use and returns the count that will be used.
 	 * One means no multisampling, which is the default. The request is clamped to what the
 	 * GPU can render and resolve and rounded down to a power of two. Picking is never

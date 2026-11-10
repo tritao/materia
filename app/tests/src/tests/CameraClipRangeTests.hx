@@ -61,10 +61,58 @@ import nativekit.scene.SceneRenderer;
       check(Math.abs(viewport.camera.clipNear - expected.clipNear) < 1e-6
         && Math.abs(viewport.camera.clipFar - expected.clipFar) < 1e-6,
         "camera motion refits clipping against the current world bounds");
+      // A copied view state replays the same camera and lens in another viewport.
+      viewport.setPresentationZoom(1.5);
+      var copied = app.editor.ViewportState.ViewportStates.decode(
+        app.editor.ViewportState.ViewportStates.encode(viewport.viewState()));
+      check(copied.width == 800 && copied.height == 600 && copied.presentation == null, "view state records size, no presentation");
+      var replay = new app.EditorPerspectiveViewport("clip-bounds-replay", scene, host);
+      try {
+        replay.updateViewportSize(copied.width, copied.height);
+        replay.applyViewState(copied);
+        check(!replay.viewStatePending(), "without a presentation the camera applies at once");
+        check(Math.abs(replay.camera.yaw - viewport.camera.yaw) < 1e-12
+          && Math.abs(replay.camera.pitch - viewport.camera.pitch) < 1e-12
+          && Math.abs(replay.camera.distance - viewport.camera.distance) < 1e-12
+          && Math.abs(replay.camera.targetX - viewport.camera.targetX) < 1e-12
+          && replay.presentationZoom() == 1.5, "replayed camera and lens match");
+        replay.fitCameraClipRange();
+        viewport.fitCameraClipRange();
+        check(Math.abs(replay.camera.clipNear - viewport.camera.clipNear) < 1e-12,
+          "replayed view fits the same near plane");
+      } catch (error:Dynamic) {
+        replay.dispose(); throw error;
+      }
+      replay.dispose();
+      var rejected = false;
+      try app.editor.ViewportState.ViewportStates.decode('{"format":"other"}') catch (_:Dynamic) rejected = true;
+      check(rejected, "other formats are rejected");
     } catch (error:Dynamic) {
       viewport.dispose(); scene.dispose(); throw error;
     }
     viewport.dispose(); scene.dispose();
+  }
+
+  /** Depth images invert the GL projection and measure steps in pixel footprints. */
+  static function capturedDepth():Void {
+    var near = 0.01, far = 10.0, depths = [0.5, 2.0, -1.0, 8.0];
+    var window = haxe.io.Bytes.alloc(16);
+    for (index in 0...4) {
+      var d = depths[index];
+      // Window depth of view depth d: ((f + n) d - 2 f n) / ((f - n) d), mapped from NDC.
+      var ndc = d < 0.0 ? 1.0 : ((far + near) * d - 2.0 * far * near) / ((far - near) * d);
+      window.setFloat(index * 4, d < 0.0 ? 1.0 : (ndc + 1.0) * 0.5);
+    }
+    var image = new app.editor.ViewportDepth(2, 2, window, near, far, 50.0, 2.0, 24);
+    check(Math.abs(image.viewDepth(0, 0) - 0.5) < 1e-4 && Math.abs(image.viewDepth(1, 0) - 2.0) < 1e-3,
+      "view depth inverts the projection");
+    check(!image.covered(0, 1) && image.covered(1, 1), "window depth 1 is background");
+    var summary = image.summary(0.02);
+    check(summary.coveredPixels == 3 && Math.abs(summary.farthestSurface - 8.0) < 0.05, "summary skips background");
+    var expected = 2.0 * (far - near) / (far * near) / 16777216.0 / (2.0 * Math.tan(25.0 * Math.PI / 180.0) / 2.0);
+    check(Math.abs(summary.focusStepPixels - expected) < expected * 1e-9, "focus step is in pixel footprints");
+    check(summary.maxStepPixels > summary.medianStepPixels && summary.pixelsOverLimit == 0, "far pixels have the largest steps");
+    check(image.summary(0.0).pixelsOverLimit == 3, "every covered pixel counts against a zero limit");
   }
   /** A close-up on a hole rim in an exploded assembly: the exploded frame's box encloses the eye. */
   static function explodedCloseUp():Void {
@@ -162,6 +210,7 @@ import nativekit.scene.SceneRenderer;
     );
     check(camera.clipNear > 0.1 && camera.clipFar < 0.5, "saved mold view keeps its useful depth precision");
     explodedCloseUp();
+    capturedDepth();
     Sys.println('Camera clip range: $assertions assertions passed');
     return 0;
   }

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "depth-capture" },
+  "entry": "tests.DepthCapture",
+  "sourceRoots": ["src"],
+  "scopeSourceRoots": false,
+  "dependencies": { "app": { "path": ".." } },
+  "target": "host",
+  "outputDir": "depth-capture/build"
+}

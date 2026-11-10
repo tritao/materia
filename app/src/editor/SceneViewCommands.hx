@@ -25,6 +25,19 @@ import haxeon.ui.core.UiModifier;
       if (app.perspectiveViewport != null) app.perspectiveViewport.resetView();
       app.log("Perspective view reset");
     }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null));
+    app.commands.register(new Command("scene.copy-view-state", "Copy view state", function() {
+      var viewport = app.perspectiveViewport;
+      if (viewport == null) return;
+      // Replay with app/tests/haxeon.depth-capture.json --state=FILE to inspect this view's depth.
+      var state = viewport.viewState(), session = app.session;
+      if (session.projectReference != null) {
+        state.project = session.projectReference;
+        var variant = session.projectVariant;
+        if (variant != null) state.variant = variant;
+      } else if (session.path != null) state.document = session.path;
+      app.ui.clipboard.writeText(ViewportState.ViewportStates.encode(state));
+      app.log("View state copied");
+    }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null));
     app.commands.register(new Command("scene.toggle-cosmetic-threads", "Cosmetic Threads", function() {
       app.preferences.store.set(AppSettings.COSMETIC_THREADS, PropertyValue.Bool(!app.cosmeticThreadsVisible));
     }, null, null, function() return app.cosmeticThreadsVisible));

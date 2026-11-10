@@ -8,6 +8,13 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	const NKS_RENDER_PICK_READY = 2;
 	const NKS_RENDER_PICK_STALE = 3;
 	/**
+	 * Renders the plan's depth-tested pick pass and reads each pixel's window depth
+	 * (0 at the near plane, 1 at the far plane and for background) as native-endian
+	 * float32, rows from the top of the image down, as pick pixel coordinates.
+	 * depth_size must be width * height * 4 bytes.
+	 */
+	extern fn nkscene_render_executor_capture_depth(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, depth: ptr<u8>, depth_size: u64) -> nkscene_result;
+	/**
 	 * Renders into an offscreen RGBA8 target and copies tightly packed pixels.
 	 */
 	extern fn nkscene_render_executor_capture_rgba8(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, clear_red: f32, clear_green: f32, clear_blue: f32, clear_alpha: f32, pixels: ptr<u8>, pixel_size: u64) -> nkscene_result;

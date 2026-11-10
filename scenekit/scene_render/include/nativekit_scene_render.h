@@ -340,6 +340,15 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
     nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,
     uint32_t width, uint32_t height, float clear_red, float clear_green, float clear_blue,
     float clear_alpha, uint8_t *pixels, uint64_t pixel_size);
+/**
+ * Renders the plan's depth-tested pick pass and reads each pixel's window depth
+ * (0 at the near plane, 1 at the far plane and for background) as native-endian
+ * float32, rows from the top of the image down, as pick pixel coordinates.
+ * depth_size must be width * height * 4 bytes.
+ */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_depth(
+    nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,
+    uint32_t width, uint32_t height, uint8_t *depth, uint64_t depth_size);
 /** Renders into a sampled GPU image owned by the executor. The returned handle
  * is borrowed until the executor is destroyed or its target is resized. */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_render_image_id(
