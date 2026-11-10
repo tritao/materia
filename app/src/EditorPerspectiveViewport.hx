@@ -1706,10 +1706,13 @@ class EditorPerspectiveViewport implements View implements Observable {
     try {
       fitCameraClipRange();
       var view = prepareRenderView(camera.viewProjection(aspect(), -1, -1, readOnly ? fov : 0));
-      var window = target.captureDepth(scene.renderSnapshot(), view, width, height);
+      var snapshot = scene.renderSnapshot();
+      var window = target.captureDepth(snapshot, view, width, height);
+      var objects = haxe.io.Bytes.alloc(width * height * 4), faces = haxe.io.Bytes.alloc(width * height * 4);
+      target.captureSurfaceIds(snapshot, view, width, height, objects, faces);
       var focus = centreFocusDepth();
       result = new app.editor.ViewportDepth(width, height, window, camera.clipNear, camera.clipFar, fov,
-        focus > 0.0 ? focus : camera.distance, SceneRenderer.depthBits());
+        focus > 0.0 ? focus : camera.distance, SceneRenderer.depthBits(), objects, faces);
     } catch (error:Dynamic) {
       updateViewportSize(shownWidth, shownHeight);
       fitCameraClipRange();
@@ -1718,6 +1721,32 @@ class EditorPerspectiveViewport implements View implements Observable {
     updateViewportSize(shownWidth, shownHeight);
     fitCameraClipRange();
     return result;
+  }
+
+  /**
+   * The displayed frame as RGBA8 from this camera at `width` x `height`, with the
+   * viewport's own lighting, edges and sample count; an empty background is transparent.
+   */
+  public function captureFrame(width:Int, height:Int):haxe.io.Bytes {
+    ensureRenderer();
+    var target = renderer;
+    if (target == null) throw "The viewport has no renderer to capture a frame with";
+    var shownWidth = viewportWidth, shownHeight = viewportHeight;
+    updateViewportSize(width, height);
+    var fov = !readOnly ? PerspectiveCamera.FOV_Y : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom));
+    var pixels:haxe.io.Bytes;
+    try {
+      fitCameraClipRange();
+      var view = prepareRenderView(camera.viewProjection(aspect(), -1, -1, readOnly ? fov : 0));
+      pixels = target.captureRgba8(scene.renderSnapshot(), view, width, height, 0.0, 0.0, 0.0, 0.0);
+    } catch (error:Dynamic) {
+      updateViewportSize(shownWidth, shownHeight);
+      fitCameraClipRange();
+      throw error;
+    }
+    updateViewportSize(shownWidth, shownHeight);
+    fitCameraClipRange();
+    return pixels;
   }
 
   /**

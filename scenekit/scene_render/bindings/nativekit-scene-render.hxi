@@ -19,6 +19,14 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 */
 	extern fn nkscene_render_executor_capture_rgba8(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, clear_red: f32, clear_green: f32, clear_blue: f32, clear_alpha: f32, pixels: ptr<u8>, pixel_size: u64) -> nkscene_result;
 	/**
+	 * Renders the same depth-tested pick pass and reads, per pixel and rows from the
+	 * top down, which drawn object and which face won it, as native-endian uint32:
+	 * `objects` holds the pass's encoded instance ID (0 is background; equal values
+	 * are the same drawn instance), `faces` the face ID within it (section caps are
+	 * NKS_RENDER_CAP_SUBELEMENT_TAG | plane). Each buffer is width * height * 4 bytes.
+	 */
+	extern fn nkscene_render_executor_capture_surface_ids(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, objects: ptr<u8>, objects_size: u64, faces: ptr<u8>, faces_size: u64) -> nkscene_result;
+	/**
 	 * Creates an executor bound to a GPU renderer. Pass a zero renderer for the
 	 * headless resource and command path. The renderer must outlive the executor.
 	 */

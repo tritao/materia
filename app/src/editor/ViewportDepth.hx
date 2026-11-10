@@ -17,10 +17,17 @@ class ViewportDepth {
   public final focusDepth:Float;
   public final depthBits:Int;
   final window:Bytes;
+  /** Winning object and face per pixel of the same pass (uint32 each), when captured. */
+  final objects:Null<Bytes>;
+  final faces:Null<Bytes>;
 
   public function new(width:Int, height:Int, window:Bytes, near:Float, far:Float, fovY:Float, focusDepth:Float,
-      depthBits:Int) {
+      depthBits:Int, ?objects:Bytes, ?faces:Bytes) {
     if (window.length != width * height * 4) throw "Depth capture size does not match its image";
+    if ((objects != null && objects.length != window.length) || (faces != null && faces.length != window.length))
+      throw "Surface ids do not match the depth image";
+    this.objects = objects;
+    this.faces = faces;
     this.width = width;
     this.height = height;
     this.window = window;
@@ -33,6 +40,22 @@ class ViewportDepth {
 
   /** The raw window depths, float32 per pixel, rows from the top down. */
   public function windowBytes():Bytes return window;
+
+  public function hasSurfaceIds():Bool return objects != null && faces != null;
+
+  /** The drawn object that won this pixel; 0 is background. */
+  public function objectAt(x:Int, y:Int):Int {
+    var ids = objects;
+    if (ids == null) throw "This capture has no surface ids";
+    return ids.getInt32((y * width + x) * 4);
+  }
+
+  /** The face of that object that won this pixel. */
+  public function faceAt(x:Int, y:Int):Int {
+    var ids = faces;
+    if (ids == null) throw "This capture has no surface ids";
+    return ids.getInt32((y * width + x) * 4);
+  }
 
   public function windowDepth(x:Int, y:Int):Float return window.getFloat((y * width + x) * 4);
 

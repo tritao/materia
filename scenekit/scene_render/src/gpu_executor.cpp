@@ -3445,8 +3445,11 @@ nkgpu_result NativeKitGpuExecutor::capture_depth(const RenderPlan &plan,
 nkgpu_result NativeKitGpuExecutor::capture_pick_ids(const RenderPlan &plan,
                                                     const SceneSnapshot &snapshot,
                                                     std::uint32_t width, std::uint32_t height,
-                                                    std::vector<std::uint32_t> &out_ids) {
+                                                    std::vector<std::uint32_t> &out_ids,
+                                                    std::vector<std::uint32_t> *out_subelements) {
     out_ids.clear();
+    if (out_subelements)
+        out_subelements->clear();
     if (!width || !height) {
         state_->last_result = NKGPU_ERROR_INVALID_ARGUMENT;
         return state_->last_result;
@@ -3479,8 +3482,27 @@ nkgpu_result NativeKitGpuExecutor::capture_pick_ids(const RenderPlan &plan,
                 pixels[index * 4 + 3]};
             out_ids[index] = decode_pick_id(pixel);
         }
-    } else {
+    }
+    if (result == NKGPU_OK && out_subelements) {
+        result = read_back_pick_image(*state_, state_->pick_subelement, width, height, pixels.size(),
+                                      pixels.data());
+        if (result == NKGPU_OK) {
+            out_subelements->resize(pixel_count);
+            for (std::size_t index = 0; index < pixel_count; ++index) {
+                const std::array<std::uint8_t, 4> pixel{
+                    pixels[index * 4], pixels[index * 4 + 1], pixels[index * 4 + 2],
+                    pixels[index * 4 + 3]};
+                // Same decoding as pick_pixel: alpha 1..254 tags a section cap's plane.
+                (*out_subelements)[index] = pixel[3] > 0 && pixel[3] < 255
+                    ? cap_subelement_tag | (pixel[3] - 1u)
+                    : decode_pick_id(pixel);
+            }
+        }
+    }
+    if (result != NKGPU_OK) {
         out_ids.clear();
+        if (out_subelements)
+            out_subelements->clear();
     }
     state_->last_result = result;
     return result;

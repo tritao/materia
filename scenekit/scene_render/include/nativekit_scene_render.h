@@ -349,6 +349,17 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_depth(
     nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,
     uint32_t width, uint32_t height, uint8_t *depth, uint64_t depth_size);
+/**
+ * Renders the same depth-tested pick pass and reads, per pixel and rows from the
+ * top down, which drawn object and which face won it, as native-endian uint32:
+ * `objects` holds the pass's encoded instance ID (0 is background; equal values
+ * are the same drawn instance), `faces` the face ID within it (section caps are
+ * NKS_RENDER_CAP_SUBELEMENT_TAG | plane). Each buffer is width * height * 4 bytes.
+ */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_surface_ids(
+    nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,
+    uint32_t width, uint32_t height, uint8_t *objects, uint64_t objects_size, uint8_t *faces,
+    uint64_t faces_size);
 /** Renders into a sampled GPU image owned by the executor. The returned handle
  * is borrowed until the executor is destroyed or its target is resized. */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_render_image_id(

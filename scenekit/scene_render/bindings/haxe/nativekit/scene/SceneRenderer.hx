@@ -128,6 +128,37 @@ class SceneRenderer {
   }
 
   /**
+   * Which drawn object and face won each pixel of the depth-tested pick pass, as
+   * uint32 per pixel, rows from the top down: `objects` (0 is background) and
+   * `faces` (section caps carry NKS_RENDER_CAP_SUBELEMENT_TAG | plane). Both must
+   * hold width * height * 4 bytes.
+   */
+  public function captureSurfaceIds(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int, objects:Bytes,
+      faces:Bytes):Void {
+    ensureLive();
+    if (width <= 0 || height <= 0 || width > Std.int(536870911 / height)) throw "Surface capture dimensions are invalid";
+    if (objects.length != width * height * 4 || faces.length != width * height * 4) throw "Surface capture buffers have the wrong size";
+    prepare(snapshot, view, null);
+    var captured = NativeKitSceneRender.nkscene_render_executor_capture_surface_ids(
+      executor.borrow(),
+      planOwner.borrow(),
+      snapshot.nativeHandle(),
+      width,
+      height,
+      objects,
+      objects.length,
+      faces,
+      faces.length
+    );
+    if (captured != 0) {
+      var last = NativeKitSceneRender.nkscene_render_executor_get_last_result(executor.borrow());
+      checkScene(last.status, "sceneRenderer.captureSurfaceIds");
+      checkGpu(last.out_result, "sceneRenderer.captureSurfaceIds");
+    }
+    checkScene(captured, "sceneRenderer.captureSurfaceIds");
+  }
+
+  /**
 	 * Sets how many samples rendered images use and returns the count that will be used.
 	 * One means no multisampling, which is the default. The request is clamped to what the
 	 * GPU can render and resolve and rounded down to a power of two. Picking is never

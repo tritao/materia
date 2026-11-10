@@ -872,6 +872,32 @@ nkscene_result NKS_CALL nkscene_render_executor_capture_depth(
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_render_executor_capture_surface_ids(
+    nkscene_render_executor executor_handle, nkscene_render_plan plan_handle,
+    nkscene_snapshot snapshot_handle, uint32_t width, uint32_t height, uint8_t *objects,
+    uint64_t objects_size, uint8_t *faces, uint64_t faces_size) {
+    const auto expected = static_cast<uint64_t>(width) * height * sizeof(std::uint32_t);
+    if (!width || !height || !objects || !faces || objects_size != expected || faces_size != expected)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    const auto snapshot = nkscene::resolve_snapshot_handle(snapshot_handle);
+    if (!snapshot)
+        return NKS_ERROR_INVALID_HANDLE;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto executor = state.executors.get(nkscene::unpack_handle(executor_handle));
+    const auto plan = state.plans.get(nkscene::unpack_handle(plan_handle));
+    if (!executor || !plan)
+        return NKS_ERROR_INVALID_HANDLE;
+    std::vector<std::uint32_t> ids, subelements;
+    if (executor->capture_pick_ids(*plan, *snapshot, width, height, ids, &subelements) != NKGPU_OK)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    if (ids.size() * sizeof(std::uint32_t) != expected || subelements.size() * sizeof(std::uint32_t) != expected)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    std::memcpy(objects, ids.data(), expected);
+    std::memcpy(faces, subelements.data(), expected);
+    return NKS_OK;
+}
+
 nkscene_result NKS_CALL nkscene_render_executor_render_image_id(
     nkscene_render_executor executor_handle, nkscene_render_plan plan_handle,
     nkscene_snapshot snapshot_handle, uint32_t width, uint32_t height, float clear_red,

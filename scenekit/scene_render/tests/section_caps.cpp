@@ -41,6 +41,9 @@ void one_plane_and_picking(nkgpu_renderer renderer) {
     assert(pixels[(48*96+48)*4+3]==255);
     PickResult pick;assert(gpu.pick_pixel(plan,f.scene->snapshot(),96,96,48,48,&pick)==NKGPU_OK);
     assert(pick.node==f.node);assert(pick.subelement.value==cap_subelement_tag);assert(std::abs(pick.worldPosition.z)<1e-4f);
+    // The whole-image readback decodes faces as pick_pixel does: the cap here, background at the corner.
+    std::vector<std::uint32_t> ids,faces;assert(gpu.capture_pick_ids(plan,f.scene->snapshot(),96,96,ids,&faces)==NKGPU_OK);
+    assert(ids.size()==96*96&&faces.size()==96*96&&ids[48*96+48]!=0&&faces[48*96+48]==cap_subelement_tag&&ids[2*96+2]==0);
     SceneSpatialIndex spatial(f.scene->snapshot(),&f.view);auto cpu=spatial.pick_ray({{0,0,2},{0,0,-1}});
     assert(cpu.node==f.node&&cpu.subelement.value==cap_subelement_tag&&std::abs(cpu.worldPosition.z)<1e-5f);
     // Cap depth must occlude a later solid whose near surface is behind the cut.

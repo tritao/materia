@@ -14,6 +14,11 @@ import nativekit.scene.DepthPrecision;
  *                the limit, yellow at it, red ten times over; background black
  *   summary.json near/far, focus, step percentiles, pixels over the limit
  *   window-depth.f32  raw window depth, float32 per pixel, rows from the top down
+ *   faces.png    which subelement won each pixel: one flat colour per (object, subelement), a
+ *                dark line where neighbours differ. Subelements are B-rep faces when the mesh
+ *                carries face ids, otherwise triangles, so plain meshes show their tessellation.
+ *   frame.png    the rendered frame as the viewport draws it (lighting, edges, samples)
+ *   frame-shaded.png  the same frame without edge strokes
  *
  * --presentation-camera keeps the presentation view's own framing instead of the
  * recorded camera, and state.json then records that framing: a way to start a
@@ -85,6 +90,13 @@ import nativekit.scene.DepthPrecision;
           sys.io.File.saveBytes(outDir + "/depth.png", depthImage(depth));
           sys.io.File.saveBytes(outDir + "/steps.png", stepImage(depth, limit));
           sys.io.File.saveBytes(outDir + "/window-depth.f32", depth.windowBytes());
+          if (depth.hasSurfaceIds()) sys.io.File.saveBytes(outDir + "/faces.png", faceImage(depth));
+          sys.io.File.saveBytes(outDir + "/frame.png", materia.image.Png.rgba(width, height, viewport.captureFrame(width, height)));
+          // The same frame without edge strokes separates stroke artefacts from surface ones.
+          var edges = editor.scene.cadEdgeMode;
+          editor.scene.setCadEdgeMode(Shaded);
+          sys.io.File.saveBytes(outDir + "/frame-shaded.png", materia.image.Png.rgba(width, height, viewport.captureFrame(width, height)));
+          editor.scene.setCadEdgeMode(edges);
           var result = depth.summary(limit);
           sys.io.File.saveContent(outDir + "/summary.json", haxe.Json.stringify(result, null, "  "));
           var replayed = viewport.viewState();
@@ -144,6 +156,28 @@ import nativekit.scene.DepthPrecision;
       // Green (0) -> yellow (0.5) -> red (1).
       var red = t < 0.5 ? Std.int(510 * t) : 255, green = t < 0.5 ? 200 : Std.int(200 * (1.0 - t) * 2.0);
       put(pixels, index, red, green, 40);
+    }
+    return materia.image.Png.rgba(depth.width, depth.height, pixels);
+  }
+
+  static function faceImage(depth:ViewportDepth):Bytes {
+    var pixels = Bytes.alloc(depth.width * depth.height * 4);
+    function key(x:Int, y:Int):Int return depth.objectAt(x, y) * 7919 + depth.faceAt(x, y);
+    for (y in 0...depth.height) for (x in 0...depth.width) {
+      var index = (y * depth.width + x) * 4;
+      if (depth.objectAt(x, y) == 0) {
+        put(pixels, index, 0, 0, 0);
+        continue;
+      }
+      var k = key(x, y);
+      var boundary = (x + 1 < depth.width && key(x + 1, y) != k) || (y + 1 < depth.height && key(x, y + 1) != k);
+      if (boundary) {
+        put(pixels, index, 20, 20, 20);
+        continue;
+      }
+      // A stable, well-spread colour per face.
+      var h = (k * 0x9E3779B1) >>> 8;
+      put(pixels, index, 90 + (h & 0x7f), 90 + ((h >> 7) & 0x7f), 90 + ((h >> 14) & 0x7f));
     }
     return materia.image.Png.rgba(depth.width, depth.height, pixels);
   }
