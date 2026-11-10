@@ -62,3 +62,10 @@ either the test moves with the machine into `machines/<name>/tests`, or the libr
 - **MM-last.** `machinekit/examples` holds only demos; a check fails if a `machinekit/tests` manifest depends on `machines/`.
 
 ## Log
+- 2026-11-10 casting shop (fc1ac6365): moved to `machines/casting-shop` as a shared shop project (it needs MachineKit, CAM, CNC
+  and toolpath kits; no kit sits above them); its aggregate review moved into the hobber's studies to break the cycle. 50
+  manifests rewritten. Shop recipe 41, joint fasteners, bench mill, hobber scene pass; aggregate-review, hobber-source and
+  motionkit tests fail identically on main.
+- 2026-11-10 MM1 hobber (bec8ada3b): `machines/flexspline-hobber` with `tests/hobber` and `tests/hobbing`; 149 manifests, 21 doc
+  links, root-relative references and script root climbs updated. Hobber 3303, hobbing 1185, enclosure end to end, joint
+  fasteners, integrity, ProjectKit 426 pass; app suite stops at the existing CosmeticThreadTests failure.
