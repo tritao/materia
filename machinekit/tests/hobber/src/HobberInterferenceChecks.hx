@@ -132,7 +132,7 @@ class HobberInterferenceChecks {
               sb.close();
               var local = PosedParts.moved(
                 common,
-                materia.assembly.AssemblyFrames.inverse(FlexsplineHobber.MACHINE_FROM_WORK)
+                materia.assembly.AssemblyFrames.inverse(machinekit.hobbing.HobberFrame.workToMachine())
               );
               common.close();
               var bb = PosedParts.boxOf(local);

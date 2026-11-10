@@ -85,7 +85,7 @@ class HobberXAssembly {
   static function bayNutAccess(machine:FlexsplineHobber):Int {
     var derived=machine.derivedFasteners(); if (derived==null) throw "Missing bay lid joints";
     var poses=machine.solvedPoses(), members=machine.components(), cache=new machinekit.assembly.PosedParts(), count=0;
-    var back=materia.assembly.AssemblyFrames.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var back=materia.assembly.AssemblyFrames.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     for (joint in derived.joints) if (joint.clampedMember=="XrearCover") {
       var host=members.filter(p->p.id==joint.receivingMember)[0];
       var face=host.component.fasteningFaces().filter(f->f.id==joint.receivingFace)[0];
@@ -99,7 +99,7 @@ class HobberXAssembly {
         function envelope(x0:Float,x1:Float,y0:Float,y1:Float):cadkit.modeling.Part {
           var raw=cadkit.modeling.Part.box(x1-x0,y1-y0,2);
           var out=machinekit.assembly.PosedParts.moved(raw,materia.assembly.AssemblyFrames.compose(
-            FlexsplineHobber.MACHINE_FROM_WORK,materia.assembly.AssemblyFrames.translation((x0+x1)/2,(y0+y1)/2,point.z-1)));
+            machinekit.hobbing.HobberFrame.workToMachine(),materia.assembly.AssemblyFrames.translation((x0+x1)/2,(y0+y1)/2,point.z-1)));
           raw.close();return out;
         }
         var tools=[envelope(x0,point.x+5,point.y-5,point.y+5),

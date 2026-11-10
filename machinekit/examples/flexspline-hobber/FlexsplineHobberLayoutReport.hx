@@ -37,7 +37,7 @@ class FlexsplineHobberLayoutReport {
   /** Radial side view from actual posed solid envelopes; Y-offset parts are projected. */
   public static function writeSection(machine:FlexsplineHobber, path:String):Void {
     var poses = machine.solvedPoses(), cache = new machinekit.assembly.PosedParts();
-    var work = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var work = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     var hob = F.compose(work, F.compose(poses.get("hob"), machine.hob.connector("centre").frame));
     var lines = [
       '<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="900" viewBox="0 0 1120 900">',
@@ -189,7 +189,7 @@ class FlexsplineHobberLayoutReport {
       });
     }
     var cache = new machinekit.assembly.PosedParts(), loX = 1e30, hiX = -1e30, loY = 1e30, hiY = -1e30;
-    var canonical = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var canonical = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     try {
       for (m in members) {
         var b = cache.box(m.component, F.compose(canonical, poses.get(m.id)));

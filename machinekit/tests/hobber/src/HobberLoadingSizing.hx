@@ -71,7 +71,7 @@ class HobberLoadingSizing {
     var model = new cadkit.modeling.AssemblyModel("mm");
     machine.addTo(model, "");
     var state = model.initialState(),
-      cache = new PosedParts(), canonical = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+      cache = new PosedParts(), canonical = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     state.setJoint("X", machine.travel[0].upper);
     state.setJoint(FlexsplineHobber.Y, 0);
     state.setJoint("Z", 0);

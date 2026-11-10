@@ -34,8 +34,30 @@ class FlexsplineHobberChecks {
     ]};
     return cadbridge.AssemblySimulationBridge.toRobotModel(model.definition("hobber"), physical).model;
   }
+  /** Physical inventory is invariant under the RF1–RF7 restructuring; geometry
+   * fingerprints and poses deliberately permit floating-point round-off. */
+  static function checkRefactorInventory(machine:FlexsplineHobber):Void {
+    var groups = machine.functionalGroups();
+    var members = [for (m in machine.components()) m.id + "\t" + groups.get(m.id) + "\t" + m.component.bom.partNumber];
+    members.sort(Reflect.compare);
+    var lines = [for (b in machine.billOfMaterials().lines())
+      [b.partNumber, b.description, b.material, Std.string(b.quantity), b.familyId,
+       b.manufacturingVariant, b.manufacturingProcess].join("\t")];
+    lines.sort(Reflect.compare);
+    var hardware = machine.derivedFasteners();
+    if (hardware == null) throw "Missing refactor fastener inventory";
+    var inventory = members.join("\n") + "\nBOM\n" + lines.join("\n")
+      + "\n" + hardware.count() + "\t" + hardware.dowelCount();
+    var digest = haxe.crypto.Sha256.encode(inventory);
+    check(digest == "2deebefaa7a0cc26cf29e52f8a36965e9a53b0794219daf101de82c49e3b8417",
+      "refactor preserves members, groups, part numbers, BOM lines and hardware: " + digest);
+    Sys.println("Refactor inventory: " + digest + "; " + members.length + " members, "
+      + lines.length + " BOM lines, " + hardware.count() + " screws, " + hardware.dowelCount() + " pins");
+  }
+
   public static function run():Void {
     var machine = new FlexsplineHobber();
+    checkRefactorInventory(machine);
     machine.validate();
     for (role in materia.casting.InsertSpec.InsertRoles.tokens())
       check(machinekit.structural.MineralFoundation.purposeGroup(role).length > 0, "foundation purpose group " + role);

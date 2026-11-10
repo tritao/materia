@@ -37,7 +37,7 @@ class HobberDesignChecks {
         }
       }
       arbSolid.close(); rotorSolid.close();
-      var canonical = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK), centre = F.compose(canonical, cutter);
+      var canonical = F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), centre = F.compose(canonical, cutter);
       for (id in ["Ymodule/railLeft", "Ymodule/railRight"]) {
         var frame = F.compose(canonical,
           poses.get(id)), normal = F.transformVector(frame, 0, 1, 0), axis = F.transformVector(
@@ -128,7 +128,7 @@ class HobberDesignChecks {
       var nutPart:machinekit.motion.BallNut = cast members.filter(m -> m.id == "Xnut")[0].component;
       for (x in [machinekit.hobbing.HobberXLayout.MIN - 5, xTravel.upper + 5]) {
         // Translation vector only; keep the mounted part's existing orientation.
-        var delta = F.transformVector(FlexsplineHobber.MACHINE_FROM_WORK, x - xTravel.initial, 0, 0);
+        var delta = F.transformVector(machinekit.hobbing.HobberFrame.workToMachine(), x - xTravel.initial, 0, 0);
         var nutPose = F.compose(F.translation(delta.x, delta.y, delta.z), poses.get("Xnut"));
         var relative = F.compose(F.inverse(poses.get("Xscrew")), nutPose);
         var n0 = F.compose(relative, F.translation(0, 0, 0)), n1 = F.compose(

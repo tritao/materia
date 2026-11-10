@@ -32,7 +32,7 @@ class HobberMotorStudy {
       for (j in def.joints) if (group.indexOf(j.parent) >= 0 && group.indexOf(j.child) < 0) {group.push(j.child); expanded = true;}
     }
     var dynamics = HobberFrameChecks.spindleDrive(machine);
-    var back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK), face = F.compose(back, poses.get("swivel/output"));
+    var back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), face = F.compose(back, poses.get("swivel/output"));
     var lines = ["P3: one installed top layout; beside layouts below are geometric studies. Adapter and joint stiffness assumptions are explicit."];
     var model = new cadkit.modeling.AssemblyModel("mm"); machine.addTo(model, "");
     // Independent study snapshot extends linear limits by the design overtravel.

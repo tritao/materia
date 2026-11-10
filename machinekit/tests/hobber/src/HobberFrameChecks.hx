@@ -111,7 +111,7 @@ class HobberFrameChecks {
   /** Rigid stock/metal envelopes use the old plate's work-Y width. Cable and
    * purge-hose routing are reported separately, not mistaken for plate width. */
   public static function v2GeometryGates(machine:FlexsplineHobber):Array<String> {
-    var poses=machine.solvedPoses(),back=F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var poses=machine.solvedPoses(),back=F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     var widest="",rigidMax=0.0,routing="",routingMax=0.0;
     PosedParts.scope(cache->{
       for(member in machine.components())if(StringTools.startsWith(member.id,"Ymodule/")||member.id=="outboardCarrier") {
@@ -310,7 +310,7 @@ class HobberFrameChecks {
    */
   public static function scales(machine:FlexsplineHobber):Array<String> {
     var poses = machine.solvedPoses(), lines = [];
-    var back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     var tool = F.compose(poses.get("hob"), machine.hob.connector("centre").frame);
     var toolWork = F.transformPoint(back, tool.x, tool.y, tool.z);
     for (a in HobberScales.all()) {
@@ -348,7 +348,7 @@ class HobberFrameChecks {
    * Returns one line per quantity; throws when the demand exceeds a rating that is known.
    */
   public static function swivelLoad(machine:FlexsplineHobber, ?worldPoses:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>):Array<String> {
-    var def = machine.definition(), poses = worldPoses ?? machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var def = machine.definition(), poses = worldPoses ?? machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     var turning = new Map<String, Bool>();
     turning.set("swivel/output", true);
     var changed = true;
@@ -457,7 +457,7 @@ class HobberFrameChecks {
    * mode lies inside that band.
    */
   public static function spindleDrive(machine:FlexsplineHobber):{lines:Array<String>, modes:Array<{name:String, f:Float}>, modalMass:Float} {
-    var spindle = machine.spindle, rating = spindle.motor.rating, poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var spindle = machine.spindle, rating = spindle.motor.rating, poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     function r(v:Float, digits:Int = 2):Float return Math.round(v * Math.pow(10, digits)) / Math.pow(10, digits);
     var lines = [];
     // Belt pull on the cartridge pulley.
@@ -641,7 +641,7 @@ class HobberFrameChecks {
 
   /** The members that move with the Z joint (the Z saddle and everything carried on it), and their mass and centre of mass in the work frame. */
   static function zMoving(machine:FlexsplineHobber):{mass:Float, x:Float, y:Float, z:Float, ids:Array<String>} {
-    var def = machine.definition(), poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var def = machine.definition(), poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     var moving = new Map<String, Bool>();
     moving.set("blockZLeft", true);
     var changed = true;
@@ -706,7 +706,7 @@ class HobberFrameChecks {
    * length. Internal bearing seats are part of the purchase, not an invented housing design. Returns the line; throws otherwise.
    */
   public static function spindleSeat(machine:FlexsplineHobber):Array<String> {
-    var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     var seat = HobberSaddle.spindleSeatRange(), toHousing = F.inverse(F.compose(back, housing));
     function zOf(y:Float):Float return F.transformPoint(toHousing, 0, y, HobberZLayout.SEAT_Z).z;
     var a = zOf(seat.y0), b = zOf(seat.y1), from = Math.min(a, b), to = Math.max(a, b);
@@ -731,7 +731,7 @@ class HobberFrameChecks {
     var model = new cadkit.modeling.AssemblyModel("mm");
     machine.addTo(model, "");
     var state = model.initialState();
-    var toMachine = FlexsplineHobber.MACHINE_FROM_WORK, zero = HobberSpindleRelief.motorZeroPose(HobSpindle.MOTOR_CLOCKING);
+    var toMachine = machinekit.hobbing.HobberFrame.workToMachine(), zero = HobberSpindleRelief.motorZeroPose(HobSpindle.MOTOR_CLOCKING);
     function analytic(x:Float, y:Float, z:Float, a:Float) return F.compose(toMachine, F.compose(HobberSpindleRelief.motion(x, y, z, a), zero));
     // (1) the chain.
     var xl = machine.travel.filter(t -> t.id == "X")[0].lower, xu = machine.travel.filter(t -> t.id == "X")[0].upper;

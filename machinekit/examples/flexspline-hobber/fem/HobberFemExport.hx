@@ -50,7 +50,7 @@ class HobberFemExport {
     sys.FileSystem.createDirectory(dir);
     var machine = new FlexsplineHobber();
     if(args.length==2&&args[1]=="y-module") {exportY(machine,dir);return;}
-    var poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK), seatZ = HobberZLayout.SEAT_Z;
+    var poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), seatZ = HobberZLayout.SEAT_Z;
     var partList:Array<Dynamic> = [];
     var out:Dynamic = {parts: partList};
     function at(id:String, x:Float, y:Float, z:Float) return F.transformPoint(F.compose(back, poses.get(id)), x, y, z);

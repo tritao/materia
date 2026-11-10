@@ -160,7 +160,7 @@ class HobberEnclosurePreview {
     var machine = source == null ? new FlexsplineHobber() : source,
       fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout, {
         halfWidth: machinekit.hobbing.HobberChipCover.OUTER_HALF_WIDTH + machinekit.enclosure.TraySeat.SEAM,
-        rearY: FlexsplineHobber.MACHINE_FROM_WORK.y + machinekit.hobbing.HobberChipCover.REAR_END
+        rearY: machinekit.hobbing.HobberChipCover.REAR_END
       }), assembly = new MachineAssembly();
     assembly.includeAsGroup("Machine", "machine", machine);
     assembly.includeAsGroup(ENCLOSURE_GROUP, SHELL_ID, shell);

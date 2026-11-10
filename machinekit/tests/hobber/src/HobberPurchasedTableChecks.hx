@@ -128,7 +128,7 @@ class HobberPurchasedTableChecks {
     var raw = cadkit.modeling.Part.cylinderSpan(19.99,
       -590, FoundationLayout.TABLE_FACE + 20), cylinder = machinekit.assembly.PosedParts.moved(
         raw,
-        FlexsplineHobber.MACHINE_FROM_WORK
+        machinekit.hobbing.HobberFrame.workToMachine()
       );
     raw.close();
     try {

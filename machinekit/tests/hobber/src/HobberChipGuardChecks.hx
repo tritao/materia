@@ -12,7 +12,7 @@ class HobberChipGuardChecks {
     var definition = model.definition("chip-coverage");
     for (j in definition.joints) if (j.id == "X") { j.limits.lower=20; j.limits.upper=115; }
     var state = new cadkit.modeling.AssemblyState(definition), cache=new PosedParts();
-    var members = machine.components(), back=F.inverse(FlexsplineHobber.MACHINE_FROM_WORK), count=0;
+    var members = machine.components(), back=F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), count=0;
     var ids=[for (r in HobberChipCover.installations()) r.id].concat([for(p in HobberChipCover.plugs())p.id]).concat(["Xbridge","XnutBlock"]);
     for (x in [20.0,45.0,110.0,115.0]) {
       state.setJoint("X",x); state.forwardKinematics();
