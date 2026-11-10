@@ -1215,7 +1215,7 @@ the hobber setup is written; the hobber setup consumes it from the start.
 Mill kits stay identical.
 
 Shop declaration decision (2026-10-25): keep the shared choices in
-`machinekit/examples/casting-shop/CastingShopRecipe.hx`, outside the libraries.
+`machines/casting-shop/CastingShopRecipe.hx`, outside the libraries.
 Each factory returns fresh records. The mill retains its source-recess ownership
 priorities; the column's wire axis and service withdrawal axis differ because it
 lies front-on-bed. Keep those geometric overrides in the setup with their reasons.
@@ -1921,7 +1921,7 @@ The unused fragment ancestry field and parent-opening aliases are deleted. Casti
 
 ## Aggregate gate scope (user, 2026-10-26)
 
-The shop mix declares 5 mm maximum aggregate (`machinekit/examples/casting-shop/SOURCING.md`, commit 963246295, user decision 2026-10-28).
+The shop mix declares 5 mm maximum aggregate (`machines/casting-shop/SOURCING.md`, commit 963246295, user decision 2026-10-28).
 Compound strength and modulus remain unqualified pending coupons. Finished-resin
 measurements use these separate recipe classes:
 

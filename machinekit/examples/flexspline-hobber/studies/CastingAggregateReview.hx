@@ -13,7 +13,7 @@ import machinekit.tooling.ToolingProcessExport;
 /** Source-only decision report. No source mutation, kit export or CAM run. */
 class CastingAggregateReview {
   static function main():Void {
-    var args = Sys.args(), out = args.length == 0 ? "machinekit/examples/casting-shop/build/aggregate-review" : args[0];
+    var args = Sys.args(), out = args.length == 0 ? "machinekit/examples/flexspline-hobber/build/aggregate-review" : args[0];
     machinekit.tooling.ToolingFiles.directory(out);
     var only = args.length > 1 ? args[1] : null;
     if (only != null && ["base",

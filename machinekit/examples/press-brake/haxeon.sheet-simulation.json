@@ -24,7 +24,7 @@
 			"path": "../../../robotkit/inference"
 		},
 		"machinekit-process": {
-			"path": "../../../machinekit/process"
+			"path": "../../process"
 		}
 	},
 	"native": {

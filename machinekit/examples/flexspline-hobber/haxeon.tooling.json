@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-hobber-tooling"},
   "entry": "HobberMoldPreview",
-  "sourceRoots": ["machine", "scenes", "checks", "studies", "../casting-shop"],
+  "sourceRoots": ["machine", "scenes", "checks", "studies", "../../../machines/casting-shop"],
   "dependencies": {
     "machinekit": {"path": "../.."},
     "cadkit": {"path": "../../../cadkit"},
