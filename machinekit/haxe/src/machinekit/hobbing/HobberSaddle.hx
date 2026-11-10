@@ -51,7 +51,7 @@ class HobberSaddle extends MachineComponent {
       "machinekit.hobbing.saddle",
       parameters(),
       v -> new HobberSaddle(v.token("design"), v)
-    ).versioned(5).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
+    ).versioned(6).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
       .procured(_ -> Make("steel fabrication and machining"))
       .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]));
   }
@@ -274,20 +274,20 @@ class HobberSaddle extends MachineComponent {
     return faces;
   }
 
-  /** The seat's two dowels into the Y saddle's plate: 8 mm, 35 mm either side of the plane through the cartridge, reamed through the 12 mm plate and 12 mm into the seat. */
-  static final SEAT_PIN_Y = 150.0;
+  /** The seat's two drawing dowels: 4 mm at Y80 and Z +/-35, through the carriage and 6 mm into the seat. Bolts carry the load; no pin strength credit. */
+  static final SEAT_PIN_Y = 80.0;
   static final SEAT_PIN_Z = 35.0;
 
   static function outboardCarrierFrame(into:Float):AssemblyFrame return BoltedFace.frameOf(
-    {x: 45.0, y: -100.0, z: 0.0}, {x: into, y: 0, z: 0}, {x: 0, y: 1, z: 0});
+    {x: 45.0, y: 30.0, z: 0.0}, {x: into, y: 0, z: 0}, {x: 0, y: 1, z: 0});
   static function outboardCarrierPins(into:Float):machinekit.component.BoltedFace.PinnedFace return PinnedFace.atPoints("outboard-pins", outboardCarrierFrame(into),
-    [for (z in [-45.0, 45.0]) {x: 45.0, y: -100.0, z: z}], 4.0, 6.0, false);
+    [for (z in [-45.0, 45.0]) {x: 45.0, y: 30.0, z: z}], 4.0, 6.0, false);
 
   public static function yHeadFaces():Array<BoltedFace> return [
     BoltedFace.clamped("outboard-carrier",outboardCarrierFrame(1),[for(y in [-8.0,8.0])for(z in [-45.0,45.0]){x:y,y:z}],4.5,12,"M4",null,false,true),
     BoltedFace.clamped("seat",BoltedFace.frameOf({x:SEAT_X1,y:0.0,z:0.0},{x:1.0,y:0,z:0},{x:0.0,y:1,z:0}),seatBolts(),9,12,"M8",null,false)
   ];
-  public static function yHeadPins():Array<PinnedFace> return [outboardCarrierPins(1),PinnedFace.atPoints("seat-pins",BoltedFace.frameOf({x:SEAT_X1,y:0.0,z:0.0},{x:1.0,y:0,z:0},{x:0.0,y:1,z:0}),[for(z in [-SEAT_PIN_Z,SEAT_PIN_Z]){x:SEAT_X1+12,y:SEAT_PIN_Y,z:z}],8,12,true)];
+  public static function yHeadPins():Array<PinnedFace> return [outboardCarrierPins(1),PinnedFace.atPoints("seat-pins",BoltedFace.frameOf({x:SEAT_X1,y:0.0,z:0.0},{x:1.0,y:0,z:0},{x:0.0,y:1,z:0}),[for(z in [-SEAT_PIN_Z,SEAT_PIN_Z]){x:SEAT_X1+10,y:SEAT_PIN_Y,z:z}],4,6,true)];
   override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
     return switch designId {
       case "GE-X-carriage":
@@ -305,7 +305,7 @@ class HobberSaddle extends MachineComponent {
       case "GE-outboard-carrier": [outboardCarrierPins(-1), HobberOutboardLayout.carrierPins()];
       case "GE-spindle-seat":
         [PinnedFace.atPoints("back-pins", BoltedFace.frameOf({x: SEAT_X1, y: (SEAT_Y0 + SEAT_Y1) / 2, z: (SEAT_LOW + SEAT_HALF) / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
-          [for (z in [-SEAT_PIN_Z, SEAT_PIN_Z]) {x: SEAT_X1, y: SEAT_PIN_Y, z: z}], 8.0, 12.0, false),
+          [for (z in [-SEAT_PIN_Z, SEAT_PIN_Z]) {x: SEAT_X1, y: SEAT_PIN_Y, z: z}], 4.0, 6.0, false),
           PinnedFace.atPoints("top-pins", BoltedFace.frameOf({x: 0.0, y: CRADLE_PIN_Y, z: SEAT_HALF}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
             [for (x in CRADLE_PIN_X) {x: x, y: CRADLE_PIN_Y, z: SEAT_HALF}], 8.0, 12.0, false)];
       case "GE-motor-cradle":
@@ -446,10 +446,8 @@ class HobberSaddle extends MachineComponent {
   }
 
   /** The four M8 that hold the seat to the Y saddle: y along the cartridge, z across it; 1.5 diameters from the seat's edges (z -50 and 58). */
-  static function seatBolts():Array<machinekit.component.BoltedFace.BoltHole> return [for (y in [95.0, 205.0]) for (z in [-38.0, 46.0])
-    // Rear lower fixing moves inward one diameter to retain its full 1.5d
-    // carriage edge land above the derived rail/overtravel clearance floor.
-    {x: y==205.0&&z<0?y-8:y, y: z}];
+  static function seatBolts():Array<machinekit.component.BoltedFace.BoltHole> return [for (y in [95.0, 115.0]) for (z in [-38.0, 46.0])
+    {x: y, y: z}];
 
   /** The spindle seat's extent along the spindle axis (work y) and the y of its three clamp screws. */
   public static function spindleSeatRange():{y0:Float, y1:Float, clampYs:Array<Float>} return {y0: SEAT_Y0, y1: SEAT_Y1, clampYs: [100.0, 150.0, 200.0]};
@@ -765,9 +763,13 @@ class HobberSaddle extends MachineComponent {
         var bridge = band(gap, gap + thick), pad = band(0, gap + thick), zr = [hb[4] - Z_SADDLE_ORIGIN_Z, hb[5] - Z_SADDLE_ORIGIN_Z];
         [Solids.union([box(148, hb[1], bridge[0], bridge[1], zr[0], zr[1]), box(hb[0], hb[1], pad[0], pad[1], zr[0], zr[1])])];
       case "GE-outboard-carrier":
-        [Solids.cut(box(-45, 45, -115, -85, -55, 55), [box(-30, 30, -115.1, -84.9, -30, 30)])];
+        [Solids.union([Solids.cut(box(-45,45,-115,-85,-55,55),[box(-30,30,-115.1,-84.9,-30,30)]),box(30,45,-86,45,35,55),box(30,45,-86,45,-55,-35)])];
       case "GE-X-fixed-drive-bar", "GE-X-floating-drive-bar", "GE-Z-fixed-drive-bar", "GE-Z-floating-drive-bar":
-        [padBox(HobberDrives.barBounds(barAxis(designId),barSupport(designId)))];
+        var axis=barAxis(designId),support=barSupport(designId),blank=padBox(HobberDrives.barBounds(axis,support));
+        if(axis.id=="Z"&&support=="floating") {
+          var range=HobberScales.stroke("Z"),over=HobberScales.overtravel();
+          [Solids.cut(blank,[HobberZOffset.envelope(range.lower-over,range.upper+over,HobberZOffset.RUNNING_GAP)])];
+        } else [blank];
       case "GE-chip-tray":
         // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
         // clearance and 2 mm sheet. The lower skirt covers the full table height.

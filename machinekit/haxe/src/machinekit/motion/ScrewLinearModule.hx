@@ -47,9 +47,8 @@ class ScrewLinearModule extends AxisBuilder {
     // Deliberately no controller/drive choice in the mechanical library component.
     for(requirement in serviceRemovals())addDesignRequirement(requirement);
   }
-  public function guardMembers():Array<String> return [];
   function made(role:String):ScrewLinearModulePart return new ScrewLinearModulePart(spec.values().setToken("role",role));
-  function blockPose(side:Int,row:Int):AssemblyFrame return AxisBuilder.orient(spec.centre+row*spec.blockSpacing/2,spec.railY(side),
+  function blockPose(side:Int,row:Int):AssemblyFrame return AxisBuilder.orient(spec.carriageCentre+row*spec.blockSpacing/2,spec.railY(side),
     spec.baseThickness+spec.wallHeight+spec.guide.railHeight,[0.0,0,1],[1.0,0,0]);
   public function fittingOrder():Array<FastenerFitOrder> {
     var out:Array<FastenerFitOrder>=[
@@ -84,18 +83,18 @@ class ScrewLinearModule extends AxisBuilder {
     {parts:["railLeft","railRight","blockLeftFront","blockLeftRear","blockRightFront","blockRightRear"],tools:["straightedge-granite","dial-indicator","magnetic-base","block-transfer-sleeves"],measurement:"Locate rails on reference edges, indicate parallel and transfer matched blocks without losing balls."},
     {parts:["motorMount","floatingBearing","screw","motor"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Fit supports and the actual screw loosely. After the carriage/nut carrier is fitted, indicate the screw parallel to rails at both travel ends, torque and match-pin supports. Catalogue motor pilot locates the motor."},
     {parts:["nut","nutCarrier","carriage"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Indicate nut carrier to screw at BOTH ends of travel, tighten then match-drill and ream; do not pre-drill carrier dowels. Adjust block pads to coplanarity target."},
-    {parts:["wallLeft","scaleHousing","scaleHeadCarrier","scaleHead"],tools:["dial-indicator","magnetic-base","feeler-gauges","af3-low-profile-key","air-fitting-socket"],measurement:"Reference housing seat to guide edge. Indicate housing to 0.1 mm and head to 0.05 mm parallelism. Fit carrier face to measured stack (0.5 mm each-way allowance ASSUMED); set lateral offset within 0.2 mm, gap 1 +/-0.3 mm at the head; confirm the reading window and 75 mm cable bend. Head screws use the low-profile key from below and slide the head out longitudinally for service."},
-    {parts:["stopFront","stopRear"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Fit drawing dowels and verify both overtravel stops engage before screw support contact. Host must limit torque to the bought bearing rating."}
+    {parts:["wallLeft","scaleHousing","scaleHeadCarrier","scaleHead"],tools:["dial-indicator","magnetic-base","feeler-gauges","af3-low-profile-key","air-fitting-socket"],measurement:"Bench-fit the carrier to the carriage before the host head/seat. Reference housing seat to guide edge. Indicate housing to 0.1 mm and head to 0.05 mm parallelism. Fit carrier face to measured stack (0.5 mm each-way allowance ASSUMED); set lateral offset within 0.2 mm, gap 1 +/-0.3 mm at the head; confirm the reading window and 75 mm cable bend. Head screws use the low-profile key from below and slide the head out longitudinally for service."},
+    {parts:["stopFront","stopRear"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Indicate each floor block against the nut carrier at its overtravel end, then tighten its two M6. Verify both stops engage before screw support contact. Fit the drawing dowels, which carry the crash; verify their model capacity. Host must limit torque to the bought bearing rating."}
   ];
   public function stopContacts():Array<{a:String,b:String}> return [{a:"nutCarrier",b:"stopFront"},{a:"nutCarrier",b:"stopRear"}];
 
   public function serviceRemovals():Array<machinekit.design.DesignRequirement> return [
     machinekit.design.DesignRequirement.ServiceRemoval("motor",["motor","motorShaft"],[{direction:[1.0,0,0],distance:spec.drive.motor.rating.shaftLength+10}],[],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("screw",["screw","coupling","nut"],[{direction:[1.0,0,0],distance:spec.baseMax+10}],
-      ["motor","motorShaft","motorMount","floatingRing"].concat(guardMembers()),[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("scaleHead",["scaleHead"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.centre+spec.scaleHead.series.headLength+20}],[],[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.scaleStart()+spec.scaleHousing.overallLength()+20}],["scaleHead"].concat(guardMembers()),[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],guardMembers(),[])
+      ["motor","motorShaft","motorMount","floatingRing"],[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("scaleHead",["scaleHead"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.scaleCentre+spec.scaleHead.series.headLength+20}],[],[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.scaleStart()+spec.scaleHousing.overallLength()+20}],["scaleHead"],[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],[],[])
   ];
   /** Rated thrust / peak motor torque, plus the containing machine's declared
    * payload shear. Half thrust per guide is 2x equal sharing over four blocks. */

@@ -305,9 +305,9 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     spindle = new HobSpindle();
     includeAt("spindle", spindle, F.fromRotationMatrix(centre, HobberSwivelLayout.SPINDLE_Y, HobberZLayout.SEAT_Z, e0));
     // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
-    // four M8 and two dowels into the Y saddle's plate.
+    // four M8 and two 4 mm drawing dowels into the plain Y carriage.
     fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Ymodule/carriage",
-      F.alongY(centre + 45, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
+      F.alongY(centre + 45, 105, HobberZLayout.SEAT_Z, 1, 0, 0));
     fixExisting("spindle-mount", "spindleSeat", "spindle/housing", F.alongY(centre + 40, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
     // The belt-drive servo stands above the cartridge on a milled cradle bolted to the top of the spindle seat block (the stiffest part
     // near it); its flange is on the cradle wall.
@@ -318,7 +318,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
     group("B spindle/Outboard support");
     fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Ymodule/carriage",
-      F.alongY(centre + 45, -100, HobberZLayout.SEAT_Z, 1, 0, 0));
+      F.alongY(centre + 45, 30, HobberZLayout.SEAT_Z, 1, 0, 0));
     var supportPose = F.compose(F.translation(centre, 0, HobberZLayout.SEAT_Z), HobberOutboardLayout.bodyPose());
     fixAt("outboard", new OutboardSupport(), supportPose, "outboardCarrier",
       F.alongY(centre + 30, -100, HobberZLayout.SEAT_Z, 1, 0, 0));

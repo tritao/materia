@@ -3,12 +3,12 @@ package machinekit.hobbing;
 /** Derived stack and swept host interfaces for the hobber Y module. */
 class HobberYLayout {
   public static final JOINT="Ymodule/travel";
-  // Host holes span -108..205 mm along Y; centre the plain plate at Y=50.
-  public static function moduleSpec():machinekit.motion.ScrewLinearModuleSpec return new machinekit.motion.ScrewLinearModuleSpec("HGH15CA",30,150,80,5,340,420);
-  public static function moduleLift():Float return 150;
+  // A short plain plate carries the refitted spindle seat and existing outboard arm.
+  public static function moduleSpec():machinekit.motion.ScrewLinearModuleSpec return new machinekit.motion.ScrewLinearModuleSpec("HGH15CA",30,140,64,5,140,290);
+  public static function moduleLift():Float return 145;
   public static function modulePose():materia.assembly.AssemblyRecord.AssemblyFrame {
     var s=moduleSpec(),back=HobberSaddle.headFaceX()+s.carriageThickness+s.carriageBottom();
-    return materia.assembly.AssemblyFrames.fromRotationMatrix(back,s.centre+50,HobberZLayout.SEAT_Z+moduleLift(),[0.0,0,-1,-1,0,0,0,1,0]);
+    return materia.assembly.AssemblyFrames.fromRotationMatrix(back,s.carriageCentre+60,HobberZLayout.SEAT_Z+moduleLift(),[0.0,0,-1,-1,0,0,0,1,0]);
   }
   public static function headInModule():materia.assembly.AssemblyRecord.AssemblyFrame return materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(modulePose()),materia.assembly.AssemblyFrames.translation(0,0,HobberZLayout.SEAT_Z));
   static function railClearance():Float {

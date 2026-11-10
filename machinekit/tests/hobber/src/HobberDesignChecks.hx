@@ -47,9 +47,9 @@ class HobberDesignChecks {
             1
           );
         count++;
-        if (Math.abs(frame.x - centre.x - 70) > 1e-8 || Math.abs(normal.x + 1) + Math.abs(normal.y) + Math.abs(normal.z)
+        if (Math.abs(frame.x - centre.x - 68) > 1e-8 || Math.abs(normal.x + 1) + Math.abs(normal.y) + Math.abs(normal.z)
           > 1e-8 || Math.abs(axis.y + 1) + Math.abs(axis.x) + Math.abs(axis.z)
-          > 1e-8) throw "Y guides must lie on the radial vertical face, 70 mm behind hob";
+          > 1e-8) throw "Y guides must lie on the radial vertical face, 68 mm behind hob";
       }
       var face = F.compose(canonical, poses.get("swivel/output"));
       var mount = F.compose(canonical, poses.get("swivel/housing"));

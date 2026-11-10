@@ -5,7 +5,7 @@ import materia.assembly.AssemblyFrames as F;
 class ScrewLinearModuleChecks {
   static var assertions=0;
   static function check(ok:Bool,label:String):Void {assertions++;if(!ok)throw label;}
-  // ASSUMED AF3 key: D3.5, 8 mm exposed leg, 90 mm reach along travel.
+  // ASSUMED AF3 key: D3.5, 5.5 mm exposed leg, 90 mm reach along travel.
   static function scaleAccess(axis:ScrewLinearModule):Void {
     var derived=axis.derivedFasteners();if(derived==null)throw "Missing scale hardware";
     var poses=axis.solvedPoses(),cache=new PosedParts(),count=0;
@@ -13,8 +13,8 @@ class ScrewLinearModuleChecks {
       var host=axis.component(joint.receivingMember),face=host.fasteningFaces().filter(f->f.id==joint.receivingFace)[0];
       var frame=F.compose(poses.get(joint.receivingMember),face.frame);
       for(volume in joint.volumes)if(volume.access)for(targetIndex=>hole in joint.hostHoles) {
-        var raw=cadkit.modeling.Part.cylinderSpan(1.75,volume.to-8,volume.to,hole.x,hole.y),stub=PosedParts.moved(raw,frame);raw.close();
-        var elbow=F.transformPoint(frame,hole.x,hole.y,volume.to-8);
+        var raw=cadkit.modeling.Part.cylinderSpan(1.75,volume.to-ScrewLinearModuleSpec.KEY_LEG,volume.to,hole.x,hole.y),stub=PosedParts.moved(raw,frame);raw.close();
+        var elbow=F.transformPoint(frame,hole.x,hole.y,volume.to-ScrewLinearModuleSpec.KEY_LEG);
         var handle=cadkit.modeling.Part.cylinderAlong(1.75,new cadkit.modeling.Vector(elbow.x,elbow.y,elbow.z),new cadkit.modeling.Vector(-1,0,0),90);
         for(tool in [stub,handle]) {
           var box=PosedParts.boxOf(tool);

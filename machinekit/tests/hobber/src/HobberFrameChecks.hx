@@ -64,6 +64,8 @@ class HobberFrameChecks {
     }
     for(member in ["scaleHousing","wallLeft","wallRight"])order.push({member:"Ymodule/"+member,fastened:["Ymodule/base"],faces:["actuator-output"]});
     for(member in ["spindleSeat","outboardCarrier"])order.push({member:member,fastened:["Ymodule/carriage"],faces:["block-1-1","block-11","block1-1","block11","nut-carrier"]});
+    // Bench-fit the scale bracket before the spindle seat and cartridge.
+    for(member in ["spindleSeat","spindle/housing"])order.push({member:member,fastened:["Ymodule/carriage"],faces:["scale-head-carrier"]});
     order.push({member:"Ymodule/scaleHead",fastened:["Ymodule/carriage"],faces:["seat","outboard-carrier"]});
     for(cover in machine.zBellows)if(cover.id.indexOf("Upper")>=0)for(member in [cover.fixedMember,cover.id+"FixedMount"])
       order.push({member:member,fastened:["railZLeft","railZRight"]});
@@ -76,7 +78,7 @@ class HobberFrameChecks {
     var report = AssemblyIntegrity.check(machine, integrityOptions(machine, sweep, gap));
     for (item in report.diagnostics.items) if (item.code == "fasteners.edge-support") Sys.println(item.code + " " + item.message);
     return [for (item in report.errors()) item.code + " " + item.message].concat(
-      [for(item in report.diagnostics.items)if(item.code=="fasteners.edge-support"&&item.message.indexOf("Ymodule/")>=0)item.code+" "+item.message]);
+      [for(item in report.diagnostics.items)if(item.code=="fasteners.edge-support"&&(item.message.indexOf("Ymodule/")>=0||item.message.indexOf("ZdriveFloatingBar")>=0))item.code+" "+item.message]);
   }
 
   /** Every declared service path is checked against the parts left installed.
@@ -106,6 +108,55 @@ class HobberFrameChecks {
     }
     return count;
   }
+  /** Rigid stock/metal envelopes use the old plate's work-Y width. Cable and
+   * purge-hose routing are reported separately, not mistaken for plate width. */
+  public static function v2GeometryGates(machine:FlexsplineHobber):Array<String> {
+    var poses=machine.solvedPoses(),back=F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var widest="",rigidMax=0.0,routing="",routingMax=0.0;
+    PosedParts.scope(cache->{
+      for(member in machine.components())if(StringTools.startsWith(member.id,"Ymodule/")||member.id=="outboardCarrier") {
+        var at=poses.get(member.id);if(at==null)throw "Missing v2 member pose";
+        var frame=F.compose(back,at),bounds=cache.box(member.component,frame);
+        var full=bounds.maxY-bounds.minY,width=full;
+        if(full>routingMax){routingMax=full;routing=member.id;}
+        if(Std.isOfType(member.component,machinekit.motion.SealedScalePart)) {
+          var scale:machinekit.motion.SealedScalePart=cast member.component;
+          var box=scale.bodyBox();
+          if(scale.variant==machinekit.motion.SealedScalePart.HEAD) {
+            var boot=scale.bootBox();
+            for(i in [0,2,4])box[i]=Math.min(box[i],boot[i]);
+            for(i in [1,3,5])box[i]=Math.max(box[i],boot[i]);
+          } else if(scale.airPort!="none") {
+            if(scale.airPort=="start")box[4]-=machinekit.motion.SealedScaleData.AIR_FITTING_LENGTH;
+            else box[5]+=machinekit.motion.SealedScaleData.AIR_FITTING_LENGTH;
+          }
+          var lo=1e9,hi=-1e9;
+          for(x in [box[0],box[1]])for(y in [box[2],box[3]])for(z in [box[4],box[5]]) {
+            var point=F.transformPoint(frame,x,y,z);lo=Math.min(lo,point.y);hi=Math.max(hi,point.y);
+          }
+          width=hi-lo;
+        }
+        if(width>rigidMax){rigidMax=width;widest=member.id;}
+        if(width>230+1e-6)throw 'v2 rigid Y width exceeds LM0 plate230 mm: ${member.id} $width';
+      }
+    });
+    // The housing is fixed to Z, not to A or Y. Its conservative capsule
+    // envelope swept continuously through physical Z overtravel proves the
+    // running gap for every Z, and is invariant under common X travel.
+    var housing=machine.swivel.housing.geometry();
+    var placed=PosedParts.moved(housing,HobberSwivelLayout.pose());housing.close();
+    var outside=machinekit.component.Solids.cut(placed,[machinekit.hobbing.HobberZOffset.envelope(0,0,0)]);
+    var escaped=outside.volume();outside.close();
+    if(escaped>0.001)throw 'Actual eRob housing escapes the Z clearance envelope: $escaped mm3';
+    var range=HobberScales.stroke("Z"),over=HobberScales.overtravel();
+    var swept=machinekit.hobbing.HobberZOffset.envelope(range.lower-over,range.upper+over,0);
+    var bars=machine.components().filter(m->m.id=="ZdriveFloatingBar");if(bars.length!=1)throw "Missing Z floating bar";
+    var bar=bars[0].component.geometry(),gap=bar.shape.distance(swept.shape);bar.close();swept.close();
+    if(gap<2-1e-6)throw 'v2 Z bar/eRob continuous-sweep gap $gap mm is below2';
+    return ['v2 Y rigid width ${Math.round(rigidMax*1000)/1000} mm ($widest), limit230; largest flexible routing envelope ${Math.round(routingMax*1000)/1000} mm ($routing).',
+      'v2 Z floating bar/eRob gap ${Math.round(gap*1000000)/1000000} mm through continuous Z${range.lower-over}..${range.upper+over}; actual housing contained in the swept envelope.'];
+  }
+
   /** Thickness of a cover end wall and of a carrier on the moving member, mm (the bench mill's `COVER_PLATE`). */
   static inline final COVER_PLATE = 14.0;
   /** Gap kept between a cover's plates and the supports and nut around them, mm (the running gap of the integrity check). */
@@ -284,6 +335,7 @@ class HobberFrameChecks {
       mz += props.mass * at.z;
       count++;
     }
+    if(mass>39.2+1e-6)throw 'v2 A rotating head $mass kg exceeds39.2 kg';
     var outputFace = F.compose(back, poses.get("swivel/output"));
     var com = {x: mx / mass - outputFace.x, y: my / mass - outputFace.y, z: mz / mass - outputFace.z};
     var g = 9.80665, face = outputFace.x, overhang = -com.x / 1000;
@@ -725,7 +777,7 @@ class HobberFrameChecks {
     var translated:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> = [];
     for (id => pose in machine.solvedPoses()) translated.set(id, F.compose(F.translation(17, 29, 31), pose));
     if (headReport.join("\n") != swivelLoad(machine, translated).join("\n")) throw "head demands depend on the machine's world origin";
-    var lines = HobberServiceDesignChecks.run(machine).concat(bt30(machine)).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(zSaddleModes(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
+    var lines = v2GeometryGates(machine).concat(HobberServiceDesignChecks.run(machine)).concat(bt30(machine)).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(zSaddleModes(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + moduleChecks + 2;
@@ -813,6 +865,7 @@ class HobberFrameChecks {
     if (args.indexOf("sizing") >= 0) for (line in sizing(machine)) Sys.println(line);
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
+    if (args.indexOf("v2") >= 0) for (line in v2GeometryGates(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
     if (args.indexOf("servicedesign") >= 0) for (line in HobberServiceDesignChecks.run(machine)) Sys.println(line);
     if (args.indexOf("chipguards") >= 0) for (line in HobberChipGuardChecks.run(machine)) Sys.println(line);
@@ -871,7 +924,7 @@ class HobberFrameChecks {
         Sys.println(item.code + " " + item.message);
       for (e in report.errors()) Sys.println(e.code + " " + e.message);
       Sys.println('fastener fit: ${report.errors().length} errors');
-      for(item in report.diagnostics.items)if(item.code=="fasteners.edge-support"&&item.message.indexOf("Ymodule/")>=0)throw "Made Y module edge support: "+item.message;
+      for(item in report.diagnostics.items)if(item.code=="fasteners.edge-support"&&(item.message.indexOf("Ymodule/")>=0||item.message.indexOf("ZdriveFloatingBar")>=0))throw "Made Y module edge support: "+item.message;
       report.require();
     }
     if (args.indexOf("integrity") >= 0) {

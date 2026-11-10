@@ -132,6 +132,22 @@ is an intermediate fit for v2-a; compact proportions and all three hard gates re
 and Y stiffness remain unqualified; no FE is added. LM0's swivel plate is 230 mm along work Y and 190 mm vertically; record
 actual part dimensions when applying the width gate.
 
+**Compact refit (v2-b).** Independent nut, guide and scale stations remove the empty end bays. The hobber uses
+30 mm nominal travel (+/-15) plus 5 mm overtravel each end, a 180 mm screw, 220 mm rails, 140 mm rail spacing and 64 mm block
+spacing. The 230 x 310.5 x 12 mm profiled steel base keeps a continuous floor and an integral actuator lobe; the plain
+140 x 290 x 10 mm aluminium carriage spans the rails and reaches down to the head. Dimensions are travel x across-guides x
+thickness. Both walls are 230 x 32 x 30 mm. The 230 mm rigid-part width gate is along work Y (LM0 plate 230 x 190 mm); the
+310.5 mm transverse base extent and the scale's 251 mm flexible hose-routing envelope are reported separately. No cable
+length is credited as rigid plate width. The scale housing is centred on the guide span; its head leads the carriage datum
+by 52.5 mm. Its single bracket bolts outside the lower guide block, behind the spindle flange, and is bench-fitted before
+the spindle seat/cartridge. The low-profile AF3 key's exposed 5.5 mm leg, D3.5 and 90 mm reach are ASSUMED tool dimensions.
+The spindle seat's four M8 now use Y95/115 rows; the existing outboard support has two integral arm extensions to its Y30
+carriage fixing, without a separate adapter. Two d4 drawing pins locate each head interface; clamped bolts carry head loads.
+The base's M6 receivers are through tapped in 12 mm stock. Floor stops retain two M6 and two d4 pins each; their pins carry
+the declared crash load. The existing Z floating bar is relieved by the eRob envelope swept continuously through Z
+-15..195 mm with 2 mm clearance; its fastener support is checked with Y parts. Optional sheets remain omitted. Stock/face
+acceptance, the selected key, the new Y/outboard stiffness and supplier/brake ratings remain unqualified; no FE is added.
+
 **Steps** (lean: model checks only, no new FE, no new library features beyond this list, about 1.5 h each, one commit each):
 - **v2-a.** Rebuild `ScrewLinearModule` to this layout; delete the riser bars, U stops, seal lands, retainers and lips.
   Module checks for the standard and the hobber sizes.
@@ -157,3 +173,5 @@ actual part dimensions when applying the width gate.
 - 2026-11-08 LM6 close-out (prior tooling/package d8354ce60): ground-bar cleanup5264c687d and LM5 comparison76383b88d retained;21 separate tooling rows/85 checked references/EUR1436 ASSUMED. Clean routed RFQ48 designs/52 instances/80.741357 kg passes all STEP/hole/drawing checks. Final hobber3361,hobbing1185,module289,joint-fasteners,assembly-integrity,way-cover,enclosure48 states/128 near pairs and Z-drive42 PASS. Extended requested frame sweep completed with1 running-gap finding in2863 s: swivel/housing versus ZdriveFloatingBar0.8 mm instead of2 at X45.215,Y-10,Z-10,A-15deg; service phase not reached. This correction/rerun, remaining LM4/Y stiffness and PU qualifications, A6,21 residual made edges, ZB offset-screw ingress/complete service, casting refresh, stock/supplier/brake/heat qualifications remain OPEN per timeboxed wrap-up; no further engineering pursued. Tree426 members/68 sets/no ungrouped; editor screenshots unavailable. Implementation wrap-up scope closed; not a machine release.
 
 - 2026-11-09 v2-a: full-length ground walls with rails on their inner reference edges, centred HZMotion/BF12 screw, two plain floor stops, outside scale and plain carriage replace risers, four U stops, scale seat, guards/bellows, seal lands, retainers and PU lips. Optional sheets omitted. Stock-sized bracket, 20 mm head lead and profiled steel base/Al carriage pass native fit with0 errors and0 Y made-edge findings; no aluminium base-thread credit. All seven gates PASS: module172 (standard and hobber sizes), hobber3284, hobbing1185, joint-fasteners/core integrity, enclosure48/66 and both example scenes. Intermediate host base400x328.5/carriage340x420 mm, head51.46 kg, output-relative COM(-69.3,48.2,94.6) mm; A tilt47.36/max gravity35.82 Nm; Y Abbe87.2 mm. Compact proportions, <=39.2 kg, <=230 mm work-Y rigid-part width and the unchanged prior0.8 mm Z-bar gap remain v2-b gates, not achieved here. Stock/finished faces and Y stiffness remain unqualified; no FE.
+
+- 2026-11-10 v2-b: compact 230 x 310.5 x 12 mm steel base, 140 x 290 x 10 mm Al carriage, 230 x 32 x 30 mm walls, 180 mm screw/220 mm rails and +/-15 mm nominal Y plus5 mm overtravel each end. Refitted seat/outboard joints and a single outside-wall scale bracket pass native fastener fit0 errors and0 Y/Z-floating-bar made edges (21 pre-existing findings elsewhere). Modelled A head38.08 kg, output-relative COM(-85.0,89.1,68.6) mm; A tilt44.14/max gravity38.78 Nm; Y Abbe93.2 mm. Rigid work-Y width230 mm <= LM0 plate230 (transverse base310.5, flexible scale-hose envelope251); continuous Z-15..195 eRob/bar gap2.000 mm. Module168, hobbing1185, joint-fasteners/core integrity, enclosure48/66 and both example scenes PASS; hobber3286 PASS; all seven gates PASS. Optional sheets omitted; stock/face, selected key, supplier/brake and Y/outboard stiffness qualifications remain open; no FE.
