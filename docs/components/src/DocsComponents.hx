@@ -1,4 +1,5 @@
 import haxe.Json;
+import materia.image.Png;
 import cadkit.MeshFeatureEdges;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;

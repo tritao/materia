@@ -1,0 +1,21 @@
+{
+  "format": "materia.viewport-state",
+  "target": [
+    -2.4868995751603507e-17,
+    0.021,
+    1.002
+  ],
+  "yaw": 0.3,
+  "pitch": -0.4,
+  "distance": 0.049323659171719846,
+  "width": 1280,
+  "height": 800,
+  "inspectionZoom": 1,
+  "project": "machines/flexspline-hobber/materia.project.json",
+  "presentation": {
+    "view": "cutting",
+    "explode": 0,
+    "step": 0,
+    "progress": 0
+  }
+}

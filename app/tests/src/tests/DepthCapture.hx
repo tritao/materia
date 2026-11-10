@@ -128,7 +128,7 @@ import nativekit.scene.DepthPrecision;
       var shade = Std.int(255 * (1.0 - 0.85 * Math.log(depth.viewDepth(x, y) / nearest) / Math.log(ratio)));
       put(pixels, index, shade, shade, shade);
     }
-    return DepthPng.rgba(depth.width, depth.height, pixels);
+    return materia.image.Png.rgba(depth.width, depth.height, pixels);
   }
 
   /** Log scale around the limit: 0.1x and below green, 1x yellow, 10x and above red. */
@@ -145,7 +145,7 @@ import nativekit.scene.DepthPrecision;
       var red = t < 0.5 ? Std.int(510 * t) : 255, green = t < 0.5 ? 200 : Std.int(200 * (1.0 - t) * 2.0);
       put(pixels, index, red, green, 40);
     }
-    return DepthPng.rgba(depth.width, depth.height, pixels);
+    return materia.image.Png.rgba(depth.width, depth.height, pixels);
   }
 
   static function put(pixels:Bytes, index:Int, red:Int, green:Int, blue:Int):Void {

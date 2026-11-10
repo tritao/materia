@@ -652,6 +652,17 @@ are checked headlessly by `app/tests/scripted-inspector/haxeon.json`. To capture
 app/tests/scripted-inspector-visual.sh
 ```
 
+Depth precision is checked on real views. In the editor, "Copy view state"
+copies the perspective viewport's camera, size and presentation cursor as JSON;
+`app/tests/haxeon.depth-capture.json -- --state=FILE --out=DIR` replays it and
+writes the depth image, a per-pixel map of the depth-buffer step in pixel
+footprints, and a summary, failing when the step at the focus exceeds the
+camera's target. The checked-in views in `app/tests/depth-precision/` run with:
+
+```sh
+app/tests/depth-precision.sh
+```
+
 `Main` is a complete desktop host. It initializes NativeKit, creates a resizable
 window and GPU surface, routes typed native input into the shared `UiContext`,
 and renders from the surface's request-driven frame callback. The main thread

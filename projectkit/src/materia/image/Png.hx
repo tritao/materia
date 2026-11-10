@@ -1,9 +1,9 @@
-package tests;
+package materia.image;
 
 import haxe.io.Bytes;
 
-/** Copied from docs/components/src/Png.hx. A minimal PNG writer for RGBA8 images: no filtering, stored (uncompressed) deflate blocks. */
-class DepthPng {
+/** A minimal PNG writer for RGBA8 images: no filtering, stored (uncompressed) deflate blocks. */
+class Png {
   static var crcTable:Null<Array<Int>>;
 
   public static function rgba(width:Int, height:Int, pixels:Bytes):Bytes {

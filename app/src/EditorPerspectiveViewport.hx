@@ -1722,16 +1722,20 @@ class EditorPerspectiveViewport implements View implements Observable {
 
   /**
    * View depth of the surface under the view centre, or zero when the centre
-   * shows background. A hit is reused until the camera or displayed scene moves.
+   * shows background. Reused until the camera or displayed scene moves.
    */
   function centreFocusDepth():Float {
     var key = clipBoundsRevision + ":" + camera.revision;
     if (key == focusDepthKey) return focusDepth;
+    focusDepthKey = key;
     focusDepth = 0.0;
     var eye = camera.eyePosition(), back = camera.viewDirection();
+    // The pick frustum-culls with its projection's near and far planes. Those must not
+    // come from the fitted clip range this depth sizes: a camera moved close to a part
+    // would then cull that part behind the previous, farther near plane.
     var view = sectionView(scene.configureRenderView(
       new SceneView(),
-      camera.viewProjection(aspect()),
+      camera.viewProjection(aspect(), camera.distance * 1e-6, camera.distance * 1e6),
       displayPoses(),
       null,
       -1,
@@ -1739,12 +1743,8 @@ class EditorPerspectiveViewport implements View implements Observable {
       cosmeticThreadsVisible
     ));
     var hit = scene.surfaceHitRayWithView(view, eye[0], eye[1], eye[2], -back[0], -back[1], -back[2]);
-    // Only hits are cached: the spatial index can lag a freshly opened scene without a
-    // revision change, so a miss is retried on the next fit instead of sticking.
-    if (hit != null) {
+    if (hit != null)
       focusDepth = Math.max(0.0, -((hit[0] - eye[0]) * back[0] + (hit[1] - eye[1]) * back[1] + (hit[2] - eye[2]) * back[2]));
-      focusDepthKey = key;
-    }
     return focusDepth;
   }
 
