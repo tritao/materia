@@ -50,8 +50,11 @@ class MateriaProjectModuleBuild {
     }
     var declared = new Map<String, Bool>();
     declare(declared, manifestPath);
+    // The root package is described by the manifest above, which need not use the default name (a project can have several
+    // manifests); dependencies are always resolved through their default manifest.
+    var rootDirectory = Path.normalize(FileSystem.fullPath(Path.directory(manifestPath)));
     for (item in project.packages.packages) {
-      declare(declared, Path.join([item.root, PackageResolver.MANIFEST_NAME]));
+      if (Path.normalize(FileSystem.fullPath(item.root)) != rootDirectory) declare(declared, Path.join([item.root, PackageResolver.MANIFEST_NAME]));
       for (path in item.ffiInterfaces) declare(declared, path);
       for (path in item.ffiProjections) declare(declared, path);
       for (imported in item.ffiImports) {
