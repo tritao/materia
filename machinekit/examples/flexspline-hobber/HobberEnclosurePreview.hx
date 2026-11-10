@@ -329,13 +329,23 @@ class HobberEnclosurePreview {
     return scene;
   }
   public static function unified():materia.project.SceneArtifact.SceneArtifactData {
+    var t0 = Sys.time();
     var machine = new FlexsplineHobber(
       new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)),
       4,
       true
     );
+    var t1 = Sys.time();
     var fitted = assembled(machine);
-    return runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke, true);
+    var t2 = Sys.time();
+    var scene = runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke, true);
+    var t3 = Sys.time();
+    if (Sys.getEnv("HOBBER_PHASES") == "1") {
+      Sys.println("PHASES build=" + Math.round(t1 - t0) + "s fit=" + Math.round(t2 - t1) + "s export=" + Math.round(t3 - t2) + "s");
+      for (line in machinekit.cache.Memos.report()) Sys.println("MEMO " + line);
+      for (line in cadkit.cache.OpCache.report()) Sys.println("OPS " + line);
+    }
+    return scene;
   }
   public static function scene():haxe.io.Bytes return SceneArtifact.encode(unified());
   public static function main():Void {

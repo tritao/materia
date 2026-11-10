@@ -32,7 +32,7 @@ class ComponentType {
 	 * so a per-instance cache never hit across compiles. `MassProperties` never changes, so one value is shared by every such
 	 * component.
 	 */
-  public static final masses = new machinekit.cache.Memo<MassProperties>("component-masses", 8192);
+  public static final masses:machinekit.cache.Memo<MassProperties> = new machinekit.cache.Memo<MassProperties>("component-masses", 8192);
 
   public function new(
     id:String,

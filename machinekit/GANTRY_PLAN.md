@@ -714,7 +714,7 @@ unchanged; no other sessions' uncommitted files or feature branches were used.
 This is a deliberate adjustment to G4's whole-main merge workflow.
 
 The app runtime target list adds `trajectory_core` while retaining the existing
-CadKit target required by the pinned build layout. NativeTransport retains its
+CadKit target required by the pinned build layout. TransportInterop retains its
 explicit byte-count arguments required by the pinned NativeKit FFI.
 
 A clean RobotKit rebuild exposed a pinned-haxeon enum membership issue:

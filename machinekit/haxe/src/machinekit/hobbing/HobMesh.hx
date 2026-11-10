@@ -6,7 +6,26 @@ import machinekit.component.ComponentDisplayMesh.ComponentDisplayMeshData;
 /** Display tessellation of the same fused solid used for CAD export.
     No independent tooth, core or end-cap construction lives in the renderer. */
 class HobMesh {
-  public static function build(hob:Hob):ComponentDisplayMeshData {
+  /** Building the detailed mesh costs about a minute and depends only on the hob's parameters. */
+  static final meshes:machinekit.cache.Memo<ComponentDisplayMeshData
+    > = new machinekit.cache.Memo<ComponentDisplayMeshData>(
+      "hob-display-mesh",
+      16,
+      copyMesh
+    );
+
+  static function copyMesh(mesh:ComponentDisplayMeshData):ComponentDisplayMeshData return {
+    positions: mesh.positions.copy(),
+    normals: mesh.normals.copy(),
+    indices: mesh.indices.copy()
+  };
+
+  public static function build(hob:Hob):ComponentDisplayMeshData return meshes.get(
+    Hob.recipeType().key(hob.values()),
+    () -> compute(hob)
+  );
+
+  static function compute(hob:Hob):ComponentDisplayMeshData {
     var solid = HobSolid.build(hob);
     try {
       var result = fromShape(solid.shape, hob.parameterNumber("surfaceTolerance"));

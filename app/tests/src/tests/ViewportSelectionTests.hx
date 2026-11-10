@@ -133,6 +133,24 @@ import haxeon.ui.widgets.collections.TreeView;
       ui.pointerDown(x, y, 0);
       ui.pointerUp(x, y, 0);
       check(tree.selectionKey() == "project:tool", "camera movement preserves direct part picking");
+      tree.selectKey("project:tool");
+      check(viewport.pick(2, 2) == "scene", "the deselection point is genuinely empty");
+      ui.pointerMove(2, 2);
+      ui.pointerDown(2, 2, 0);
+      ui.pointerUp(2, 2, 0);
+      check(scene.selectedId == "scene" && tree.selectionKey() == "scene" && tree.selectedObjects().length == 0,
+        "empty-space click clears a tree-selected physical object");
+      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).selectionOverrideCount() == 0,
+        "empty-space click removes the tree-selected object's render highlight");
+      tree.selectKey("project:tool");
+      ui.pointerMove(2, 2);
+      ui.submit(viewport, frame);
+      ui.pointerDown(2, 2, 0);
+      ui.submit(viewport, frame);
+      check(viewport.navigationPointer != null, "a frame between press and release preserves the pending click");
+      ui.pointerUp(2, 2, 0);
+      check(scene.selectedId == "scene" && tree.selectionKey() == "scene",
+        "empty-space deselection survives a frame between press and release");
       tree.selectKey(path[1]);
       ui.pointerDown(2, 2, 0);
       ui.pointerUp(2, 2, 0);

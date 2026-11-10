@@ -183,7 +183,7 @@ class HobberDrives {
     var body = mount.geometry();
     var raw = Part.box(400, 10, 400), slab = raw.translated(new Vector(0, -5, -100));
     raw.close();
-    var hanging = body.intersect(slab);
+    var hanging = body.combineKept(slab, cadkit.modeling.Mode.Intersect);
     body.close();
     slab.close();
     var bounds = hanging.shape.bounds(), lo = bounds.get_min(), hi = bounds.get_max();

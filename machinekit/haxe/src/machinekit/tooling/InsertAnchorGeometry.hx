@@ -822,7 +822,7 @@ class InsertAnchorGeometry {
    * derives the same fixed inserts in every pass and once more for the lifting layout, and the result (or the reason none
    * fits) depends on nothing else. Only component values are kept; each caller gets its own copy.
    */
-  static final derived = new machinekit.cache.Memo<InsertAnchorDerivation>("anchor-derivations", 512);
+  static final derived:machinekit.cache.Memo<InsertAnchorDerivation> = new machinekit.cache.Memo<InsertAnchorDerivation>("anchor-derivations", 512);
 
   static function derivationKey(
     source:CastInsert,
@@ -834,8 +834,8 @@ class InsertAnchorGeometry {
       case FootprintOnly: "footprint";
       case Casting(_, pose, bodyKey): bodyKey == null ? null : bodyKey + "|" + haxe.Json.stringify(pose);
     };
-    return where == null ? null : source.geometryKey() + "|" + haxe.Json.stringify(rule) + "|" + where + "|"
-      + Std.string(liftingShareN);
+    return where == null ? null : source.geometryKey() + "|" + haxe.Json.stringify(rule)
+      + "|" + where + "|" + Std.string(liftingShareN);
   }
 
   static function build(
@@ -1128,8 +1128,9 @@ class InsertAnchorGeometry {
               return false;
             }
           }
-          var exposed = keep(keep(Part.fuseAll(hardware)).subtract(exterior));
-          if (keep(exposed.subtract(bulk)).volume() > 1e-6) {
+          // Only the volume, bounds and distance of these results are read, never their operation history: the cached boolean serves them.
+          var exposed = keep(keep(Part.fuseAll(hardware)).combineKept(exterior, cadkit.modeling.Mode.Subtract));
+          if (keep(exposed.combineKept(bulk, cadkit.modeling.Mode.Subtract)).volume() > 1e-6) {
             accepted = false;
           }
           var bounds = exposed.shape.bounds(), lo = bounds.get_min(), hi = bounds.get_max();

@@ -1499,8 +1499,19 @@ class EditorPerspectiveViewport implements View implements Observable {
   function selectAt(localX:Float, localY:Float):String {
     var id:String;
     if (!editingEnabled()) {
-      id = pick(localX, localY);
-      scene.select(id);
+      fitCameraClipRange();
+      var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
+      var view = sectionView(scene.configureRenderView(
+        new SceneView(),
+        camera.viewProjection(aspect()),
+        displayPoses(),
+        null,
+        -1,
+        null,
+        cosmeticThreadsVisible
+      ));
+      id = scene.selectPickedRayWithView(view, ray.originX, ray.originY, ray.originZ, ray.directionX, ray.directionY, ray.directionZ,
+        edgeAngularTolerance(localX, localY));
     } else {
       fitCameraClipRange();
       var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);

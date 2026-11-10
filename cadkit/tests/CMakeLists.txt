@@ -42,3 +42,7 @@ add_executable(cadkit-naming-benchmark ${PROJECT_SOURCE_DIR}/benchmarks/naming_b
 target_compile_features(cadkit-naming-benchmark PRIVATE cxx_std_17)
 target_include_directories(cadkit-naming-benchmark PRIVATE ${CADKIT_OCCT_INCLUDE_DIR})
 target_link_libraries(cadkit-naming-benchmark PRIVATE TKBO TKFillet TKPrim TKTopAlgo TKBRep)
+
+add_executable(cadkit-shape-bytes-smoke shape_bytes_smoke.cpp)
+target_link_libraries(cadkit-shape-bytes-smoke PRIVATE cadkit::core)
+add_test(NAME cadkit-shape-bytes-smoke COMMAND cadkit-shape-bytes-smoke)

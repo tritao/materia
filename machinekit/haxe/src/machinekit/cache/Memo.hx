@@ -70,7 +70,8 @@ class Memo<V> implements MemoTable {
     if (found != null) return found.value;
     var began = Sys.time();
     var value = compute();
-    return keep(key, value, Sys.time() - began);
+    var seconds = Sys.time() - began;
+    return keep(key, value, seconds);
   }
 
   /** Whether `key` is kept (a hit is not counted). */

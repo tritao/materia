@@ -346,16 +346,17 @@ The generator uses Haxeon's reusable compiler session, and its compiled code is 
 across opens and editable recipe changes. Deterministic entrypoints opt into geometry
 caching with `"cache": {}`. Haxeon's analyzed module graph supplies the transitive
 source inputs using the same request as compilation; source lists are unnecessary.
-External non-source resources may additionally be declared in `cache.inputs`.
+The data files a generator reads (supplier CAD, tables) need no declaration either: the run notes every file it reads
+through the standard library and the runner keeps that list with the output, regenerating when any of them changed.
 The module-graph analysis behind the fingerprint is recorded beside the cache as
-`<key>.inputs.json` (file hashes, source-directory listings, native library stamps,
+`<key>.inputs.json` (file hashes, source-directory listings, native library and toolchain contents,
 compiler options); a repeat open confirms the fingerprint by rehashing those files
 instead of re-analyzing, and falls back to the analysis on any difference.
 The Gantry picker, yaw picker, and welder enable this cache. Source contents,
 manifests, compiler options, declared inputs, and tool/native library metadata invalidate
 cached artifacts. Recipe edits always execute the generator with the new document.
 Caches live below `${XDG_CACHE_HOME:-$HOME/.cache}/materia`, in `project-tools` and
-`generated-artifacts`; stable generated entrypoints live in `project-sources`.
+`memo` (the cache store: compiled generators, fingerprint records and cached outputs share it with the kernel operation cache, under one size cap); stable generated entrypoints live in `project-sources`.
 Compiler workers use Haxeon's existing idle timeout and resident limits. Cancelling an
 open closes its helper connection, cancels that compiler transaction, and preserves the
 previous published bytecode. Unsupported hosts and `HAXEON_COMPILER_SERVER=0` use the

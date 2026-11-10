@@ -2,6 +2,7 @@ package cadkit.modeling;
 
 import CadKit;
 import cadkit.Shape;
+import cadkit.ShapeKey;
 import cadkit.Operation;
 
 /** Planar faces with a workplane, including disconnected regions and holes. */
@@ -59,10 +60,12 @@ class Sketch extends Model {
         wires.push(wire);
         holeShapes.push(wire.shape);
       }
-      var result = new Sketch(
-        Shape.fromOwnedHandle(CadKit.planarFaceChecked(boundary.shape.borrowHandle(), Model.refs(holeShapes))),
-        plane
-      );
+      var faceShape = Shape.fromOwnedHandle(CadKit.planarFaceChecked(boundary.shape.borrowHandle(), Model.refs(holeShapes)));
+      // The face is a function of its boundary wire and its hole wires; the plane only validates it.
+      var faceKey = ShapeKey.op("planar-face", "", [boundary.shape].concat(holeShapes));
+      faceShape.key = faceKey;
+      faceShape.gap = faceKey == null ? ShapeKey.gapOf("planar-face", [boundary.shape].concat(holeShapes)) : null;
+      var result = new Sketch(faceShape, plane);
       for (wire in wires) wire.close();
       return result;
     } catch (error:Dynamic) {
@@ -247,7 +250,7 @@ class Sketch extends Model {
       var result = Part.fromOperation(new Operation(CadKit.sweepOperationChecked(
         shape.borrowHandle(),
         wire.shape.borrowHandle()
-      )));
+      ), null, null, "sweep"));
       wire.close();
       return result;
     } catch (error:Dynamic) {

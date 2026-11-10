@@ -305,6 +305,25 @@ CADKIT_API cad_result cad_step_export(
     cad_shape shape,
     const char* path CADKIT_HXI_UTF8);
 
+/* A shape as bytes, for a cache on disk: the B-rep (OCCT binary, without triangulations, so a restored shape meshes
+ * the way a fresh one does) together with the shape's element names and aliases, which CadKit keeps outside the B-rep.
+ * The bytes carry a format version, the OCCT version and a checksum. The byte capacity is both the query result and
+ * the input capacity in bytes. Writing the same shape twice gives the same bytes. The bytes are the shape's canonical
+ * form: OCCT's reader rebuilds locations and surface placements (last bits, signed zeros), so the writer repeats
+ * write-and-read until the B-rep bytes stop changing and hands out that fixed point. A shape read from these bytes writes
+ * exactly them again, and meshes the same as any other read of them; it can differ from the shape that was written in the
+ * last bits of rotated placements and in the sign of zeros. Take the bytes before meshing. */
+CADKIT_API cad_result cad_shape_write_bytes(
+    cad_shape shape,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* A shape from bytes written by cad_shape_write_bytes. Truncated, damaged, foreign or other-version bytes fail with
+ * CAD_ERROR_INVALID_ARGUMENT and a message; nothing is read from them before the checksum has been verified. */
+CADKIT_API cad_result cad_shape_read_bytes(
+    const uint8_t* data CADKIT_HXI_IN_ARRAY(byte_count), uint32_t byte_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 /* Transform functions return a new shape and leave the input shape unchanged. */
 CADKIT_API cad_result cad_shape_translate(
     cad_shape shape,
@@ -450,6 +469,11 @@ CADKIT_API cad_result cad_fuse(
 CADKIT_API cad_result cad_cut(
     cad_shape first,
     cad_shape second,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* `first` minus every tool in one operation; the tools may overlap each other. */
+CADKIT_API cad_result cad_cut_many(
+    cad_shape first,
+    const cad_shape_ref* tools CADKIT_HXI_IN_ARRAY(tool_count), uint32_t tool_count,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
 CADKIT_API cad_result cad_common(
@@ -798,6 +822,9 @@ CADKIT_API void cad_mesh_destroy(cad_mesh mesh);
 CADKIT_API void cad_operation_destroy(cad_operation operation);
 
 CADKIT_API const char* cad_last_error(void) CADKIT_HXI_RETURNS_BORROWED_UTF8;
+
+/* The version text of the OCCT this library was built against; the same text shape bytes carry. Never null. */
+CADKIT_API const char* cad_occt_version(void) CADKIT_HXI_RETURNS_BORROWED_UTF8;
 
 #ifdef __cplusplus
 }

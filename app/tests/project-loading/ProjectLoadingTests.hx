@@ -3,6 +3,7 @@ import app.ProjectLoadControl;
 import app.PreparedProjectCache;
 import app.CadPreviewGeometry;
 import materia.project.SceneArtifact;
+import cadkit.cache.DiskStore;
 import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 import haxe.Json;
@@ -30,6 +31,256 @@ class ProjectLoadingTests {
       name,
       extension
     )) root + "/" + name];
+
+  /** The store's entries are `<sha256>.memo` files: an 8-byte frame, then the payload. Which kind one is shows in its first bytes. */
+  static function kindOf(path:String):String {
+    var bytes = File.getBytes(path);
+    if (bytes.length < 11) return "other";
+    if (bytes.get(8) == "{".code) return "record";
+    if (bytes.get(8) == "[".code) return "reads";
+    if (bytes.get(8) == "H".code && bytes.get(9) == "L".code && bytes.get(10) == "B".code) return "generator";
+    try SceneArtifact.decodeView(bytes.sub(8, bytes.length - 8)) catch (_:Dynamic) return "kernel";
+    return "output";
+  }
+
+  static function stored(store:String, kind:String):Array<String> return [for (path in files(store, ".memo")) if (kindOf(path) == kind) path];
+
+  static function payload(path:String):Bytes {
+    var bytes = File.getBytes(path);
+    return bytes.sub(8, bytes.length - 8);
+  }
+
+  /** `text` as a well-formed store entry, so the damage a test plants is in the payload and not in the frame. */
+  static function framed(text:String):Bytes {
+    var body = Bytes.ofString(text), bytes = Bytes.alloc(8 + body.length);
+    bytes.setInt32(0, 0x4D454D31);
+    bytes.setInt32(4, body.length);
+    bytes.blit(8, body, 0, body.length);
+    return bytes;
+  }
+
+  /**
+   * A generator the runner starts runs from a temporary directory with no native libraries beside it. Its kernel cache must
+   * still be on (the native identity comes from the library the process loaded), and say so loudly if it is not: the editor
+   * once ran with the cache silently off. The generator fails when it has no native identity, and the store must hold
+   * kernel-operation entries after the open.
+   */
+  /** A CadKit generator project in `root` (see kernelCacheInGeneration); it also writes its native identity to MATERIA_IDENTITY_OUT. */
+  static function kernelFixture(root:String, installation:String):String {
+    var config:Dynamic = {
+      version: 1,
+      sourceRoots: ["."],
+      target: "host",
+      dependencies: {projectkit: {path: installation + "/projectkit"}, cadkit: {path: installation + "/cadkit"}}
+    };
+    Reflect.setField(config, "package", {name: "kernel-cache-fixture"});
+    File.saveContent(root + "/haxeon.json", Json.stringify(config));
+    File.saveContent(root + "/KernelPreview.hx", 'import haxe.io.Bytes;\nimport materia.project.SceneArtifact;\n'
+      + 'class KernelPreview { public static function preview():Bytes {\n'
+      + 'var drilled = cadkit.Shape.box(10, 10, 10).cut(cadkit.Shape.box(4, 4, 20));\n'
+      + 'if (drilled.volume() < 1) throw "no geometry";\n'
+      + 'var identity = cadkit.cache.NativeIdentity.get();\n'
+      + 'if (identity == null) throw "kernel cache off: no native identity";\n'
+      + 'var out = Sys.getEnv("MATERIA_IDENTITY_OUT"); if (out != null) sys.io.File.saveContent(out, identity);\n'
+      + 'var vertices = Bytes.alloc(96); var coordinates = [0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];\n'
+      + 'for (i in 0...12) vertices.setDouble(i * 8, coordinates[i]);\n'
+      + 'var indices = Bytes.alloc(48); var triangles = [0,2,1,0,1,3,0,3,2,1,2,3];\n'
+      + 'for (i in 0...12) indices.setInt32(i * 4, triangles[i]);\n'
+      + 'var part:materia.project.SceneArtifact.SceneArtifactPart = {id: "tetra", name: "Tetra", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12, '
+      + 'vertices: vertices, normals: Bytes.alloc(96), indices: indices, faceRanges: []};\n'
+      + 'return SceneArtifact.encode({metresPerUnit: 1.0, parts: [part]}); }}\n');
+    var entry:Dynamic = {kind: "cad-preview", module: "KernelPreview", cache: {}};
+    Reflect.setField(entry, "function", "preview");
+    var manifest = root + "/materia.project.json";
+    File.saveContent(manifest, Json.stringify({
+      format: "materia.project",
+      version: 1,
+      defaultEntrypoint: "preview",
+      build: {system: "haxeon", manifest: "haxeon.json"},
+      entrypoints: {preview: entry}
+    }));
+    return manifest;
+  }
+
+  /** Opens the fixture with a fresh store and returns the native identity its generator saw. */
+  static function nativeIdentityOf(root:String, installation:String, name:String):String {
+    var directory = root + "/" + name;
+    FileSystem.createDirectory(directory);
+    var manifest = kernelFixture(directory, installation);
+    Sys.putEnv("XDG_CACHE_HOME", directory + "/cache");
+    Sys.putEnv("MATERIA_IDENTITY_OUT", directory + "/identity.txt");
+    DiskStore.useProcess(new DiskStore(directory + "/cache/materia/memo", 1e9));
+    MateriaProjectRunner.loadProject(manifest);
+    DiskStore.useProcess(null);
+    return File.getContent(directory + "/identity.txt");
+  }
+
+  static function copyFile(from:String, to:String):Void File.saveBytes(to, File.getBytes(from));
+
+  /**
+   * The native identity is the content of the loaded CadKit library and the OCCT install's `occt.identity`: a library with other
+   * content (same size too) changes it, an identical copy elsewhere keeps it, another OCCT stamp changes it, and an OCCT install
+   * without a stamp turns the kernel cache off with a message.
+   */
+  static function nativeIdentityTracksBuild(installation:String):Void {
+    var temporary = Sys.getEnv("TMPDIR");
+    if (temporary == null || temporary.length == 0) temporary = "/tmp";
+    var root = temporary + "/materia-native-identity-test-" + Sys.getPid() + "-" + Std.random(1000000000);
+    FileSystem.createDirectory(root);
+    var previousCache = Sys.getEnv("XDG_CACHE_HOME"), previousLibraries = Sys.getEnv("LD_LIBRARY_PATH");
+    try {
+      var cadkit:Null<String> = null, occt:Null<String> = null;
+      for (directory in (previousLibraries == null ? "" : previousLibraries).split(":")) {
+        if (directory == "" || !FileSystem.exists(directory) || !FileSystem.isDirectory(directory)) continue;
+        if (cadkit == null && FileSystem.exists(directory + "/libcadkit-core.so")) cadkit = directory + "/libcadkit-core.so";
+        if (occt == null && FileSystem.exists(directory + "/libTKernel.so")) occt = directory;
+      }
+      var occtDirectory = Sys.getEnv("CADKIT_OCCT_DIR");
+      if (occt == null && occtDirectory != null) occt = occtDirectory + "/lib";
+      check(cadkit != null && occt != null, "the library path names the CadKit library and the OCCT libraries");
+      function libraries(directory:String):Void Sys.putEnv("LD_LIBRARY_PATH", directory + (previousLibraries == null ? "" : ":" + previousLibraries));
+      // The same bytes in two places.
+      FileSystem.createDirectory(root + "/one");
+      FileSystem.createDirectory(root + "/two");
+      var cadkitLibrary:String = cadkit;
+      copyFile(cadkitLibrary, root + "/one/libcadkit-core.so");
+      copyFile(cadkitLibrary, root + "/two/libcadkit-core.so");
+      libraries(root + "/one");
+      var identity = nativeIdentityOf(root, installation, "a");
+      libraries(root + "/two");
+      check(nativeIdentityOf(root, installation, "b") == identity, "an identical copy of the CadKit library keeps the native identity");
+      // Same size, other content (an unused byte of the file changes: the first byte after the ELF identification).
+      var bytes = File.getBytes(cadkitLibrary);
+      bytes.set(bytes.length - 1, bytes.get(bytes.length - 1) ^ 1);
+      FileSystem.createDirectory(root + "/three");
+      File.saveBytes(root + "/three/libcadkit-core.so", bytes);
+      libraries(root + "/three");
+      check(nativeIdentityOf(root, installation, "c") != identity, "a CadKit library with other content changes the native identity");
+      // Another OCCT stamp, and none, on a copy of the install (the shared one is in use by other processes).
+      var occtLibraries:String = occt, prefix = haxe.io.Path.directory(occtLibraries);
+      check(FileSystem.exists(prefix + "/occt.identity"), "the OCCT install has an identity stamp (" + prefix + "/occt.identity)");
+      FileSystem.createDirectory(root + "/occt");
+      check(Sys.command("cp", ["-a", occtLibraries, root + "/occt/lib"]) == 0, "copied the OCCT libraries");
+      File.saveContent(root + "/occt/occt.identity", File.getContent(prefix + "/occt.identity"));
+      Sys.putEnv("LD_LIBRARY_PATH", root + "/one:" + root + "/occt/lib:" + previousLibraries);
+      check(nativeIdentityOf(root, installation, "d") == identity, "a copy of the OCCT install with the same stamp keeps the native identity");
+      File.saveContent(root + "/occt/occt.identity", "another build\n");
+      check(nativeIdentityOf(root, installation, "e") != identity, "another OCCT stamp changes the native identity");
+      FileSystem.deleteFile(root + "/occt/occt.identity");
+      var message:Null<String> = null;
+      try nativeIdentityOf(root, installation, "f") catch (error:Dynamic) message = Std.string(error);
+      check(message != null && message.indexOf("no native identity") >= 0, "an OCCT install without a stamp turns the kernel cache off: " + message);
+    } catch (error:Dynamic) {
+      Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      Sys.putEnv("LD_LIBRARY_PATH", previousLibraries);
+      DiskStore.useProcess(null);
+      remove(root);
+      throw error;
+    }
+    Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    Sys.putEnv("LD_LIBRARY_PATH", previousLibraries);
+    DiskStore.useProcess(null);
+    remove(root);
+  }
+
+  static function kernelCacheInGeneration(installation:String):Void {
+    var temporary = Sys.getEnv("TMPDIR");
+    if (temporary == null || temporary.length == 0) temporary = "/tmp";
+    var root = temporary + "/materia-kernel-cache-test-" + Sys.getPid() + "-" + Std.random(1000000000);
+    FileSystem.createDirectory(root);
+    var previousCache = Sys.getEnv("XDG_CACHE_HOME");
+    Sys.putEnv("XDG_CACHE_HOME", root + "/cache");
+    try {
+      var manifest = kernelFixture(root, installation);
+      var store = root + "/cache/materia/memo";
+      DiskStore.useProcess(new DiskStore(store, 1e9));
+      MateriaProjectRunner.loadProject(manifest);
+      check(stored(store, "kernel").length > 0, "the generator's kernel operations are in the store after the open");
+      check(stored(store, "generator").length == 1 && stored(store, "record").length == 1, "and so are its generator and record");
+      // The generator created the store's directories while it ran; asking whether they existed must not make its output stale.
+      var again = new ProjectLoadControl();
+      MateriaProjectRunner.loadProject(manifest, null, again);
+      check(!hasPhase(again, "Running the project"), "a generator that used the kernel cache is not regenerated on the next open");
+    } catch (error:Dynamic) {
+      Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      DiskStore.useProcess(null);
+      remove(root);
+      throw error;
+    }
+    Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    DiskStore.useProcess(null);
+    remove(root);
+  }
+
+  /**
+   * The files a generator reads are noticed as it runs (nothing is declared) and kept with its output: editing one, creating a
+   * file it looked for and found missing, and changing a directory it listed each regenerate the output without a compile; a file
+   * the generator writes itself is not an input, and an unchanged reopen hits.
+   */
+  static function generatorInputs(installation:String):Void {
+    var temporary = Sys.getEnv("TMPDIR");
+    if (temporary == null || temporary.length == 0) temporary = "/tmp";
+    var root = temporary + "/materia-reads-test-" + Sys.getPid() + "-" + Std.random(1000000000);
+    FileSystem.createDirectory(root);
+    FileSystem.createDirectory(root + "/listed");
+    var previousCache = Sys.getEnv("XDG_CACHE_HOME");
+    Sys.putEnv("XDG_CACHE_HOME", root + "/cache");
+    try {
+      var config:Dynamic = {version: 1, sourceRoots: ["."], target: "host", dependencies: {projectkit: {path: installation + "/projectkit"}}};
+      Reflect.setField(config, "package", {name: "reads-fixture"});
+      File.saveContent(root + "/haxeon.json", Json.stringify(config));
+      var counter = root + "/runs.txt", data = root + "/data.txt", optional = root + "/optional.txt";
+      File.saveContent(counter, "");
+      File.saveContent(data, "one");
+      File.saveContent(root + "/listed/a.txt", "a");
+      File.saveContent(root + "/ReadsPreview.hx", 'import haxe.io.Bytes;\nimport sys.FileSystem;\nimport sys.io.File;\nimport materia.project.SceneArtifact;\n'
+        + 'class ReadsPreview { public static function preview():Bytes {\n'
+        + 'File.saveContent(' + Json.stringify(counter) + ', File.getContent(' + Json.stringify(counter) + ') + "x");\n'
+        + 'var text = File.getContent(' + Json.stringify(data) + ') + (FileSystem.exists(' + Json.stringify(optional) + ') ? "+optional" : "")'
+        + ' + FileSystem.readDirectory(' + Json.stringify(root + "/listed") + ').join(",");\n'
+        + 'var vertices = Bytes.alloc(96); var coordinates = [0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];\n'
+        + 'for (i in 0...12) vertices.setDouble(i * 8, coordinates[i]);\n'
+        + 'var indices = Bytes.alloc(48); var triangles = [0,2,1,0,1,3,0,3,2,1,2,3];\n'
+        + 'for (i in 0...12) indices.setInt32(i * 4, triangles[i]);\n'
+        + 'var part:materia.project.SceneArtifact.SceneArtifactPart = {id: "tetra", name: "Tetra", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12, '
+        + 'vertices: vertices, normals: Bytes.alloc(96), indices: indices, faceRanges: []};\n'
+        + 'return SceneArtifact.encode({metresPerUnit: 1.0, parts: [part], recipeDocument: text}); }}\n');
+      var entry:Dynamic = {kind: "cad-preview", module: "ReadsPreview", cache: {}};
+      Reflect.setField(entry, "function", "preview");
+      var manifest = root + "/materia.project.json";
+      File.saveContent(manifest, Json.stringify({
+        format: "materia.project",
+        version: 1,
+        defaultEntrypoint: "preview",
+        build: {system: "haxeon", manifest: "haxeon.json"},
+        entrypoints: {preview: entry}
+      }));
+      var store = root + "/cache/materia/memo";
+      DiskStore.useProcess(new DiskStore(store, 1e9));
+      function open():String return MateriaProjectRunner.loadProject(manifest).recipeDocument;
+      function runs():Int return File.getContent(counter).length;
+      check(open() == "onea.txt" && runs() == 1, "first open generates");
+      check(open() == "onea.txt" && runs() == 1, "an unchanged reopen hits, although the generator wrote a file it had read");
+      File.saveContent(data, "two");
+      check(open() == "twoa.txt" && runs() == 2, "editing a file the generator read regenerates it");
+      check(open() == "twoa.txt" && runs() == 2, "and the new output hits");
+      File.saveContent(optional, "x");
+      check(open() == "two+optionala.txt" && runs() == 3, "creating a file the generator looked for and did not find regenerates it");
+      File.saveContent(root + "/listed/b.txt", "b");
+      check(open() == "two+optionala.txt,b.txt" && runs() == 4, "changing a directory the generator listed regenerates it");
+      File.saveContent(root + "/listed/b.txt", "bb");
+      check(open() == "two+optionala.txt,b.txt" && runs() == 4, "editing a file in a listed directory does not");
+      check(stored(store, "generator").length == 1, "none of this compiled again");
+    } catch (error:Dynamic) {
+      Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      DiskStore.useProcess(null);
+      remove(root);
+      throw error;
+    }
+    Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    DiskStore.useProcess(null);
+    remove(root);
+  }
 
   static function remove(root:String):Void {
     if (!FileSystem.exists(root)) return;
@@ -181,7 +432,7 @@ class ProjectLoadingTests {
         kind: "cad-preview",
         module: "LoadingPreview",
         documentInput: true,
-        cache: {inputs: ["input.txt"]}
+        cache: {}
       };
       Reflect.setField(entry, "function", "preview");
       var manifest = root + "/materia.project.json";
@@ -193,31 +444,32 @@ class ProjectLoadingTests {
         entrypoints: {preview: entry}
       };
       File.saveContent(manifest, Json.stringify(project));
-      var artifacts = root + "/cache/materia/generated-artifacts";
+      var artifacts = root + "/cache/materia/memo";
+      DiskStore.useProcess(new DiskStore(artifacts, 1e9));
       var coldControl = new ProjectLoadControl();
       var coldScene = MateriaProjectRunner.loadProject(manifest, null, coldControl);
       check(coldScene.recipeDocument == "first-v1", "cold output");
       check(hasPhase(coldControl, "Preparing geometry and physics"), "cold load prepares data");
       var preparedDirectory = root + "/cache/materia/prepared-scenes";
       check(files(preparedDirectory, ".mtrp").length == 1, "cold load caches portable preparation");
-      check(files(artifacts, ".hl").length == 1, "cold load caches compiled code");
-      check(files(artifacts, ".mtrg").length == 1, "declared deterministic output is cached");
-      check(files(root + "/cache/materia/project-tools", ".hl").length == 2, "both tools run as compiled executables");
-      check(hasPhase(coldControl, "Fingerprinting the project"), "cold load analyzes the module graph");
-      check(files(artifacts, ".inputs.json").length == 1, "cold load records the fingerprint's inputs");
+      check(stored(artifacts, "generator").length == 1, "cold load caches compiled code");
+      check(stored(artifacts, "output").length == 1, "declared deterministic output is cached");
+      check(files(root + "/cache/materia/project-tools", ".hl").length == 1, "the build tool runs as a compiled executable");
+      check(hasPhase(coldControl, "Compiling the project"), "cold load compiles, and the compile reports its inputs");
+      check(stored(artifacts, "record").length == 1, "cold load records the fingerprint's inputs");
       var warmControl = new ProjectLoadControl();
       var warmScene = MateriaProjectRunner.loadProject(manifest, null, warmControl);
       check(warmScene.recipeDocument == "first-v1", "warm output");
-      check(!hasPhase(warmControl, "Fingerprinting the project"), "warm load confirms the recorded fingerprint");
-      // A new module could change resolution: its directory listing changes, so the graph is analyzed again (same result here).
+      check(!hasPhase(warmControl, "Compiling the project"), "warm load confirms the recorded fingerprint without compiling");
+      // A module nothing imports is not an input: a file matters once an import names it, and the importing file is in the record.
       File.saveContent(root + "/Unrelated.hx", "class Unrelated {}\n");
       var listingControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, listingControl).recipeDocument == "first-v1", "new module output");
-      check(hasPhase(listingControl, "Fingerprinting the project"), "a new module re-runs the analysis");
-      File.saveContent(files(artifacts, ".inputs.json")[0], "{not json");
+      check(!hasPhase(listingControl, "Compiling the project"), "a new module nothing imports does not compile again");
+      File.saveBytes(stored(artifacts, "record")[0], framed("{not json"));
       var recordControl = new ProjectLoadControl();
       check(MateriaProjectRunner.loadProject(manifest, null, recordControl).recipeDocument == "first-v1", "corrupt record output");
-      check(hasPhase(recordControl, "Fingerprinting the project"), "a corrupt fingerprint record is ignored");
+      check(hasPhase(recordControl, "Compiling the project"), "a corrupt fingerprint record is ignored");
       check(File.getContent(counter) == "x", "fingerprint records never change cached output");
       check(!hasPhase(warmControl, "Preparing geometry and physics"), "warm load skips preparation");
       check(
@@ -237,7 +489,7 @@ class ProjectLoadingTests {
           "fresh native geometry ownership with matching mesh counts"
         );
       }
-      var artifactBytes = File.getBytes(files(artifacts, ".mtrg")[0]);
+      var artifactBytes = payload(stored(artifacts, "output")[0]);
       var digest = Sha256.make(artifactBytes), artifactHash = new StringBuf();
       var digits = "0123456789abcdef";
       for (i in 0...digest.length) {
@@ -365,9 +617,14 @@ class ProjectLoadingTests {
         MateriaProjectRunner.loadProject(manifest, "recipe-b").recipeDocument == "recipe-b-v1",
         "changed editable input"
       );
-      check(files(artifacts, ".hl").length == 1, "recipe changes reuse compiled code");
-      check(File.getContent(counter) == "xxx", "editable input always executes");
-      File.saveContent(files(artifacts, ".mtrg")[0], "corrupt");
+      check(stored(artifacts, "generator").length == 1, "recipe changes reuse compiled code");
+      check(File.getContent(counter) == "xxx", "each new editable input executes once");
+      check(
+        MateriaProjectRunner.loadProject(manifest, "recipe-a").recipeDocument == "recipe-a-v1",
+        "unchanged editable input reopens"
+      );
+      check(File.getContent(counter) == "xxx", "unchanged editable input hits the output cache");
+      for (path in stored(artifacts, "output")) File.saveBytes(path, framed("corrupt"));
       check(MateriaProjectRunner.loadProject(manifest).recipeDocument == "first-v1", "corrupt output regenerates");
       check(File.getContent(counter) == "xxxx", "corrupt output executes again");
       File.saveContent(data, "other");
@@ -381,15 +638,15 @@ class ProjectLoadingTests {
         MateriaProjectRunner.loadProject(manifest, null, editControl).recipeDocument == "other-v2",
         "same-size source edit invalidates code and output"
       );
-      check(hasPhase(editControl, "Fingerprinting the project"), "a source edit fails fingerprint confirmation");
+      check(hasPhase(editControl, "Compiling the project"), "a source edit fails fingerprint confirmation");
       Reflect.deleteField(entry, "cache");
       File.saveContent(manifest, Json.stringify(project));
-      var before = files(artifacts, ".mtrg").length;
+      var before = stored(artifacts, "output").length;
       MateriaProjectRunner.loadProject(manifest);
-      var compiled = files(artifacts, ".hl").length;
+      var compiled = stored(artifacts, "generator").length;
       MateriaProjectRunner.loadProject(manifest);
-      check(files(artifacts, ".hl").length == compiled, "uncached output still reuses compiled code");
-      check(files(artifacts, ".mtrg").length == before, "uncached generators never cache output");
+      check(stored(artifacts, "generator").length == compiled, "uncached output still reuses compiled code");
+      check(stored(artifacts, "output").length == before, "uncached generators never cache output");
       check(File.getContent(counter).length == 8, "uncached generator executes on each open");
       var control = new ProjectLoadControl();
       control.cancel();
@@ -414,13 +671,29 @@ class ProjectLoadingTests {
       check(MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument == "other-v2", "variant switch back hits");
       check(MateriaProjectRunner.loadProject(manifest, null, null, "other").recipeDocument == "alternate-v2", "variant hits");
       check(File.getContent(counter).length == runsBeforeVariants + 2, "each variant executes once, then reuses its output");
+      // Artifacts are store entries like any other: a store over its cap evicts them, and the next open regenerates the same output.
+      var runsBeforeEviction = File.getContent(counter).length;
+      var kept = MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument;
+      check(stored(artifacts, "output").length > 0 && stored(artifacts, "generator").length > 0 && stored(artifacts, "record").length > 0,
+        "the store holds an output, a generator and a record");
+      var tiny = new DiskStore(artifacts, 1.0);
+      tiny.evict();
+      check(files(artifacts, ".memo").length == 0, "a store over its cap evicts artifacts, generators and records");
+      var regenerated = MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument;
+      check(regenerated == kept, "after eviction the next open regenerates the same output");
+      check(File.getContent(counter).length == runsBeforeEviction + 1, "the evicted output was generated again");
     } catch (error:Dynamic) {
       Sys.putEnv("XDG_CACHE_HOME", previousCache);
+      DiskStore.useProcess(null);
       remove(root);
       throw error;
     }
     Sys.putEnv("XDG_CACHE_HOME", previousCache);
+    DiskStore.useProcess(null);
     remove(root);
+    kernelCacheInGeneration(installation);
+    nativeIdentityTracksBuild(installation);
+    generatorInputs(installation);
     Sys.println("Project loading tests passed");
     return 0;
   }

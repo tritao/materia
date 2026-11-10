@@ -10,7 +10,7 @@
 			"kind": "cad-preview",
 			"module": "RobotArmPreview",
 			"function": "arm",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

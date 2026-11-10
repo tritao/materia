@@ -61,11 +61,12 @@ class PosedParts {
   /** `part` moved to `pose`: a new owned part. */
   public static function moved(part:Part, pose:AssemblyFrame):Part {
     var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
-    return part.placed(new Location(new Plane(
+    // A posed part is displayed and measured, never edited, so it keeps no operation history: placing the shape does not record one.
+    return new Part(new Location(new Plane(
       new Vector(pose.x, pose.y, pose.z),
       new Vector(x.x, x.y, x.z),
       new Vector(z.x, z.y, z.z)
-    )));
+    )).apply(part.shape));
   }
 
   /**

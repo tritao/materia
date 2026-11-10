@@ -146,16 +146,8 @@ class LinearRailBlock extends MachineComponent {
   public static function referenceDirectory():String {
     var configured = Sys.getEnv("MATERIA_HG_REFERENCE");
     if (configured != null && configured != "") return configured;
-    var root = Sys.getEnv("MATERIA_ROOT");
-    if (root == null || root == "") {
-      root = Sys.getCwd();
-      while (!sys.FileSystem.exists(root + "/tools/suppliers/hg-reference.json")) {
-        var parent = haxe.io.Path.directory(root);
-        if (parent == root
-          || parent == "") throw "Set MATERIA_HG_REFERENCE or MATERIA_ROOT to find the HG reference CAD";
-        root = parent;
-      }
-    }
+    var root = machinekit.catalog.RepositoryRoot.find();
+    if (root == null) throw "Set MATERIA_HG_REFERENCE or MATERIA_ROOT to find the HG reference CAD";
     return root + "/build/suppliers/vallder/hg-reference";
   }
 

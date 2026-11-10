@@ -65,6 +65,9 @@
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
+#include <BinTools.hxx>
+#include <BinTools_FormatVersion.hxx>
+#include <Standard_Version.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepGProp.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
@@ -127,6 +130,7 @@
 #include <new>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -143,6 +147,8 @@ struct ShapeEntry {
     // Null until first asked for: shapes from operations without a naming
     // adapter yet get weak index names then.
     naming::ElementMapPtr names;
+    // The shape passed BRepCheck_Analyzer, here or where it was made: a rigid move of it needs no second check.
+    bool valid = false;
 };
 
 struct MeshData {
@@ -302,7 +308,7 @@ OperationEntry* lookup_operation_locked(cad_operation handle) {
     return &entry;
 }
 
-cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::ElementMapPtr names = nullptr) {
+cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::ElementMapPtr names = nullptr, bool valid = false) {
     if (out_shape == nullptr) {
         return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
     }
@@ -316,6 +322,7 @@ cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::Elemen
             auto& entry = g_shapes[slot - 1];
             entry.shape.emplace(std::move(shape));
             entry.names = std::move(names);
+            entry.valid = valid;
             *out_shape = encode_handle(HandleKind::Shape, slot, entry.generation);
             return CAD_OK;
         }
@@ -328,6 +335,7 @@ cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::Elemen
         auto& entry = g_shapes.back();
         entry.shape.emplace(std::move(shape));
         entry.names = std::move(names);
+        entry.valid = valid;
         slot = static_cast<std::uint16_t>(g_shapes.size());
         *out_shape = encode_handle(HandleKind::Shape, slot, entry.generation);
         return CAD_OK;
@@ -1297,6 +1305,9 @@ cad_result evaluate_boolean(
         operation.SetNonDestructive(true);
         // Names need the history even when the caller does not (TN-D12).
         operation.SetToFillHistory(true);
+        // OCCT's parallel mode splits the intersection work across cores; the result is the same (measured on the hobber scene's
+        // 38 slow fuses: same volume and face count, build time 33 s -> 12 s).
+        operation.SetRunParallel(true);
         operation.Build();
         if (!operation.IsDone() || operation.HasErrors()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "OCCT boolean operation failed");
@@ -2023,6 +2034,247 @@ extern "C" CADKIT_API cad_result cad_step_export(
     return export_step_shape(shape, path);
 }
 
+namespace {
+
+// Bytes of a shape: magic, format, naming scheme, OCCT version text, name and B-rep section sizes, the sections, and an
+// FNV-1a checksum of everything before it. Little-endian. See cadkit.h.
+constexpr char kShapeMagic[4] = {'C', 'K', 'S', 'H'};
+constexpr std::uint32_t kShapeFormat = 1;
+
+std::uint64_t shape_checksum(const std::uint8_t* data, std::size_t size) {
+    std::uint64_t hash = 1469598103934665603ull;
+    for (std::size_t i = 0; i < size; ++i) {
+        hash ^= data[i];
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+void put_u32(std::vector<std::uint8_t>& out, std::uint32_t value) {
+    for (int i = 0; i < 4; ++i) out.push_back(static_cast<std::uint8_t>((value >> (8 * i)) & 0xffu));
+}
+
+void put_u64(std::vector<std::uint8_t>& out, std::uint64_t value) {
+    for (int i = 0; i < 8; ++i) out.push_back(static_cast<std::uint8_t>((value >> (8 * i)) & 0xffu));
+}
+
+void put_text(std::vector<std::uint8_t>& out, const std::string& text) {
+    put_u32(out, static_cast<std::uint32_t>(text.size()));
+    out.insert(out.end(), text.begin(), text.end());
+}
+
+void put_texts(std::vector<std::uint8_t>& out, const std::vector<std::string>& texts) {
+    put_u32(out, static_cast<std::uint32_t>(texts.size()));
+    for (const auto& text : texts) put_text(out, text);
+}
+
+void put_text_lists(std::vector<std::uint8_t>& out, const std::vector<std::vector<std::string>>& lists) {
+    put_u32(out, static_cast<std::uint32_t>(lists.size()));
+    for (const auto& list : lists) put_texts(out, list);
+}
+
+struct ByteReader {
+    const std::uint8_t* data;
+    std::size_t size;
+    std::size_t position = 0;
+
+    bool u32(std::uint32_t& value) {
+        if (size - position < 4) return false;
+        value = 0;
+        for (int i = 0; i < 4; ++i) value |= static_cast<std::uint32_t>(data[position + i]) << (8 * i);
+        position += 4;
+        return true;
+    }
+    bool text(std::string& value) {
+        std::uint32_t length = 0;
+        if (!u32(length) || size - position < length) return false;
+        value.assign(reinterpret_cast<const char*>(data + position), length);
+        position += length;
+        return true;
+    }
+    bool texts(std::vector<std::string>& values) {
+        std::uint32_t count = 0;
+        // Every entry takes at least four bytes, so a count beyond that is damage, not a reason to allocate.
+        if (!u32(count) || count > (size - position) / 4) return false;
+        values.resize(count);
+        for (auto& value : values) if (!text(value)) return false;
+        return true;
+    }
+    bool text_lists(std::vector<std::vector<std::string>>& values) {
+        std::uint32_t count = 0;
+        if (!u32(count) || count > (size - position) / 4) return false;
+        values.resize(count);
+        for (auto& value : values) if (!texts(value)) return false;
+        return true;
+    }
+};
+
+std::string brep_bytes(const TopoDS_Shape& shape) {
+    std::ostringstream stream(std::ios::out | std::ios::binary);
+    BinTools::Write(shape, stream, false, false, BinTools_FormatVersion_CURRENT);
+    return stream.str();
+}
+
+TopoDS_Shape brep_from_bytes(const char* data, std::size_t size) {
+    std::istringstream stream(std::string(data, size), std::ios::in | std::ios::binary);
+    TopoDS_Shape restored;
+    BinTools::Read(restored, stream);
+    return restored;
+}
+
+// OCCT's reader does not return what the writer was given: it rebuilds every location with gp_Trsf::SetValues (divide by the
+// cube root of the determinant, then Gram-Schmidt) and every surface placement with gp_Ax3 (Y recomputed as N x X), which
+// moves last bits and flips signed zeros. Round-off makes that converge over a few passes instead of one (a box with all its
+// edges chamfered takes five). The bytes handed out are the fixed point, so reading them and writing again gives them back
+// exactly, and everything built from a restored shape (meshes included) is the same whether it came from this process or a
+// cache. The bound is generous: no shape has needed more than six writes.
+constexpr int kCanonicalPasses = 32;
+
+std::string canonical_brep_bytes(const TopoDS_Shape& shape) {
+    auto bytes = brep_bytes(shape);
+    for (int pass = 0; pass < kCanonicalPasses; ++pass) {
+        const auto restored = brep_from_bytes(bytes.data(), bytes.size());
+        auto next = brep_bytes(restored);
+        if (next == bytes) return bytes;
+        bytes = std::move(next);
+    }
+    throw std::runtime_error("shape did not reach a canonical form");
+}
+
+int subshape_count(const TopoDS_Shape& shape, TopAbs_ShapeEnum type) {
+    naming::ShapeIndex index;
+    TopExp::MapShapes(shape, type, index);
+    return index.Extent();
+}
+
+}  // namespace
+
+extern "C" CADKIT_API cad_result cad_shape_write_bytes(
+    cad_shape shape,
+    std::uint8_t* output,
+    std::uint32_t* byte_capacity) {
+    clear_error();
+    if (byte_capacity == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "byte_capacity must not be null");
+    }
+    naming::NamedShape named;
+    const auto copied = copy_named_shape(shape, named);
+    if (copied != CAD_OK) return copied;
+    try {
+        const auto brep = canonical_brep_bytes(named.shape);
+
+        std::vector<std::uint8_t> names;
+        put_texts(names, named.names->faces);
+        put_texts(names, named.names->edges);
+        put_texts(names, named.names->vertices);
+        put_texts(names, named.names->solids);
+        put_text_lists(names, named.names->face_aliases);
+        put_text_lists(names, named.names->solid_aliases);
+
+        if (brep.size() > 0x7fffffffu || names.size() > 0x7fffffffu) {
+            return fail(CAD_ERROR_OUT_OF_MEMORY, "shape exceeds 32-bit range");
+        }
+        std::vector<std::uint8_t> bytes;
+        bytes.reserve(brep.size() + names.size() + 128);
+        bytes.insert(bytes.end(), kShapeMagic, kShapeMagic + 4);
+        put_u32(bytes, kShapeFormat);
+        put_u32(bytes, naming::kSchemeVersion);
+        put_text(bytes, OCC_VERSION_STRING_EXT);
+        put_u32(bytes, static_cast<std::uint32_t>(names.size()));
+        put_u32(bytes, static_cast<std::uint32_t>(brep.size()));
+        bytes.insert(bytes.end(), names.begin(), names.end());
+        bytes.insert(bytes.end(), brep.begin(), brep.end());
+        put_u64(bytes, shape_checksum(bytes.data(), bytes.size()));
+
+        if (bytes.size() > 0xffffffffu) return fail(CAD_ERROR_OUT_OF_MEMORY, "shape exceeds 32-bit range");
+        const auto required = static_cast<std::uint32_t>(bytes.size());
+        const auto capacity = *byte_capacity;
+        *byte_capacity = required;
+        if (capacity < required || output == nullptr) {
+            return fail(CAD_ERROR_BUFFER_TOO_SMALL, "shape output buffer is too small");
+        }
+        std::memcpy(output, bytes.data(), bytes.size());
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_read_bytes(
+    const std::uint8_t* data,
+    std::uint32_t byte_count,
+    cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+    // magic, format, scheme, text length, names size, B-rep size, checksum
+    constexpr std::size_t kMinimum = 4 + 4 + 4 + 4 + 4 + 4 + 8;
+    if (data == nullptr || byte_count < kMinimum) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes are truncated");
+    }
+    if (std::memcmp(data, kShapeMagic, 4) != 0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "not shape bytes");
+    }
+    const std::size_t body = byte_count - 8;
+    std::uint64_t stored = 0;
+    for (int i = 0; i < 8; ++i) stored |= static_cast<std::uint64_t>(data[body + i]) << (8 * i);
+    if (stored != shape_checksum(data, body)) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes are damaged (checksum mismatch)");
+    }
+    try {
+        ByteReader reader{data, body, 4};
+        std::uint32_t format = 0, scheme = 0, names_size = 0, brep_size = 0;
+        std::string occt;
+        if (!reader.u32(format) || !reader.u32(scheme) || !reader.text(occt) || !reader.u32(names_size) ||
+            !reader.u32(brep_size)) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes are truncated");
+        }
+        if (format != kShapeFormat) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes have an unsupported format version");
+        if (scheme != naming::kSchemeVersion) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes use another naming scheme");
+        if (occt != OCC_VERSION_STRING_EXT) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes were written by another OCCT version");
+        if (body - reader.position != static_cast<std::uint64_t>(names_size) + brep_size) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes have inconsistent section sizes");
+        }
+
+        ByteReader names_reader{data + reader.position, names_size, 0};
+        auto names = std::make_shared<naming::ElementMap>();
+        if (!names_reader.texts(names->faces) || !names_reader.texts(names->edges) || !names_reader.texts(names->vertices) ||
+            !names_reader.texts(names->solids) || !names_reader.text_lists(names->face_aliases) ||
+            !names_reader.text_lists(names->solid_aliases) || names_reader.position != names_size) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "shape name section is damaged");
+        }
+
+        TopoDS_Shape restored =
+            brep_from_bytes(reinterpret_cast<const char*>(data + reader.position + names_size), brep_size);
+        if (restored.IsNull()) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes hold no shape");
+
+        const bool consistent =
+            names->faces.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_FACE)) &&
+            names->edges.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_EDGE)) &&
+            names->vertices.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_VERTEX)) &&
+            names->solids.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_SOLID)) &&
+            names->face_aliases.size() == names->faces.size() && names->solid_aliases.size() == names->solids.size();
+        if (!consistent) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape names do not match the shape");
+        return insert_shape(std::move(restored), out_shape, naming::ElementMapPtr(std::move(names)));
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_shape_translate(
     cad_shape shape,
     cad_vec3 delta,
@@ -2556,6 +2808,64 @@ extern "C" CADKIT_API cad_result cad_cut(
     cad_shape* out_shape) {
     clear_error();
     return make_boolean_shape<BRepAlgoAPI_Cut>(first, second, out_shape);
+}
+
+extern "C" CADKIT_API cad_result cad_cut_many(
+    cad_shape first,
+    const cad_shape_ref* tools,
+    uint32_t tool_count,
+    cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+    if (tools == nullptr || tool_count == 0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "cut needs at least one tool");
+    }
+    std::vector<naming::NamedShape> inputs(1 + static_cast<std::size_t>(tool_count));
+    const auto base_result = copy_named_shape(first, inputs[0]);
+    if (base_result != CAD_OK) {
+        return base_result;
+    }
+    for (uint32_t index = 0; index < tool_count; ++index) {
+        const auto tool_result = copy_named_shape(tools[index].shape, inputs[1 + index]);
+        if (tool_result != CAD_OK) {
+            return tool_result;
+        }
+    }
+    try {
+        BRepAlgoAPI_Cut operation;
+        NCollection_List<TopoDS_Shape> arguments;
+        arguments.Append(inputs[0].shape);
+        NCollection_List<TopoDS_Shape> tool_list;
+        for (std::size_t index = 1; index < inputs.size(); ++index) tool_list.Append(inputs[index].shape);
+        operation.SetArguments(arguments);
+        operation.SetTools(tool_list);
+        operation.SetNonDestructive(true);
+        operation.SetToFillHistory(true);
+        operation.SetRunParallel(true);
+        operation.Build();
+        if (!operation.IsDone() || operation.HasErrors()) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "OCCT boolean operation failed");
+        }
+        if (!BRepCheck_Analyzer(operation.Shape()).IsValid()) {
+            const auto message = "OCCT boolean produced invalid topology" + boolean_warning_summary(operation);
+            return fail(CAD_ERROR_OPERATION_FAILED, message.c_str());
+        }
+        auto result = operation.Shape();
+        naming::AlgorithmHistory<BRepAlgoAPI_Cut> history(operation);
+        auto names = naming::propagate(inputs, &history, result);
+        return insert_shape(std::move(result), out_shape, std::move(names));
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
 }
 
 extern "C" CADKIT_API cad_result cad_common(
@@ -4052,6 +4362,10 @@ extern "C" CADKIT_API void cad_operation_destroy(cad_operation operation) {
     release_operation_locked(operation);
 }
 
+extern "C" CADKIT_API const char* cad_occt_version(void) {
+    return OCC_VERSION_STRING_EXT;
+}
+
 extern "C" CADKIT_API const char* cad_last_error(void) {
     return g_last_error.c_str();
 }
@@ -4068,6 +4382,18 @@ TopoDS_Shape model_shape(cad_shape handle) {
     if (result != CAD_OK) throw ModelingFailure{result, g_last_error};
     return shape;
 }
+// Whether the shape behind `handle` is known to be valid; `mark_valid` records a check that passed.
+bool shape_known_valid(cad_shape handle) {
+    std::lock_guard lock(g_shapes_mutex);
+    auto* entry = lookup_locked(handle);
+    return entry != nullptr && entry->valid;
+}
+
+void mark_shape_valid(cad_shape handle) {
+    std::lock_guard lock(g_shapes_mutex);
+    if (auto* entry = lookup_locked(handle)) entry->valid = true;
+}
+
 naming::NamedShape model_named(cad_shape handle) {
     naming::NamedShape shape;
     auto result = copy_named_shape(handle, shape);
@@ -4113,21 +4439,21 @@ template<class F> cad_result model_output(cad_shape* output, F action, naming::E
 
 namespace {
 template<class F> cad_result model_record(cad_shape* output, cad_operation* history, F action,
-                                          naming::ElementMapPtr* names = nullptr) {
+                                          naming::ElementMapPtr* names = nullptr, bool already_valid = false) {
     if (output) *output = 0;
     if (history) *history = 0;
     return model_guard([&]() {
         require_model(output != nullptr || history != nullptr, "result output must not be null");
         OperationData data;
         auto shape = action(history ? &data : nullptr);
-        if (shape.IsNull() || !BRepCheck_Analyzer(shape).IsValid())
+        if (shape.IsNull() || (!already_valid && !BRepCheck_Analyzer(shape).IsValid()))
             return fail(CAD_ERROR_OPERATION_FAILED, "modeling operation produced invalid topology");
         if (history) {
             data.result = shape;
             data.result_names = names ? *names : nullptr;
             return insert_operation(std::move(data), history);
         }
-        return insert_shape(shape, output, names ? *names : nullptr);
+        return insert_shape(shape, output, names ? *names : nullptr, true);
     });
 }
 }
@@ -4303,14 +4629,19 @@ static cad_result do_cad_shape_place(cad_shape handle, cad_vec3 origin, cad_vec3
         transform.SetValues(dx.X(),dy.X(),dz.X(),p.X(), dx.Y(),dy.Y(),dz.Y(),p.Y(), dx.Z(),dy.Z(),dz.Z(),p.Z());
         auto named = model_named(handle);
         const auto& source = named.shape;
+        // A rigid move of a valid shape is valid, so each source is checked once, not once per placement.
+        if (!shape_known_valid(handle)) {
+            require_model(BRepCheck_Analyzer(source).IsValid(), "modeling operation produced invalid topology");
+            mark_shape_valid(handle);
+        }
         // A proper rigid placement preserves geometry and tolerances through TopLoc.
         // Copying the geometry can invalidate trimmed STEP faces after translation.
         BRepBuilderAPI_Transform operation(source, transform, false);
         if (record) collect_operation_history(operation, source, nullptr, *record);
-        naming::AlgorithmHistory<BRepBuilderAPI_Transform> naming_history(operation);
-        names = naming::propagate({named}, &naming_history, operation.Shape());
+        // The move is rigid and does not copy: the result's elements are the source's, in the same order.
+        names = naming::carry_rigid(named, operation.Shape());
         return operation.Shape();
-    }, &names);
+    }, &names, true);
 }
 extern "C" CADKIT_API cad_result cad_shape_place(cad_shape handle, cad_vec3 origin, cad_vec3 x, cad_vec3 z, cad_shape* output) {
     return do_cad_shape_place(handle, origin, x, z, output, nullptr);

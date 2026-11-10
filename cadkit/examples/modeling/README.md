@@ -160,11 +160,11 @@ are rejected until enough dependent coordinates are selected.
 
 The viewport entrypoint opts into a generated artifact cache. Materia reuses the
 artifact when its Haxeon source graph, compiler sources, and native runtime build
-have not changed. Scripts that read additional data files must list those files
-in the entrypoint's `cache.inputs` array, relative to `materia.project.json`.
+have not changed. Data files a script reads are noticed as it runs and kept with the
+artifact, which is regenerated when any of them changes.
 Entrypoints without a `cache` declaration execute on every open. The cache is
-stored under `$XDG_CACHE_HOME/materia/generated-artifacts`, or `~/.cache/materia`
-when `XDG_CACHE_HOME` is unset. Only deterministic entrypoints should opt in;
+stored in the shared cache store under `$XDG_CACHE_HOME/materia/memo`, or `~/.cache/materia/memo`
+when `XDG_CACHE_HOME` is unset (capped by `MATERIA_CACHE_MAX_MB`, least recently used first). Only deterministic entrypoints should opt in;
 omit `cache` when output depends on the clock, environment, or undeclared inputs.
 
 Saving this view as a Materia scene keeps a relative reference to the project

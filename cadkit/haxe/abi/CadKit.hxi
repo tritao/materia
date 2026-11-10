@@ -58,6 +58,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_common_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_compound(shapes: ptr<const<cad_shape_ref>> @in_array("shape_count"), shape_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_cut(first: cad_shape, second: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_cut_many(first: cad_shape, tools: ptr<const<cad_shape_ref>> @in_array("tool_count"), tool_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_cut_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_cylinder(radius: f64, height: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_edge_axis(edge: cad_shape, out_axis: ptr<cad_axis> @out) -> cad_result;
@@ -94,6 +95,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_mesh_index_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_mesh_vertex_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_naming_scheme_version(out_version: ptr<u32> @out) -> cad_result;
+	extern fn cad_occt_version() -> utf8 @borrowed;
 	extern fn cad_operation_destroy(operation: cad_operation) -> void;
 	extern fn cad_operation_history_count(operation: cad_operation, relation: cad_history_relation, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_operation_history_source_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -137,6 +139,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_physical_properties(shape: cad_shape, out_properties: ptr<cad_physical_properties> @out) -> cad_result;
 	extern fn cad_shape_place(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_place_operation(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_shape_read_bytes(data: ptr<const<u8>> @in_array("byte_count"), byte_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_refine_operation(shape: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_revolve(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_revolve_operation(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
@@ -154,6 +157,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_valid(shape: cad_shape, out_valid: ptr<u8> @out) -> cad_result;
 	extern fn cad_shape_volume(shape: cad_shape, out_volume: ptr<f64> @out) -> cad_result;
 	extern fn cad_shape_volume_with_tolerance(shape: cad_shape, relative_tolerance: f64, out_volume: ptr<f64> @out) -> cad_result;
+	extern fn cad_shape_write_bytes(shape: cad_shape, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
 	extern fn cad_sheet_bend_region_operation(profile: cad_shape, thickness: f64, angle: f64, allowance: f64, inner_radius: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shell(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shell_operation(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;

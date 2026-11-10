@@ -69,7 +69,7 @@ class BoxMaterialVolume {
       if (PosedParts.apart(toolBoxes[i], toolBoxes[j], 0)) continue;
       var a = tools[i].key, b = tools[j].key, pair = a == null || b == null ? null : a + "#" + b;
       var overlap = keptOverlaps.get(pair, () -> {
-        var shared = solid(i).intersect(solid(j));
+        var shared = solid(i).combineKept(solid(j), cadkit.modeling.Mode.Intersect);
         var volume = shared.volume();
         shared.close();
         return volume > CONTACT_VOLUME;
@@ -90,7 +90,7 @@ class BoxMaterialVolume {
           var cell = Part.box(box.width, box.depth, box.height);
           var placed = cell.translated(new Vector(box.x + box.width / 2, box.y + box.depth / 2, box.z));
           cell.close();
-          var common = solid(t).intersect(placed);
+          var common = solid(t).combineKept(placed, cadkit.modeling.Mode.Intersect);
           placed.close();
           var share:Null<cadkit.PhysicalProperties> = null;
           try {

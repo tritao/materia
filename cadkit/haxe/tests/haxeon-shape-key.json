@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "cadkit-shape-key-smoke"},
+  "entry": "ShapeKeySmoke",
+  "sourceRoots": ["."],
+  "dependencies": {"cadkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/shape-key"
+}

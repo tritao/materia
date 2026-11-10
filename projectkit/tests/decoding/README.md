@@ -1,8 +1,8 @@
 # Artifact decoding benchmarks
 
 These isolate binary decoding and validation from compilation, disk I/O, geometry
-preparation and rendering. Use an actual cached `.mtrg` file from
-`${XDG_CACHE_HOME:-$HOME/.cache}/materia/generated-artifacts`.
+preparation and rendering. Use an actual `.mtrg` file: one exported from the editor, or the
+payload of a cache entry in `${XDG_CACHE_HOME:-$HOME/.cache}/materia/memo` (an entry is an 8-byte frame followed by the file).
 
 From the repository root, build and run the native benchmark:
 

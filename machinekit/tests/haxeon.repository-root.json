@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-repository-root-tests"},
+  "entry": "RepositoryRootTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/repository-root"
+}

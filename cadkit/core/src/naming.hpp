@@ -167,6 +167,11 @@ private:
 // inputs get `@slot`; leftovers get weak index names).
 ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history, const TopoDS_Shape& result);
 
+// The names of `input` carried to `result`, which is the same shape moved by a rigid transformation without copying (its
+// elements are the input's, in the same order): every element keeps its name, so the names are copied by index instead of
+// being matched element by element through a history. Throws if the element counts differ, which they cannot for such a move.
+ElementMapPtr carry_rigid(const NamedShape& input, const TopoDS_Shape& result);
+
 // `names` with the given faces named by role where they only had weak names
 // (caps of lofts, which come from no single source element).
 ElementMapPtr with_face_roles(const TopoDS_Shape& shape, const ElementMap& names,

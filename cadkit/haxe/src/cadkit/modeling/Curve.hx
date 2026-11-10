@@ -2,6 +2,7 @@ package cadkit.modeling;
 
 import CadKit;
 import cadkit.Shape;
+import cadkit.ShapeKey;
 import cadkit.Operation;
 
 class Curve extends Model {
@@ -40,29 +41,59 @@ class Curve extends Model {
     }
   }
 
+  static function vec(v:Vector):String return ShapeKey.number(v.x)
+    + "," + ShapeKey.number(v.y) + "," + ShapeKey.number(v.z);
+
+  static function leaf(shape:Shape, name:String, params:String):Shape {
+    shape.key = ShapeKey.leaf("curve-" + name, params);
+    shape.gap = null;
+    return shape;
+  }
+
   public static function line(start:Vector, end:Vector):Curve {
-    return new Curve(Shape.fromOwnedHandle(CadKit.lineChecked(start.native(), end.native())));
+    return new Curve(leaf(
+      Shape.fromOwnedHandle(CadKit.lineChecked(start.native(), end.native())),
+      "line",
+      vec(start) + "|" + vec(end)
+    ));
   }
 
   public static function arc(start:Vector, middle:Vector, end:Vector):Curve {
-    return new Curve(Shape.fromOwnedHandle(CadKit.arcChecked(start.native(), middle.native(), end.native())));
+    return new Curve(leaf(
+      Shape.fromOwnedHandle(CadKit.arcChecked(start.native(), middle.native(), end.native())),
+      "arc",
+      vec(start) + "|" + vec(middle) + "|" + vec(end)
+    ));
   }
 
   public static function circle(radius:Float, ?plane:Plane):Curve {
     if (plane == null) plane = Plane.XY();
-    return new Curve(Shape.fromOwnedHandle(CadKit.circleChecked(plane.origin.native(), plane.normal.native(), radius)));
+    return new Curve(leaf(
+      Shape.fromOwnedHandle(CadKit.circleChecked(plane.origin.native(), plane.normal.native(), radius)),
+      "circle",
+      vec(plane.origin) + "|" + vec(plane.normal) + "|" + ShapeKey.number(radius)
+    ));
   }
 
   public static function spline(points:Array<Vector>):Curve {
     var values:Array<CadKit.Vec3> = [];
     for (p in points) values.push(p.native());
-    return new Curve(Shape.fromOwnedHandle(CadKit.splineChecked(values)));
+    // The same points give the same curve: keyed by their exact bits.
+    return new Curve(leaf(
+      Shape.fromOwnedHandle(CadKit.splineChecked(values)),
+      "spline",
+      [for (p in points) vec(p)].join(";")
+    ));
   }
 
   public static function polyline(points:Array<Vector>, closed:Bool = false):Curve {
     var values:Array<CadKit.Vec3> = [];
     for (p in points) values.push(p.native());
-    return new Curve(Shape.fromOwnedHandle(CadKit.polylineChecked(values, closed ? 1 : 0)));
+    return new Curve(leaf(
+      Shape.fromOwnedHandle(CadKit.polylineChecked(values, closed ? 1 : 0)),
+      "polyline",
+      (closed ? "closed" : "open") + "|" + [for (p in points) vec(p)].join(";")
+    ));
   }
 
   public static function wire(curves:Array<Curve>):Curve {
@@ -74,7 +105,12 @@ class Curve extends Model {
           i
         ));
       }
-      var result = new Curve(Shape.fromOwnedHandle(CadKit.wireChecked(Model.refs(edges))));
+      var wireShape = Shape.fromOwnedHandle(CadKit.wireChecked(Model.refs(edges)));
+      // The wire is made of every edge of the curves, in order: keyed by the curves' keys when they all have one.
+      var wireKey = ShapeKey.op("wire", "", [for (curve in curves) curve.shape]);
+      wireShape.key = wireKey;
+      wireShape.gap = wireKey == null ? ShapeKey.gapOf("wire", [for (curve in curves) curve.shape]) : null;
+      var result = new Curve(wireShape);
       for (edge in edges) edge.close();
       return result;
     } catch (error:Dynamic) {
@@ -95,7 +131,12 @@ class Curve extends Model {
   public function offset(distance:Float):Curve {
     var wire = asWire();
     try {
-      var result = fromOperation(new Operation(CadKit.wireOffsetOperationChecked(wire.shape.borrowHandle(), distance)));
+      var result = fromOperation(new Operation(
+        CadKit.wireOffsetOperationChecked(wire.shape.borrowHandle(), distance),
+        null,
+        null,
+        "wire-offset"
+      ));
       wire.close();
       return result;
     } catch (error:Dynamic) {

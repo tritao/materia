@@ -182,7 +182,7 @@ class Main {
 
     if (args.indexOf("--snapshot") >= 0) {
       var projectPath:String = "";
-      for (arg in args) if (arg.indexOf("--project=") == 0) projectPath = arg.substr(10);
+      for (arg in args) if (arg.indexOf("--project=") == 0) projectPath = materia.project.LaunchPaths.resolve(arg.substr(10));
       var editor = args.indexOf("--demo") >= 0 ? new ReferenceEditorApp(
         null,
         null,
@@ -581,7 +581,7 @@ private class ReferenceEditorLaunchOptions {
       } else if (arg.indexOf("--setup-script=") == 0) {
         setupScript = arg.substr(15);
       } else if (arg.indexOf("--project=") == 0) {
-        projectPath = arg.substr(10);
+        projectPath = materia.project.LaunchPaths.resolve(arg.substr(10));
       }
     }
     if (directory != null && directory.length == 0) {
@@ -657,6 +657,9 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
   // File tier, one-pixel divider, and mode/transport tier.
   static inline var TOOLBAR_HEIGHT:Float = 75.0;
   static inline var STATUS_HEIGHT:Float = 28.0;
+  static inline var STATUS_COPIED_SECONDS:Float = 1.5;
+  /** When the status selection text was last clicked to copy it, `Sys.time()`. */
+  var statusCopiedAt:Float = -100.0;
 
   public final ui:UiContext;
   var appearance:EditorAppearance;
@@ -2123,16 +2126,35 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     var left = statusSelectionLabel();
     var right = statusRuntimeLabel();
     var narrow = viewportWidth < 700.0, wide = viewportWidth >= 900.0;
+    var copying = Sys.time() - statusCopiedAt < STATUS_COPIED_SECONDS;
+    if (copying) invalidateView();
+    var selectionText = new Text(
+      shortenLabel(copying ? "Copied to clipboard" : left, narrow ? 20 : 48),
+      null,
+      simulation.error == null ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger,
+      TextStyleOverride.text(12.0)
+    );
+    var copyable = statusSelectionCopyText() != null;
+    var selectionView:View = selectionText;
+    if (copyable) {
+      // Clicking the selection text copies what it names: the object's reference, and the picked face when there is one.
+      var buttonStyle = new LayoutStyle();
+      buttonStyle.height = LayoutAxis.fixed(STATUS_HEIGHT - 6.0);
+      buttonStyle.padding = new Insets(6.0, 0.0, 6.0, 0.0);
+      var copy = new Button("", buttonStyle, function() {
+        var text = statusSelectionCopyText();
+        if (text == null) return;
+        ui.clipboard.writeText(text);
+        statusCopiedAt = Sys.time();
+        invalidateView();
+      }, "selection-copy");
+      copy.variant = ButtonVariant.Navigation;
+      copy.labelView = selectionText;
+      copy.accessibilityLabel = "Copy reference to the selection: " + left;
+      selectionView = copy;
+    }
     var items:Array<KeyedView> = [
-      new KeyedView(
-        "selection",
-        new Text(
-          shortenLabel(left, narrow ? 20 : 48),
-          null,
-          simulation.error == null ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger,
-          TextStyleOverride.text(12.0)
-        )
-      ),
+      new KeyedView("selection", selectionView),
       new KeyedView("space", new Spacer("status-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0)))
     ];
     var mates = session.assemblyMateStatus();
@@ -2164,13 +2186,24 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     return new Row("editor-status-bar", items, style);
   }
 
+  /** What clicking the status selection text copies, or null when it names no object (nothing selected, loading, an error). */
+  function statusSelectionCopyText():Null<String> {
+    if (projectLoadingStatus() != null || projectLoadingFailure() != null || simulation.error != null) return null;
+    if (scene.object(scene.selectedId) == null) return null;
+    var key = treeModel.selectionKey();
+    if (key == null) return null;
+    var reference = app.editor.SceneTreeReference.capture(treeModel, key, session.projectReference ?? session.path,
+      session.projectVariant ?? session.projectJob);
+    return app.editor.SelectionReference.copyText(reference.text(), scene.pickedFace);
+  }
+
   function statusSelectionLabel():String {
     var loading = projectLoadingStatus();
     if (loading != null) return loading.title + " · " + loading.phase;
     if (projectLoadingFailure() != null) return "Project could not be opened";
     var selected = scene.object(scene.selectedId);
     var left = simulation.error
-      != null ? "Simulation error: " + simulation.error : selected == null ? "Ready" : selected.label + " selected";
+      != null ? "Simulation error: " + simulation.error : selected == null ? "Ready" : app.editor.SelectionReference.statusText(selected.label + " selected", scene.pickedFace);
     var mission = simulation.missionPlayer();
     if (mission != null
       && simulation.isActive() && (simulation.isRunning() || mission.failure != null)) left = mission.statusLabel(true);

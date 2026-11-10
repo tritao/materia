@@ -2621,6 +2621,7 @@ class ProjectKitTests {
 
   static function main():Void {
     PresentationTests.run();
+    assertions += LaunchPathsTests.run();
     assertions += DrawingProjectionTests.run();
     SceneScrewTests.run();
     SceneScrewFeederTests.run();

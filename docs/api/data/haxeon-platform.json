@@ -390,7 +390,7 @@
       {
        "name": "createWindowNative",
        "kind": "method",
-       "signature": "(options:NativeWindowOptions):Window"
+       "signature": "(options:nativekit.ffi.NativeKitTypes.WindowOptions):Window"
       },
       {
        "name": "dispose",
@@ -557,7 +557,7 @@
       {
        "name": "nativeValue",
        "kind": "method",
-       "signature": "():NativeSurfaceOptions"
+       "signature": "():nativekit.ffi.NativeKitTypes.SurfaceOptions"
       }
      ]
     },
@@ -576,7 +576,7 @@
       {
        "name": "createNative",
        "kind": "method",
-       "signature": "(parent:Handle, options:NativeWebViewOptions):WebView",
+       "signature": "(parent:Handle, options:nativekit.ffi.NativeKitTypes.WebviewOptions):WebView",
        "static": true
       },
       {
@@ -665,7 +665,7 @@
       {
        "name": "nativeValue",
        "kind": "method",
-       "signature": "():NativeWebViewOptions"
+       "signature": "():nativekit.ffi.NativeKitTypes.WebviewOptions"
       }
      ]
     },
@@ -689,7 +689,7 @@
       {
        "name": "setDecorationRegionsNative",
        "kind": "method",
-       "signature": "(regions:Array<NativeWindowDecorationRegion>):Void",
+       "signature": "(regions:Array<nativekit.ffi.NativeKitTypes.WindowDecorationRegion>):Void",
        "doc": "Raw ABI entrypoint for native window chrome integrations."
       },
       {
@@ -700,7 +700,7 @@
       {
        "name": "createSurfaceNative",
        "kind": "method",
-       "signature": "(options:NativeSurfaceOptions):Surface"
+       "signature": "(options:nativekit.ffi.NativeKitTypes.SurfaceOptions):Surface"
       },
       {
        "name": "createWebView",
@@ -710,7 +710,7 @@
       {
        "name": "createWebViewNative",
        "kind": "method",
-       "signature": "(options:NativeWebViewOptions):WebView"
+       "signature": "(options:nativekit.ffi.NativeKitTypes.WebviewOptions):WebView"
       },
       {
        "name": "registerDependent",
@@ -775,7 +775,7 @@
       {
        "name": "nativeValue",
        "kind": "method",
-       "signature": "():NativeWindowDecorationRegion"
+       "signature": "():nativekit.ffi.NativeKitTypes.WindowDecorationRegion"
       }
      ]
     },
@@ -823,7 +823,7 @@
       {
        "name": "nativeValue",
        "kind": "method",
-       "signature": "():NativeWindowOptions"
+       "signature": "():nativekit.ffi.NativeKitTypes.WindowOptions"
       }
      ]
     }
@@ -1136,7 +1136,7 @@
       {
        "name": "nativeValue",
        "kind": "method",
-       "signature": "():NativeFileDialogOptions"
+       "signature": "():nativekit.ffi.NativeKitTypes.FileDialogOptions"
       }
      ]
     },
@@ -1174,7 +1174,7 @@
       {
        "name": "nativeValue",
        "kind": "method",
-       "signature": "():NativeMessageDialogOptions"
+       "signature": "():nativekit.ffi.NativeKitTypes.MessageDialogOptions"
       }
      ]
     }
@@ -1408,7 +1408,7 @@
       {
        "name": "TextEdit",
        "kind": "case",
-       "signature": "(source:Handle, edit:PlatformTextEdit)"
+       "signature": "(source:Handle, edit:haxeon.platform.input.TextEdit)"
       },
       {
        "name": "AccessibilityAction",
@@ -1868,7 +1868,7 @@
       {
        "name": "nativeValue",
        "kind": "method",
-       "signature": "():NativeTextInputState",
+       "signature": "():nativekit.ffi.NativeKitTypes.TextInputState",
        "doc": "Creates ABI storage for the duration of a platform call."
       }
      ]
