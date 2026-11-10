@@ -11,11 +11,11 @@ class HobberEnclosureChecks {
    * frame outriggers sit in the frame folder and its tray clamps (each with its bolt) under the tray by bed edge.
    */
   static function checkEnclosureGroups(assembly:MachineAssembly):Void {
-    var groups = assembly.functionalGroups(), poses = assembly.solvedPoses(), shell = HobberEnclosurePreview.shellGroup;
+    var groups = assembly.functionalGroups(), poses = assembly.solvedPoses(), shell = HobberCell.shellGroup;
     var allowed = [shell("Panels"), shell("Floor tray/"), shell("frame"), shell("door")];
     var counts:Map<String, Int> = [];
     for (id => path in groups) {
-      if (!StringTools.startsWith(path, HobberEnclosurePreview.ENCLOSURE_GROUP)) continue;
+      if (!StringTools.startsWith(path, HobberCell.ENCLOSURE_GROUP)) continue;
       if (![for (a in allowed) StringTools.startsWith(path,
         a)].contains(true)) throw 'Enclosure group: $id is in $path';
       counts.set(path, (counts.exists(path) ? counts.get(path) : 0) + 1);
@@ -61,13 +61,31 @@ class HobberEnclosureChecks {
     for (id => path in assembly.functionalGroups()) counts.set(path, (counts.exists(path) ? counts.get(path) : 0) + 1);
     var large = [for (path => count in counts) if (count > MAX_FOLDER_PARTS) '$path ($count)'];
     if (large.length > 0) throw "Scene folders with more than " + MAX_FOLDER_PARTS + " parts: " + large.join(", ");
-    for (folder in ["door/Track", "door/Lower guides", "door/Left leaf/Hanger 1", "door/Right leaf/Hanger 2"]) if (!counts.exists(HobberEnclosurePreview.shellGroup(folder)))
+    for (folder in ["door/Track", "door/Lower guides", "door/Left leaf/Hanger 1", "door/Right leaf/Hanger 2"]) if (!counts.exists(HobberCell.shellGroup(folder)))
       throw 'Enclosure group: $folder is empty';
+  }
+
+  static function checkCastingEnvelopes(machine:FlexsplineHobber):Void {
+    var poses=machine.solvedPoses();
+    PosedParts.scope(cache->{
+      for(id in ["bed/casting","column/casting"]) {
+        var pose=poses.get(id);
+        if(pose==null)throw "Missing casting pose: "+id;
+        var part=machine.components().filter(member->member.id==id)[0].component;
+        var declared=HobberEnclosureFit.castingBox(cast(part,machinekit.structural.MineralCasting),pose);
+        var actual=cache.box(part,pose);
+        var a=[actual.minX,actual.minY,actual.minZ,actual.maxX,actual.maxY,actual.maxZ];
+        var b=[declared.minX,declared.minY,declared.minZ,declared.maxX,declared.maxY,declared.maxZ];
+        for(i in 0...a.length)if(Math.abs(a[i]-b[i])>1e-5)
+          throw "Declared casting envelope differs from installed solid: "+id+" bound "+i+": "+a[i]+" / "+b[i];
+      }
+    });
   }
 
   public static function main():Void {
     HobberElectricalChecks.run(new FlexsplineHobber());
-    var fitted = HobberEnclosurePreview.assembled(), assembly = fitted.assembly, shell = fitted.shell;
+    var fitted = HobberEnclosurePreview.cell(), assembly = fitted.assembly, shell = fitted.shell;
+    checkCastingEnvelopes(fitted.machine);
     var guardReport = HobberEnclosureGuardChecks.run(assembly, shell.layout.stroke);
     if (assembly.validate().length != 0) throw "Enclosed hobber assembly does not validate";
     checkEnclosureGroups(assembly);
@@ -351,7 +369,7 @@ class HobberEnclosureChecks {
       Sys
         .println('Hobber enclosure passed: $samples machine/door samples, $checked exact near-pair checks, loading corridor, port, mass and save/reopen');
       // Export only after acceptance, using the checked fit rather than sizing against a different model.
-      var scene = HobberEnclosurePreview.runtimeScene(assembly,
+      var scene = HobberScenePresentation.build(assembly,
         fitted.machine, shell.layout.stroke), root = Sys.getCwd();
       while (!sys.FileSystem.exists(root
         + "/machinekit/examples/flexspline-hobber/machine/FlexsplineHobber.hx")) root = haxe.io.Path.directory(root);

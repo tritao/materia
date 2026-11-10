@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Four dry-side mounting envelopes. Fastener sizing and insert retention are fabrication work. */
 class HobberEnclosureMounts {
   public static function install(assembly:MachineAssembly, shell:GeneratedEnclosure):Void {
-    assembly.group(HobberEnclosurePreview.shellGroup("frame/Base outriggers"));
+    assembly.group(HobberCell.shellGroup("frame/Base outriggers"));
     var poses = assembly.solvedPoses(), l = shell.layout, root = "enclosure/frame/post00", index = 0;
     for (seat in HobberLayout.get().enclosureSeats()) {
       var parent = "machine/bed/" + seat.id, pad = poses.get(parent);

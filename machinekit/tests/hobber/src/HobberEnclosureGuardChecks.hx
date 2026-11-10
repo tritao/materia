@@ -142,7 +142,7 @@ class HobberEnclosureGuardChecks {
     };
   }
   public static function main():Void {
-    var fitted = HobberEnclosurePreview.assembled(), report = run(fitted.assembly, fitted.shell.layout.stroke);
+    var fitted = HobberEnclosurePreview.cell(), report = run(fitted.assembly, fitted.shell.layout.stroke);
     var output = Sys.getCwd() + "/machinekit/examples/flexspline-hobber/build/enclosure";
     sys.FileSystem.createDirectory(output);
     sys.io.File.saveContent(output + "/guard-checks.json", haxe.Json.stringify(report, null, "  "));

@@ -37,7 +37,7 @@ class OccurrenceNamesAudit {
     check("cnc-router-folded-z", new CncRouter(false, true), failures);
     if (hobber == null) failures.push("Enclosure naming audit has no hobber source");
     else {
-      try check("hobber-enclosure", HobberEnclosurePreview.assembled(hobber).assembly, failures)
+      try check("hobber-enclosure", HobberEnclosurePreview.cell(hobber).assembly, failures)
       catch (error:Dynamic) failures.push("hobber-enclosure construction: " + Std.string(error));
     }
     if (failures.length > 0) throw "Occurrence naming audit failed: " + failures.join("; ");

@@ -2,7 +2,7 @@
 
 **Goal.** The same machine and the same scene, built from code that is easy to change: one frame, one layout source, the
 machine composed from subassemblies with named interfaces, one class per real part, and a tidy example directory. Pure
-restructuring: no design change. Status: plan, 2026-11-10.
+restructuring: no design change. Status: implemented, 2026-11-10.
 
 **Start after** the linear-module branch (Y module v2, ground bars, Z bellows) has landed on main: it touches the same files.
 
@@ -11,7 +11,7 @@ restructuring: no design change. Status: plan, 2026-11-10.
 - All suites named in the prompt pass; the machine keeps the same member IDs, groups, part numbers, BOM lines and derived fastener counts.
 - Floating-point round-off in poses, connectors, holes and meshes is allowed; no design changes. One commit per step; delete replacements, no shims or aliases.
 
-## Today
+## Starting point
 
 - `FlexsplineHobber.hx` (~770 lines) builds everything in one constructor: sections marked with `group(...)`, a hand-kept
   `zero` pose map, and `fixAt`/`fixExisting` mates between any two parts.
@@ -72,3 +72,5 @@ A second build after restoring the original source reproduced that digest exactl
 - RF5 — Complete: 32 machine-specific layout, foundation, made-part and FE/budget files move from `machinekit.hobbing` to the example's `hobber` package (5403 lines including imports); reusable hobbing components stay in the library. `HobberComponents` owns application registration, and saved-machine callers use its registry; the library has no example imports or source-root dependency. All six suites PASS; inventory unchanged (421/154/328/42), scene digest unchanged, machined JSON/tooling CSV and bed casting JSON byte-identical to RF4. Lines: FlexsplineHobber 119; HobberComponents 23; HobberLayout 1302; HobberFrame 37; other unit/part splits change only imports. Open: the same baseline column-export section error remains.
 
 - RF6 — Complete: machine assemblies/parts, scenes, reports/review rules, independent studies and documentation move into `machine/`, `scenes/`, `checks/`, `studies/`, `docs/`; example machine checks move to `tests/hobber`, while production mold review has an explicit owner in `checks/`. Project variants replace the unit-preview manifest; duplicate/invalid manifests and stale tray-mounting, box-only base-interface/anchor studies plus their helper are deleted (13 top-level manifests become 7). Paths, scripts and documentation are updated. All six suites PASS; inventory and scene digest unchanged; retained 23-part proposal preview passes and moved scripts parse. Lines: FlexsplineHobber 119; Unit 166; Foundation 81; TableWork 151; XAxis 67; ZAxis 131; AHead 27; YStage 29; BSpindle 74; ElectricalRack 50; Controls 33; ServiceAccess 96; UnitPreview 21; EnclosurePreview 367. No open RF6 work; baseline column-export error remains separate.
+
+- RF7 — Complete: explicit `machine`, `cell`, `scene` entry functions replace the combined scene builder; `HobberCell` owns physical enclosure assembly, `HobberEnclosureFit` owns fitting, and `HobberScenePresentation` owns export/motion/navigation/inspection. Casting bounds come from declared extrusion profiles rather than constructed casting solids; the enclosure suite verifies all bounds against installed solids within 1e-5 mm. All six suites PASS; inventory unchanged (421/154/328/42); scene rebuilt with informational SHA-256 `35b3254597a9a5154cd1a62077a0a12251f3d962cfbba169195f7068f84363ef`. Lines: FlexsplineHobber 119; EnclosurePreview 41; Cell 109; EnclosureFit 163; ScenePresentation 86. No open refactor items; the pre-existing column-export section error recorded in RF4/RF5 remains.

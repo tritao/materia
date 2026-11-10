@@ -200,3 +200,9 @@ under `machinekit/tests/hobber`. Unit and mold previews use project variants;
 standalone manifests remain for checks and studies that export their own data.
 The retired box-only interface/anchor screens are preserved only as historical
 evidence; the installed machine uses the accepted socket definitions.
+
+`HobberEnclosurePreview.machine`, `cell` and `scene` are the three scene-entry
+stages. `HobberCell` installs the enclosure and its interfaces;
+`HobberEnclosureFit` reads casting envelopes from declared extrusion profiles;
+`HobberScenePresentation` owns export, motion, navigation and inspection.
+The enclosure suite compares the declared casting bounds with installed solids.

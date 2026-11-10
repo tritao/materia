@@ -26,7 +26,7 @@ class HobberTrayMounts {
       var pose = F.fromRotationMatrix(seat.x, seat.y, seat.z, [out.x, -out.y, 0, out.y, out.x, 0, 0, 0, 1]);
       var edge = Math.abs(row.pose.y) > 300 ? (Math.abs(out.x) > Math.abs(out.y) ? (out.x < 0 ? "-X side" : "+X side")
         : (out.y < 0 ? "-Y side" : "+Y side")) : ((row.pose.x < 0) == (tableX < 0) ? "Table end" : "Column end");
-      assembly.group(HobberEnclosurePreview.shellGroup("Floor tray/Clamps/" + edge));
+      assembly.group(HobberCell.shellGroup("Floor tray/Clamps/" + edge));
       var height = row.clampHeight == null ? machinekit.enclosure.TraySeat.TOP : row.clampHeight;
       var id = "enclosureTrayClamp" + i,
         bolt = "enclosureTrayBolt" + i, clamp = new TrayClamp(height), screw = SocketHeadCapScrew.metric(

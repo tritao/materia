@@ -50,7 +50,7 @@ class HobberTrayClearanceStudy {
         state.setJoint("Z", z);
         state.setJoint(FlexsplineHobber.A, a);
         state.forwardKinematics();
-        for (row in machine.components()) if (!HobberEnclosurePreview.external(row.id)) {
+        for (row in machine.components()) if (!HobberEnclosureFit.external(row.id)) {
           var pose = state.worldPose(row.id), key = row.id + haxe.Json.stringify(pose);
           if (verified.exists(key) || PosedParts.apart(box, cache.box(row.component, pose), 0)) continue;
           verified.set(key, true);

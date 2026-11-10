@@ -96,7 +96,7 @@ class HobberInspectionViews {
       Generated("hobber")
     ));
     var external = [for (part in flat.occurrences) if (StringTools.startsWith(part.id,
-      prefix) && HobberEnclosurePreview.external(part.id.substr(prefix.length))) {
+      prefix) && HobberEnclosureFit.external(part.id.substr(prefix.length))) {
       select: {occurrence: part.id, subtree: false}, mode:Hidden
     }
     ];
