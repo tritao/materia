@@ -1,7 +1,7 @@
 {
   "format": "materia.project",
   "version": 1,
-  "name": "Screw linear module",
+  "name": "Screw linear module v2",
   "defaultEntrypoint": "standard",
   "build": {
     "system": "haxeon",
@@ -25,17 +25,17 @@
   "variants": [
     {
       "id": "standard",
-      "label": "Standard module",
+      "label": "Standard v2 (20 mm)",
       "entrypoint": "standard",
       "kind": "configuration",
-      "summary": "Library default: HGH15 guides, 20 mm stroke, carriage plate up."
+      "summary": "Open ground-stock body: 230 mm base length, full-length side walls, centred screw and plain carriage. Optional covers omitted."
     },
     {
       "id": "hobber-y",
-      "label": "Hobber Y module",
+      "label": "Hobber Y v2 (30 mm)",
       "entrypoint": "hobber-y",
-      "kind": "study",
-      "summary": "The hobber's Y module as fitted, laid flat."
+      "kind": "configuration",
+      "summary": "Compact fitted Y: 230 x 310.5 mm profiled base, 140 x 290 mm carriage, 220 mm rails and 180 mm screw; laid flat. Optional covers omitted."
     }
   ]
 }

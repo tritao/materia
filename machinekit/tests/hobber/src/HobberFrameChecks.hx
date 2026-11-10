@@ -157,6 +157,39 @@ class HobberFrameChecks {
       'v2 Z floating bar/eRob gap ${Math.round(gap*1000000)/1000000} mm through continuous Z${range.lower-over}..${range.upper+over}; actual housing contained in the swept envelope.'];
   }
 
+  /** Match LM0's inventory scope: joint descendants, component purchase lines,
+   * hardware on clamped descendants, and dowels whose two ends are inside.
+   * The full machine total also includes inventory/tooling, unlike a subtree. */
+  public static function v2Inventory(machine:FlexsplineHobber):Array<String> {
+    var definition=machine.definition(),hardware=machine.derivedFasteners();
+    if(hardware==null)throw "Missing v2 hardware inventory";
+    var lines=['v2 global inventory: ${machine.components().length} members, ${machine.billOfMaterials().lines().length} BOM lines including inventory/tooling, ${hardware.count()} screws, ${hardware.dowelCount()} pins; LM0 global BOM total unrecorded.'];
+    for(root in ["Ymodule/base","Ymodule/blockLeftFront"]) {
+      var members:Map<String,Bool>=[];members.set(root,true);
+      var changed=true;
+      while(changed) {
+        changed=false;
+        for(joint in definition.joints)if(members.exists(joint.parent)&&!members.exists(joint.child)) {
+          members.set(joint.child,true);changed=true;
+        }
+      }
+      var bom=new machinekit.component.Bom(),count=0,mass=0.0,screws=0,pins=0;
+      for(member in machine.components())if(members.exists(member.id)) {
+        count++;mass+=member.component.massProperties().mass;bom.addComponent(member.component);
+      }
+      var componentLines=bom.lines().length;
+      for(joint in hardware.joints)if(members.exists(joint.clampedMember)) {
+        screws+=joint.count;bom.add(joint.item,joint.count);
+        for(extra in joint.extras)bom.add(extra.item,extra.count);
+      }
+      for(joint in hardware.dowels)if(members.exists(joint.memberA)&&members.exists(joint.memberB)) {
+        pins+=joint.count;bom.add(joint.item,joint.count);
+      }
+      lines.push('v2 inventory $root: $count members, ${Math.round(mass*1000000)/1000000} kg, $componentLines component BOM lines, ${bom.lines().length} BOM lines with clamped fasteners, $screws screws, $pins pins.');
+    }
+    return lines;
+  }
+
   /** Thickness of a cover end wall and of a carrier on the moving member, mm (the bench mill's `COVER_PLATE`). */
   static inline final COVER_PLATE = 14.0;
   /** Gap kept between a cover's plates and the supports and nut around them, mm (the running gap of the integrity check). */
@@ -866,6 +899,7 @@ class HobberFrameChecks {
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
     if (args.indexOf("v2") >= 0) for (line in v2GeometryGates(machine)) Sys.println(line);
+    if (args.indexOf("v2inventory") >= 0) for (line in v2Inventory(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
     if (args.indexOf("servicedesign") >= 0) for (line in HobberServiceDesignChecks.run(machine)) Sys.println(line);
     if (args.indexOf("chipguards") >= 0) for (line in HobberChipGuardChecks.run(machine)) Sys.println(line);
