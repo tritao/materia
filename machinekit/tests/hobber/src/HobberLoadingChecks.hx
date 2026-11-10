@@ -1,6 +1,6 @@
+import machinekit.hobbing.HobberLayout;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.assembly.PosedParts;
-import machinekit.hobbing.HobberXLayout;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import gearkit.GearSpec;
@@ -20,7 +20,7 @@ class HobberLoadingChecks {
       var machine = new FlexsplineHobber(spec), model = new cadkit.modeling.AssemblyModel("mm");
       machine.addTo(model, "");
       var state = model.initialState();
-      state.setJoint("X", HobberXLayout.RETRACT);
+      state.setJoint("X", HobberLayout.get().xRetract);
       state.setJoint(FlexsplineHobber.Y, 0);
       state.setJoint("Z", 0);
       state.setJoint(FlexsplineHobber.B, 0);
@@ -34,7 +34,7 @@ class HobberLoadingChecks {
       var protrusion = machine.mandrel.parameterNumber("height") - seat;
       if (protrusion >= cup.component.parameterNumber("height")
         - cup.component.parameterNumber("endThickness")) throw "mandrel hits closed cup end";
-      if (HobberXLayout.FRONT_LIFT - protrusion < 5) throw "front transfer fails 5 mm mandrel clearance";
+      if (HobberLayout.get().frontLift - protrusion < 5) throw "front transfer fails 5 mm mandrel clearance";
       var radius = spec.tipRadius(), gripper = [box(-radius - 80, -radius - 25, -radius - 25, radius + 25, 40, 80)];
       for (side in [-1, 1]) gripper.push(box(
         -radius - 30,
@@ -44,8 +44,8 @@ class HobberLoadingChecks {
         30,
         55
       ));
-      var samples = [for (x in [-HobberXLayout.FRONT_APPROACH, -150.0, -75, 0]) {
-        x:x, lift:HobberXLayout.FRONT_LIFT
+      var samples = [for (x in [-HobberLayout.get().frontApproach, -150.0, -75, 0]) {
+        x:x, lift:HobberLayout.get().frontLift
       }
       ];
       for (lift in [20.0, 10, 5, 0]) samples.push({x: 0.0, lift: lift});
@@ -53,12 +53,12 @@ class HobberLoadingChecks {
       for (jaw in gripper) {
         var b = PosedParts.boxOf(jaw);
         sweptJaws.push(box(
-          b.minX - HobberXLayout.FRONT_APPROACH,
+          b.minX - HobberLayout.get().frontApproach,
           b.maxX,
           b.minY,
           b.maxY,
           b.minZ,
-          b.maxZ + HobberXLayout.FRONT_LIFT
+          b.maxZ + HobberLayout.get().frontLift
         ));
       }
       try {

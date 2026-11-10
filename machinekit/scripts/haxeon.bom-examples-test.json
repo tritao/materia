@@ -144,7 +144,6 @@
     "../examples/flexspline-hobber/FoundationStudyGeometry.hx",
     "../examples/flexspline-hobber/HobberBaseInterfaceStudy.hx",
     "../examples/flexspline-hobber/HobberElectricalChecks.hx",
-    "../examples/flexspline-hobber/HobberElectricalLayout.hx",
     "../examples/flexspline-hobber/HobberEnclosureChecks.hx",
     "../examples/flexspline-hobber/HobberEnclosureControl.hx",
     "../examples/flexspline-hobber/HobberEnclosureGuardChecks.hx",

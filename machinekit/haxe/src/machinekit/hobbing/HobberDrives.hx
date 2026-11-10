@@ -53,23 +53,23 @@ class HobberDrives {
 
   /** X: screw along -x from the motor end at the back of the bed, supports on pads 15 mm above the bed insert. */
   public static function x():HobberDriveAxis return xCache.get(() -> {
-    var l = HobberXLayout.front();
-    var axis:HobberDriveAxis = {id: "X", drive: SupportedScrewDrive.m60dBk12(true), axis: {start: [l.screwStart, 0.0, 180.0], direction: [-1.0, 0, 0], normal: [0.0, 0, 1]},
-      length: l.screwLength, nutStation: l.nutStation, nutUp: [0.0, 0, 1], blockHeight: 80.0};
+    var l = HobberLayout.get().xNominal();
+    var axis:HobberDriveAxis = {id: "X", drive: SupportedScrewDrive.m60dBk12(true), axis: HobberLayout.get().xDriveAxis(),
+      length: l.screwLength, nutStation: l.nutStation, nutUp: [0.0, 0, 1], blockHeight: HobberLayout.get().xNutBlockHeight};
     pin(axis);
     return axis;
   });
 
   /** Y is the library module's screw in the unchanged hobber work frame. */
   public static function y():HobberDriveAxis return yCache.get(()->{
-    var s=HobberYLayout.moduleSpec(),pose=HobberYLayout.modulePose(),local=s.axis();
+    var s=HobberLayout.get().moduleSpec(),pose=HobberLayout.get().modulePose(),local=s.axis();
     var p=F.transformPoint(pose,local.start[0],local.start[1],local.start[2]);
     var d=F.transformVector(pose,local.direction[0],local.direction[1],local.direction[2]);
     var n=F.transformVector(pose,local.normal[0],local.normal[1],local.normal[2]);
     var up=F.transformVector(F.compose(pose,s.nutPose()),0,1,0);
     return {id:"Y",drive:s.drive,axis:{start:[p.x,p.y,p.z],direction:[d.x,d.y,d.z],normal:[n.x,n.y,n.z]},length:s.screwLength,nutStation:s.nutStation,nutUp:[up.x,up.y,up.z],blockHeight:s.carrierHeight()};
   });
-  public static function jointId(id:String):String return id=="Y"?HobberYLayout.JOINT:id;
+  public static function jointId(id:String):String return id=="Y"?HobberLayout.Y_JOINT:id;
   public static function member(id:String,role:String):String {
     if(id=="Y")return "Ymodule/"+switch(role){case "mount":"motorMount";case "floating":"floatingBearing";case "ring":"floatingRing";case _:role;};
     return id+switch(role){case "mount":"fixed";case "nutCarrier":"nutBlock";case "motorShaft":"motor-shaft";case "ring":"floatingRing";case _:role;};
@@ -93,19 +93,19 @@ class HobberDrives {
       return built;
     });
     return {id: "Z", drive: drive,
-      axis: {start: [HobberZLayout.AXIS_X, y, HobberZLayout.SHAFT_TOP], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
-      length: HobberZLayout.SHAFT_LENGTH, nutStation: partStart(HobberZLayout.NUT_STATION), nutUp: [-1.0, 0, 0], blockHeight: HobberZLayout.AXIS_X - 148};
+      axis: {start: [HobberLayout.get().zScrewNativeX, y, HobberLayout.get().zShaftTop], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
+      length: HobberLayout.get().zShaftLength, nutStation: partStart(HobberLayout.get().zNutStation), nutUp: [-1.0, 0, 0], blockHeight: HobberLayout.get().zScrewNativeX - HobberLayout.get().heights().zBlockFaceY};
   }
 
-  /** Z: screw straight down at x 176, y `HobberZLayout.axisY()` (derived: clear of the A axis housing) from the motor at the top, supports on ground bar pads against the column. */
+  /** Z: screw straight down at x 176, y `HobberLayout.get().zAxisY()` (derived: clear of the A axis housing) from the motor at the top, supports on ground bar pads against the column. */
   public static function z():HobberDriveAxis {
-    return zCache.get(() -> zAt(HobberZLayout.axisY()));
+    return zCache.get(() -> zAt(HobberLayout.get().zAxisY()));
   }
 
   public static function all():Array<HobberDriveAxis> return [x(), y(), z()];
 
   public static function poses(d:HobberDriveAxis):Map<String, AssemblyFrame> {
-    if(d.id=="Y") {var at=d.drive.poses(d.axis,d.length,d.nutStation);at.set("nut",F.compose(HobberYLayout.modulePose(),HobberYLayout.moduleSpec().nutPose()));return at;}
+    if(d.id=="Y") {var at=d.drive.poses(d.axis,d.length,d.nutStation);at.set("nut",F.compose(HobberLayout.get().modulePose(),HobberLayout.get().moduleSpec().nutPose()));return at;}
     var at = d.drive.poses(d.axis, d.length, d.nutStation);
     var nut = at.get("nut");
     if (nut == null) throw "Hobber drive lost its nut pose";
@@ -206,8 +206,8 @@ class HobberDrives {
   /** Matched short ground bars: height is the bought support's foot plane
    * minus the cast insert plane, never a new typed axis height. */
   public static function barThickness(d:HobberDriveAxis):Float {
-    var kind=d.id=="X"?"bed":"column",row=FoundationLayout.placements(kind).filter(r->r.id=="driveSeat")[0];
-    var top=F.transformPoint(F.compose(FoundationLayout.worldPose(kind),row.pose),0,0,row.part.boxDimensions(row.id).height);
+    var kind=d.id=="X"?"bed":"column",row=HobberLayout.get().foundationPlacements(kind).filter(r->r.id=="driveSeat")[0];
+    var top=F.transformPoint(F.compose(HobberLayout.get().foundationDatum(kind),row.pose),0,0,row.part.boxDimensions(row.id).height);
     var p=seatHoles(d,"fixed")[0].position,n=d.axis.normal;
     var thickness=(p[0]-top.x)*n[0]+(p[1]-top.y)*n[1]+(p[2]-top.z)*n[2];
     return Math.round(thickness*1000)/1000;

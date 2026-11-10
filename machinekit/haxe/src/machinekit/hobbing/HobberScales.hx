@@ -9,7 +9,7 @@ import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /**
- * One axis's sealed scale (JFT-40, `SealedScalePart`) placed in the hobber, all in the work frame at joint zero.
+ * One axis's sealed scale (JFT-40, `SealedScalePart`) placed in the hobber, in the native manufacturing datum at joint zero.
  *
  * The housing is bolted by its side (the fixing holes run through its 18 mm thickness, from the STEP) to a seat wall under `toSeat`, with its travel along
  * `along`, the joint's positive direction; the reading head stands level with it on the reading face's side, `across` from the hole line, carried from
@@ -50,7 +50,7 @@ typedef HobberScaleAxis = {
  */
 class HobberScales {
   /** Top of the bed beam beside the X guide (work z), mm, measured on the casting. */
-  public static inline final BED_BEAM_TOP = 210.0;
+  static function bedBeamTop():Float return HobberLayout.get().heights().bedTopZ - HobberFrame.PART_DATUM_Z;
   /**
    * Thickness of the ground bar the housing stands on, mm: the two M8 (DIN 7984 low head, the JFT-40's 5.75 mm counterbores) through the 12.25 mm left under the head need
    * 8 mm of thread in the seat, which takes the 25 mm screw, and its 12.75 mm of engagement is tapped through 15 mm.
@@ -67,18 +67,18 @@ class HobberScales {
   public static inline final COLUMN_WALL_Y = 120.0;
 
   /** Which channel wall the Z scale stands on: the one away from the Z screw's pads (+1 is the +y wall). */
-  public static function zWallSign():Float return HobberZLayout.axisY() < 0 ? 1.0 : -1.0;
+  public static function zWallSign():Float return HobberLayout.get().zAxisY() < 0 ? 1.0 : -1.0;
   /**
    * Where the Z scale's hole line runs along x, mm. The head stands deeper in the channel than the housing (away from the open front, `across` +x): the housing's bar (32 wide,
    * centred on it) then covers x 184.6..216.6 on the wall, just inside the casting's front edge at x 186 (the bottom face is 13.5 from the hole line), and the head (13 wide)
    * stands at x 219.7..232.7, reached by an arm from the saddle.
    */
-  public static inline final Z_COLUMN_X = 200.0;
+
   /**
    * Where the X scale's hole line runs along y, mm: the housing covers y 161.3..193.5, clear of the guide blocks (y 196) by the running gap, and the bar y 162.5..194.5 (they reach 2.5
    * mm and 3.7 mm past the beam's inner edge at y 165: the flat strip between that edge and the rail seat at y 195 is 30 mm wide, narrower than the 32.2 mm housing).
    */
-  public static inline final X_HOLE_LINE_Y = 180.0;
+
   /** Arm that carries the Z head, thickness across the wall and bolt-up height, mm. */
   public static inline final Z_ARM_THICKNESS = 12.0;
   /** How far the head can overhang the carrier that holds it, mm (it is wider than the holes' span). */
@@ -87,19 +87,19 @@ class HobberScales {
   /** Each axis' scale, derived once per axis and shared: no caller changes it. */
   static final cache = new machinekit.cache.Memo<HobberScaleAxis>("hobber-scales", 8);
 
-  static function overtravel():Float return HobberXLayout.OVERTRAVEL;
+  static function overtravel():Float return HobberLayout.get().overtravel;
 
   /** Axis travel the scale must cover (lower, upper joint values), conservative: the design stroke, not the cut-dependent one. */
   public static function stroke(id:String):{lower:Float, upper:Float} return switch id {
-    case "X": {lower: HobberXLayout.MIN, upper: HobberXLayout.RETRACT};
-    case "Y": {lower: -15.0, upper: 15.0};
-    case "Z": {lower: -10.0, upper: 190.0};
+    case "X": {lower: HobberLayout.get().xMin, upper: HobberLayout.get().xRetract};
+    case "Y": {lower: -HobberLayout.get().moduleSpec().stroke / 2, upper: HobberLayout.get().moduleSpec().stroke / 2};
+    case "Z": {lower: HobberLayout.get().zTravelMin, upper: HobberLayout.get().zTravelMax};
     default: throw 'No scale for axis $id';
   };
 
   public static function x():HobberScaleAxis return axis("X");
   public static function y():HobberScaleAxis return cache.get("Y",()->{
-    var s=HobberYLayout.moduleSpec(),mount=HobberYLayout.modulePose();
+    var s=HobberLayout.get().moduleSpec(),mount=HobberLayout.get().modulePose();
     var hp=F.compose(mount,s.scalePose()),tp=F.compose(mount,s.scalePose(true));
     var normal=F.transformVector(hp,0,1,0),along=F.transformVector(hp,0,0,1),across=F.transformVector(hp,-1,0,0);
     var body=new machinekit.motion.ScrewLinearModulePart(s.values().setToken("role","wallLeft")).geometry(),b=machinekit.assembly.PosedParts.boxOf(body);body.close();
@@ -114,11 +114,11 @@ class HobberScales {
     return switch id {
       case "X":
         // The head centre is at x 262 at joint zero; the housing starts so the head's travel sits in the window.
-        var at = 262.0 - startFor;
-        {toSeat: [0.0, 0, -1], along: [1.0, 0, 0], start: [at, X_HOLE_LINE_Y, BED_BEAM_TOP + SEAT_BAR], side: 1.0, plate: false, headCentre: startFor, air: "end", bend: "none"};
+        var at = HobberLayout.get().xScaleHeadStation - startFor;
+        {toSeat: [0.0, 0, -1], along: [1.0, 0, 0], start: [at, HobberLayout.get().nativeXScaleHoleY, bedBeamTop() + SEAT_BAR], side: 1.0, plate: false, headCentre: startFor, air: "end", bend: "none"};
       case "Z":
-        var at = HobberZLayout.SEAT_Z + 50.0 - startFor, w = zWallSign();
-        {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [Z_COLUMN_X, w * (COLUMN_WALL_Y - SEAT_BAR), at], side: w, plate: false, headCentre: startFor, air: "end", bend: "none"};
+        var at = HobberLayout.get().nativeHobCentreZ + HobberLayout.get().zScaleHeadOffset - startFor, w = zWallSign();
+        {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [HobberLayout.get().nativeZScaleHoleX, w * (COLUMN_WALL_Y - SEAT_BAR), at], side: w, plate: false, headCentre: startFor, air: "end", bend: "none"};
       default:
         throw 'No scale for axis $id';
     };

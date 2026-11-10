@@ -1,8 +1,8 @@
+import machinekit.hobbing.HobberLayout;
 import FoundationStudyGeometry.FoundationStudyRegion;
 import FoundationStudyGeometry as Geometry;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingFeature.CastingFeatureKind;
-import machinekit.hobbing.FoundationLayout;
 
 /** Candidate placement, not an anchor qualification or an alteration to the working machine. */
 class HobberTrayAnchorStudy {
@@ -17,7 +17,7 @@ class HobberTrayAnchorStudy {
   );
   static function main():Void {
     var root = Sys.getCwd();
-    while (!sys.FileSystem.exists(root + "/machinekit/examples/flexspline-hobber/FoundationLayout.hx")
+    while (!sys.FileSystem.exists(root + "/machinekit/examples/flexspline-hobber/HobberLayout.hx")
       && !sys.FileSystem.exists(root + "/machinekit/examples/flexspline-hobber/FlexsplineHobber.hx")) {
       var parent = haxe.io.Path.directory(root);
       if (parent == root || parent.length == 0) throw "Cannot find hobber worktree";
@@ -29,7 +29,7 @@ class HobberTrayAnchorStudy {
     var reference:Dynamic = haxe.Json.parse(sys.io.File.getContent(out + "/cad-check.json"));
     if (reference.measuredBodyLengthMm != 50 || reference.measuredSleeveDiameterMm != 13.5
       || reference.currentCatalogueOrder != "1000200636") throw "Anchor reference changed";
-    var d = FoundationLayout.dimensions("bed"), z = d[2] - machinekit.enclosure.TraySeat.DEPTH;
+    var d = HobberLayout.get().foundationDimensions("bed"), z = d[2] - machinekit.enclosure.TraySeat.DEPTH;
     var points:Array<{id:String, x:Float, y:Float, edgeMm:Float}> = [];
     function add(x:Float, y:Float):Void points.push({
       id: "trayAnchor" + points.length,
@@ -64,7 +64,7 @@ class HobberTrayAnchorStudy {
       id:c.id, kind:c.kind, box:b
     }
     ].concat(service);
-    var inserts:Array<FoundationStudyRegion> = [for (r in FoundationLayout.inserts("bed")) if (!StringTools.startsWith(
+    var inserts:Array<FoundationStudyRegion> = [for (r in HobberLayout.get().foundationInserts("bed")) if (!StringTools.startsWith(
       r.id,
       "trayClampSeat"
     )) Geometry.insertRegion(r)];
@@ -100,7 +100,7 @@ class HobberTrayAnchorStudy {
     if (wideRebateConflicts.indexOf("work-well") < 0) throw "Expected front work-well interruption changed";
     var wideRear = Geometry.region("wide-rear-ledge", 80, d[1], 4, d[0] / 2 - 40, 0, z), rearInsertConflicts = [];
     for (r in inserts) if (intersects(Geometry.bounds(wideRear), Geometry.bounds(r))) rearInsertConflicts.push(r.id);
-    var oldPositions = [for (r in FoundationLayout.trayClampSeats()) {
+    var oldPositions = [for (r in HobberLayout.get().trayClampSeats()) {
       id:r.id, x:r.pose.x, y:r.pose.y, edgeMm:edge(r.pose.x, r.pose.y, d)
     }
     ];

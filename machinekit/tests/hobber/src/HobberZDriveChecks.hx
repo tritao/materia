@@ -1,4 +1,4 @@
-import machinekit.hobbing.HobberZLayout as Z;
+import machinekit.hobbing.HobberLayout;
 import machinekit.assembly.PosedParts;
 import materia.assembly.AssemblyFrames as F;
 import cadkit.modeling.AssemblyModel;
@@ -19,9 +19,9 @@ class HobberZDriveChecks {
     function pose(id:String):materia.assembly.AssemblyRecord.AssemblyFrame return F.compose(work, state.worldPose(id));
     var a = pose("railZLeft"), b = pose("railZRight"),
       screw = pose("Zscrew"), fixed = pose("Zfixed"), floating = pose("Zfloating"), motor = pose("Zmotor");
-    near(screw.y, (a.y + b.y) / 2 + Z.axisY(), "screw between rails, offset clear of the A actuator housing");
+    near(screw.y, (a.y + b.y) / 2 + HobberLayout.get().zAxisY(), "screw between rails, offset clear of the A actuator housing");
     near(screw.x - a.x, 15, "screw 15 mm behind guide axis plane");
-    near(screw.z, Z.SHAFT_TOP, "top drive journal");
+    near(screw.z, HobberLayout.get().zShaftTop, "top drive journal");
     near(motor.z, 764, "motor mounting face: 34 mm above the screw start");
     var direction = F.transformVector(screw, 0, 0, 1);
     near(direction.z, -1, "screw axis points down");
@@ -105,7 +105,7 @@ class HobberZDriveChecks {
       guideSpacingMm: 290,
       screwLateralOffsetMm: screw.y - (a.y + b.y) / 2,
       screwBehindGuideMm: screw.x - a.x,
-      shaftTopZMm: Z.SHAFT_TOP,
+      shaftTopZMm: HobberLayout.get().zShaftTop,
       shaftBottomZMm: 310,
       motorFaceZMm: motor.z,
       motorTopZMm: 910,

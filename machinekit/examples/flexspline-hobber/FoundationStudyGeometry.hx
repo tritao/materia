@@ -38,7 +38,7 @@ class FoundationStudyGeometry {
     return result;
   }
 
-  public static function insertRegion(row:machinekit.hobbing.FoundationLayout.InsertLocation):FoundationStudyRegion {
+  public static function insertRegion(row:machinekit.hobbing.HobberLayout.InsertLocation):FoundationStudyRegion {
     row.part.boxDimensions(row.id); // Explicit source-ID gate; this study cannot approximate a round insert.
     return {
       id: row.id,

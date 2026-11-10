@@ -1,5 +1,5 @@
+import machinekit.hobbing.HobberLayout;
 import machinekit.assembly.PosedParts;
-import machinekit.hobbing.FoundationLayout;
 import machinekit.hobbing.MineralCastBed;
 import machinekit.hobbing.MineralCastColumn;
 import machinekit.structural.CastInsert;
@@ -124,7 +124,7 @@ class CastingPackageExport {
     var foundation:MineralFoundation = kind == "bed" ? new MineralCastBed() : new MineralCastColumn();
     var sized = Sys.time() - began;
     var body = foundation.body, cache = new PosedParts(), closers:Array<cadkit.modeling.Part> = [];
-    var dims = FoundationLayout.dimensions(kind);
+    var dims = HobberLayout.get().foundationDimensions(kind);
     var asCast = body.asCastGeometry();
     closers.push(asCast);
     var bounds = PosedParts.boxOf(asCast);
@@ -304,10 +304,10 @@ class CastingPackageExport {
 
     var lifting = [for (l in foundation.liftingPoints()) {id: l.id, insertId: l.insertId, holeId: l.holeId}];
     var feet:Array<Dynamic> = [];
-    if (kind == "bed") for (f in FoundationLayout.feet()) feet.push({
+    if (kind == "bed") for (f in HobberLayout.get().feet()) feet.push({
       x: f.x,
       y: f.y,
-      plate: [FoundationLayout.FOOT_PLATE_WIDTH, FoundationLayout.FOOT_PLATE_WIDTH, FoundationLayout.FOOT_PLATE_THICKNESS]
+      plate: [MineralCastBed.FOOT_PLATE_WIDTH, MineralCastBed.FOOT_PLATE_WIDTH, MineralCastBed.FOOT_PLATE_THICKNESS]
     });
     var datumScheme = body.foundationDatumScheme();
     var data = {

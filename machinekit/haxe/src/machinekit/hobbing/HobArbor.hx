@@ -7,14 +7,18 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Made BT30 hob arbor. MAS BT30 shank dimensions are catalogued; hob seat,
  * face key, lock-nut thread and outboard journal are project design inputs. */
 class HobArbor extends MachineComponent {
+
+  public static inline final HEIGHT = 180.0;
+  public static inline final SUPPORT_LENGTH = 29.0;
+
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
     P.quantity("outside", 16, "mm"),
     P.quantity("bore", 0, "mm"),
-    P.quantity("height", HobberOutboardLayout.ARBOR_HEIGHT, "mm"),
+    P.quantity("height", HobArbor.HEIGHT, "mm"),
     P.quantity("hobSeatLength", 40, "mm"),
     P.quantity("hobCentreOffset", 60, "mm"),
     P.quantity("supportDiameter", 15, "mm"),
-    P.quantity("supportLength", HobberOutboardLayout.JOURNAL_LENGTH, "mm"),
+    P.quantity("supportLength", HobArbor.SUPPORT_LENGTH, "mm"),
     P.quantity("radialRunout", 0.002, "mm"),
     P.quantity("axialRunout", 0.002, "mm")
   ]);

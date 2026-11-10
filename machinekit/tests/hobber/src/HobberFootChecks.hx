@@ -1,5 +1,5 @@
-import machinekit.hobbing.FoundationLayout;
-import machinekit.hobbing.FoundationLayout as Pocket;
+import machinekit.hobbing.HobberLayout;
+import machinekit.hobbing.MineralCastBed;
 import machinekit.structural.LevelingFoot;
 import machinekit.component.MachineKitComponents;
 import machinekit.assembly.MachineAssembly;
@@ -15,7 +15,7 @@ class HobberFootChecks {
       n++;
       if (!ok) throw label;
     }
-    var machine = new FlexsplineHobber(), members = machine.components(), feet = FoundationLayout.feet();
+    var machine = new FlexsplineHobber(), members = machine.components(), feet = HobberLayout.get().feet();
     check(feet.length == 3, "three primary support points");
     check(
       machine.bed.insertLocations().filter(p -> StringTools.startsWith(p.id, "foot")).length == 0,
@@ -30,9 +30,9 @@ class HobberFootChecks {
     var restored = MachineAssembly.decode(machine.encode(), MachineKitComponents.standard());
     check(restored.components().length == members.length, "separate foot hardware persists");
     var body = machine.bed.body.geometry(), plate = LevelingFoot.of(Plate(
-      Pocket.FOOT_PLATE_WIDTH,
-      Pocket.FOOT_PLATE_WIDTH,
-      Pocket.FOOT_PLATE_THICKNESS,
+      MineralCastBed.FOOT_PLATE_WIDTH,
+      MineralCastBed.FOOT_PLATE_WIDTH,
+      MineralCastBed.FOOT_PLATE_THICKNESS,
       26
     )), cache = new PosedParts();
     var plateShape = plate.geometry(), began = Sys.time();
@@ -52,17 +52,17 @@ class HobberFootChecks {
       for (i in 0...feet.length) {
         var p = feet[i];
         var roof = box(
-          Pocket.FOOT_PLATE_WIDTH,
-          Pocket.FOOT_PLATE_WIDTH,
-          Pocket.FOOT_SUPPORT_TOP - Pocket.FOOT_ROOF,
+          MineralCastBed.FOOT_PLATE_WIDTH,
+          MineralCastBed.FOOT_PLATE_WIDTH,
+          MineralCastBed.FOOT_SUPPORT_TOP - MineralCastBed.FOOT_ROOF,
           p.x,
           p.y,
-          Pocket.FOOT_ROOF
+          MineralCastBed.FOOT_ROOF
         );
         var expected = roof.volume();
         check(Math.abs(volumeInBody(roof) - expected) < 1e-5, "continuous solid compression roof " + i);
         roof.close();
-        var passage = box(Pocket.FOOT_STEM_CLEARANCE, Pocket.FOOT_STEM_CLEARANCE, Pocket.FOOT_FLOOR, p.x, p.y, 0);
+        var passage = box(MineralCastBed.FOOT_STEM_CLEARANCE, MineralCastBed.FOOT_STEM_CLEARANCE, MineralCastBed.FOOT_FLOOR, p.x, p.y, 0);
         check(volumeInBody(passage) < 0.001, "lower stud has casting clearance " + i);
         passage.close();
         var foot = members.filter(member -> member.id == "foot" + i)[0];
@@ -72,8 +72,8 @@ class HobberFootChecks {
         check(overlap < 0.001, "actual installed foot ends below the solid compression roof " + i);
         // An 80 mm-wide, 12 mm-thick wrench corridor reaches both nuts.
         for (z in [
-          Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 9.5,
-          Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 28.5
+          MineralCastBed.FOOT_ROOF - MineralCastBed.FOOT_PLATE_THICKNESS - 9.5,
+          MineralCastBed.FOOT_ROOF - MineralCastBed.FOOT_PLATE_THICKNESS - 28.5
         ]) {
           var alongX = i == 2,
             edge = alongX ? machine.bed.body.parameterNumber("width") / 2 + 40 : (p.y < 0 ? -440.0 : 440.0);
@@ -94,7 +94,7 @@ class HobberFootChecks {
         for (j in 0...11) {
           var placed = PosedParts.moved(
             plateShape,
-            F.translation(p.x, p.y, Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 2 * j)
+            F.translation(p.x, p.y, MineralCastBed.FOOT_ROOF - MineralCastBed.FOOT_PLATE_THICKNESS - 2 * j)
           );
           check(volumeInBody(placed) < 0.001, "plate lowering clear " + i + ":" + j);
           placed.close();
@@ -103,14 +103,14 @@ class HobberFootChecks {
           var dx = i == 2 ? 15.0 * j : 0.0, dy = i == 2 ? 0.0 : (i == 0 ? -15.0 * j : 15.0 * j);
           var placed = PosedParts.moved(
             plateShape,
-            F.translation(p.x + dx, p.y + dy, Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 20)
+            F.translation(p.x + dx, p.y + dy, MineralCastBed.FOOT_ROOF - MineralCastBed.FOOT_PLATE_THICKNESS - 20)
           );
           check(volumeInBody(placed) < 0.001, "plate side extraction clear " + i + ":" + j);
           placed.close();
         }
         var loaded = PosedParts.moved(
           plateShape,
-          F.translation(p.x, p.y, Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS)
+          F.translation(p.x, p.y, MineralCastBed.FOOT_ROOF - MineralCastBed.FOOT_PLATE_THICKNESS)
         );
         check(volumeInBody(loaded) < 0.001, "installed plate bears directly on the solid roof " + i);
         loaded.close();
@@ -153,14 +153,14 @@ class HobberFootChecks {
       base.beam.status == "unsupported" && base.beam.newMinimumIyMm4 == null && base.beam.passed == false,
       "round socket sections do not become a passing beam screen"
     );
-    var contactArea = Pocket.FOOT_PLATE_WIDTH * Pocket.FOOT_PLATE_WIDTH - 26 * 26 * Math.PI / 4;
+    var contactArea = MineralCastBed.FOOT_PLATE_WIDTH * MineralCastBed.FOOT_PLATE_WIDTH - 26 * 26 * Math.PI / 4;
     var result = {
       assertions: n,
       seconds: Sys.time() - began,
       footCount: 3,
-      pocketRoofMm: Pocket.FOOT_ROOF,
-      pocketFloorMm: Pocket.FOOT_FLOOR,
-      roofThicknessMm: Pocket.FOOT_SUPPORT_TOP - Pocket.FOOT_ROOF,
+      pocketRoofMm: MineralCastBed.FOOT_ROOF,
+      pocketFloorMm: MineralCastBed.FOOT_FLOOR,
+      roofThicknessMm: MineralCastBed.FOOT_SUPPORT_TOP - MineralCastBed.FOOT_ROOF,
       plateMm: [110, 110, 15],
       stemClearanceMm: 28,
       thread: "M24x3 nominal, semantic threads",

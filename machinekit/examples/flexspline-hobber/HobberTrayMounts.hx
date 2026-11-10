@@ -1,7 +1,7 @@
+import machinekit.hobbing.HobberLayout;
 import machinekit.assembly.MachineAssembly;
 import machinekit.enclosure.GeneratedEnclosure;
 import machinekit.enclosure.TrayClamp;
-import machinekit.hobbing.FoundationLayout;
 import machinekit.standard.SocketHeadCapScrew;
 import materia.assembly.AssemblyFrames as F;
 
@@ -12,7 +12,7 @@ class HobberTrayMounts {
     // Group the clamps by the bed edge they hold: the two ends are named by the table they face (the column runs at the
     // other end), the long sides by the scene axis they face.
     var tableX = F.compose(F.inverse(casting), poses.get("machine/bed/tablePlate")).x;
-    for (row in FoundationLayout.trayClampSeats()) {
+    for (row in HobberLayout.get().trayClampSeats()) {
       var parent = "machine/bed/" + row.id;
       var seat = F.compose(poses.get(parent), assembly.memberConnectorFrame(parent, "top"));
       var out = Math.abs(row.pose.y) > 300 ? F.transformVector(casting,

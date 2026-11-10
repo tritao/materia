@@ -27,13 +27,13 @@ class HobberFoundationSizing {
   static inline final COLUMN_LIFT_PROPOSED_Y_MM = 60;
 
   public static function resolve(kind:String):HobberSizedFoundation {
-    var body = FoundationLayout.bodyValues(kind);
-    var rows = HobberMountingHoles.derive(kind, FoundationLayout.placements(kind));
+    var body = HobberLayout.get().foundationBodyValues(kind);
+    var rows = HobberMountingHoles.derive(kind, HobberLayout.get().foundationPlacements(kind));
     var rule = InsertAnchorSelection.sourceDemandRule("hobber-" + kind + "-source-anchors");
     var failures:Array<String> = [];
     for (size in rule.allowedNominalDiametersMm) {
       var single = FoundationSizing.singleThreadRule(rule, size);
-      single.coverDiameters = Math.max(single.coverDiameters, FoundationLayout.SOURCE_STEEL_COVER_MM / size);
+      single.coverDiameters = Math.max(single.coverDiameters, MineralCastBed.SOURCE_STEEL_COVER_MM / size);
       try {
         var placed = kind == "column" ? columnLifting(body, rows, single) : plinthLifting(body, rows, single);
         // Catalogue sockets retain their retention while their real mass
@@ -92,10 +92,10 @@ class HobberFoundationSizing {
     rows:Array<CastInsertPlacement>,
     rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule
   ):Array<CastInsertPlacement> {
-    var d = FoundationLayout.dimensions("column"), cover = FoundationLayout.SOURCE_STEEL_COVER_MM;
+    var d = HobberLayout.get().foundationDimensions("column"), cover = MineralCastBed.SOURCE_STEEL_COVER_MM;
     var choice = InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(LIFT_THREAD_MM).mating());
     var policy = machinekit.design.ThreadedHolePolicy.resolve(choice.thread, C45Bright);
-    var x0 = FoundationLayout.COLUMN_HEAD_WIDTH / 2 + cover, x1 = d[0] / 2 - cover;
+    var x0 = MineralCastColumn.COLUMN_HEAD_WIDTH / 2 + cover, x1 = d[0] / 2 - cover;
     var fixed = FoundationSizing.anchors(
       rows.filter(row -> row.part.parameterToken("role") != LiftingMount),
       rule,
@@ -204,7 +204,7 @@ class HobberFoundationSizing {
     var mass = FoundationSizing.asCastMass(new MineralFoundation(body, result.concat(sites)));
     if (mass.mass <= 0 || !Math.isFinite(mass.mass)
       || mass.unaccounted.length > 0) throw "Hobber lifting layout requires known source mass: plinth";
-    var d = FoundationLayout.dimensions("bed");
+    var d = HobberLayout.get().foundationDimensions("bed");
     var proposed = InsertAnchorSelection.liftingPositions(
       {x: -d[0] / 2, y: -d[1] / 2, z: 0, width: d[0], depth: d[1], height: d[2]},
       {x: mass.centreOfMass.x, y: mass.centreOfMass.y, z: mass.centreOfMass.z},
@@ -226,7 +226,7 @@ class HobberFoundationSizing {
     if (missing < 0 || proposed.length < missing) throw "Unexpected source lifting count: plinth";
     for (index in 0...missing) {
       var point = proposed[index];
-      point.y = (point.y < 0 ? -1 : 1) * FoundationLayout.LIFT_CENTRE_Y;
+      point.y = (point.y < 0 ? -1 : 1) * MineralCastBed.LIFT_CENTRE_Y;
       Sys.println("Hobber source lifting proposal bed: " + point.x + ", " + point.y + ", " + point.z);
       sites.push({
         id: "liftAdditional" + (index + 1),
@@ -288,7 +288,7 @@ class HobberFoundationSizing {
                 neighbours,
                 resin,
                 d,
-                FoundationLayout.SOURCE_STEEL_COVER_MM
+                MineralCastBed.SOURCE_STEEL_COVER_MM
               );
               var anchored = machinekit.tooling.InsertAnchorGeometry.derive(
                 candidate.id,

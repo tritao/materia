@@ -1,4 +1,4 @@
-import machinekit.hobbing.FoundationLayout;
+import machinekit.hobbing.HobberLayout;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingCavities;
 import materia.casting.CastingPatterns;
@@ -15,7 +15,7 @@ import materia.assembly.AssemblyFrames as F;
 
   public static function bodyIntent():Void {
     for (kind in ["bed", "column"]) {
-      var values = FoundationLayout.bodyValues(kind), cuts = CastingPatterns.decode(values.token("features"));
+      var values = HobberLayout.get().foundationBodyValues(kind), cuts = CastingPatterns.decode(values.token("features"));
       var envelope = materia.casting.CastingEnvelope.build(
         values.number("width"),
         values.number("depth"),
@@ -98,7 +98,7 @@ import materia.assembly.AssemblyFrames as F;
       );
       for (point in points.filter(point -> point.id == "liftLeft" || point.id == "liftRight")) {
         var expectedX = kind == Plinth
-          ? -150 - machinekit.hobbing.HobberXLayout.front().bedCentre : (point.id == "liftLeft" ? -160.0 : 160.0);
+          ? -150 - machinekit.hobbing.HobberLayout.get().xNominal().bedCentre : (point.id == "liftLeft" ? -160.0 : 160.0);
         var expectedY = kind == Plinth ? (point.id == "liftLeft" ? -310.0 : 310.0) : -40.0;
         check(
           Math.abs(point.x - expectedX) + Math.abs(point.y - expectedY) < 1e-7,
@@ -217,7 +217,7 @@ import materia.assembly.AssemblyFrames as F;
       if (kind == Column) {
         var rows = foundation.insertLocations(), site = rows.filter(row -> row.id == "liftRight")[0];
         var neighbours = new machinekit.tooling.SourceSteel(rows.filter(row -> row.id != site.id)),
-          resin = new machinekit.structural.MineralCasting(FoundationLayout.bodyValues("column")).geometry();
+          resin = new machinekit.structural.MineralCasting(HobberLayout.get().foundationBodyValues("column")).geometry();
         var cover = switch site.part.insertSpec().anchorage {
           case Bolted(rules, _):
             rules.minimumCoverMm;
@@ -236,14 +236,14 @@ import materia.assembly.AssemblyFrames as F;
           bad,
           neighbours,
           resin,
-          FoundationLayout.dimensions("column"),
+          HobberLayout.get().foundationDimensions("column"),
           cover
         ) catch (error:Dynamic) message = Std.string(error);
         try machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(
           site,
           neighbours,
           resin,
-          FoundationLayout.dimensions("column"),
+          HobberLayout.get().foundationDimensions("column"),
           cover
         ) catch (error:Dynamic) {
           neighbours.close();

@@ -16,13 +16,13 @@ class HobberCastingPockets {
   static inline final DECK_RIB_WIDTH = 50.0;
 
   public static function plinth(width:Float, depth:Float, height:Float):Array<CastingFeature> {
-    var layout = HobberXLayout.front();
+    var layout = HobberLayout.get().xNominal();
     var wall = WALL;
-    var footInset = 120.0, footBossHalf = FoundationLayout.FOOT_BOSS_WIDTH / 2;
-    var tableHalf = FoundationLayout.TABLE_INSERT_WIDTH / 2 + FoundationLayout.SOURCE_STEEL_COVER_MM,
-      ribHalf = FoundationLayout.PLINTH_CORE_WEB / 2;
-    var driveRibHalf = FoundationLayout.DRIVE_RIB_HALF_WIDTH;
-    var railCentre = FoundationLayout.BED_RAIL_CENTRE, railBeamHalf = FoundationLayout.BED_RAIL_BEAM_WIDTH / 2;
+    var footInset = 120.0, footBossHalf = MineralCastBed.FOOT_BOSS_WIDTH / 2;
+    var tableHalf = MineralCastBed.TABLE_INSERT_WIDTH / 2 + MineralCastBed.SOURCE_STEEL_COVER_MM,
+      ribHalf = MineralCastBed.PLINTH_CORE_WEB / 2;
+    var driveRibHalf = MineralCastBed.DRIVE_RIB_HALF_WIDTH;
+    var railCentre = HobberLayout.get().bedRailCentre, railBeamHalf = MineralCastBed.BED_RAIL_BEAM_WIDTH / 2;
     var capHalf = 150.0, webCentre = 112.5;
     var frontDeckRibX = 100.0, middleDeckRibX = 160.0, rearDeckRibX = 220.0, deckRibY = 80.0;
     var deckRibHalf = DECK_RIB_WIDTH / 2;
@@ -41,12 +41,12 @@ class HobberCastingPockets {
     var xRearFootFront = width / 2 - footInset - footBossHalf;
     var xMotorRibFront = layout.screwStart - layout.bedCentre - driveRibHalf;
     // The pocket stops a full cover land before the actual relocated socket tail.
-    var socketHalf = Math.max(FoundationLayout.TRAY_SOCKET_OUTSIDE_DIAMETER,
-      FoundationLayout.TRAY_SOCKET_TAIL_WIDTH) / 2;
+    var socketHalf = Math.max(MineralCastBed.TRAY_SOCKET_OUTSIDE_DIAMETER,
+      MineralCastBed.TRAY_SOCKET_TAIL_WIDTH) / 2;
     var xRearSocketStart = width
-      / 2 - FoundationLayout.TRAY_SOCKET_END_INSET - socketHalf - FoundationLayout.SOURCE_STEEL_COVER_MM;
+      / 2 - MineralCastBed.TRAY_SOCKET_END_INSET - socketHalf - MineralCastBed.SOURCE_STEEL_COVER_MM;
     var xRearWall = width / 2 - wall;
-    var xWellFront = FoundationLayout.WORK_WELL_CENTRE_X - layout.bedCentre - FoundationLayout.WORK_WELL_WIDTH / 2;
+    var xWellFront = MineralCastBed.WORK_WELL_CENTRE_X - layout.bedCentre - MineralCastBed.WORK_WELL_WIDTH / 2;
     var xFrontSocketEnd = xWellFront;
     var yLeftRailInside = -railCentre + railBeamHalf;
     var yLeftCap = -capHalf;
@@ -62,14 +62,14 @@ class HobberCastingPockets {
     var yRightTable = tableHalf;
     var yRightCap = capHalf;
     var yRightRailInside = railCentre - railBeamHalf;
-    var zFloor = FoundationLayout.PLINTH_CORE_FLOOR;
-    var zFootRoof = FoundationLayout.FOOT_SUPPORT_TOP;
-    var zCapSole = FoundationLayout.DRIVE_CAP_UNDERSIDE;
+    var zFloor = MineralCastBed.PLINTH_CORE_FLOOR;
+    var zFootRoof = MineralCastBed.FOOT_SUPPORT_TOP;
+    var zCapSole = MineralCastBed.DRIVE_CAP_UNDERSIDE;
     var zCapTop = DRIVE_CAP_TOP;
     var zSocketSole = height - SOCKET_BOSS_DEPTH;
     // Retain the full wall below the recessed tray seats, not only below the top.
     var zRoof = height - wall - machinekit.enclosure.TraySeat.DEPTH;
-    var zWellFloor = FoundationLayout.TABLE_WELL_FLOOR_HEIGHT;
+    var zWellFloor = MineralCastBed.TABLE_WELL_FLOOR_HEIGHT;
     return [
       pocket(
         "pocket-centreWebRight-leftCap-capTop",

@@ -1,20 +1,18 @@
+import machinekit.hobbing.HobberLayout;
+import machinekit.hobbing.MineralCastBed;
 import machinekit.hobbing.HobberDrives;
 import machinekit.assembly.AssemblyIntegrity;
 import machinekit.assembly.PosedParts;
 import machinekit.design.DesignRequirement;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
-import machinekit.hobbing.FoundationLayout;
 import machinekit.hobbing.HobSpindle;
 import machinekit.hobbing.HobberFeResults;
 import machinekit.hobbing.HobberCastingPockets;
 import machinekit.hobbing.HobberSaddle;
 import machinekit.hobbing.HobberSpindleRelief;
-import machinekit.hobbing.HobberXLayout;
 import machinekit.hobbing.HobberScales;
 import machinekit.hobbing.SpindleHousing;
-import machinekit.hobbing.HobberSwivelLayout;
-import machinekit.hobbing.HobberZLayout;
 import materia.assembly.AssemblyFrames as F;
 
 /** Frame, drive and integrity checks on the assembled hobber (FRAME_PLAN.md H1-H6). */
@@ -30,7 +28,7 @@ class HobberFrameChecks {
         {member: "column/", fastened: ["Xbridge"], faces: ["blockL1", "blockL2", "blockR1", "blockR2", "nut-block"]},
         {member: "XscaleHead", fastened: ["Xrib-scale"], faces: ["plate"]},
         // Tighten the sole after lowering the column, before fitting its removable skirt.
-        {member: "Xskirt", fastened: ["Xbridge"], faces: [for (pad in machinekit.hobbing.FoundationLayout.columnSolePads()) "column-sole-"+pad.id]},
+        {member: "Xskirt", fastened: ["Xbridge"], faces: [for (pad in machinekit.hobbing.HobberLayout.get().columnSolePads()) "column-sole-"+pad.id]},
         // Indicate the housing on its carrier before mounting the carriage.
         {member:"Ymodule/carriage",fastened:["outboard"]},
         // The servo goes on the cradle after the cradle is bolted to the seat (the floor bolts' heads are under the servo).
@@ -144,12 +142,12 @@ class HobberFrameChecks {
     // envelope swept continuously through physical Z overtravel proves the
     // running gap for every Z, and is invariant under common X travel.
     var housing=machine.swivel.housing.geometry();
-    var placed=PosedParts.moved(housing,HobberSwivelLayout.pose());housing.close();
-    var outside=machinekit.component.Solids.cut(placed,[machinekit.hobbing.HobberZOffset.envelope(0,0,0)]);
+    var placed=PosedParts.moved(housing,HobberLayout.get().swivelDatum());housing.close();
+    var outside=machinekit.component.Solids.cut(placed,[machinekit.hobbing.HobberLayout.get().envelope(0,0,0)]);
     var escaped=outside.volume();outside.close();
     if(escaped>0.001)throw 'Actual eRob housing escapes the Z clearance envelope: $escaped mm3';
     var range=HobberScales.stroke("Z"),over=HobberScales.overtravel();
-    var swept=machinekit.hobbing.HobberZOffset.envelope(range.lower-over,range.upper+over,0);
+    var swept=machinekit.hobbing.HobberLayout.get().envelope(range.lower-over,range.upper+over,0);
     var bars=machine.components().filter(m->m.id=="ZdriveFloatingBar");if(bars.length!=1)throw "Missing Z floating bar";
     var bar=bars[0].component.geometry(),gap=bar.shape.distance(swept.shape);bar.close();swept.close();
     if(gap<2-1e-6)throw 'v2 Z bar/eRob continuous-sweep gap $gap mm is below2';
@@ -211,7 +209,7 @@ class HobberFrameChecks {
    * Way covers on the X and Z screws (FRAME_PLAN, "Chip protection and service"): the free length each cover would have between its end wall (behind the support, a `COVER_PLATE` plate
    * and a gap) and its carrier on the nut block's side of the moving member, measured on the posed machine at the end stop where they are closest, and the least length a box
    * cover of the lamella row needs for that stroke round the bare screw (opening 40 x 50). Where the free length is short, the line says by how much: the geometry change that would make
-   * the cover fit is that much more screw between the support and the nut's end stop (`HobberXLayout`, `HobberZLayout`). Returns one line per cover.
+   * the cover fit is that much more screw between the support and the nut's end stop (`HobberLayout`). Returns one line per cover.
    */
   /** Park each opposite end away rather than assuming a straight driver can
    * reach through it. The derived P5 access cylinders include the driver/head
@@ -220,11 +218,11 @@ class HobberFrameChecks {
     var derived=machine.derivedFasteners();if(derived==null)throw "Missing Z bellows fasteners";
     var model=new cadkit.modeling.AssemblyModel("mm");machine.addTo(model,"");
     var state=new cadkit.modeling.AssemblyState(model.definition("z-bellows-tools")),members=machine.components(),count=0;
-    state.setJoint("X",HobberXLayout.RETRACT);
+    state.setJoint("X",HobberLayout.get().xRetract);
     PosedParts.scope(cache->{
       for(joint in derived.joints)if(StringTools.startsWith(joint.clampedMember,"Zbellows") &&
         (StringTools.endsWith(joint.clampedMember,"-fixed")||StringTools.endsWith(joint.clampedMember,"-moving"))) {
-        var q=joint.clampedMember.indexOf("Upper")>=0?HobberZLayout.TRAVEL_MIN:HobberZLayout.TRAVEL_MAX;
+        var q=joint.clampedMember.indexOf("Upper")>=0?HobberLayout.get().zTravelMin:HobberLayout.get().zTravelMax;
         state.setJoint("Z",q);state.forwardKinematics();
         var poses=machine.solvedPoses(state),host=members.filter(m->m.id==joint.receivingMember)[0],pose=poses.get(host.id);
         if(pose==null)throw "Missing bellows receiver pose";
@@ -243,7 +241,7 @@ class HobberFrameChecks {
       }
     });
     if(count!=32)throw "Expected32 bellows end-flange driver corridors, got "+count;
-    return ['Z bellows: $count derived driver corridors clear at Z${HobberZLayout.TRAVEL_MIN}/${HobberZLayout.TRAVEL_MAX}; bench-fit moving brackets before the column.'];
+    return ['Z bellows: $count derived driver corridors clear at Z${HobberLayout.get().zTravelMin}/${HobberLayout.get().zTravelMax}; bench-fit moving brackets before the column.'];
   }
 
   public static function coverFit(machine:FlexsplineHobber):Array<String> {
@@ -265,8 +263,8 @@ class HobberFrameChecks {
       var nut = box("Xnut"), floating = box("Xfloating"), fixedSupport = box("Xfixed");
       var xStroke = x.upper - x.lower;
       var nutFront = nut.minY + (x.lower - x.initial), nutBack = nut.maxY + (x.upper - x.initial);
-      row("X front (floating support to nut)", (nutFront - COVER_GAP - COVER_PLATE) - (floating.maxY + COVER_GAP + COVER_PLATE), xStroke, FoundationLayout.DRIVE_CHANNEL_WIDTH / 2);
-      row("X rear (nut to fixed support)", (fixedSupport.minY - COVER_GAP - COVER_PLATE) - (nutBack + COVER_GAP + COVER_PLATE), xStroke, FoundationLayout.DRIVE_CHANNEL_WIDTH / 2);
+      row("X front (floating support to nut)", (nutFront - COVER_GAP - COVER_PLATE) - (floating.maxY + COVER_GAP + COVER_PLATE), xStroke, MineralCastBed.DRIVE_CHANNEL_WIDTH / 2);
+      row("X rear (nut to fixed support)", (fixedSupport.minY - COVER_GAP - COVER_PLATE) - (nutBack + COVER_GAP + COVER_PLATE), xStroke, MineralCastBed.DRIVE_CHANNEL_WIDTH / 2);
       // Z: work z is world z. The nut moves with the saddle.
       var znut = box("Znut"), zfloating = box("Zfloating"), zfixed = box("Zfixed");
       var zStroke = z.upper - z.lower;
@@ -375,7 +373,7 @@ class HobberFrameChecks {
     var tilt = mass * g * overhang;
     // Gravity torque about A: the centre of mass is (dy, dz) from the axis; turned by theta its lever on the vertical force is dy cos - dz sin.
     function gravityTorque(theta:Float):Float return mass * g * (com.y * Math.cos(theta) - com.z * Math.sin(theta)) / 1000;
-    var worst = 0.0, at0 = gravityTorque(0), limit = HobberSwivelLayout.RANGE;
+    var worst = 0.0, at0 = gravityTorque(0), limit = HobberLayout.get().swivelRange;
     for (i in -15...16) worst = Math.max(worst, Math.abs(gravityTorque(i * Math.PI / 180)));
     var tool = F.transformPoint(F.compose(back, F.compose(poses.get("hob"), machine.hob.connector("centre").frame)), 0, 0, 0);
     var hobOverhang = (face - tool.x) / 1000, hobLever = Math.sqrt(Math.pow(tool.y - outputFace.y, 2) + Math.pow(tool.z - outputFace.z, 2)) / 1000;
@@ -413,8 +411,8 @@ class HobberFrameChecks {
   public static function outboard(machine:FlexsplineHobber):Array<String> {
     var poses = machine.solvedPoses(), arbor = machine.spindle.arbor;
     var inv = F.inverse(poses.get("spindle/arbor"));
-    var radial = machinekit.hobbing.HobberOutboardLayout.INDICATED_RADIAL + machinekit.hobbing.HobberOutboardLayout.SEAT_RADIAL
-      + machinekit.hobbing.HobberOutboardLayout.BEARING_RADIAL + machinekit.hobbing.HobberOutboardLayout.THERMAL_RADIAL;
+    var radial = machinekit.hobbing.OutboardSupport.INDICATED_RADIAL + machinekit.hobbing.OutboardSupport.SEAT_RADIAL
+      + machinekit.hobbing.OutboardSupport.BEARING_RADIAL + machinekit.hobbing.OutboardSupport.THERMAL_RADIAL;
     for (id in ["outboard", "outboardSleeve", "outboardBearingFront", "outboardBearingRear"]) {
       var p = F.compose(inv, poses.get(id)), axis = F.transformVector(p, 0, 0, 1);
       if (Math.sqrt(p.x * p.x + p.y * p.y) > 1e-7 || Math.abs(Math.abs(axis.z) - 1) > 1e-8) throw "outboard is not on spindle axis: " + id;
@@ -423,9 +421,9 @@ class HobberFrameChecks {
     if (Math.abs(front.z - (arbor.parameterNumber("height") - arbor.parameterNumber("supportLength"))) > 1e-8
       || Math.abs(rear.z - front.z - 18) > 1e-8
       || F.transformVector(F.compose(F.inverse(poses.get("outboardBearingFront")), poses.get("outboardBearingRear")), 0, 0, 1).z > -0.999999) throw "outboard DB pair does not seat against journal shoulder";
-    if (radial > machinekit.hobbing.HobberOutboardLayout.RADIAL_BUDGET + 1e-12) throw "outboard coaxiality budget exceeded";
-    var thermal = machinekit.hobbing.HobberOutboardLayout.STEEL_EXPANSION * arbor.parameterNumber("height") * machinekit.hobbing.HobberOutboardLayout.TEMPERATURE_RISE;
-    var floatMargin = 1 - thermal - machinekit.hobbing.HobberOutboardLayout.ASSEMBLY_AXIAL;
+    if (radial > machinekit.hobbing.OutboardSupport.RADIAL_BUDGET + 1e-12) throw "outboard coaxiality budget exceeded";
+    var thermal = machinekit.hobbing.OutboardSupport.STEEL_EXPANSION * arbor.parameterNumber("height") * machinekit.hobbing.OutboardSupport.TEMPERATURE_RISE;
+    var floatMargin = 1 - thermal - machinekit.hobbing.OutboardSupport.ASSEMBLY_AXIAL;
     var nutClearance = (30 - 22 / Math.cos(Math.PI / 6)) / 2;
     if (floatMargin <= 0 || nutClearance < 2) throw "outboard thermal travel or nut access insufficient";
     return ['Outboard: SKF 7002 CDGA/P4A DB pair, 15x32x9 each, class-A 20 N unmounted preload; installed radial budget 5 um '
@@ -478,9 +476,9 @@ class HobberFrameChecks {
       mass += weight * props.mass;
       mx += weight * props.mass * at.x;
       my += weight * props.mass * at.y;
-      mz += weight * props.mass * (at.z - HobberZLayout.SEAT_Z);
+      mz += weight * props.mass * (at.z - HobberLayout.get().nativeHobCentreZ);
       if (m.id == "motorCradle") cradle = props.mass;
-      else servo.push({m: props.mass, x: at.x, y: at.y, z: at.z - HobberZLayout.SEAT_Z});
+      else servo.push({m: props.mass, x: at.x, y: at.y, z: at.z - HobberLayout.get().nativeHobCentreZ});
     }
     var sec = HobberSaddle.cradleSection(), dims = HobberSaddle.cradleDimensions(), rest = HobberSaddle.cradleRest(), faceY = HobberSaddle.cradleFaceY();
     var com = {x: mx / mass, y: my / mass, z: mz / mass}, ahead = faceY - com.y, height = com.z - sec.floorTop;
@@ -665,14 +663,14 @@ class HobberFrameChecks {
   }
 
   /**
-   * The Z screw stands off the rail pair's middle (`HobberZOffset`), so its thrust and the moving mass's weight, which acts at the mass's
+   * The Z screw stands off the rail pair's middle (`HobberLayout`), so its thrust and the moving mass's weight, which acts at the mass's
    * centre of mass, are `e` apart across the machine and form a moment about the rail normal (x), the blocks' yaw. The sign of the offset must be
    * the side of the centre of mass. The moment is shared by the four blocks and set against the block row's rated yaw moment (static: the
    * weight, held by the brake; dynamic: the sizing's peak thrust, the rated moment scaled by C/C0 because the catalogue lists static moments
    * only). Returns the lines; throws when the sign is wrong or a block is over its rating.
    */
   public static function zOffsetMoments(machine:FlexsplineHobber):Array<String> {
-    var z = zMoving(machine), g = 9.80665, offset = HobberZLayout.axisY(), result = machinekit.hobbing.HobberZOffset.result();
+    var z = zMoving(machine), g = 9.80665, offset = HobberLayout.get().zAxisY(), result = machinekit.hobbing.HobberLayout.get().zOffset();
     if (offset * (z.y - 0) <= 0) throw 'Z screw at y ${offset} is on the opposite side of the moving mass centre (y ${z.y})';
     var report:Dynamic = FlexsplineHobberLayoutReport.measure(machine), mass = z.mass, q = 0.005 / (2 * Math.PI);
     var nut:machinekit.motion.BallNut = cast machine.components().filter(m -> m.id == "Znut")[0].component;
@@ -708,7 +706,7 @@ class HobberFrameChecks {
   public static function spindleSeat(machine:FlexsplineHobber):Array<String> {
     var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
     var seat = HobberSaddle.spindleSeatRange(), toHousing = F.inverse(F.compose(back, housing));
-    function zOf(y:Float):Float return F.transformPoint(toHousing, 0, y, HobberZLayout.SEAT_Z).z;
+    function zOf(y:Float):Float return F.transformPoint(toHousing, 0, y, HobberLayout.get().nativeHobCentreZ).z;
     var a = zOf(seat.y0), b = zOf(seat.y1), from = Math.min(a, b), to = Math.max(a, b);
     var screws = [for (y in seat.clampYs) zOf(y)];
     var lines = ['Spindle seat grips housing z ${Math.round(from * 10) / 10}..${Math.round(to * 10) / 10} (${Math.round((to - from) * 10) / 10} mm) of the clamping length ${SpindleHousing.CLAMP_FROM}..${SpindleHousing.CLAMP_TO} (assumed); ' +
@@ -752,7 +750,7 @@ class HobberFrameChecks {
     state.forwardKinematics();
     var cache = new machinekit.assembly.PosedParts(), members = machine.components();
     var castingPose = state.worldPose("bed/casting");
-    var expectedCasting = F.compose(toMachine, FoundationLayout.worldPose("bed"));
+    var expectedCasting = F.compose(toMachine, HobberLayout.get().foundationDatum("bed"));
     var cp = F.toRotationMatrix(castingPose), ce = F.toRotationMatrix(expectedCasting);
     var offset = Math.max(Math.abs(castingPose.x - expectedCasting.x), Math.max(Math.abs(castingPose.y - expectedCasting.y), Math.abs(castingPose.z - expectedCasting.z)));
     for (i in 0...9) offset = Math.max(offset, Math.abs(cp[i] - ce[i]));
@@ -760,9 +758,9 @@ class HobberFrameChecks {
     var casting = cache.posed(members.filter(m -> m.id == "bed/casting")[0].component, castingPose);
     var motor = members.filter(m -> m.id == "spindle/motor")[0].component;
     // (2) the gap at the extremes with the overtravel.
-    var ot = HobberXLayout.OVERTRAVEL, worstGap = 1e9, worstAt = "";
+    var ot = HobberLayout.get().overtravel, worstGap = 1e9, worstAt = "";
     var x = HobberScales.stroke("X"), y = HobberScales.stroke("Y"), z = HobberScales.stroke("Z");
-    for (xv in [x.lower - ot, x.upper + ot]) for (yv in [y.lower - ot, y.upper + ot]) for (zv in [z.lower - ot, z.lower, 0.0]) for (a in [-HobberSwivelLayout.RANGE, 0.0, HobberSwivelLayout.RANGE]) {
+    for (xv in [x.lower - ot, x.upper + ot]) for (yv in [y.lower - ot, y.upper + ot]) for (zv in [z.lower - ot, z.lower, 0.0]) for (a in [-HobberLayout.get().swivelRange, 0.0, HobberLayout.get().swivelRange]) {
       var posed = cache.posed(motor, analytic(xv, yv, zv, a)), gap = posed.distance(casting);
       posed.close();
       if (gap < worstGap) {
@@ -781,7 +779,7 @@ class HobberFrameChecks {
       return lines;
     }
     var wall = HobberCastingPockets.WALL;
-    var d = FoundationLayout.dimensions("bed");
+    var d = HobberLayout.get().foundationDimensions("bed");
     var slab = cadkit.modeling.Part.box(relief.x1 - relief.x0, relief.y1 - relief.y0, wall, cadkit.modeling.Align.Min, cadkit.modeling.Align.Min, cadkit.modeling.Align.Min)
       .translated(new cadkit.modeling.Vector(relief.x0, relief.y0, relief.z0 - wall));
     var slabPosed = machinekit.assembly.PosedParts.moved(slab, castingPose);
@@ -929,10 +927,10 @@ class HobberFrameChecks {
       // Expand only the validation snapshot to the declared Z overtravel.
       // The machine's operating limits and its saved design remain unchanged.
       var record=machine.describe();
-      for(j in record.mechanical.joints)if(j.id=="Z"){j.limits.lower=machinekit.hobbing.HobberZBellowsLayout.lowerLimit();j.limits.upper=machinekit.hobbing.HobberZBellowsLayout.upperLimit();}
+      for(j in record.mechanical.joints)if(j.id=="Z"){j.limits.lower=machinekit.hobbing.HobberLayout.get().zBellowsLowerLimit();j.limits.upper=machinekit.hobbing.HobberLayout.get().zBellowsUpperLimit();}
       var copy=MachineAssembly.fromDescription(record,MachineKitComponents.standard()),states:Array<Map<String,Float>>=[];
       var x=machine.travel.filter(t->t.id=="X")[0],y=machine.travel.filter(t->t.id=="Y")[0];
-      for(xx in [x.lower,x.upper])for(yy in [y.lower,y.upper])for(zz in [machinekit.hobbing.HobberZBellowsLayout.lowerLimit(),machinekit.hobbing.HobberZBellowsLayout.upperLimit()])for(a in [-HobberSwivelLayout.RANGE,0.0,HobberSwivelLayout.RANGE])
+      for(xx in [x.lower,x.upper])for(yy in [y.lower,y.upper])for(zz in [machinekit.hobbing.HobberLayout.get().zBellowsLowerLimit(),machinekit.hobbing.HobberLayout.get().zBellowsUpperLimit()])for(a in [-HobberLayout.get().swivelRange,0.0,HobberLayout.get().swivelRange])
         states.push(["X"=>xx,FlexsplineHobber.Y=>yy,"Z"=>zz,FlexsplineHobber.A=>a]);
       var report=AssemblyIntegrity.check(copy,{sweepStates:states,runningGap:2.0,processContacts:machine.processContacts(),serviceProcedures:[],fasteners:false});
       var own=[for(e in report.errors())if(e.message.indexOf("Zbellows")>=0)e];

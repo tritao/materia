@@ -107,10 +107,10 @@ class HobberEnclosurePreview {
       var loading:PartBox = {
         minX: origin.x - r - 25,
         maxX: origin.x + r + 25,
-        minY: Math.min(origin.y - machinekit.hobbing.HobberXLayout.FRONT_APPROACH - r - 80, swept.minY - 225),
+        minY: Math.min(origin.y - machinekit.hobbing.HobberLayout.get().frontApproach - r - 80, swept.minY - 225),
         maxY: origin.y + 15,
         minZ: origin.z - 60,
-        maxZ: origin.z + 80 + machinekit.hobbing.HobberXLayout.FRONT_LIFT
+        maxZ: origin.z + 80 + machinekit.hobbing.HobberLayout.get().frontLift
       };
       // Tray overlaps the casting perimeter by the rebate width.
       var a = machinekit.enclosure.TraySeat.WIDTH;
@@ -304,9 +304,9 @@ class HobberEnclosurePreview {
         wall: machine.mandrel.parameterNumber("sleeveWall"),
         length: machine.mandrel.parameterNumber("sleeveLength"),
         radialTravel: machine.mandrel.parameterNumber("radialFitGap"),
-        retractX: machinekit.hobbing.HobberXLayout.RETRACT,
-        frontApproachMm: machinekit.hobbing.HobberXLayout.FRONT_APPROACH,
-        liftMm: machinekit.hobbing.HobberXLayout.FRONT_LIFT
+        retractX: machinekit.hobbing.HobberLayout.get().xRetract,
+        frontApproachMm: machinekit.hobbing.HobberLayout.get().frontApproach,
+        liftMm: machinekit.hobbing.HobberLayout.get().frontLift
       };
     }
     if (scene.project == null) scene.project = {dynamicParts: [], motions: []};

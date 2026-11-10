@@ -1,15 +1,23 @@
 package machinekit.hobbing;
 
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
-import machinekit.hobbing.HobberOutboardLayout as L;
 
 /** Made coaxial support parts in the housing datum. The sleeve carries both
  * outer races; its gland closes their matched ground faces. The inner spacer
  * lets a standard-sized retaining nut clear the fixed gland. */
 class OutboardBearingPart extends MachineComponent {
+
+  public static function capHoles():Array<machinekit.component.BoltedFace.BoltHole> return [
+    for (x in [-23.0, 23.0]) for (y in [-12.0, 12.0]) {x: x, y: y}
+  ];
+  public static function capFrame(into:Float):AssemblyFrame return BoltedFace.frameOf({x: 0.0, y: 0.0, z: OutboardSupport.BODY_LENGTH},
+    {x: 0, y: 0, z: into}, {x: 1, y: 0, z: 0});
+
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [P.choice("role", ["sleeve", "gland", "cap", "innerSpacer"], "sleeve")];
   public static function recipeType():ComponentType {
@@ -35,26 +43,26 @@ class OutboardBearingPart extends MachineComponent {
   override public function machinable():Bool return values().token("role") == "cap";
   override public function fastensByForm():Bool return ["gland", "innerSpacer"].indexOf(values().token("role")) >= 0;
   override public function fasteningFaces():Array<BoltedFace> return values().token("role") == "cap" ? [
-    BoltedFace.clamped("housing", L.capFrame(1), L.capHoles(), 4.5, L.CAP_THICKNESS, "M4", null, false)
+    BoltedFace.clamped("housing", OutboardBearingPart.capFrame(1), OutboardBearingPart.capHoles(), 4.5, OutboardSupport.CAP_THICKNESS, "M4", null, false)
   ] : [];
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return switch values().token("role") {
-    case "sleeve": Solids.cut(Solids.named(Part.cylinderSpan(20, L.SLEEVE_FROM, L.SLEEVE_TO), "sleeve"), [
-      Solids.named(Part.cylinderSpan(10.5, L.SLEEVE_FROM - 1, L.PAIR_FROM), "shaft-bore"),
-      Solids.named(Part.cylinderSpan(16, L.PAIR_FROM, L.PAIR_TO), "pair-seat"),
-      Solids.named(Part.cylinderSpan(18, L.GLAND_FROM, L.GLAND_TO + 1), "gland-seat")
+    case "sleeve": Solids.cut(Solids.named(Part.cylinderSpan(20, OutboardSupport.SLEEVE_FROM, OutboardSupport.SLEEVE_TO), "sleeve"), [
+      Solids.named(Part.cylinderSpan(10.5, OutboardSupport.SLEEVE_FROM - 1, OutboardSupport.PAIR_FROM), "shaft-bore"),
+      Solids.named(Part.cylinderSpan(16, OutboardSupport.PAIR_FROM, OutboardSupport.PAIR_TO), "pair-seat"),
+      Solids.named(Part.cylinderSpan(18, OutboardSupport.GLAND_FROM, OutboardSupport.GLAND_TO + 1), "gland-seat")
     ]);
     case "gland":
-      var tools = [Solids.named(Part.cylinderSpan(14, L.GLAND_FROM - 1, L.GLAND_TO + 1), "bore")];
+      var tools = [Solids.named(Part.cylinderSpan(14, OutboardSupport.GLAND_FROM - 1, OutboardSupport.GLAND_TO + 1), "bore")];
       // Blind pin-spanner holes, not fastener holes. M36x1 represented nominally.
-      for (k => x in [-16.0, 16.0]) tools.push(Solids.named(Part.cylinderSpan(1, L.GLAND_TO - 2, L.GLAND_TO + 0.1, x, 0), "spanner-hole" + (k + 1)));
-      Solids.cut(Solids.named(Part.cylinderSpan(18, L.GLAND_FROM, L.GLAND_TO), "gland"), tools);
-    case "innerSpacer": Solids.cut(Solids.named(Part.cylinderSpan(L.SPACER_DIAMETER / 2, L.PAIR_TO, L.PAIR_TO + L.SPACER_LENGTH), "spacer"),
-      [Solids.named(Part.cylinderSpan(7.5, L.PAIR_TO - 1, L.PAIR_TO + L.SPACER_LENGTH + 1), "bore")]);
+      for (k => x in [-16.0, 16.0]) tools.push(Solids.named(Part.cylinderSpan(1, OutboardSupport.GLAND_TO - 2, OutboardSupport.GLAND_TO + 0.1, x, 0), "spanner-hole" + (k + 1)));
+      Solids.cut(Solids.named(Part.cylinderSpan(18, OutboardSupport.GLAND_FROM, OutboardSupport.GLAND_TO), "gland"), tools);
+    case "innerSpacer": Solids.cut(Solids.named(Part.cylinderSpan(OutboardSupport.SPACER_DIAMETER / 2, OutboardSupport.PAIR_TO, OutboardSupport.PAIR_TO + OutboardSupport.SPACER_LENGTH), "spacer"),
+      [Solids.named(Part.cylinderSpan(7.5, OutboardSupport.PAIR_TO - 1, OutboardSupport.PAIR_TO + OutboardSupport.SPACER_LENGTH + 1), "bore")]);
     case "cap": machined(Solids.cut(Solids.union([
-      Solids.named(Part.box(60, 60, L.CAP_THICKNESS).translated(new Vector(0, 0, L.BODY_LENGTH)), "cap"),
-      Solids.named(Part.cylinderSpan(20, L.REAR_STOP, L.BODY_LENGTH), "spigot")
-    ]), [Solids.named(Part.cylinderSpan(L.CAP_BORE / 2, L.REAR_STOP - 1, L.BODY_LENGTH + L.CAP_THICKNESS + 1), "bore")]));
+      Solids.named(Part.box(60, 60, OutboardSupport.CAP_THICKNESS).translated(new Vector(0, 0, OutboardSupport.BODY_LENGTH)), "cap"),
+      Solids.named(Part.cylinderSpan(20, OutboardSupport.REAR_STOP, OutboardSupport.BODY_LENGTH), "spigot")
+    ]), [Solids.named(Part.cylinderSpan(OutboardSupport.CAP_BORE / 2, OutboardSupport.REAR_STOP - 1, OutboardSupport.BODY_LENGTH + OutboardSupport.CAP_THICKNESS + 1), "bore")]));
     default: throw "unknown outboard bearing part";
   };
 }

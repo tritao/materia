@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberLayout;
 import machinekit.assembly.PosedParts;
 
 /** Geometric rack support and mounting checks; generic device mounting holes remain unspecified. */
@@ -8,14 +9,14 @@ class HobberElectricalChecks {
       var rack = [for (m in members) if (m.id == "electricalPanel") m][0], rackPose = poses.get(rack.id);
       var rackBox = cache.box(rack.component, rackPose);
       if (Math.abs(rackBox.minZ) > 1e-6) throw "Electrical stand is not on the machine floor datum";
-      var panel = HobberElectricalLayout.panelPose(), count = 0;
+      var panel = HobberLayout.get().electricalPanelPose(), count = 0;
       var devices = [for (m in members) if (m.id == "powerSupply"
         || m.id == "supply48" || m.id == "bissMaster" || StringTools.endsWith(
           m.id,
           "-driver"
         )) m];
       for (m in devices) {
-        // The rack stands free in the machine frame (`HobberElectricalLayout.panelPose`), so its devices are compared there too.
+        // The rack stands free in the machine frame (`HobberLayout.electricalPanelPose`), so its devices are compared there too.
         var pose = poses.get(m.id), b = cache.box(m.component, pose);
         if (Math.abs(b.maxY - (panel.y - 10)) > 1e-6) throw '${m.id} mounting face does not meet the backplate';
         if (b.minX < panel.x - 210 || b.maxX > panel.x + 210 || b.minZ < panel.z + 20

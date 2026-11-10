@@ -62,3 +62,5 @@ A second build after restoring the original source reproduced that digest exactl
 ## Log
 
 - RF1 — Complete: all assembly rest poses, mates, covers and service directions use the machine frame; `HobberFrame` owns native-part mounting and the process conversion. Inventory unchanged (421 members, 154 BOM lines, 328 screws, 42 pins); all six suites PASS (hobber 3303, hobbing 1185, linear module 230; joint fasteners, assembly integrity, enclosure checks). Scene IDs/groups unchanged (544 occurrences including enclosure). `FlexsplineHobber.hx`: 762 lines; `HobberFrame.hx`: 35. Earlier byte-only diagnostics superseded by the relaxed gate.
+
+- RF2 — Complete: one lazy `HobberLayout` replaces all eight layout classes plus bellows/electrical placement; the shared height stack feeds guides, carriage, column, swivel, Y module, hob and table. Intrinsic dimensions move to the bed, column, saddle, outboard and arbor classes. All six suites PASS; inventory unchanged (421 members, 154 BOM lines, 328 screws, 42 pins). `FlexsplineHobber.hx`: 764 lines; `HobberLayout.hx`: 1300. No open RF2 items.

@@ -551,8 +551,8 @@ class PartNumberKeyTests {
       if (PartNumberLint.problems(number).length != 0) throw 'Lifting insert identity: $number';
     }
     var bedSeat = "", columnSeat = "";
-    for (row in machinekit.hobbing.FoundationLayout.inserts("bed")) if (row.id == "railLeft") bedSeat = row.part.bom.partNumber;
-    for (row in machinekit.hobbing.FoundationLayout.inserts("column")) if (row.id == "railLeft") columnSeat = row.part.bom.partNumber;
+    for (row in machinekit.hobbing.HobberLayout.get().foundationInserts("bed")) if (row.id == "railLeft") bedSeat = row.part.bom.partNumber;
+    for (row in machinekit.hobbing.HobberLayout.get().foundationInserts("column")) if (row.id == "railLeft") columnSeat = row.part.bom.partNumber;
     if (bedSeat != "CAST-INSERT-HOBBER-BED-RAILLEFT" || columnSeat != "CAST-INSERT-HOBBER-COLUMN-RAILLEFT"
       || bedSeat == columnSeat) throw "Foundation scope must distinguish repeated local insert IDs";
     var structural = [machinekit.structural.RectTubeMember.recipeType().create().bom.partNumber,

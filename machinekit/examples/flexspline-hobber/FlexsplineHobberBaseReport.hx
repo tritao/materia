@@ -1,9 +1,8 @@
-import machinekit.hobbing.FoundationLayout;
+import machinekit.hobbing.HobberLayout;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.BoxAlgebra;
 import materia.casting.Box3;
 import materia.casting.CastingRecordCodec as R;
-import machinekit.hobbing.HobberXLayout;
 
 /** Preliminary assumed-stiffness evidence, not FEA or a structural certification. */
 class FlexsplineHobberBaseReport {
@@ -62,7 +61,7 @@ class FlexsplineHobberBaseReport {
     nativeBody.close();
     if (cells != null && Math.abs(BoxAlgebra.volume(cells) - nativeVolume)
       > nativeVolume * 1e-9) throw "Casting collision/beam cells disagree with exact CAD volume";
-    var span = HobberXLayout.front().footSpan, half = span / 2;
+    var span = HobberLayout.get().xNominal().footSpan, half = span / 2;
     var oldI = BoxAlgebra.minimumIy(oldCells, -430, 430), e = 35000.0;
     var newI:Null<Float> = cells == null ? null : BoxAlgebra.minimumIy(cells, -half, half);
     var baseKg = 0.0, columnKg = 0.0, total = 0.0;
@@ -103,7 +102,7 @@ class FlexsplineHobberBaseReport {
       -1e30
     ], worstFoot = 0.0;
     for (i in 0...21) {
-      var x = HobberXLayout.MIN + (HobberXLayout.RETRACT - HobberXLayout.MIN) * i / 20, legalX = Math.max(
+      var x = HobberLayout.get().xMin + (HobberLayout.get().xRetract - HobberLayout.get().xMin) * i / 20, legalX = Math.max(
         machine.travel[0].lower,
         x
       );
@@ -135,7 +134,7 @@ class FlexsplineHobberBaseReport {
           e * sectionI,
           span
         );
-        newError = [(121 * nv[1] - (363 - FoundationLayout.TABLE_SEAT) * nt[1]) * 1000, (nv[0] - nt[0]) * 1000];
+        newError = [(121 * nv[1] - (363 - HobberLayout.get().nativeTableSeat) * nt[1]) * 1000, (nv[0] - nt[0]) * 1000];
         for (k in 0...2) {
           newLo[k] = Math.min(newLo[k], newError[k]);
           newHi[k] = Math.max(newHi[k], newError[k]);
@@ -207,7 +206,7 @@ class FlexsplineHobberBaseReport {
         faceDiameterMm : machine.tableSpec.number("faceDiameter"),
         heightMm : machine.tableSpec.number("height"),
         throughBoreMm : machine.tableSpec.number("bore"),
-        seatWorkZMm : FoundationLayout.TABLE_SEAT,
+        seatWorkZMm : HobberLayout.get().nativeTableSeat,
         fieldValues : machine.tableSpec.report(),
         basis
       : "per-field catalog/measured/assumed data; face/flange/centering provisional; bearing construction not claimed"

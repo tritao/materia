@@ -1,8 +1,8 @@
+import machinekit.hobbing.HobberLayout;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
 import machinekit.assembly.PosedParts.PartBox;
-import machinekit.hobbing.HobberZLayout;
 import materia.assembly.AssemblyFrames as F;
 
 /** P3 envelope study, not an alternate installed machine. Both side directions
@@ -39,16 +39,16 @@ class HobberMotorStudy {
     // The installed machine definition and its operational limits stay intact.
     var studyDefinition = model.definition("motor-layout-study");
     for (j in studyDefinition.joints) {
-      if (j.id == "X") {j.limits.lower = machinekit.hobbing.HobberXLayout.MIN - 5; j.limits.upper = 115;}
+      if (j.id == "X") {j.limits.lower = machinekit.hobbing.HobberLayout.get().xMin - 5; j.limits.upper = 115;}
       if (j.id == "Y") {j.limits.lower = -15; j.limits.upper = 15;}
       if (j.id == "Z") {j.limits.lower = -15; j.limits.upper = 195;}
     }
     var state = new cadkit.modeling.AssemblyState(studyDefinition);
     var cache = new PosedParts();
-    var adapter = Part.box(10, 89, 72).translated(new Vector(-53, 194.5, HobberZLayout.SEAT_Z - 36));
+    var adapter = Part.box(10, 89, 72).translated(new Vector(-53, 194.5, HobberLayout.get().nativeHobCentreZ - 36));
     var adapterMass = adapter.volume() * 1e-9 * 7850;
     var targets = ["bed/casting", "column/casting", "Xbridge", "Zplate", "Ymodule/carriage", "Ymodule/base", "Ymodule/railLeft", "Ymodule/railRight", "Ymodule/base", "Ymodule/base", "Ymodule/carriage", "ZdriveFixedBar", "ZdriveFloatingBar"];
-    var lower = machinekit.hobbing.HobberXLayout.MIN;
+    var lower = machinekit.hobbing.HobberLayout.get().xMin;
     for (side in [0, -1, 1]) {
       var c = side == 0 ? 1.0 : 0.0, s = side * 1.0;
       var rotate = F.fromRotationMatrix(0, 0, 0, [c, -s, 0, s, c, 0, 0, 0, 1]);
@@ -64,7 +64,7 @@ class HobberMotorStudy {
       if (side != 0) {
         var centre = F.transformPoint(F.compose(back, poses.get("spindle/housing")), 0, 0, 0);
         mass += adapterMass; mx += adapterMass * (centre.x + (side < 0 ? 53 : -53));
-        my += adapterMass * 194.5; mz += adapterMass * HobberZLayout.SEAT_Z;
+        my += adapterMass * 194.5; mz += adapterMass * HobberLayout.get().nativeHobCentreZ;
       }
       var x = mx / mass - face.x, y = my / mass - face.y, z = mz / mass - face.z, torque = 0.0;
       for (angle in -15...16) torque = Math.max(torque, mass * 9.80665 * Math.abs(y * Math.cos(angle * Math.PI / 180) - z * Math.sin(angle * Math.PI / 180)) / 1000);

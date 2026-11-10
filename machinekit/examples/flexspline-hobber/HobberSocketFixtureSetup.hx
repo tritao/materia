@@ -1,5 +1,5 @@
+import machinekit.hobbing.HobberLayout;
 import machinekit.component.ComponentValues;
-import machinekit.hobbing.FoundationLayout;
 import machinekit.structural.MineralFoundation;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
 import machinekit.tooling.FoundationToolingAdapter;
@@ -16,7 +16,7 @@ import materia.tooling.casting.InsertFixturePlanner.InsertPlateOptions;
 class HobberSocketFixtureSetup {
   public static function document():ToolingDocument {
     var placements:Array<CastInsertPlacement> = [for (i in 0...2) {
-      id:"socket" + i, purpose:materia.casting.InsertSpec.InsertRole.TrayClampMount, part:FoundationLayout.traySocket(),
+      id:"socket" + i, purpose:materia.casting.InsertSpec.InsertRole.TrayClampMount, part:HobberLayout.get().traySocket(),
         pose:F.translation(i == 0 ? -80 : 80, 0, 30), openings : [CastingPatterns.face("body.z-max")]
     }
     ];

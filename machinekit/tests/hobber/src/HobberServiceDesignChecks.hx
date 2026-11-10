@@ -1,9 +1,9 @@
+import machinekit.hobbing.HobberLayout;
 import machinekit.design.DesignRequirement;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
 import machinekit.hobbing.HobberDrives;
-import machinekit.hobbing.HobberXLayout;
 import machinekit.motion.BallNut;
 import materia.assembly.AssemblyFrames as F;
 
@@ -13,13 +13,13 @@ class HobberServiceDesignChecks {
   public static function run(machine:FlexsplineHobber):Array<String> {
     var drive=HobberDrives.x(), nut=new BallNut(), block=HobberDrives.nutBlock(drive,nut), at=HobberDrives.poses(drive).get("nut");
     var direction=F.transformVector(at,0,0,1), flange=F.transformPoint(at,0,0,nut.bodyLength);
-    var b=machinekit.hobbing.HobberChipCover.nutBounds(), expected=HobberXLayout.NUT_BLOCK_FRONT;
+    var b=machinekit.hobbing.HobberChipCover.nutBounds(), expected=HobberLayout.get().nutBlockFront;
     if(direction.x<0.9999 || Math.abs(flange.x-b.maxX)>1e-7)throw "X nut flange is not on the motor-side block face";
     if(Math.abs(b.minX-expected)>1e-7 || Math.abs(b.maxX-expected-block.thickness)>1e-7)throw "X nut reversal displaced the carriage interface";
     var poses=machine.solvedPoses(), back=F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), members=machine.components();
     var screw:machinekit.motion.HzMotionDrawingScrew=cast members.filter(m->m.id=="Xscrew")[0].component;
     var initial=machine.travel.filter(t->t.id=="X")[0].initial, reserve=1e9, barrel=1e9;
-    for(x in [HobberXLayout.MIN-5,HobberXLayout.RETRACT+5]) {
+    for(x in [HobberLayout.get().xMin-5,HobberLayout.get().xRetract+5]) {
       var delta=F.transformVector(machinekit.hobbing.HobberFrame.workToMachine(),x-initial,0,0);
       var p=F.compose(F.inverse(poses.get("Xscrew")),F.compose(F.translation(delta.x,delta.y,delta.z),poses.get("Xnut")));
       var a=F.transformPoint(p,0,0,0).z,c=F.transformPoint(p,0,0,nut.bodyLength).z,d=F.transformPoint(p,0,0,nut.bodyLength+nut.flangeThickness).z;
@@ -30,7 +30,7 @@ class HobberServiceDesignChecks {
     var derivation=machine.derivedFasteners();if(derivation==null)throw "missing joint-derived X flange fasteners";
     var cache=new PosedParts(), count=0, reach=0.0;
     for(j in derivation.joints)if(j.clampedMember=="Xnut"&&j.receivingMember=="XnutBlock")for(v in j.volumes)if(v.access)for(h in j.worldHoles) {
-      var p=F.transformPoint(back,h.x,h.y,h.z), start=p.x-v.to, length=HobberXLayout.front().bedRear+5-start;
+      var p=F.transformPoint(back,h.x,h.y,h.z), start=p.x-v.to, length=HobberLayout.get().xNominal().bedRear+5-start;
       var tool=Part.cylinderAlong(v.diameter/2,new Vector(start,p.y,p.z),Vector.X(),length), box=PosedParts.boxOf(tool);
       for(m in members)if(["Xmotor","Xmotor-shaft","Xfixed","XfloatingRing"].indexOf(m.id)<0) {
         var pose=F.compose(back,poses.get(m.id)), other=cache.box(m.component,pose);if(PosedParts.apart(box,other,0))continue;
@@ -45,7 +45,7 @@ class HobberServiceDesignChecks {
       case ServiceRemoval("xScrewWithdrawal", _, steps, _, _):
         stroke=steps[0].distance;
         var bounds=cache.box(screw,F.compose(back,poses.get("Xscrew")));
-        endClear=bounds.minX+stroke-HobberXLayout.front().bedRear;
+        endClear=bounds.minX+stroke-HobberLayout.get().xNominal().bedRear;
       default:
     }
     if(endClear<FlexsplineHobber.SERVICE_CLEARANCE-1e-7)throw "X screw stroke does not clear the rear of the bed";

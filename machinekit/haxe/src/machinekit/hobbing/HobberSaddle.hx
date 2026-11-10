@@ -1,6 +1,7 @@
 package machinekit.hobbing;
 
 import cadkit.modeling.Part;
+import machinekit.motion.ErobActuatorPart;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
 import machinekit.component.*;
@@ -15,7 +16,58 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * Dimensions are mm; construction is unwelded. Strength and modal stiffness
  * estimates retain their stated assumptions pending Phase D. */
 class HobberSaddle extends MachineComponent {
-  public static inline final ELECTRICAL_HEIGHT = FoundationLayout.PLINTH_HEIGHT - machinekit.enclosure.TraySeat.DEPTH - 6;
+  static function seatY0():Float return HobberLayout.get().spindleNativeY - Bt30SpindleData.CLAMP_TO;
+  static function zSaddleOriginZ():Float return HobberLayout.get().nativeHobCentreZ;
+
+  /** The Z saddle plate's front face and back (block) face, x. */
+  public static inline final SWIVEL_PLATE_FRONT = 135.0;
+  public static inline final SWIVEL_PLATE_BACK = 148.0;
+  /** The swivel plate's back face, where the adapter ring ends. */
+  public static inline final SWIVEL_PLATE_X = 100.0;
+  /** Adapter ring: outside and inside diameter, mm. The inside leaves the output flange more than half its footprint to bear on. */
+  public static inline final SWIVEL_RING_OUTSIDE = 110.0;
+  public static inline final SWIVEL_RING_INSIDE = 40.0;
+  /**
+   * Adapter-to-plate screws: four M6 on this pitch circle, in the ring's plate end, at 45 deg to the plate's axes. They have to stand in the strip |z| 24..40 of the
+   * plate's front: the Y scale's housing lies on it along y at z 0, and the Y guide blocks (z 43 to 77, on the rails at +-60) run over everything beyond z 40.
+   * Four M6 12.9 clamp the ring (70 % of proof, ~390 N m of friction at mu 0.15 on this radius), which holds the eRob's 204 N m peak but not its 369 N m momentary
+   * torque with the 1.2 the slip check wants (1.05); the ring was first drawn with eight M5, whose heads fell under the scale and the guide blocks. The torque is
+   * therefore taken by two dowels (`RING_PIN_*`) and the friction is the reserve (`JointSlip`: pins carry, friction not counted).
+   */
+  public static inline final SWIVEL_PLATE_PCD = 95.0;
+  public static inline final SWIVEL_PLATE_SCREWS = 4;
+  public static inline final SWIVEL_PLATE_PHASE:Float = Math.PI / 4;
+  /**
+   * The two dowels between the adapter ring and the swivel plate, on opposite sides of the axis: Ø6 (ISO 8734) on this radius, 15 deg off the output flange's
+   * screw at 0 deg so the ring's sunk heads (Ø7.5 on r 38.5) keep 2.5 mm from them, each hole `RING_PIN_DEPTH` deep from the joint plane into the ring and into
+   * the plate (blind: the plate's front, where the Y scale lies, stays whole). Two Ø6 pins bearing 6 mm in aluminium take ~740 N m (the check says).
+   */
+  public static inline final SWIVEL_RING_PIN_DIAMETER = 6.0;
+  public static inline final SWIVEL_RING_PIN_RADIUS = 43.0;
+  public static inline final SWIVEL_RING_PIN_PHASE:Float = Math.PI / 12;
+  public static inline final SWIVEL_RING_PIN_DEPTH = 10.0;
+
+  /** How far the output face stands in front of the saddle plate's front face (its bore is 2.2 mm wider in radius than the pilot). */
+  public static function swivelRunningGap():Float return HobberSaddle.SWIVEL_PLATE_FRONT - HobberLayout.get().swivelNativeX;
+  /** Depth of the pocket from the plate's back face to the housing's front face. */
+  public static function swivelPocketDepth():Float return HobberSaddle.SWIVEL_PLATE_BACK - (HobberLayout.get().swivelNativeX - ErobActuatorPart.SEAT_Z);
+
+  /** The pocket, output bore and screw clearance holes the Z saddle needs, in the saddle's frame (the work frame lowered by `SEAT_Z`). */
+  public static function swivelHousingCutout():Part {
+    var tool = new ErobActuatorPart().mountingCutout(HobberSaddle.swivelPocketDepth(), HobberSaddle.swivelRunningGap(), 0.4, 0, ErobActuatorPart.PILOT_BORE_CLEARANCE);
+    var placed = PosedParts.moved(tool, F.fromRotationMatrix(HobberLayout.get().swivelNativeX, 0, 0, HobberLayout.get().swivelRotation));
+    tool.close();
+    return placed;
+  }
+  public static function outboardHousingMountFrame():AssemblyFrame return BoltedFace.frameOf({x: 30.0, y: -100.0, z: 0.0},
+    {x: 1, y: 0, z: 0}, {x: 0, y: 1, z: 0});
+  public static function outboardHousingHoles():Array<machinekit.component.BoltedFace.BoltHole> return [
+    for (y in [-8.0, 8.0]) for (z in [-22.0, 22.0]) {x: y, y: z}
+  ];
+  public static function outboardHousingPins():PinnedFace return PinnedFace.atPoints("housing-pins", HobberSaddle.outboardHousingMountFrame(),
+    [for (z in [-22.0, 22.0]) {x: 30.0, y: -100.0, z: z}], 4, 6, false);
+
+  public static inline final ELECTRICAL_HEIGHT = MineralCastBed.PLINTH_HEIGHT - machinekit.enclosure.TraySeat.DEPTH - 6;
   final designId:String;
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
@@ -137,7 +189,6 @@ class HobberSaddle extends MachineComponent {
   }
 
   /** Where the Z saddle's own frame sits in the work frame (z), mm: `FlexsplineHobber` places it at z 363. The drive's holes are in the work frame. */
-  static inline final Z_SADDLE_ORIGIN_Z = HobberZLayout.SEAT_Z;
   /** Depth of the head screws' tapped holes in the rib / saddle plate, mm (M4: 1.5 diameters in steel, with the thread's run-out). */
   static inline final X_HEAD_HOLE_DEPTH = 8.0;
   static inline final Y_HEAD_HOLE_DEPTH = 8.0;
@@ -198,7 +249,7 @@ class HobberSaddle extends MachineComponent {
 
   /** One joint declaration also reserves its source drilling before cast-anchor
    * selection. Anchor hardware must never be selected through a service thread. */
-  public static function columnSoleFace(pad:machinekit.hobbing.FoundationLayout.ColumnSolePad):BoltedFace {
+  public static function columnSoleFace(pad:machinekit.hobbing.HobberLayout.ColumnSolePad):BoltedFace {
     var cx=(pad.x0+pad.x1)/2;
     var cy=(pad.y0+pad.y1)/2;
     return BoltedFace.clamped("column-sole-"+pad.id,
@@ -239,14 +290,14 @@ class HobberSaddle extends MachineComponent {
   public static function xDeckKeepout(gap:Float,drop:Float):Part return Solids.cut(
     box(60-gap,386+gap,-xCarriageHalfWidth()-gap,xCarriageHalfWidth()+gap,xCarriageBottom()-gap-drop,xCarriageTop()+gap),
     [box(55+gap,140-gap,-150+gap,150-gap,xCarriageBottom()-gap-drop-1,xCarriageTop()+gap+1)]);
-  public static function xGuideOriginZ():Float return FoundationLayout.bedRailSeatTop() + xGuideSpec().railHeight;
+  public static function xGuideOriginZ():Float return HobberLayout.get().heights().xGuideOriginZ - HobberFrame.PART_DATUM_Z;
   static function xGuideSpec():machinekit.motion.LinearRailProfile.LinearRailProfileSpec {
     var spec=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA");
     if (spec==null) throw "X guide specification unavailable";
     return spec;
   }
-  public static function xCarriageBottom():Float return FoundationLayout.bedRailSeatTop() + xGuideSpec().blockHeight;
-  public static function xCarriageTop():Float return xCarriageBottom() + X_CARRIAGE_THICKNESS;
+  public static function xCarriageBottom():Float return HobberLayout.get().heights().xCarriageBottomZ - HobberFrame.PART_DATUM_Z;
+  public static function xCarriageTop():Float return HobberLayout.get().heights().xCarriageTopZ - HobberFrame.PART_DATUM_Z;
 
 
   /** Buy the carriage width outward from the outermost guide-block bolt and its
@@ -255,7 +306,7 @@ class HobberSaddle extends MachineComponent {
     var block = machinekit.motion.LinearRailBlock.metric("HGH25CA");
     var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(block.spec.blockMountThread);
     var edge = machinekit.assembly.JointFasteners.requiredEdgeRadius(screw.diameter, screw.headDiameter + 2);
-    return Math.ceil((FoundationLayout.BED_RAIL_CENTRE + block.spec.blockHoleSpacingAcross / 2 + edge) / 5) * 5;
+    return Math.ceil((HobberLayout.get().bedRailCentre + block.spec.blockHoleSpacingAcross / 2 + edge) / 5) * 5;
   }
   static inline final PLATE_BLOCK_SOLE = 6.0;
 
@@ -298,13 +349,13 @@ class HobberSaddle extends MachineComponent {
             [for (x in rib.pinXs()) {x: x - 263, y: 0.0}], 4, 8));
         }
         pins;
-      case "GE-Z-saddle": [nutBlockPins(HobberDrives.z(), [0.0, 0, Z_SADDLE_ORIGIN_Z])];
+      case "GE-Z-saddle": [nutBlockPins(HobberDrives.z(), [0.0, 0, zSaddleOriginZ()])];
       case "GE-X-fixed-drive-bar", "GE-X-floating-drive-bar", "GE-Z-fixed-drive-bar", "GE-Z-floating-drive-bar":
         var axis=barAxis(designId),support=barSupport(designId);
         padPins(axis,[support],HobberDrives.barThickness(axis),HobberDrives.barBounds(axis,support));
-      case "GE-outboard-carrier": [outboardCarrierPins(-1), HobberOutboardLayout.carrierPins()];
+      case "GE-outboard-carrier": [outboardCarrierPins(-1), HobberSaddle.outboardHousingPins()];
       case "GE-spindle-seat":
-        [PinnedFace.atPoints("back-pins", BoltedFace.frameOf({x: SEAT_X1, y: (SEAT_Y0 + SEAT_Y1) / 2, z: (SEAT_LOW + SEAT_HALF) / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
+        [PinnedFace.atPoints("back-pins", BoltedFace.frameOf({x: SEAT_X1, y: (seatY0() + SEAT_Y1) / 2, z: (SEAT_LOW + SEAT_HALF) / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           [for (z in [-SEAT_PIN_Z, SEAT_PIN_Z]) {x: SEAT_X1, y: SEAT_PIN_Y, z: z}], 4.0, 6.0, false),
           PinnedFace.atPoints("top-pins", BoltedFace.frameOf({x: 0.0, y: CRADLE_PIN_Y, z: SEAT_HALF}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
             [for (x in CRADLE_PIN_X) {x: x, y: CRADLE_PIN_Y, z: SEAT_HALF}], 8.0, 12.0, false)];
@@ -320,13 +371,13 @@ class HobberSaddle extends MachineComponent {
     switch designId {
       case "GE-X-carriage":
         var block = machinekit.motion.LinearRailBlock.metric("HGH25CA", machinekit.motion.LinearRailBlock.SUPPLIER);
-        for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR])
-          faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2"), [row, side * FoundationLayout.BED_RAIL_CENTRE, xCarriageBottom()],
+        for (side in [-1, 1]) for (row in [HobberLayout.get().xBlockFront, HobberLayout.get().xBlockRear])
+          faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == HobberLayout.get().xBlockFront ? "1" : "2"), [row, side * HobberLayout.get().bedRailCentre, xCarriageBottom()],
             [0.0, 0, 1], [1.0, 0, 0], block, 20, X_BLOCK_SOLE));
         // Two derived M8 per ground corner pad, spread over the whole column base.
-        for (pad in FoundationLayout.columnSolePads()) faces.push(columnSoleFace(pad));
+        for (pad in HobberLayout.get().columnSolePads()) faces.push(columnSoleFace(pad));
         faces.push(nutBlockFace(HobberDrives.x(), X_CARRIAGE_THICKNESS, [0.0, 0, 0]));
-        faces = faces.concat(HobberChipCover.carriageReceivers()).concat(HobberZBellowsLayout.deckReceivers());
+        faces = faces.concat(HobberChipCover.carriageReceivers()).concat(HobberLayout.get().zBellowsDeckReceivers());
         // The X scale head's two M4 enter from the seat side (below, before the carriage is set on the rails) and thread into the rib's underside.
         for (role in HobberCarriageRib.ROLES) {
           var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
@@ -335,29 +386,29 @@ class HobberSaddle extends MachineComponent {
             246, b.high - b.low, 15, 20, BoltedFace.ThreadMaterial.Steel, rib.boltSize()));
         }
       case "GE-Z-saddle":
-        faces=faces.concat(HobberZBellowsLayout.saddleReceivers());
+        faces=faces.concat(HobberLayout.get().zBellowsSaddleReceivers());
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
-        for (side in [-1, 1]) for (row in [0.0, HobberZLayout.BLOCK_SPACING])
+        for (side in [-1, 1]) for (row in [0.0, HobberLayout.get().zBlockSpacing])
           faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == 0 ? "1" : "2"), [148.0, side * 145.0, row], [-1.0, 0, 0], [0.0, 1, 0], block, 13, PLATE_BLOCK_SOLE));
         // Flush heads keep the fixed Z chip shield clear throughout saddle travel.
-        faces.push(nutBlockFace(HobberDrives.z(), 6.5, [0.0, 0, Z_SADDLE_ORIGIN_Z], {diameter: 12.0, depth: 6.5}));
+        faces.push(nutBlockFace(HobberDrives.z(), 6.5, [0.0, 0, zSaddleOriginZ()], {diameter: 12.0, depth: 6.5}));
         // The eRob housing's 16 M4 into its front face, passed through the 5 mm web from the front (x 135): the plane is the housing's front face.
-        faces.push(BoltedFace.clamped("erob", BoltedFace.frameOf({x: HobberSwivelLayout.OUTPUT_X - machinekit.motion.ErobActuatorPart.SEAT_Z, y: 0.0, z: 0.0}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
+        faces.push(BoltedFace.clamped("erob", BoltedFace.frameOf({x: HobberLayout.get().swivelNativeX - machinekit.motion.ErobActuatorPart.SEAT_Z, y: 0.0, z: 0.0}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           [for (i in 0...machinekit.motion.ErobActuatorData.FIXED_BOLT_COUNT) {
             var b = machinekit.motion.ErobActuatorPart.fixedBolt(i);
             {x: b.x, y: b.y};
           }], machinekit.standard.SocketHeadCapScrew.catalog().get("M4").clearanceMedium,
-          HobberSwivelLayout.OUTPUT_X - machinekit.motion.ErobActuatorPart.SEAT_Z - HobberSwivelLayout.PLATE_FRONT, "M4", null, false));
+          HobberLayout.get().swivelNativeX - machinekit.motion.ErobActuatorPart.SEAT_Z - HobberSaddle.SWIVEL_PLATE_FRONT, "M4", null, false));
       case "GE-outboard-carrier":
         faces.push(BoltedFace.drilledToSuit("saddle", outboardCarrierFrame(-1), 30, 110, 10, 15, BoltedFace.ThreadMaterial.Steel));
-        faces.push(BoltedFace.clamped("housing", HobberOutboardLayout.carrierMountFrame(), HobberOutboardLayout.carrierHoles(), 4.5, 9.5, "M4", {diameter: 9.5, depth: 5.5}, false, true));
+        faces.push(BoltedFace.clamped("housing", HobberSaddle.outboardHousingMountFrame(), HobberSaddle.outboardHousingHoles(), 4.5, 9.5, "M4", {diameter: 9.5, depth: 5.5}, false, true));
       case "GE-X-scale-seat":
         faces.push(HobberScales.seatFace(HobberScales.x(), [0.0, 0, 0], HobberScales.SEAT_BAR));
       case "GE-Z-scale-seat":
         faces.push(HobberScales.seatFace(HobberScales.z(), [0.0, 0, 0], HobberScales.SEAT_BAR));
       case "GE-Z-scale-arm":
         // The Z scale head's two M4 thread into the arm (10 thick) from the seat side.
-        faces.push(HobberScales.carrierFace(HobberScales.z(), [0.0, 0, Z_SADDLE_ORIGIN_Z], HobberScales.Z_ARM_THICKNESS - 1, HobberScales.Z_ARM_THICKNESS + HobberScales.RUNNING_CLEARANCE));
+        faces.push(HobberScales.carrierFace(HobberScales.z(), [0.0, 0, zSaddleOriginZ()], HobberScales.Z_ARM_THICKNESS - 1, HobberScales.Z_ARM_THICKNESS + HobberScales.RUNNING_CLEARANCE));
       case "GE-X-fixed-drive-bar", "GE-X-floating-drive-bar", "GE-Z-fixed-drive-bar", "GE-Z-floating-drive-bar":
         var axis=barAxis(designId),support=barSupport(designId);
         faces.push(seatFace(axis,support,HobberDrives.barThickness(axis),HobberDrives.barBounds(axis,support)));
@@ -369,8 +420,8 @@ class HobberSaddle extends MachineComponent {
           SEAT_HALF - SEAT_LOW, BoltedFace.ThreadMaterial.Steel, null, false, (u, _) -> SEAT_HALF - Math.sqrt(Math.max(0.0, SEAT_BORE * SEAT_BORE / 4 - (u - 1.5) * (u - 1.5)))));
         faces.push(BoltedFace.drilledToSuit("topRear", BoltedFace.frameOf({x: (SEAT_X0 + SEAT_TONGUE_X1) / 2, y: 223.0, z: SEAT_HALF}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
           SEAT_TONGUE_X1 - SEAT_X0, 56, 14, SEAT_HALF - SEAT_TONGUE_Z0, BoltedFace.ThreadMaterial.Steel, null, true));
-        faces.push(BoltedFace.drilledToSuit("back", BoltedFace.frameOf({x: SEAT_X1, y: (SEAT_Y0 + SEAT_Y1) / 2, z: (SEAT_LOW + SEAT_HALF) / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
-          SEAT_Y1 - SEAT_Y0, SEAT_HALF - SEAT_LOW, 16, SEAT_X1 - SEAT_X0, BoltedFace.ThreadMaterial.Steel));
+        faces.push(BoltedFace.drilledToSuit("back", BoltedFace.frameOf({x: SEAT_X1, y: (seatY0() + SEAT_Y1) / 2, z: (SEAT_LOW + SEAT_HALF) / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
+          SEAT_Y1 - seatY0(), SEAT_HALF - SEAT_LOW, 16, SEAT_X1 - SEAT_X0, BoltedFace.ThreadMaterial.Steel));
       case "GE-motor-cradle":
         // The floor's four M8 into the seat: heads on the floor top, clearance holes through it; the rear row's heads are sunk (Ø14 x 9) under the servo's flange.
         for (row in [CRADLE_FRONT_BOLT_Y, CRADLE_REAR_BOLT_Y]) {
@@ -383,7 +434,7 @@ class HobberSaddle extends MachineComponent {
         // and nut on its rear face: a through plate, so the screws, washers and nuts derive while the slots stay the part's own.
         var motor = cradleMotor(), flange = motor.mounting();
         if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
-        faces.push(BoltedFace.through("motor", BoltedFace.frameOf({x: CRADLE_MOTOR_X, y: CRADLE_FACE_Y, z: HobSpindle.motorHeight()},
+        faces.push(BoltedFace.through("motor", BoltedFace.frameOf({x: CRADLE_MOTOR_X, y: cradleFaceY(), z: HobSpindle.motorHeight()},
           {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), [for (h in flange.holes) {x: h.x, y: -h.y}], flange.holeDiameter, CRADLE_WALL,
           "M" + Std.int(flange.holeDiameter - 0.5)).withSlots(CRADLE_SLOT, HobSpindle.TENSION_TRAVEL, "y"));
       default:
@@ -397,15 +448,15 @@ class HobberSaddle extends MachineComponent {
   // ---- A axis and spindle seat (FRAME_PLAN R1, R2) ------------------------------------------------------------------------------
 
   static function platePositions():Array<{y:Float, z:Float}> {
-    var r = HobberSwivelLayout.PLATE_PCD / 2, n = HobberSwivelLayout.PLATE_SCREWS;
-    return [for (i in 0...n) {y: r * Math.cos(2 * Math.PI * i / n + HobberSwivelLayout.PLATE_PHASE), z: r * Math.sin(2 * Math.PI * i / n + HobberSwivelLayout.PLATE_PHASE)}];
+    var r = HobberSaddle.SWIVEL_PLATE_PCD / 2, n = HobberSaddle.SWIVEL_PLATE_SCREWS;
+    return [for (i in 0...n) {y: r * Math.cos(2 * Math.PI * i / n + HobberSaddle.SWIVEL_PLATE_PHASE), z: r * Math.sin(2 * Math.PI * i / n + HobberSaddle.SWIVEL_PLATE_PHASE)}];
   }
 
   /** The Z saddle's eRob output bore (the housing's screws and the pocket are derived or cut from the actuator's mounting cut-out), in the saddle's frame. */
   static function erobPilotBore():Array<machinekit.component.ManufacturingRoute.RouteHole> {
-    var web = HobberSwivelLayout.OUTPUT_X - machinekit.motion.ErobActuatorPart.SEAT_Z - HobberSwivelLayout.PLATE_FRONT;
+    var web = HobberLayout.get().swivelNativeX - machinekit.motion.ErobActuatorPart.SEAT_Z - HobberSaddle.SWIVEL_PLATE_FRONT;
     var d = machinekit.motion.ErobActuatorData.OUTPUT_PILOT_DIAMETER + machinekit.motion.ErobActuatorPart.PILOT_BORE_CLEARANCE;
-    return [{id: "P1", kind: "bore", thread: null, diameter: d, nominal: d, fit: null, depth: web, position: [HobberSwivelLayout.PLATE_FRONT, 0, 0], direction: [1.0, 0, 0]}];
+    return [{id: "P1", kind: "bore", thread: null, diameter: d, nominal: d, fit: null, depth: web, position: [HobberSaddle.SWIVEL_PLATE_FRONT, 0, 0], direction: [1.0, 0, 0]}];
   }
 
   /** The ring's end screws into the output flange are heads sunk this deep (the head is 4: flush with the plate end, 0.2 over). */
@@ -414,7 +465,6 @@ class HobberSaddle extends MachineComponent {
   /** Spindle seat block: x from the bore's front side to the saddle plate, y along the cartridge, z across. */
   static inline final SEAT_X0 = -48.0;
   static inline final SEAT_X1 = 45.0;
-  static inline final SEAT_Y0 = HobberSwivelLayout.SPINDLE_Y - Bt30SpindleData.CLAMP_TO;
   static inline final SEAT_Y1 = 222.0;
   /** Half height on the +z side (the slit and clamp screws); the -z side is cut back to `SEAT_LOW` so the head clears the X rail at A +15 deg. */
   static inline final SEAT_HALF = 58.0;
@@ -450,14 +500,14 @@ class HobberSaddle extends MachineComponent {
     {x: y, y: z}];
 
   /** The spindle seat's extent along the spindle axis (work y) and the y of its three clamp screws. */
-  public static function spindleSeatRange():{y0:Float, y1:Float, clampYs:Array<Float>} return {y0: SEAT_Y0, y1: SEAT_Y1, clampYs: [100.0, 150.0, 200.0]};
+  public static function spindleSeatRange():{y0:Float, y1:Float, clampYs:Array<Float>} return {y0: seatY0(), y1: SEAT_Y1, clampYs: [100.0, 150.0, 200.0]};
 
   /** The split-clamp block that holds the Ø80 cartridge: bore, slit up the +z side, the holes of `seatHoles` and the cradle floor's tapped holes in its top. */
   static function spindleSeat():Part {
-    var block = box(SEAT_X0, SEAT_X1, SEAT_Y0, SEAT_Y1, SEAT_LOW, SEAT_HALF);
+    var block = box(SEAT_X0, SEAT_X1, seatY0(), SEAT_Y1, SEAT_LOW, SEAT_HALF);
     var tongue = box(SEAT_X0, SEAT_TONGUE_X1, SEAT_Y1 - 1, SEAT_TONGUE_Y1, SEAT_TONGUE_Z0, SEAT_HALF);
-    var cuts = [boreY(SEAT_BORE / 2, SEAT_Y0 - 0.1, SEAT_Y1 + 0.1, 0, 0), box(-SEAT_SLIT / 2, SEAT_SLIT / 2, SEAT_Y0 - 0.1, CRADLE_FACE_Y - CRADLE_SLIT_END, 0, SEAT_HALF + 0.1)];
-    var blank=Solids.cut(Solids.union([block,tongue]),cuts),keep=HobberYLayout.headClearance(),trimmed=blank.intersect(keep);blank.close();keep.close();
+    var cuts = [boreY(SEAT_BORE / 2, seatY0() - 0.1, SEAT_Y1 + 0.1, 0, 0), box(-SEAT_SLIT / 2, SEAT_SLIT / 2, seatY0() - 0.1, cradleFaceY() - CRADLE_SLIT_END, 0, SEAT_HALF + 0.1)];
+    var blank=Solids.cut(Solids.union([block,tongue]),cuts),keep=HobberLayout.get().headClearance(),trimmed=blank.intersect(keep);blank.close();keep.close();
     return withHoles(trimmed,seatHoles(false).concat(cradleHoles(true)));
   }
 
@@ -469,7 +519,6 @@ class HobberSaddle extends MachineComponent {
    */
   static inline final CRADLE_WALL = 8.0;
   /** The wall's front face (the motor flange face) in work y. */
-  static inline final CRADLE_FACE_Y = HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z;
   /**
    * The floor sits on the spindle seat block's top (z `SEAT_HALF`). Behind `CRADLE_FLOOR_STEP` (where the seat block ends and the wall's foot
    * overhangs it) it is `CRADLE_FLOOR` thick; ahead, where it only carries the first bolt row, `CRADLE_FLOOR_THIN`.
@@ -549,7 +598,7 @@ class HobberSaddle extends MachineComponent {
   public static function cradleRest():{x0:Float, x1:Float, y0:Float, y1:Float, top:Float} return {x0: CRADLE_REST_X0, x1: CRADLE_REST_X1, y0: CRADLE_REST_Y0, y1: CRADLE_REST_Y1, top: cradleRestTop()};
 
   /** Work y of the wall's front face (the motor flange face). */
-  public static inline function cradleFaceY():Float return CRADLE_FACE_Y;
+  public static function cradleFaceY():Float return HobberLayout.get().spindleNativeY - HobSpindle.MOTOR_FACE_Z;
 
   /** The servo's axis in work x (the cradle's authored frame). */
   public static inline function cradleMotorX():Float return CRADLE_MOTOR_X;
@@ -565,7 +614,7 @@ class HobberSaddle extends MachineComponent {
   }
 
   /** Work y of the wall's rear face. */
-  public static inline function cradleRearY():Float return CRADLE_FACE_Y + CRADLE_WALL;
+  public static function cradleRearY():Float return cradleFaceY() + CRADLE_WALL;
 
   /**
    * The cradle's section for the drive-mode estimate: wall thickness and width, height above the floor, the rib's thickness, x and depth ahead of the
@@ -582,7 +631,7 @@ class HobberSaddle extends MachineComponent {
    * edge to the window) and its rear post between z `CRADLE_RIB_WINDOW_Z0` and `Z1`. Overlapping slabs are merged by x into one y extent each.
    */
   public static function cradleSlabs(z:Float, withRib:Bool):Array<{x0:Float, x1:Float, y0:Float, y1:Float}> {
-    var rects = [{x0: CRADLE_X0, x1: CRADLE_X1, y0: CRADLE_FACE_Y, y1: cradleRearY()}];
+    var rects = [{x0: CRADLE_X0, x1: CRADLE_X1, y0: cradleFaceY(), y1: cradleRearY()}];
     if (withRib) {
       var rx0 = CRADLE_X0 - 5.0, rx1 = CRADLE_X0 + 1.0;
       if (z >= CRADLE_RIB_WINDOW_Z0 && z <= CRADLE_RIB_WINDOW_Z1) {
@@ -607,7 +656,7 @@ class HobberSaddle extends MachineComponent {
 
   /** The thicknesses the drive check reports: wall, thick floor, thin floor, jack lug height above the floor, slot travel (each way), slot width. */
   public static function cradleDimensions():{wall:Float, floor:Float, floorThin:Float, foot:Float, lug:Float, travel:Float, slot:Float, jackY:Float} {
-    return {wall: CRADLE_WALL, floor: CRADLE_FLOOR, floorThin: CRADLE_FLOOR_THIN, foot: CRADLE_FOOT, lug: CRADLE_LUG, travel: HobSpindle.TENSION_TRAVEL, slot: CRADLE_SLOT, jackY: CRADLE_FACE_Y - 4.0};
+    return {wall: CRADLE_WALL, floor: CRADLE_FLOOR, floorThin: CRADLE_FLOOR_THIN, foot: CRADLE_FOOT, lug: CRADLE_LUG, travel: HobSpindle.TENSION_TRAVEL, slot: CRADLE_SLOT, jackY: cradleFaceY() - 4.0};
   }
 
   static function cradleMotor():machinekit.motion.ServoMotor return machinekit.motion.LeadshineServo.driven(HobSpindle.MOTOR);
@@ -633,18 +682,18 @@ class HobberSaddle extends MachineComponent {
     var c = HobSpindle.motorHeight(), t = HobSpindle.TENSION_TRAVEL, k = 0;
     // The pilot register and the shaft bore are slots too (the servo slides on its flange bolts, the pilot has the travel to spare).
     list.push({id: "P1", kind: "bore", thread: null, diameter: flange.pilotDiameter + 0.2, nominal: flange.pilotDiameter, fit: "H7",
-      depth: flange.pilotHeight, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
+      depth: flange.pilotHeight, position: [CRADLE_MOTOR_X, cradleFaceY(), c], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
     list.push({id: "P2", kind: "bore", thread: null, diameter: motor.rating.shaftDiameter + 8, nominal: motor.rating.shaftDiameter + 8, fit: null,
-      depth: CRADLE_WALL, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
+      depth: CRADLE_WALL, position: [CRADLE_MOTOR_X, cradleFaceY(), c], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
     // The flange bolts: M6 from the motor side through the slot and a washer and nut on the wall's rear face.
     for (h in flange.holes) {
       k++;
       list.push({id: "M" + k, kind: "clearance", thread: "M" + Std.int(flange.holeDiameter - 0.5), diameter: CRADLE_SLOT, nominal: flange.holeDiameter - 0.5, fit: null,
-        depth: CRADLE_WALL, position: [CRADLE_MOTOR_X + h.x, CRADLE_FACE_Y, c + h.y], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
+        depth: CRADLE_WALL, position: [CRADLE_MOTOR_X + h.x, cradleFaceY(), c + h.y], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
     }
     // The jack screw: M8 up through the lug, its tip on the flange's underside.
     list.push({id: "J1", kind: "tapped", thread: "M8", diameter: m8, nominal: 8, fit: null, depth: CRADLE_LUG + 12.0,
-      position: [CRADLE_MOTOR_X, CRADLE_FACE_Y - 4.0, cradleFloorTop(CRADLE_FACE_Y) + CRADLE_LUG], direction: [0.0, 0, -1]});
+      position: [CRADLE_MOTOR_X, cradleFaceY() - 4.0, cradleFloorTop(cradleFaceY()) + CRADLE_LUG], direction: [0.0, 0, -1]});
     return list;
   }
 
@@ -655,18 +704,18 @@ class HobberSaddle extends MachineComponent {
       box(CRADLE_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_STEP, SEAT_Y1, low, floor),
       box(CRADLE_X0, CRADLE_FLOOR_X1, SEAT_Y1, rear, low, foot),
       box(CRADLE_REST_X0, CRADLE_REST_X1, CRADLE_REST_Y0, CRADLE_REST_Y1, low, cradleRestTop()),
-      box(CRADLE_X0, CRADLE_X1, CRADLE_FACE_Y, rear, foot, top),
+      box(CRADLE_X0, CRADLE_X1, cradleFaceY(), rear, foot, top),
       box(CRADLE_X0 - 5, CRADLE_X0 + 1, CRADLE_RIB_Y0, rear, low, top),
-      box(CRADLE_MOTOR_X - CRADLE_LUG_HALF, CRADLE_MOTOR_X + CRADLE_LUG_HALF, CRADLE_LUG_Y0, CRADLE_FACE_Y + 0.5, foot, foot + CRADLE_LUG)]);
-    var slit = box(-CRADLE_SLIT / 2, CRADLE_SLIT / 2, CRADLE_FLOOR_Y0 - 1, CRADLE_FACE_Y - CRADLE_SLIT_END, low - 1, Math.max(foot, cradleRestTop()) + 1);
+      box(CRADLE_MOTOR_X - CRADLE_LUG_HALF, CRADLE_MOTOR_X + CRADLE_LUG_HALF, CRADLE_LUG_Y0, cradleFaceY() + 0.5, foot, foot + CRADLE_LUG)]);
+    var slit = box(-CRADLE_SLIT / 2, CRADLE_SLIT / 2, CRADLE_FLOOR_Y0 - 1, cradleFaceY() - CRADLE_SLIT_END, low - 1, Math.max(foot, cradleRestTop()) + 1);
     var window = box(CRADLE_X0 - 6, CRADLE_X0 + 2, CRADLE_RIB_WINDOW_Y0, CRADLE_RIB_WINDOW_Y1, CRADLE_RIB_WINDOW_Z0, CRADLE_RIB_WINDOW_Z1);
     var flange = cradleMotor().mounting();
     if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(cradleMotor().rating.designation);
     var t = HobSpindle.TENSION_TRAVEL, cuts = [slit, window];
     // Pilot recess, shaft bore and the four flange-bolt slots, then the plain holes.
-    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, flange.pilotDiameter + 0.2, t, CRADLE_FACE_Y, flange.pilotHeight));
-    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, cradleMotor().rating.shaftDiameter + 8, t, CRADLE_FACE_Y, CRADLE_WALL));
-    for (h in flange.holes) cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X + h.x, c + h.y, CRADLE_SLOT, t, CRADLE_FACE_Y, CRADLE_WALL));
+    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, flange.pilotDiameter + 0.2, t, cradleFaceY(), flange.pilotHeight));
+    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, cradleMotor().rating.shaftDiameter + 8, t, cradleFaceY(), CRADLE_WALL));
+    for (h in flange.holes) cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X + h.x, c + h.y, CRADLE_SLOT, t, cradleFaceY(), CRADLE_WALL));
     var plain = [for (h in cradleHoles(false)) if (h.slotLength == null) h];
     return withHoles(Solids.cut(body, cuts), plain);
   }
@@ -745,7 +794,7 @@ class HobberSaddle extends MachineComponent {
       case "GE-Z-saddle":
         // One milled plate between the swivel seat (x 135) and the block faces (x 148), with the nut block's bolts.
         // The eRob's pocket opens in the back face (x 148); the web in front of the housing carries its 16 screws and the output bore.
-        [Solids.cut(box(135, 148, -175, 175, -65, 170), [HobberSwivelLayout.housingCutout()])];
+        [Solids.cut(box(135, 148, -175, 175, -65, 170), [HobberSaddle.swivelHousingCutout()])];
       case "GE-spindle-seat":
         [spindleSeat()];
       case "GE-motor-cradle":
@@ -760,7 +809,7 @@ class HobberSaddle extends MachineComponent {
         var z = HobberScales.z(), face = HobberScales.headFace(z), hb = HobberScales.carrierBox(z, HobberScales.HEAD_CARRIER_MARGIN);
         var toward = -HobberScales.zWallSign(), gap = HobberScales.RUNNING_CLEARANCE, thick = HobberScales.Z_ARM_THICKNESS;
         function band(from:Float, to:Float):Array<Float> return toward > 0 ? [face[1] + from, face[1] + to] : [face[1] - to, face[1] - from];
-        var bridge = band(gap, gap + thick), pad = band(0, gap + thick), zr = [hb[4] - Z_SADDLE_ORIGIN_Z, hb[5] - Z_SADDLE_ORIGIN_Z];
+        var bridge = band(gap, gap + thick), pad = band(0, gap + thick), zr = [hb[4] - zSaddleOriginZ(), hb[5] - zSaddleOriginZ()];
         [Solids.union([box(148, hb[1], bridge[0], bridge[1], zr[0], zr[1]), box(hb[0], hb[1], pad[0], pad[1], zr[0], zr[1])])];
       case "GE-outboard-carrier":
         [Solids.union([Solids.cut(box(-45,45,-115,-85,-55,55),[box(-30,30,-115.1,-84.9,-30,30)]),box(30,45,-86,45,35,55),box(30,45,-86,45,-55,-35)])];
@@ -768,7 +817,7 @@ class HobberSaddle extends MachineComponent {
         var axis=barAxis(designId),support=barSupport(designId),blank=padBox(HobberDrives.barBounds(axis,support));
         if(axis.id=="Z"&&support=="floating") {
           var range=HobberScales.stroke("Z"),over=HobberScales.overtravel();
-          [Solids.cut(blank,[HobberZOffset.envelope(range.lower-over,range.upper+over,HobberZOffset.RUNNING_GAP)])];
+          [Solids.cut(blank,[HobberLayout.get().envelope(range.lower-over,range.upper+over,HobberLayout.get().zRunningGap)])];
         } else [blank];
       case "GE-chip-tray":
         // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
@@ -777,8 +826,8 @@ class HobberSaddle extends MachineComponent {
         var skirt = Math.max(parameterNumber("tableHousingDiameter") / 2 + 15, lip + 5);
         var top = parameterNumber("tableFaceHeight") - 3, bottom = parameterNumber("tableSeatHeight");
         var shoulder = Math.max(bottom + 5, top - 61);
-        var front = FoundationLayout.WORK_WELL_CENTRE_X
-          - FoundationLayout.WORK_WELL_WIDTH / 2 + FoundationLayout.CHIP_TRAY_WELL_CLEARANCE_MM;
+        var front = MineralCastBed.WORK_WELL_CENTRE_X
+          - MineralCastBed.WORK_WELL_WIDTH / 2 + MineralCastBed.CHIP_TRAY_WELL_CLEARANCE_MM;
         [
           Part.revolve([
             {r: lip + 2, z: top},

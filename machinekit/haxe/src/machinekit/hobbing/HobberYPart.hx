@@ -19,7 +19,7 @@ class HobberYPart extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage"],"base")];
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(22).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->Make("ground plate, joint drilling")));
   public function new(?overrides:ComponentValues) {
-    var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberYLayout.moduleSpec();
+    var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberLayout.get().moduleSpec();
     super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,role=="base"?"steel":"aluminium 6061",false,v);
     addFacet(ManufacturingRoute.groundStock(GroundStock.plate(role=="base"?GroundStock.STEEL:GroundStock.ALUMINIUM,role=="base"?spec.baseThickness:spec.carriageThickness),[{name:"inspect ground stock; supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed").setToken("source","Bought ground stock acceptance and small-face finishing remain unqualified")));
@@ -28,7 +28,7 @@ class HobberYPart extends MachineComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function machinable():Bool return true;
   function body():MachineComponent return new ScrewLinearModulePart(spec.values().setToken("role",role));
-  public static function actuatorPoint():{x:Float,y:Float,z:Float} return F.transformPoint(F.inverse(HobberYLayout.modulePose()),HobberSwivelLayout.OUTPUT_X,0,HobberZLayout.SEAT_Z);
+  public static function actuatorPoint():{x:Float,y:Float,z:Float} return F.transformPoint(F.inverse(HobberLayout.get().modulePose()),HobberLayout.get().swivelNativeX,0,HobberLayout.get().nativeHobCentreZ);
   override public function fasteningFaces():Array<BoltedFace> {
     var out=body().fasteningFaces().filter(face->face.id!="host");
     if(role=="base") {
@@ -40,14 +40,14 @@ class HobberYPart extends MachineComponent {
     if(role=="carriage")for(face in HobberSaddle.yHeadFaces())switch face.role {
       case Clamped(size,clearance,grip,recess):
         var holes=face.holes;if(holes==null)throw "Head interface needs its pattern";
-        out.push(BoltedFace.clamped(face.id,F.compose(HobberYLayout.headInModule(),face.frame),holes,clearance,spec.carriageThickness,size,recess,false,true));
+        out.push(BoltedFace.clamped(face.id,F.compose(HobberLayout.get().headInModule(),face.frame),holes,clearance,spec.carriageThickness,size,recess,false,true));
       case _:throw "Unexpected head interface";
     }
     return out;
   }
   override public function pinnedFaces():Array<PinnedFace> {
     var out:Array<PinnedFace>=body().pinnedFaces();
-    if(role=="carriage")for(face in HobberSaddle.yHeadPins())out.push(new PinnedFace(face.id,F.compose(HobberYLayout.headInModule(),face.frame),face.holes,face.diameter,face.through?spec.carriageThickness:face.depth,face.through,false,face.fit));
+    if(role=="carriage")for(face in HobberSaddle.yHeadPins())out.push(new PinnedFace(face.id,F.compose(HobberLayout.get().headInModule(),face.frame),face.holes,face.diameter,face.through?spec.carriageThickness:face.depth,face.through,false,face.fit));
     return out;
   }
   static function box(a:Float,b:Float,c:Float,d:Float,e:Float,f:Float):Part {
@@ -68,9 +68,9 @@ class HobberYPart extends MachineComponent {
       shape=box(spec.carriageCentre-spec.carriageLength/2,spec.carriageCentre+spec.carriageLength/2,high-spec.carriageWidth,high,spec.carriageBottom(),spec.carriageBottom()+spec.carriageThickness);
     }
     if(role=="carriage") {
-      var bore=Part.cylinderAlong(Bt30SpindleData.FLANGE_DIAMETER/2+3,new Vector(0,-132,0),Vector.Y(),HobberSwivelLayout.SPINDLE_Y-Bt30SpindleData.FLANGE_FROM+134);
-      var tool=PosedParts.moved(bore,HobberYLayout.headInModule());bore.close();shape=Solids.cut(shape,[tool]);
-    } else shape=Solids.cut(shape,[HobberYLayout.sweptDeckRelief()]);
+      var bore=Part.cylinderAlong(Bt30SpindleData.FLANGE_DIAMETER/2+3,new Vector(0,-132,0),Vector.Y(),HobberLayout.get().spindleNativeY-Bt30SpindleData.FLANGE_FROM+134);
+      var tool=PosedParts.moved(bore,HobberLayout.get().headInModule());bore.close();shape=Solids.cut(shape,[tool]);
+    } else shape=Solids.cut(shape,[HobberLayout.get().sweptDeckRelief()]);
     var made=machined(shape);
     if(made.solidCount()!=1) {
       var fragments=[];

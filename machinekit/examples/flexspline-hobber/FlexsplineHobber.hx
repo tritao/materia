@@ -30,7 +30,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
   /** The servo's own joint: the belt couples it to B, and the hob drive is bound on it. */
   public static final B_MOTOR = "spindle/motor-turn";
   public static final A = "swivel/A";
-  public static final Y = HobberYLayout.JOINT;
+  public static final Y = HobberLayout.Y_JOINT;
   /**
    * ASSUMED holding torque of the A brake, N m at the output flange. ZeroErr has not published it (asked 2026-11-03); this is the
    * actuator's rated output torque (87 N m, ratio 100), a placeholder for a spring-applied holding brake of this class. Replace it from
@@ -64,6 +64,8 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     ?rotaryAxis:machinekit.motion.PrecisionRotaryAxis
   ) {
     super();
+    var layout = HobberLayout.get();
+    var heights = layout.heights();
     this.spec = spec == null ? new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)) : spec;
     if (this.spec.internal) throw "external hobbing machine requires external gear";
     var profile = this.spec.profile();
@@ -77,16 +79,16 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     bed = cast foundations[0];
     column = cast foundations[1];
     group("Bed and column");
-    includeAt("bed", bed, HobberFrame.sourcePose(FoundationLayout.worldPose("bed")));
-    var footCentres = FoundationLayout.feet();
+    includeAt("bed", bed, heights.foundationBed);
+    var footCentres = layout.feet();
     for (i in 0...footCentres.length) {
       group("Bed and column/Leveling feet/Foot " + (i + 1));
-      var p = footCentres[i], x = p.x + HobberXLayout.front().bedCentre, y = p.y;
-      var roof = -590 + FoundationLayout.FOOT_ROOF, plateBottom = roof - FoundationLayout.FOOT_PLATE_THICKNESS;
+      var p = footCentres[i], x = p.x + layout.xNominal().bedCentre, y = p.y;
+      var roof = -590 + MineralCastBed.FOOT_ROOF, plateBottom = roof - MineralCastBed.FOOT_PLATE_THICKNESS;
       var plate = machinekit.structural.LevelingFoot.of(Plate(
-        FoundationLayout.FOOT_PLATE_WIDTH,
-        FoundationLayout.FOOT_PLATE_WIDTH,
-        FoundationLayout.FOOT_PLATE_THICKNESS,
+        MineralCastBed.FOOT_PLATE_WIDTH,
+        MineralCastBed.FOOT_PLATE_WIDTH,
+        MineralCastBed.FOOT_PLATE_THICKNESS,
         26
       ));
       fixAt("footSeat" + i, plate, HobberFrame.partAt(-(y), x, HobberFrame.PART_DATUM_Z + plateBottom), "bed/casting", F.alongY(-(y), x, HobberFrame.PART_DATUM_Z + roof, 0, 0, 1));
@@ -111,8 +113,8 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
         15,
         footThread,
         15,
-        47 + FoundationLayout.FOOT_ROOF - 2,
-        47 + FoundationLayout.FOOT_ROOF - FoundationLayout.FOOT_PLATE_THICKNESS - 19,
+        47 + MineralCastBed.FOOT_ROOF - 2,
+        47 + MineralCastBed.FOOT_ROOF - MineralCastBed.FOOT_PLATE_THICKNESS - 19,
         Nominal,
         NoCollar
       ));
@@ -123,7 +125,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
       == null ? new machinekit.motion.PurchasedRotaryTable() : rotaryAxis;
     table = installed.assembly();
     tableSpec = installed.specification();
-    var tableBase = FoundationLayout.TABLE_FACE - tableSpec.number("height"), seat = FoundationLayout.TABLE_SEAT;
+    var tableBase = layout.nativeTableFace - tableSpec.number("height"), seat = layout.nativeTableSeat;
     if (tableBase
       < seat) throw "Rotary-axis height exceeds reserved table well; resize foundation seat before installation";
     var tableParent = "bed/tablePlate";
@@ -150,7 +152,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
       var port = table.port(name, "table");
       exposePort("table." + name, port.instanceId, port.portName);
     }
-    var diameter = 2 * (this.spec.rootRadius() - 0.6), workSeat = HobberZLayout.SEAT_Z - FoundationLayout.TABLE_FACE;
+    var diameter = 2 * (this.spec.rootRadius() - 0.6), workSeat = layout.nativeHobCentreZ - layout.nativeTableFace;
     mandrel = new ExpandingMandrel(new ComponentValues().setNumber("outside", diameter - LOADING_CLEARANCE).setNumber(
       "radialFitGap",
       LOADING_CLEARANCE / 2
@@ -200,9 +202,9 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     fixAt(
       "mandrel",
       mandrel,
-      HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + FoundationLayout.TABLE_FACE),
+      HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + layout.nativeTableFace),
       "table/" + tableSpec.workPart,
-      F.alongY(-20, 0, HobberFrame.PART_DATUM_Z + FoundationLayout.TABLE_FACE, 0, 0, 1)
+      F.alongY(-20, 0, HobberFrame.PART_DATUM_Z + layout.nativeTableFace, 0, 0, 1)
     );
     fixAt(
       "mandrelSleeve",
@@ -213,10 +215,10 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
         "height",
         mandrel.parameterNumber("sleeveLength")
       )),
-      HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + (FoundationLayout.TABLE_FACE + mandrel.parameterNumber("sleeveStart"))),
+      HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + (layout.nativeTableFace + mandrel.parameterNumber("sleeveStart"))),
       "mandrel"
     );
-    workOrigin = HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z);
+    workOrigin = HobberFrame.partAt(0, 0, heights.hobCentreZ);
     var blank = new FlexsplineCupBlank(new ComponentValues().setNumber("outside", 2 * this.spec.tipRadius()).setNumber(
       "bore",
       diameter
@@ -227,7 +229,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
       "bandWidth",
       this.spec.faceWidth
     ));
-    fixAt("blank", blank, HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), "mandrel");
+    fixAt("blank", blank, HobberFrame.partAt(0, 0, heights.hobCentreZ), "mandrel");
     var minX = Math.max(25, mandrel.parameterNumber("outside") / 2 + hob.design.outsideDiameter / 2 + 0.2);
     var cutDistance = this.spec.pitchRadius()
       + hob.design.pitchDiameter / 2 + this.spec.profileShift * this.spec.module;
@@ -236,26 +238,26 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     if (cutDistance < minX
       || cutDistance > 100 || this.spec.faceWidth > 20) throw "gear/fixture exceeds hobber capacity";
     travel = [
-      {id: "X", lower: minX, upper: HobberXLayout.RETRACT, initial: cutDistance},
+      {id: "X", lower: minX, upper: layout.xRetract, initial: cutDistance},
       {id: "Y", lower: -15, upper: 15, initial: 0},
-      {id: "Z", lower: HobberZLayout.TRAVEL_MIN, upper: HobberZLayout.TRAVEL_MAX, initial: 0}
+      {id: "Z", lower: layout.zTravelMin, upper: layout.zTravelMax, initial: 0}
     ];
     group("X axis");
-    for (placed in HobberRailPlacement.placements("bed", FoundationLayout.placements("bed"))) {
+    for (placed in layout.rails("bed", layout.foundationPlacements("bed"))) {
       var insert = "bed/" + placed.insertId;
       fixAt(placed.memberId, placed.rail, HobberFrame.sourcePose(placed.pose), insert, HobberFrame.sourcePose(placed.contact));
       precisionMounts.push({name: placed.memberId + "-mount", parent: insert});
     }
     // The prismatic joint is the guide block on its rail; the carriage is fixed to that block and carries the others.
-    for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) {
-      var id = "blockX" + (side < 0 ? "Left" : "Right") + (row == HobberXLayout.BLOCK_FRONT ? "" : "Front");
+    for (side in [-1, 1]) for (row in [layout.xBlockFront, layout.xBlockRear]) {
+      var id = "blockX" + (side < 0 ? "Left" : "Right") + (row == layout.xBlockFront ? "" : "Front");
       var block = LinearRailBlock.metric("HGH25CA", LinearRailBlock.SUPPLIER);
-      var pose = AxisBuilder.orient(-side * FoundationLayout.BED_RAIL_CENTRE, centre + row, HobberFrame.PART_DATUM_Z + HobberSaddle.xGuideOriginZ(), [0.0, 0, 1], [0.0, 1, 0]);
-      var top = F.alongY(-side * FoundationLayout.BED_RAIL_CENTRE, centre + row, HobberFrame.PART_DATUM_Z + HobberSaddle.xCarriageBottom(), 0, 0, 1);
+      var pose = AxisBuilder.orient(-side * layout.bedRailCentre, centre + row, heights.xGuideOriginZ, [0.0, 0, 1], [0.0, 1, 0]);
+      var top = F.alongY(-side * layout.bedRailCentre, centre + row, heights.xCarriageBottomZ, 0, 0, 1);
       if (id == "blockXLeft") {
         addComponent(id, block);
         zero.set(id, pose);
-        moving("X", Prismatic, "railXLeft", id, HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + (HobberSaddle.xGuideOriginZ())), [0.0, 1, 0], cutDistance, minX, HobberXLayout.RETRACT);
+        moving("X", Prismatic, "railXLeft", id, HobberFrame.partAt(0, 0, heights.xGuideOriginZ), [0.0, 1, 0], cutDistance, minX, layout.xRetract);
         fixAt("Xbridge", new HobberSaddle("GE-X-carriage"), HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z), id, top);
       } else fixAt(id, block, pose, "Xbridge", top);
     }
@@ -263,69 +265,69 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
       var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
       var b = rib.band();
       fixAt("Xrib-" + role, rib, HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z), "Xbridge",
-        F.alongY(-((b.low + b.high) / 2), 263, HobberFrame.PART_DATUM_Z + (HobberSaddle.xCarriageBottom()), 0, 0, 1));
+        F.alongY(-((b.low + b.high) / 2), 263, heights.xCarriageBottomZ, 0, 0, 1));
     }
     group("Bed and column");
-    includeAt("column", column, HobberFrame.sourcePose(FoundationLayout.worldPose("column")));
-    var firstSolePad = FoundationLayout.columnSolePads()[0];
+    includeAt("column", column, heights.foundationColumn);
+    var firstSolePad = layout.columnSolePads()[0];
     fixExisting("column-mount", "Xbridge", "column/"+firstSolePad.id,
-      F.alongY(-((firstSolePad.y0+firstSolePad.y1)/2), centre+(firstSolePad.x0+firstSolePad.x1)/2, HobberFrame.PART_DATUM_Z + (HobberSaddle.xCarriageTop()), 0, 0, 1));
+      F.alongY(-((firstSolePad.y0+firstSolePad.y1)/2), centre+(firstSolePad.x0+firstSolePad.x1)/2, heights.xCarriageTopZ, 0, 0, 1));
     group("Z axis");
-    for (placed in HobberRailPlacement.placements("column", FoundationLayout.placements("column"))) {
+    for (placed in layout.rails("column", layout.foundationPlacements("column"))) {
       var insert = "column/" + placed.insertId;
       fixAt(placed.memberId, placed.rail, HobberFrame.sourcePose(placed.pose), insert, HobberFrame.sourcePose(placed.contact));
       precisionMounts.push({name: placed.memberId + "-mount", parent: insert});
     }
-    for (side in [-1, 1]) for (row in [0.0, HobberZLayout.BLOCK_SPACING]) {
+    for (side in [-1, 1]) for (row in [0.0, layout.zBlockSpacing]) {
       var id = "blockZ" + (side < 0 ? "Left" : "Right") + (row == 0 ? "" : "Upper");
       var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);
-      var pose = AxisBuilder.orient(-side * 145, centre + 161, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z + row, [0.0, -1, 0], [0.0, 0, 1]);
-      var face = F.alongY(-side * 145, centre + 148, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z + row, 0, -1, 0);
+      var pose = AxisBuilder.orient(-side * layout.columnRailCentre, centre + heights.zGuideOriginY, heights.hobCentreZ + row, [0.0, -1, 0], [0.0, 0, 1]);
+      var face = F.alongY(-side * layout.columnRailCentre, centre + heights.zBlockFaceY, heights.hobCentreZ + row, 0, -1, 0);
       if (id == "blockZLeft") {
         addComponent(id, block);
         zero.set(id, pose);
-        moving("Z", Prismatic, "railZLeft", id, HobberFrame.partAt(0, centre + 161, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), [0.0, 0, 1], 0, HobberZLayout.TRAVEL_MIN, HobberZLayout.TRAVEL_MAX);
-        fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), id, face);
+        moving("Z", Prismatic, "railZLeft", id, HobberFrame.partAt(0, centre + heights.zGuideOriginY, heights.hobCentreZ), [0.0, 0, 1], 0, layout.zTravelMin, layout.zTravelMax);
+        fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), HobberFrame.partAt(0, centre, heights.hobCentreZ), id, face);
       } else fixAt(id, block, pose, "Zplate", face);
     }
     // A axis: eRob housing in the Z saddle pocket, with the ground Y module base directly on its output flange. The actuator's own brake holds the head; its holding torque is an assumption.
     group("A swivel");
-    swivel = new ErobActuator(100, 20, true, "A", new ComponentValues().setNumber("brakeHoldingTorque", A_BRAKE_HOLDING), HobberSwivelLayout.RANGE, A_ACCELERATION);
-    includeAt("swivel", swivel, HobberFrame.sourcePose(HobberSwivelLayout.pose()));
-    fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(0, HobberSwivelLayout.OUTPUT_X + 6, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, 0, 1, 0));
-    var e0 = HobberSwivelLayout.SPINDLE_ROTATION;
+    swivel = new ErobActuator(100, 20, true, "A", new ComponentValues().setNumber("brakeHoldingTorque", A_BRAKE_HOLDING), layout.swivelRange, A_ACCELERATION);
+    includeAt("swivel", swivel, heights.swivel);
+    fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(0, layout.swivelNativeX + 6, heights.hobCentreZ, 0, 1, 0));
+    var e0 = layout.spindleRotation;
     group("Y axis");
-    yModule=new ScrewLinearModule(HobberYLayout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")));
+    yModule=new ScrewLinearModule(layout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")));
     yModule.takeServiceRemoval("carriage");
-    includeAt("Ymodule",yModule,HobberFrame.sourcePose(HobberYLayout.modulePose()));
-    fixExisting("Ymodule-mount","swivel/output","Ymodule/base",F.alongY(0, HobberSwivelLayout.OUTPUT_X, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, 0, -1, 0));
+    includeAt("Ymodule",yModule,heights.yModule);
+    fixExisting("Ymodule-mount","swivel/output","Ymodule/base",F.alongY(0, layout.swivelNativeX, heights.hobCentreZ, 0, -1, 0));
     group("B spindle");
     spindle = new HobSpindle();
-    includeAt("spindle", spindle, HobberFrame.partAt(-(HobberSwivelLayout.SPINDLE_Y), centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, e0));
+    includeAt("spindle", spindle, HobberFrame.partAt(-(layout.spindleNativeY), centre, heights.hobCentreZ, e0));
     // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
     // four M8 and two 4 mm drawing dowels into the plain Y carriage.
-    fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), "Ymodule/carriage",
-      F.alongY(-105, centre + 45, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, 0, 1, 0));
-    fixExisting("spindle-mount", "spindleSeat", "spindle/housing", F.alongY(-150, centre + 40, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, 0, 1, 0));
+    fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), HobberFrame.partAt(0, centre, heights.hobCentreZ), "Ymodule/carriage",
+      F.alongY(-105, centre + 45, heights.hobCentreZ, 0, 1, 0));
+    fixExisting("spindle-mount", "spindleSeat", "spindle/housing", F.alongY(-150, centre + 40, heights.hobCentreZ, 0, 1, 0));
     // The belt-drive servo stands above the cartridge on a milled cradle bolted to the top of the spindle seat block (the stiffest part
     // near it); its flange is on the cradle wall.
-    fixAt("motorCradle", new HobberSaddle("GE-motor-cradle"), HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), "spindleSeat",
-      F.alongY(-190, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z + 58, 0, 0, 1));
+    fixAt("motorCradle", new HobberSaddle("GE-motor-cradle"), HobberFrame.partAt(0, centre, heights.hobCentreZ), "spindleSeat",
+      F.alongY(-190, centre, heights.hobCentreZ + 58, 0, 0, 1));
     fixExisting("motor-mount", "motorCradle", "spindle/motor",
-      F.alongY(-(HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z), centre - HobSpindle.MOTOR_OFFSET, HobberFrame.PART_DATUM_Z + (HobberZLayout.SEAT_Z + HobSpindle.motorHeight()), -1, 0, 0));
-    fixAt("hob", hob, HobberFrame.partAt(-20, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, e0), "spindle/arbor");
+      F.alongY(-(layout.spindleNativeY - HobSpindle.MOTOR_FACE_Z), centre - HobSpindle.MOTOR_OFFSET, HobberFrame.PART_DATUM_Z + (layout.nativeHobCentreZ + HobSpindle.motorHeight()), -1, 0, 0));
+    fixAt("hob", hob, HobberFrame.partAt(-20, centre, heights.hobCentreZ, e0), "spindle/arbor");
     group("B spindle/Outboard support");
-    fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), "Ymodule/carriage",
-      F.alongY(-30, centre + 45, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, 0, 1, 0));
-    var supportPose = F.compose(HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), HobberOutboardLayout.bodyPose());
+    fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), HobberFrame.partAt(0, centre, heights.hobCentreZ), "Ymodule/carriage",
+      F.alongY(-30, centre + 45, heights.hobCentreZ, 0, 1, 0));
+    var supportPose = F.compose(HobberFrame.partAt(0, centre, heights.hobCentreZ), layout.outboardDatum());
     fixAt("outboard", new OutboardSupport(), supportPose, "outboardCarrier",
-      F.alongY(-(-100), centre + 30, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z, 0, 1, 0));
+      F.alongY(-(-100), centre + 30, heights.hobCentreZ, 0, 1, 0));
     for (role in ["sleeve", "gland", "cap"]) fixAt("outboard" + (role == "sleeve" ? "Sleeve" : role == "gland" ? "Gland" : "Cap"),
       new OutboardBearingPart(new ComponentValues().setToken("role", role)),
       supportPose, role == "cap" ? "outboard" : role == "gland" ? "outboardSleeve" : "outboard");
     for (rear in [false, true]) {
       var id = rear ? "outboardBearingRear" : "outboardBearingFront";
-      var pose = F.compose(supportPose, F.fromRotationMatrix(0, 0, rear ? HobberOutboardLayout.PAIR_TO : HobberOutboardLayout.PAIR_FROM,
+      var pose = F.compose(supportPose, F.fromRotationMatrix(0, 0, rear ? OutboardSupport.PAIR_TO : OutboardSupport.PAIR_FROM,
         rear ? [1.0, 0, 0, 0, -1, 0, 0, 0, -1] : [1.0, 0, 0, 0, 1, 0, 0, 0, 1]));
       fixAt(id, new SpindleBearing(), pose, "outboardSleeve");
       mountContacts.push({parent: "spindle/arbor", child: id});
@@ -333,7 +335,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     fixAt("outboardInnerSpacer", new OutboardBearingPart(new ComponentValues().setToken("role", "innerSpacer")),
       supportPose, "spindle/arbor");
     fixAt("outboardLocknut", new machinekit.standard.FinePitchNut(),
-      F.compose(supportPose, F.translation(0, 0, HobberOutboardLayout.PAIR_TO + HobberOutboardLayout.SPACER_LENGTH)), "spindle/arbor");
+      F.compose(supportPose, F.translation(0, 0, OutboardSupport.PAIR_TO + OutboardSupport.SPACER_LENGTH)), "spindle/arbor");
     var supply = new ThreePhaseRectifier(
       new AcMains(ThreePhase, new AcRmsVoltage(400), 50),
       new DcCurrent(40),
@@ -346,16 +348,16 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     // The rack is a free-standing floor unit with its own base plate on the floor, not part of the machine's structure (it was
     // mated to the bed's lifting seat 650 mm away); the wiring to the machine is by ports, not by a mate.
     group("Electrical");
-    addComponent("electricalPanel", new HobberSaddle("electrical-panel"), HobberElectricalLayout.panelPose());
-    zero.set("electricalPanel", HobberElectricalLayout.panelPose());
-    fixAt("powerSupply", supply, HobberElectricalLayout.devicePose(0, 130), "electricalPanel");
+    addComponent("electricalPanel", new HobberSaddle("electrical-panel"), layout.electricalPanelPose());
+    zero.set("electricalPanel", layout.electricalPanelPose());
+    fixAt("powerSupply", supply, layout.electricalDevicePose(0, 130), "electricalPanel");
     exposePort("mains", "powerSupply", "mains");
     // The 48 V bus for the A actuator, from the same mains: it takes back what the actuator regenerates in a brake chopper and resistor.
     fixAt("supply48", new ThreePhaseDcSupply(new AcMains(ThreePhase, new AcRmsVoltage(400), 50), 48, 20, 1, 125, 125, 120, 300),
-      HobberElectricalLayout.devicePose(-105, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
+      layout.electricalDevicePose(-105, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
     exposePort("mains48", "supply48", "mains");
     // The three sealed scales are read by a BiSS-C master module of the controller.
-    fixAt("bissMaster", new BissMaster(4), HobberElectricalLayout.devicePose(110, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
+    fixAt("bissMaster", new BissMaster(4), layout.electricalDevicePose(110, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
     // Four short ground bars, matched in thickness per axis; open nut channel.
     for(axis in [HobberDrives.x(),HobberDrives.z()]) {
       group(axis.id+" axis/Drive");var insert=axis.id=="X"?"bed/driveSeat":"column/driveSeat";
@@ -376,7 +378,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     group("Z axis/Scale");
     fixAt("ZscaleSeat", new HobberSaddle("GE-Z-scale-seat"), HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z), "column/casting", scaleBarContact(scaleZ));
     var armFace = HobberScales.headFace(scaleZ);
-    fixAt("ZscaleArm", new HobberSaddle("GE-Z-scale-arm"), HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z), "Zplate",
+    fixAt("ZscaleArm", new HobberSaddle("GE-Z-scale-arm"), HobberFrame.partAt(0, 0, heights.hobCentreZ), "Zplate",
       F.alongY(-(armFace[1] - HobberScales.Z_ARM_THICKNESS / 2), 148, HobberFrame.PART_DATUM_Z + armFace[2], 0, 1, 0));
     scale(scaleX, "XscaleSeat", "Xrib-scale");
     connectPorts("Y-biss","Ymodule/scaleHead","biss","bissMaster","ch"+(bissChannel++ + 1));
@@ -392,7 +394,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
             tableSpec.number("housingDiameter")
           ).setNumber(
             "tableFaceHeight",
-            FoundationLayout.TABLE_FACE
+            layout.nativeTableFace
           ).setNumber(
             "tableSeatHeight",
             tableBase
@@ -406,7 +408,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
       fixAt(
         "coolantPort",
         new HobberSaddle("GE-coolant"),
-        HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z + HobberZLayout.SEAT_Z),
+        HobberFrame.partAt(0, centre, heights.hobCentreZ),
         "Ymodule/carriage",
         F.alongY(-64.35, centre + 45, HobberFrame.PART_DATUM_Z + 435, 0, 1, 0)
       );
@@ -505,23 +507,23 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     }
     var nutGroup=below("Ymodule/nutCarrier").concat(["Ymodule/nutCarrier"]);
     var carriageBundle=below("Ymodule/carriage").concat(["Ymodule/carriage"]).filter(id->!nutGroup.contains(id)&&!StringTools.startsWith(id,"Ymodule/block")&&id!="Ymodule/scaleHead");
-    out.push(ServiceRemoval("yCarriageWithdrawal",carriageBundle,[{direction:[0.0,-1,0],distance:HobberYLayout.moduleSpec().carriageThickness+40}],
-      ["Ymodule/scaleHead"],[{joint:"X",value:HobberXLayout.RETRACT}]));
+    out.push(ServiceRemoval("yCarriageWithdrawal",carriageBundle,[{direction:[0.0,-1,0],distance:HobberLayout.get().moduleSpec().carriageThickness+40}],
+      ["Ymodule/scaleHead"],[{joint:"X",value:HobberLayout.get().xRetract}]));
     var shaft = spindle.motor.rating.shaftLength;
     out.push(ServiceRemoval("bMotorWithdrawal", ["spindle/motor", "spindle/motorShaft", "spindle/motorEncoder"],
       [{direction: away(axisOf("spindle/motor", 0, 0, 1)), distance: shaft + 10 + SERVICE_CLEARANCE}], ["spindle/belt", "spindle/motorPulley"], []));
     out.push(ServiceRemoval("bBeltRemoval", ["spindle/belt"],
       [{direction: away(axisOf("spindle/housing", 0, 0, 1)), distance: 2 * HobSpindle.BELT_WIDTH + SERVICE_CLEARANCE}], [], []));
     out.push(ServiceRemoval("outboardRetainersWithdrawal", ["outboardLocknut", "outboardInnerSpacer"],
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 16.0}], [], [{joint: "X", value: HobberXLayout.RETRACT}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 16.0}], [], [{joint: "X", value: HobberLayout.get().xRetract}]));
     out.push(ServiceRemoval("outboardWithdrawal", outboardMembers(),
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"], [{joint: "X", value: HobberXLayout.RETRACT}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"], [{joint: "X", value: HobberLayout.get().xRetract}]));
     out.push(ServiceRemoval("spindleCartridgeWithdrawal", cartridgeMembers(),
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"].concat(outboardMembers()), [{joint: "X", value: HobberXLayout.RETRACT}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"].concat(outboardMembers()), [{joint: "X", value: HobberLayout.get().xRetract}]));
     // The flange is motor-side. Release the nut flange, motor and BK12;
     // the BF12 stays and the barrel slides through the stationary nut block.
     var x = HobberDrives.x();
-    var rearward = HobberXLayout.front().bedRear - (x.axis.start[0] - x.length) + SERVICE_CLEARANCE;
+    var rearward = HobberLayout.get().xNominal().bedRear - (x.axis.start[0] - x.length) + SERVICE_CLEARANCE;
     out.push(ServiceRemoval("xScrewWithdrawal", ["Xscrew", "Xcoupling", "Xnut"],
       [{direction: [0.0,1,0], distance: rearward}],
       ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []));
@@ -534,7 +536,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     out.push(ServiceRemoval("xChipGuardWithdrawal",HobberChipCover.fixedMembers(),
       [{direction:[0.0,0,1],distance:100.0}],stack,[]));
     var head = below("Ymodule/base").concat(["Ymodule/base"]).filter(id -> id != "Ymodule/motor" && id != "Ymodule/motorShaft");
-    var retract = [{joint:"X",value:HobberXLayout.RETRACT}];
+    var retract = [{joint:"X",value:HobberLayout.get().xRetract}];
     // Keep the head on the actuator: the adapter output screws are buried
     // behind the swivel plate. Release the saddle from its blocks and nut
     // block, and support the disconnected scale head on the fixed scale.
@@ -555,7 +557,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
     PosedParts.scope(cache->{
       for(cover in zBellows) {
         var ids=cover.members();
-        for(q in [HobberZBellowsLayout.lowerLimit(),0.0,HobberZBellowsLayout.upperLimit()]) {
+        for(q in [HobberLayout.get().zBellowsLowerLimit(),0.0,HobberLayout.get().zBellowsUpperLimit()]) {
           var shapes:Array<cadkit.modeling.Part>=[];
           for(i in 0...ids.length) {
             var id=ids[i],entry=entries.filter(m->m.id==id)[0],pose=poses.get(id);
@@ -577,22 +579,22 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
 
   /** Bellows flanges and loose skins use the shared coupled-cover builder. */
   function installZBellows():Void {
-    var p=HobberZBellowsLayout.plan();
+    var p=HobberLayout.get().zBellowsPlan();
     for(side in [-1,1])for(upper in [false,true]) {
       var id="Zbellows"+(side<0?"Left":"Right")+(upper?"Upper":"Lower"),moving=id+"MovingMount",fixed=id+"FixedMount";
       group("Z axis/Protection/"+id+"/Mounts");
-      var movingPose=HobberFrame.sourcePose(HobberZBellowsLayout.pose(side,upper,false));
-      fixAt(moving,HobberZBellowsLayout.movingMount(),movingPose,"Zplate");zBellowsMounts.push(moving);
+      var movingPose=HobberFrame.sourcePose(HobberLayout.get().zBellowsPose(side,upper,false));
+      fixAt(moving,HobberLayout.get().zBellowsMovingMount(),movingPose,"Zplate");zBellowsMounts.push(moving);
       if(upper) {
-        var mount=HobberZBellowsLayout.fixedUpperMount(),pose=HobberFrame.sourcePose(HobberZBellowsLayout.pose(side,true,true));
+        var mount=HobberLayout.get().zBellowsFixedUpperMount(),pose=HobberFrame.sourcePose(HobberLayout.get().zBellowsPose(side,true,true));
         var face=mount.fasteningFaces().filter(f->f.id=="column")[0];
         var contact=F.compose(pose,face.frame);
-        var rail=HobberRailPlacement.placements("column",FoundationLayout.placements("column")).filter(r->side*r.contact.y>0)[0];
+        var rail=HobberLayout.get().rails("column",HobberLayout.get().foundationPlacements("column")).filter(r->side*r.contact.y>0)[0];
         fixAt(fixed,mount,pose,"column/"+rail.insertId,contact);zBellowsMounts.push(fixed);
       }
-      var origin=HobberFrame.sourcePose(HobberZBellowsLayout.pose(side,upper,true)),cover=machinekit.cover.WayCover.installOn(this,this,{
+      var origin=HobberFrame.sourcePose(HobberLayout.get().zBellowsPose(side,upper,true)),cover=machinekit.cover.WayCover.installOn(this,this,{
         id:id,row:p.row.id,fixedParent:upper?fixed:"Xbridge",movingParent:moving,
-        leader:{id:"Z",lower:HobberZBellowsLayout.lowerLimit(),upper:HobberZBellowsLayout.upperLimit(),initial:0.0},
+        leader:{id:"Z",lower:HobberLayout.get().zBellowsLowerLimit(),upper:HobberLayout.get().zBellowsUpperLimit(),initial:0.0},
         origin:[origin.x,origin.y,origin.z],along:[0.0,0,upper?-1.0:1.0],up:[0.0,-1,0],width:p.width,height:p.height,space:p.space,shape:p.shape});
       zBellows.push(cover);
       var last=cover.skinMembers[cover.skinMembers.length-1];
@@ -742,7 +744,7 @@ class FlexsplineHobber extends MachineAssembly implements machinekit.cover.WayCo
         "GENERIC-400V-SERVO-AMP",
         new PhaseRmsCurrent(id == "table-drive" ? tableSpec.number("peakCurrent") : 20)
       ),
-      HobberElectricalLayout.devicePose(
+      HobberLayout.get().electricalDevicePose(
         -140 + ((driverNumber - 1) % 3) * 140,
         300 + Std.int((driverNumber - 1) / 3) * 250
       ),

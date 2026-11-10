@@ -1,7 +1,7 @@
+import machinekit.hobbing.HobberLayout;
 import FoundationStudyGeometry as Geometry;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingFeature.CastingFeatureKind;
-import machinekit.hobbing.FoundationLayout;
 
 /** Independent M6 tray proposal: placement screening, no supplier geometry or strength claim. */
 class HobberTrayMountingStudy {
@@ -21,7 +21,7 @@ class HobberTrayMountingStudy {
     var proposal:Dynamic = haxe.Json.parse(sys.io.File.getContent(path));
     var points:Array<Array<Float>> = proposal.sockets.positionsMm,
       tabs:Array<Array<Float>> = proposal.casting.localRebatesXYMm;
-    var z = FoundationLayout.dimensions("bed")[2] + proposal.sockets.mouthZMm;
+    var z = HobberLayout.get().foundationDimensions("bed")[2] + proposal.sockets.mouthZMm;
     var cores = Geometry.designRegions();
     var bosses = [for (p in points)[p[0] - 25, p[1] - 25, z - 65, p[0] + 25, p[1] + 25, z]];
     var lightening = [for (c in cores) if (c.kind == Lightening) c];
@@ -40,7 +40,7 @@ class HobberTrayMountingStudy {
       var envelope = [p[0] - 12, p[1] - 12, z - 40, p[0] + 12, p[1] + 12, z];
       for (c in remaining) if (intersects(envelope, Geometry.bounds(c))) conflicts.push('Anchor $i / void ${c.id}');
 
-      for (r in FoundationLayout.inserts("bed")) if (!StringTools.startsWith(r.id, "trayClampSeat")) {
+      for (r in HobberLayout.get().foundationInserts("bed")) if (!StringTools.startsWith(r.id, "trayClampSeat")) {
         var insert = Geometry.bounds(Geometry.insertRegion(r));
         if (intersects(envelope, insert)) conflicts.push('Anchor $i / retained insert ${r.id}');
         for (t in tabs) if (intersects([t[0],

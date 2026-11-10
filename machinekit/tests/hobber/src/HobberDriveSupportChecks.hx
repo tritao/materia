@@ -1,5 +1,4 @@
-import machinekit.hobbing.FoundationLayout as Layout;
-import machinekit.hobbing.HobberXLayout;
+import machinekit.hobbing.HobberLayout;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingCavities;
 import machinekit.assembly.PosedParts;
@@ -18,7 +17,7 @@ class HobberDriveSupportChecks {
     return p;
   }
   public static function ribProbes(body:Part):Array<{label:String, missingMm3:Float}> {
-    var l = HobberXLayout.front(), c = l.bedCentre, start = l.deckStart - c, end = l.motorFace - c;
+    var l = HobberLayout.get().xNominal(), c = l.bedCentre, start = l.deckStart - c, end = l.motorFace - c;
     var probes:Array<{label:String, bounds:Array<Float>}> = [];
     for (side in [-1, 1]) probes.push({
       label: 'longitudinal web ' + side,
@@ -28,7 +27,7 @@ class HobberDriveSupportChecks {
       label: 'bearing cross-rib ' + station,
       bounds: [station - c - 15, -275, 230, station - c + 15, 275, 660]
     });
-    var rear = Layout.feet()[2];
+    var rear = HobberLayout.get().feet()[2];
     for (side in [-1, 1]) probes.push({
       label: 'rear foot boss/web junction ' + side,
       bounds: [rear.x - 40, side < 0 ? -95.0 : 90.0, 160, rear.x + 40, side < 0 ? -90.0 : 95.0, 230]
@@ -44,7 +43,7 @@ class HobberDriveSupportChecks {
     ];
   }
   static function section(path:String, cells:Array<Array<Float>>, workX:Float):Void {
-    var x = workX - HobberXLayout.front().bedCentre, parts =
+    var x = workX - HobberLayout.get().xNominal().bedCentre, parts =
       ['<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1050" viewBox="0 0 1000 1050"><rect width="1000" height="1050" fill="white"/><g font-family="sans-serif" fill="#222"><text x="50" y="35" font-size="21">Bed transverse section: work X = '
       + workX
       + ' mm</text><text x="50" y="62" font-size="15">Dark: exact box intermediate BEFORE round socket and anchor cuts. Dimensions in mm.</text>'];
@@ -145,8 +144,8 @@ class HobberDriveSupportChecks {
         != machinekit.structural.CastingCollisionQualification.CastingCollisionStatus
         .Unsupported) throw "Final box-only hull must identify the twelve source socket recesses";
       var unsupported = "";
-      try source.minimumSectionIy(-HobberXLayout.front().footSpan / 2,
-        HobberXLayout.front().footSpan / 2) catch (error:Dynamic) unsupported = Std.string(error);
+      try source.minimumSectionIy(-HobberLayout.get().xNominal().footSpan / 2,
+        HobberLayout.get().xNominal().footSpan / 2) catch (error:Dynamic) unsupported = Std.string(error);
       n++;
       if (unsupported.indexOf("Unsupported non-box anchor material for inserts: ") != 0
         || source.embeddedAnchors().filter(anchor -> unsupported.indexOf(anchor.owner)
@@ -156,12 +155,12 @@ class HobberDriveSupportChecks {
         section(
           output + "-box-intermediate-motor-flange.svg",
           [for (b in cells) BoxAlgebra.limits(b)],
-          HobberXLayout.front().motorFace - 10
+          HobberLayout.get().xNominal().motorFace - 10
         );
         section(
           output + "-box-intermediate-under-motor.svg",
           [for (b in cells) BoxAlgebra.limits(b)],
-          (HobberXLayout.front().motorFace + HobberXLayout.front().motorRear) / 2
+          (HobberLayout.get().xNominal().motorFace + HobberLayout.get().xNominal().motorRear) / 2
         );
       }
       var result = {

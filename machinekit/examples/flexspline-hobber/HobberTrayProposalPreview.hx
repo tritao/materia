@@ -87,7 +87,7 @@ class HobberTrayProposalPreview {
       Solids.cut(polygon(shifted(outer, 5), seat + 15, seat + 17), [polygon(shifted(outer, 20), seat + 14, seat + 18)]),
       [0.15, 0.65, 0.40]
     );
-    var socket = machinekit.hobbing.FoundationLayout.traySocket();
+    var socket = machinekit.hobbing.HobberLayout.get().traySocket();
     var socketGeometry = socket.geometry();
     if (socketGeometry.solidCount() != 1) throw "Socket must be one solid";
     var freeProbe = Part.cylinderSpan(2.4, 16, 39.8), freeCommon = socketGeometry.intersect(freeProbe);

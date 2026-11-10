@@ -1,7 +1,7 @@
+import machinekit.hobbing.HobberLayout;
 import FoundationStudyGeometry.FoundationStudyRegion;
 import FoundationStudyGeometry as Geometry;
 import materia.casting.CastingFeature.CastingFeatureKind;
-import machinekit.hobbing.FoundationLayout;
 import machinekit.enclosure.PanelCatalogue;
 
 private typedef SeatingCase = {
@@ -49,7 +49,7 @@ class HobberBaseInterfaceStudy {
       if (common != null) interruptions.push({ledge: ledge.id, feature: core.id, boundsMm: common});
     }
     var conflicts:Array<String> = [];
-    for (row in FoundationLayout.inserts("bed")) {
+    for (row in HobberLayout.get().foundationInserts("bed")) {
       var insert:FoundationStudyRegion = Geometry.insertRegion(row);
       for (ledge in ledges) if (overlap(ledge, insert) != null) conflicts.push(ledge.id + " / " + row.id);
     }
@@ -74,7 +74,7 @@ class HobberBaseInterfaceStudy {
     panel.validate();
     if (sheet != 13 || Std.string(panel.fabrication) != "RouterCut" || panel.qualifications.coolantRecord != null
       || panel.qualifications.heatLimitC != null) throw "Review the preliminary 13 mm router-cut material policy";
-    var d = FoundationLayout.dimensions("bed"), cores = Geometry.designRegions();
+    var d = HobberLayout.get().foundationDimensions("bed"), cores = Geometry.designRegions();
     // Compare the seats with the pre-rebate machine voids, excluding the now-authored tray features.
     cores = [for (core in cores) if (!StringTools.startsWith(core.id, "tray-")) core];
     var raised = seating("raised", SHALLOW_DEPTH, sheet, d, cores), flush = seating(

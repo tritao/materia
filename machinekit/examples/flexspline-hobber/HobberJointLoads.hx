@@ -54,7 +54,7 @@ class HobberJointLoads {
     // Conservative column interface shear: the whole X-moving mass is charged
     // to this joint. Gravity is normal to this horizontal interface, not shear.
     var xCrash = HobberCrashProtection.axis(machine, "X");
-    for (pad in machinekit.hobbing.FoundationLayout.columnSolePads()) loads.push({
+    for (pad in machinekit.hobbing.HobberLayout.get().columnSolePads()) loads.push({
       label: "Column sole pad " + pad.id + " on the X carriage (whole shear charged to each pad)",
       between: ["column/"+pad.id, "Xbridge"],
       shear: {peak: xCrash.movingKg * 0.5 + CUTTING_FORCE,
@@ -96,7 +96,7 @@ class HobberJointLoads {
     // passes through the nut/fixed support; a Y stop takes a Y-axis crash.
     // Charge the whole moving weight and the assumed100 N guide drag to EACH
     // rail, then add the100 N cutting bound in its worst direction.
-    var angle=machinekit.hobbing.HobberSwivelLayout.RANGE,along=yg*Math.sin(angle)+100,across=yg*Math.cos(angle);
+    var angle=machinekit.hobbing.HobberLayout.get().swivelRange,along=yg*Math.sin(angle)+100,across=yg*Math.cos(angle);
     var fPeak=row.peakTorque/(ys.railSpacing/1000)+along,fCrash=row.momentaryTorque/(ys.railSpacing/1000)+along;
     var railPeak=Math.sqrt(fPeak*fPeak+across*across)+CUTTING_FORCE,railCrash=Math.sqrt(fCrash*fCrash+across*across)+CUTTING_FORCE;
     var railLoad:LoadCase={peak:railPeak,momentary:railCrash};
@@ -143,7 +143,7 @@ class HobberJointLoads {
       if(!upper)loads.push({label:cover.id+" fixed flange",between:[cover.fixedMember,"Xbridge"],shear:{peak:load}});
       else {
         var fixed=cover.id+"FixedMount",side=cover.id.indexOf("Left")>=0?-1:1;
-        var rail=machinekit.hobbing.HobberRailPlacement.placements("column",machinekit.hobbing.FoundationLayout.placements("column")).filter(r->side*r.contact.y>0)[0];
+        var rail=machinekit.hobbing.HobberLayout.get().rails("column",machinekit.hobbing.HobberLayout.get().foundationPlacements("column")).filter(r->side*r.contact.y>0)[0];
         loads.push({label:cover.id+" fixed flange",between:[cover.fixedMember,fixed],shear:{peak:load}});
         loads.push({label:cover.id+" fixed bracket",between:[fixed,"column/"+rail.insertId],shear:{peak:load}});
       }

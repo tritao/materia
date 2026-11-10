@@ -54,8 +54,8 @@ class HobberDesignChecks {
       var face = F.compose(canonical, poses.get("swivel/output"));
       var mount = F.compose(canonical, poses.get("swivel/housing"));
       count++;
-      if (Math.abs(face.x - centre.x - machinekit.hobbing.HobberSwivelLayout.OUTPUT_X) > 1e-8
-        || Math.abs(mount.x - face.x) > 1e-8 || face.x >= centre.x + machinekit.hobbing.HobberSwivelLayout.PLATE_FRONT - 2) throw "swivel output face must be in front of the Z saddle plate by its running gap";
+      if (Math.abs(face.x - centre.x - machinekit.hobbing.HobberLayout.get().swivelNativeX) > 1e-8
+        || Math.abs(mount.x - face.x) > 1e-8 || face.x >= centre.x + machinekit.hobbing.HobberSaddle.SWIVEL_PLATE_FRONT - 2) throw "swivel output face must be in front of the Z saddle plate by its running gap";
       var screw = F.compose(canonical, poses.get("Xscrew"));
       count++;
       if (Math.abs(screw.y) > 1e-8
@@ -67,7 +67,7 @@ class HobberDesignChecks {
         );
       var zd = F.transformVector(zScrew, 0, 0, 1);
       count++;
-      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2 - machinekit.hobbing.HobberZLayout.axisY()) > 1e-8 || Math.abs(zScrew.x - zl.x - 15) > 1e-8
+      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2 - machinekit.hobbing.HobberLayout.get().zAxisY()) > 1e-8 || Math.abs(zScrew.x - zl.x - 15) > 1e-8
         || Math.abs(zd.z + 1) > 1e-8) throw "Z screw must lie behind the guide plane, offset clear of the A actuator housing, and point down";
       var zFixed = F.compose(canonical, poses.get("Zfixed")), zFloating = F.compose(canonical, poses.get("Zfloating"));
       count++;
@@ -126,7 +126,7 @@ class HobberDesignChecks {
       var xTravel = machine.travel.filter(t -> t.id == "X")[0];
       var screwPart:machinekit.motion.HzMotionDrawingScrew = cast members.filter(m -> m.id == "Xscrew")[0].component;
       var nutPart:machinekit.motion.BallNut = cast members.filter(m -> m.id == "Xnut")[0].component;
-      for (x in [machinekit.hobbing.HobberXLayout.MIN - 5, xTravel.upper + 5]) {
+      for (x in [machinekit.hobbing.HobberLayout.get().xMin - 5, xTravel.upper + 5]) {
         // Translation vector only; keep the mounted part's existing orientation.
         var delta = F.transformVector(machinekit.hobbing.HobberFrame.workToMachine(), x - xTravel.initial, 0, 0);
         var nutPose = F.compose(F.translation(delta.x, delta.y, delta.z), poses.get("Xnut"));
