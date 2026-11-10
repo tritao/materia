@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.BoxAlgebra;
 import materia.casting.Box3;
@@ -96,7 +97,7 @@ class FlexsplineHobberBaseReport {
     for (m in machine.components()) if (ids.exists(m.id)) moving += m.component.massProperties().mass;
     var model = new cadkit.modeling.AssemblyModel("mm");
     machine.addTo(model, "");
-    var state = model.initialState(), canonical = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var state = model.initialState(), canonical = F.inverse(hobber.HobberFrame.workToMachine());
     var samples:Array<Dynamic> = [], oldLo = [1e30, 1e30], oldHi = [-1e30, -1e30], newLo = [1e30, 1e30], newHi = [
       -1e30,
       -1e30

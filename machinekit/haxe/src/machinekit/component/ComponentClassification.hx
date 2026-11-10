@@ -23,7 +23,6 @@ class ComponentClassification {
     file(registry, "machinekit.control.safety-relay", "Safety", ComponentKind.Generic);
     file(registry, "machinekit.control.digital-sensor", "Sensors and inputs", ComponentKind.Generic);
     file(registry, "machinekit.control.thermistor-input", "Sensors and inputs", ComponentKind.Generic);
-    file(registry,"machinekit.hobbing.z-bellows","Covers and wipers",ComponentKind.Supplier);
     // hmi
     file(registry, "machinekit.hmi.hand-wheel", "Operator controls", ComponentKind.Supplier);
     file(registry, "machinekit.hmi.emergency-stop", "Operator controls", ComponentKind.Generic);
@@ -54,8 +53,6 @@ class ComponentClassification {
     file(registry, "machinekit.hobbing.table-platen", "Rotary table", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.hobber-bracket", "Structure", ComponentKind.MachinePart);
     file(registry, "machinekit.standard.panel-hole-plug", "Covers", ComponentKind.Generic);
-    file(registry, "machinekit.hobbing.chip-cover", "Covers", ComponentKind.MachinePart);
-    file(registry, "machinekit.hobbing.saddle", "Structure", ComponentKind.MachinePart);
     file(registry, "machinekit.hobbing.swivel-housing", "Structure", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.flexspline-cup-blank", "Workpieces", ComponentKind.MachinePart);
     // milling

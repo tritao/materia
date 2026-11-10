@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import gearkit.ConjugateRack;
 import gearkit.GearSpec;
 import gearkit.Involute;

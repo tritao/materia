@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberDrives;
+import hobber.*;
+import hobber.HobberDrives;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.assembly.PosedParts;
@@ -71,7 +72,7 @@ class HobberLoadingSizing {
     var model = new cadkit.modeling.AssemblyModel("mm");
     machine.addTo(model, "");
     var state = model.initialState(),
-      cache = new PosedParts(), canonical = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+      cache = new PosedParts(), canonical = F.inverse(hobber.HobberFrame.workToMachine());
     state.setJoint("X", machine.travel[0].upper);
     state.setJoint(FlexsplineHobber.Y, 0);
     state.setJoint("Z", 0);
@@ -164,16 +165,15 @@ class HobberLoadingSizing {
     var frontMax = 0.0, topMax = 0.0;
     for (row in rows) for (result in (cast row.results:Array<Dynamic>)) {
       var limit = result.direction
-        == "front" ? machinekit.hobbing.HobberLayout.get().xRetract : machinekit.hobbing.HobberLayout.get().topRetract;
+        == "front" ? hobber.HobberLayout.get().xRetract : hobber.HobberLayout.get().topRetract;
       if (result.roundedRetractMm > limit) throw "loading retract obstructs a supported size";
       if (result.direction == "front") frontMax = Math.max(frontMax, result.roundedRetractMm);
       else topMax = Math.max(topMax, result.roundedRetractMm);
     }
-    if (frontMax != machinekit.hobbing.HobberLayout.get().xRetract || topMax != machinekit.hobbing.HobberLayout.get().topRetract) throw "loading retract must be the geometry-derived 5 mm round-up for the largest required corridor";
+    if (frontMax != hobber.HobberLayout.get().xRetract || topMax != hobber.HobberLayout.get().topRetract) throw "loading retract must be the geometry-derived 5 mm round-up for the largest required corridor";
     Sys.println(haxe.Json.stringify({
-      mechanicalFront: machinekit.hobbing.HobberLayout.get().xNominal(),
-      mechanicalTopAlternative: machinekit
-      .hobbing.HobberLayout.get().xDimensions(machinekit.hobbing.HobberLayout.get().topRetract),
+      mechanicalFront: hobber.HobberLayout.get().xNominal(),
+      mechanicalTopAlternative: hobber.HobberLayout.get().xDimensions(hobber.HobberLayout.get().topRetract),
       basis: "Assumed side-jaw gripper and front wrist; actual head solids; all A enclosed by 1-degree samples plus R*half-angle displacement padding; B stopped, Y=Z=0; exact hollow-cup and unpadded jaw/fixture paths checked separately",
       configurations: rows
     }));

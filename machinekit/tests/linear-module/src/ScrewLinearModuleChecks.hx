@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.motion.*;
 import machinekit.assembly.*;
 import materia.assembly.AssemblyFrames as F;
@@ -51,11 +52,12 @@ class ScrewLinearModuleChecks {
     air.close();cache.close();
   }
   public static function main():Void {
+    HobberComponents.install();
     var requested=Sys.args(),selected=0;
     for(size in [{profile:"HGH15CA",stroke:20.0,spacing:150.0,blocks:80.0},
       {profile:"HGH15CA",stroke:30.0,spacing:150.0,blocks:80.0}]) if(requested.length==0||requested.contains("stroke="+machinekit.component.Dimension.format(size.stroke))) {
       selected++;
-      var spec=size.stroke==30?machinekit.hobbing.HobberLayout.get().moduleSpec():new ScrewLinearModuleSpec(size.profile,size.stroke,size.spacing,size.blocks);
+      var spec=size.stroke==30?hobber.HobberLayout.get().moduleSpec():new ScrewLinearModuleSpec(size.profile,size.stroke,size.spacing,size.blocks);
       var host=new ScrewLinearModulePart(spec.values().setToken("role","carriage")),axis=new ScrewLinearModule(spec,null,host);
       check(axis.component("carriage")==host,"Containing machine supplies its carriage interface");
       check(axis.validate().length==0,"Module assembly validation");

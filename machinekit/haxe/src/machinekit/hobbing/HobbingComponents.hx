@@ -6,17 +6,12 @@ class HobbingComponents {
   public static function register(registry:ComponentRegistry):Void {
     registry.register(FloatingRadialBearing.recipeType());
     registry.register(HobberBracket.recipeType());
-    registry.register(HobberMadePart.recipeType());
-    registry.register(HobberCarriageRib.recipeType());
-    registry.register(HobberChipCover.recipeType());
     registry.register(FlexsplineCupBlank.recipeType());
     registry.register(MandrelSleeve.recipeType());
     registry.register(HobArbor.recipeType());
     registry.register(OutboardSupport.recipeType());
     registry.register(OutboardBearingPart.recipeType());
     registry.register(Hob.recipeType());
-    registry.register(HobberYPart.recipeType());
-    registry.register(HobberZBellowsPart.recipeType());
     registry.register(ExpandingMandrel.recipeType());
     registry.register(RotaryClamp.recipeType());
     registry.register(TablePlaten.recipeType());

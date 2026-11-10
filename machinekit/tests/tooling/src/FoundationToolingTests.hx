@@ -1,3 +1,4 @@
+import hobber.*;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -755,7 +756,7 @@ class FoundationToolingTests {
     check(chamferedInput.envelope[0].profile.length == 8, "chamfer represented by actual profile");
 
     // Existing independent machine family exercises the same adapter unchanged.
-    var hobber = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastBed(), "typed-hobber", 1);
+    var hobber = FoundationToolingAdapter.snapshot(new hobber.MineralCastBed(), "typed-hobber", 1);
     check(
       hobber.inserts.filter(i -> i.id == "tablePlate")[0].role == materia.casting.InsertSpec.InsertRole.TableMount,
       "hobber table plate role explicit"
@@ -769,7 +770,7 @@ class FoundationToolingTests {
       check(seats.length == 1, "hobber bed declares column carriage guide " + id);
       check(seats[0].role == materia.casting.InsertSpec.InsertRole.GuideSeat, "column carriage guide role explicit");
     }
-    var column = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastColumn(),
+    var column = FoundationToolingAdapter.snapshot(new hobber.MineralCastColumn(),
       "typed-hobber-column", 1);
     var sole = column.inserts.filter(i -> i.id == "basePlate");
     check(sole.length == 1, "hobber moving column declares its carriage sole");
@@ -783,8 +784,8 @@ class FoundationToolingTests {
     var rejectedRole = false;
     try new CastInsert(new ComponentValues().setToken("role", "unknown role")) catch (e:Dynamic) rejectedRole = true;
     check(rejectedRole, "unknown source roles fail at the typed source parameter");
-    equivalent(new machinekit.hobbing.MineralCastBed(), "hobber-bed");
-    equivalent(new machinekit.hobbing.MineralCastColumn(), "hobber-column");
+    equivalent(new hobber.MineralCastBed(), "hobber-bed");
+    equivalent(new hobber.MineralCastColumn(), "hobber-column");
     var finished = new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken(
       "finish",
       "replicated-after-casting"

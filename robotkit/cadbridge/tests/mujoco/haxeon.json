@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "cadbridge-mujoco-tests"},
   "entry": "tests.EndEffectorContactMuJoCo",
-  "sourceRoots": ["src", "../../../../machinekit/examples"],
+  "sourceRoots": ["src", "../../../../machinekit/examples", "../../../../machinekit/examples/flexspline-hobber"],
   "dependencies": {
     "haxeon-platform": {"path": "../../../../haxeon/packages/platform"},
     "robotkit": {"path": "../../.."},

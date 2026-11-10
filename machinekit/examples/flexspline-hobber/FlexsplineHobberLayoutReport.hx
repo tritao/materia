@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberDrives;
+import hobber.*;
+import hobber.HobberDrives;
 import materia.assembly.AssemblyFrames as F;
 class FlexsplineHobberLayoutReport {
   public static function sceneBounds(path:String):Dynamic {
@@ -37,7 +38,7 @@ class FlexsplineHobberLayoutReport {
   /** Radial side view from actual posed solid envelopes; Y-offset parts are projected. */
   public static function writeSection(machine:FlexsplineHobber, path:String):Void {
     var poses = machine.solvedPoses(), cache = new machinekit.assembly.PosedParts();
-    var work = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var work = F.inverse(hobber.HobberFrame.workToMachine());
     var hob = F.compose(work, F.compose(poses.get("hob"), machine.hob.connector("centre").frame));
     var lines = [
       '<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="900" viewBox="0 0 1120 900">',
@@ -107,7 +108,7 @@ class FlexsplineHobberLayoutReport {
       + (px(0) - 100) + '" y="670">hob centre radial = 0</text>');
     var dimensions = [
       {x: 70.0, label: "Y guide axis plane: 70 mm"},
-      {x: machinekit.hobbing.HobberLayout.get().swivelNativeX, label: "A output flange face: " + machinekit.hobbing.HobberLayout.get().swivelNativeX + " mm"},
+      {x: hobber.HobberLayout.get().swivelNativeX, label: "A output flange face: " + hobber.HobberLayout.get().swivelNativeX + " mm"},
       {x: 135.0, label: "Z saddle plate front: 135 mm"},
       {x: 161.0, label: "Z guide axis plane: 161 mm"}
     ];
@@ -189,7 +190,7 @@ class FlexsplineHobberLayoutReport {
       });
     }
     var cache = new machinekit.assembly.PosedParts(), loX = 1e30, hiX = -1e30, loY = 1e30, hiY = -1e30;
-    var canonical = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var canonical = F.inverse(hobber.HobberFrame.workToMachine());
     try {
       for (m in members) {
         var b = cache.box(m.component, F.compose(canonical, poses.get(m.id)));
@@ -212,7 +213,7 @@ class FlexsplineHobberLayoutReport {
       },
       headStackMm: {
         yGuidePlane: 70,
-        swivelOutputFlangeFace: machinekit.hobbing.HobberLayout.get().swivelNativeX,
+        swivelOutputFlangeFace: hobber.HobberLayout.get().swivelNativeX,
         swivelPlateBackFace: 100,
         zSaddleFront: 135,
         zGuidePlane: 161,

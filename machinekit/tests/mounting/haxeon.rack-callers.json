@@ -7,7 +7,7 @@
   "sourceRoots": [
     "src",
     "../src",
-    "../../examples/robot-arm"
+    "../../examples/robot-arm", "../../examples/flexspline-hobber"
   ],
   "dependencies": {
     "machinekit": {

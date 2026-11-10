@@ -17,7 +17,7 @@
     "../examples/machine-tending",
     "mobile-welder/src",
     "../examples/gantry-picker",
-    "../examples/track-arm"
+    "../examples/track-arm", "../examples/flexspline-hobber"
   ],
   "dependencies": {
     "collisionkit-native": {"path": "../../collisionkit/native"},

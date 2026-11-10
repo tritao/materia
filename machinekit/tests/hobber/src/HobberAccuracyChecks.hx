@@ -1,5 +1,6 @@
+import hobber.*;
 import machinekit.hobbing.*;
-import machinekit.hobbing.HobberAccuracyBudget;
+import hobber.HobberAccuracyBudget;
 import machinekit.motion.PrecisionErrors;
 import materia.assembly.AssemblyFrames as F;
 
@@ -21,7 +22,7 @@ class HobberAccuracyChecks {
 
   /** Abbe offset (scale line to hob centre) and the thermal loop lengths of each scale, from the posed machine at the initial joint values. */
   static function axes(machine:FlexsplineHobber):Array<AccuracyAxis> {
-    var poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), out = [];
+    var poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine()), out = [];
     var tool = F.compose(poses.get("hob"), machine.hob.connector("centre").frame);
     var toolWork = F.transformPoint(back, tool.x, tool.y, tool.z);
     for (a in HobberScales.all()) {
@@ -61,7 +62,7 @@ class HobberAccuracyChecks {
     i.axes = axes(machine);
     // Stroke and height of the cut: the Z travel and the hob's height above the column sole (work z 280, FRAME_PLAN H1).
     for (t in machine.travel) if (t.id == "Z") i.strokeMm = t.upper - t.lower;
-    var poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine());
     var tool = F.transformPoint(F.compose(back, F.compose(poses.get("hob"), machine.hob.connector("centre").frame)), 0, 0, 0);
     i.hobHeightMm = Math.abs(tool.z - 280.0);
     i.aLeverMm = Math.sqrt(tool.y * tool.y + Math.pow(tool.z - HobberLayout.get().nativeHobCentreZ, 2)) + i.aEngagementMm;

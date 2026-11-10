@@ -30,7 +30,7 @@
     "src",
     "../../examples/bench-mill",
     "../../examples/cnc-router",
-    "../../examples/box-mold"
+    "../../examples/box-mold", "../../examples/flexspline-hobber"
   ],
   "dependencies": {
     "robotkit-autonomy": {

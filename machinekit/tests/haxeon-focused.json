@@ -11,7 +11,7 @@
 		"../examples/cnc-router",
 		"../examples/mobile-base",
 		"../examples/robot-welder",
-		"../examples/corexy"
+		"../examples/corexy", "../examples/flexspline-hobber"
 	],
 	"dependencies": {
 		"collisionkit-native": {"path": "../../collisionkit/native"},

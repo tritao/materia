@@ -8,7 +8,7 @@
     "src",
     "../../../machinekit/examples",
     "../../../machinekit/examples/mobile-base",
-    "../../../machinekit/examples/robot-arm"
+    "../../../machinekit/examples/robot-arm", "../../../machinekit/examples/flexspline-hobber"
   ],
   "dependencies": {
     "haxeon-platform": {

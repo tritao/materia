@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.structural.FoundationIntegrity;
 import cadkit.modeling.AssemblyModel;
 import materia.assembly.AssemblyFrames as F;
@@ -286,7 +287,7 @@ class FlexsplineHobberChecks {
         "B/C have no mechanical gear coupling (B's only coupling is the belt to its servo)"
       );
       for (axis in ["X", "Y", "Z"]) {
-        var matching=joint.filter(k->k.id==machinekit.hobbing.HobberDrives.jointId(axis));
+        var matching=joint.filter(k->k.id==hobber.HobberDrives.jointId(axis));
         check(matching.length==1,"one physical linear joint for "+axis);
         var j=matching[0];
         check(j.limits.lower != null && j.limits.upper != null, "bounded linear travel");
@@ -300,7 +301,7 @@ class FlexsplineHobberChecks {
         "foundation precision mounts all land on inserts"
       );
       for (axis in ["X", "Y", "Z"]) {
-        var matching=definition.couplings.filter(k->k.id==machinekit.hobbing.HobberDrives.member(axis,"lead"));
+        var matching=definition.couplings.filter(k->k.id==hobber.HobberDrives.member(axis,"lead"));
         check(matching.length==1,"one physical screw coupling for "+axis);
         var coupling=matching[0];
         near(Math.abs(coupling.ratio), 2 * Math.PI / 5, 1e-12, "ball screw derives rad/mm coupling");

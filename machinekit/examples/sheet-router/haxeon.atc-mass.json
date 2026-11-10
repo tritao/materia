@@ -23,7 +23,7 @@
     "../track-arm",
     "../overhead-arm",
     "../robot-screwdriver",
-    "../gantry-welder"
+    "../gantry-welder", "../flexspline-hobber"
   ],
   "dependencies": {
     "collisionkit-native": {

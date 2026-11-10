@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.motion.*;
 import machinekit.hobbing.*;
 import machinekit.component.*;
@@ -79,7 +80,7 @@ class HobberPurchasedTableChecks {
     for (axis in choices) {
       var assembly = axis.assembly(), spec = axis.specification(), restored = MachineAssembly.decode(
         assembly.encode(),
-        MachineKitComponents.standard()
+        HobberComponents.registry()
       );
       check(
         restored.components().length == assembly.components().length,
@@ -120,7 +121,7 @@ class HobberPurchasedTableChecks {
       "radialRunoutReason",
       "Explicit bench test fixture"
     ));
-    var saved = MachineAssembly.decode(measured.encode(), MachineKitComponents.standard()),
+    var saved = MachineAssembly.decode(measured.encode(), HobberComponents.registry()),
       part:PurchasedRotaryPart = cast saved.components().filter(m -> m.id == "housing")[0].component;
     near(part.axis.number("radialRunout"), 0.001, 0, "measured value persists");
     check(part.axis.basis("radialRunout") == machinekit.transmission.ValueBasis.Measured, "Measured basis persists");
@@ -128,7 +129,7 @@ class HobberPurchasedTableChecks {
     var raw = cadkit.modeling.Part.cylinderSpan(19.99,
       -590, HobberLayout.get().nativeTableFace + 20), cylinder = machinekit.assembly.PosedParts.moved(
         raw,
-        machinekit.hobbing.HobberFrame.workToMachine()
+        hobber.HobberFrame.workToMachine()
       );
     raw.close();
     try {

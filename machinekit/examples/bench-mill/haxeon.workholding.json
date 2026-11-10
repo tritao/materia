@@ -25,7 +25,7 @@
   "sourceRoots": [
     "../casting-shop",
     ".",
-    "../cnc-router"
+    "../cnc-router", "../flexspline-hobber"
   ],
   "dependencies": {
     "robotkit-autonomy": {

@@ -1,9 +1,10 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import machinekit.design.DesignRequirement;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
-import machinekit.hobbing.HobberDrives;
+import hobber.HobberDrives;
 import machinekit.motion.BallNut;
 import materia.assembly.AssemblyFrames as F;
 
@@ -13,14 +14,14 @@ class HobberServiceDesignChecks {
   public static function run(machine:FlexsplineHobber):Array<String> {
     var drive=HobberDrives.x(), nut=new BallNut(), block=HobberDrives.nutBlock(drive,nut), at=HobberDrives.poses(drive).get("nut");
     var direction=F.transformVector(at,0,0,1), flange=F.transformPoint(at,0,0,nut.bodyLength);
-    var b=machinekit.hobbing.HobberChipCover.nutBounds(), expected=HobberLayout.get().nutBlockFront;
+    var b=hobber.HobberChipCover.nutBounds(), expected=HobberLayout.get().nutBlockFront;
     if(direction.x<0.9999 || Math.abs(flange.x-b.maxX)>1e-7)throw "X nut flange is not on the motor-side block face";
     if(Math.abs(b.minX-expected)>1e-7 || Math.abs(b.maxX-expected-block.thickness)>1e-7)throw "X nut reversal displaced the carriage interface";
-    var poses=machine.solvedPoses(), back=F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), members=machine.components();
+    var poses=machine.solvedPoses(), back=F.inverse(hobber.HobberFrame.workToMachine()), members=machine.components();
     var screw:machinekit.motion.HzMotionDrawingScrew=cast members.filter(m->m.id=="Xscrew")[0].component;
     var initial=machine.travel.filter(t->t.id=="X")[0].initial, reserve=1e9, barrel=1e9;
     for(x in [HobberLayout.get().xMin-5,HobberLayout.get().xRetract+5]) {
-      var delta=F.transformVector(machinekit.hobbing.HobberFrame.workToMachine(),x-initial,0,0);
+      var delta=F.transformVector(hobber.HobberFrame.workToMachine(),x-initial,0,0);
       var p=F.compose(F.inverse(poses.get("Xscrew")),F.compose(F.translation(delta.x,delta.y,delta.z),poses.get("Xnut")));
       var a=F.transformPoint(p,0,0,0).z,c=F.transformPoint(p,0,0,nut.bodyLength).z,d=F.transformPoint(p,0,0,nut.bodyLength+nut.flangeThickness).z;
       barrel=Math.min(barrel,Math.min(Math.min(a,c)-screw.fixedEnd,screw.totalLength-screw.floatingEnd-Math.max(a,c)));

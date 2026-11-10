@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberDrives;
+import hobber.*;
+import hobber.HobberDrives;
 import machinekit.design.DesignRequirement;
 import machinekit.hobbing.HobSpindle;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
@@ -131,7 +132,7 @@ class HobberAssemblyProcedures {
    * compensated instead of left in the part. Roll about the travel is not measured here (it needs a level or the optics' roll option).
    */
   public static function compensateTilt(axis:String, travel:{lower:Float, upper:Float}, rails:Array<String>):Procedure {
-    var scale = machinekit.hobbing.HobberScales.member(axis);
+    var scale = hobber.HobberScales.member(axis);
     return {
       id: axis.toLowerCase() + "-compensate-tilt",
       label: axis + ": measure pitch and yaw and load the correction table",

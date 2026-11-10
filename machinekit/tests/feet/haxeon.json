@@ -8,7 +8,7 @@
     "src",
     "../../examples/bench-mill",
     "../../examples/casting-shop",
-    "../../examples/cnc-router"
+    "../../examples/cnc-router", "../../examples/flexspline-hobber"
   ],
   "dependencies": {
     "machinekit": {

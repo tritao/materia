@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.assembly.PosedParts;
 import cadkit.modeling.Part;
@@ -67,7 +68,7 @@ class HobberLoadingChecks {
           state.forwardKinematics();
           // A conservative occupied volume encloses BOTH transfer and seating,
           // so no gap between gripper path samples can conceal an obstruction.
-          var gripperPose = F.compose(machinekit.hobbing.HobberFrame.workToMachine(), F.translation(0, 0, 363));
+          var gripperPose = F.compose(hobber.HobberFrame.workToMachine(), F.translation(0, 0, 363));
           var jaws = [for (jaw in sweptJaws) PosedParts.moved(jaw,
             gripperPose)], jawBoxes = [for (jaw in jaws) PosedParts.boxOf(jaw)];
           for (m in members) if (m.id != "blank") {
@@ -88,7 +89,7 @@ class HobberLoadingChecks {
           }
           for (jaw in jaws) jaw.close();
           for (sample in samples) {
-            var pose = F.compose(machinekit.hobbing.HobberFrame.workToMachine(), F.translation(sample.x, 0, 363 + sample.lift));
+            var pose = F.compose(hobber.HobberFrame.workToMachine(), F.translation(sample.x, 0, 363 + sample.lift));
             for (m in members) if (m.id != "blank") {
               var volume = cache.overlap(cup.component, pose, m.component, state.worldPose(m.id));
               count++;

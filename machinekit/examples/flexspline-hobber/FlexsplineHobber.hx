@@ -1,3 +1,4 @@
+import hobber.*;
 import cadkit.modeling.AssemblyState;
 import gearkit.*;
 import machinekit.assembly.*;
@@ -57,6 +58,7 @@ class FlexsplineHobber extends MachineAssembly {
   final zUnit:HobberZAxis;
   public function new(?spec:GearSpec,gashes:Int=12,detailedHob:Bool=false,?rotaryAxis:PrecisionRotaryAxis) {
     super();
+    HobberComponents.install();
     var layout=HobberLayout.get();
     this.spec=spec==null?new GearSpec(0.3,200,8,new Involute(20*Math.PI/180)):spec;
     if(this.spec.internal)throw "external hobbing machine requires external gear";

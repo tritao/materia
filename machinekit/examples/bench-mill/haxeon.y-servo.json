@@ -26,7 +26,7 @@
     "../casting-shop",
     ".",
     "../cnc-router",
-    "../../tests/src"
+    "../../tests/src", "../flexspline-hobber"
   ],
   "dependencies": {
     "robotkit-autonomy": {

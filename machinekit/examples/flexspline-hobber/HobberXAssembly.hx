@@ -1,6 +1,7 @@
+import hobber.*;
 import machinekit.hobbing.*;
-import machinekit.hobbing.HobberLayout;
-import machinekit.hobbing.HobberCarriageRib;
+import hobber.HobberLayout;
+import hobber.HobberCarriageRib;
 
 /** Assembly instructions are keyed to the actual derived joints, never a second bolt list.
  * Tool IDs are shared with the LM6 tooling BOM. Support seat layers are held by the same through-stack fasteners. */
@@ -52,7 +53,7 @@ class HobberXAssembly {
   static function headAccess(machine:FlexsplineHobber):Int {
     var derived=machine.derivedFasteners(); if (derived==null) throw "Missing X head joints";
     var poses=machine.solvedPoses(), members=machine.components(), cache=new machinekit.assembly.PosedParts(), count=0;
-    var guards=machinekit.hobbing.HobberChipCover.fixedMembers().concat(["Xskirt"]);
+    var guards=hobber.HobberChipCover.fixedMembers().concat(["Xskirt"]);
     for (joint in derived.joints) if (joint.clampedMember=="XscaleHead") {
       var host=members.filter(p->p.id==joint.receivingMember)[0];
       var face=host.component.fasteningFaces().filter(f->f.id==joint.receivingFace)[0];
@@ -86,7 +87,7 @@ class HobberXAssembly {
   static function bayNutAccess(machine:FlexsplineHobber):Int {
     var derived=machine.derivedFasteners(); if (derived==null) throw "Missing bay lid joints";
     var poses=machine.solvedPoses(), members=machine.components(), cache=new machinekit.assembly.PosedParts(), count=0;
-    var back=materia.assembly.AssemblyFrames.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var back=materia.assembly.AssemblyFrames.inverse(hobber.HobberFrame.workToMachine());
     for (joint in derived.joints) if (joint.clampedMember=="XrearCover") {
       var host=members.filter(p->p.id==joint.receivingMember)[0];
       var face=host.component.fasteningFaces().filter(f->f.id==joint.receivingFace)[0];
@@ -94,13 +95,13 @@ class HobberXAssembly {
       for (volume in joint.volumes) if (volume.name=="nut") for (targetIndex=>hole in joint.hostHoles) {
         var centre=materia.assembly.AssemblyFrames.transformPoint(frame,hole.x,hole.y,(volume.from+volume.to)/2);
         var point=materia.assembly.AssemblyFrames.transformPoint(back,centre.x,centre.y,centre.z);
-        var x0=point.x-5, x1=machinekit.hobbing.HobberChipCover.REAR_END+5;
+        var x0=point.x-5, x1=hobber.HobberChipCover.REAR_END+5;
         // ASSUMED AF5.5 offset spanner: D10 jaw, 5-wide handle offset 7, 2 thick, >=140 reach.
         var outward=point.y<0?-1:1, handleY=point.y+outward*7;
         function envelope(x0:Float,x1:Float,y0:Float,y1:Float):cadkit.modeling.Part {
           var raw=cadkit.modeling.Part.box(x1-x0,y1-y0,2);
           var out=machinekit.assembly.PosedParts.moved(raw,materia.assembly.AssemblyFrames.compose(
-            machinekit.hobbing.HobberFrame.workToMachine(),materia.assembly.AssemblyFrames.translation((x0+x1)/2,(y0+y1)/2,point.z-1)));
+            hobber.HobberFrame.workToMachine(),materia.assembly.AssemblyFrames.translation((x0+x1)/2,(y0+y1)/2,point.z-1)));
           raw.close();return out;
         }
         var tools=[envelope(x0,point.x+5,point.y-5,point.y+5),
@@ -145,11 +146,11 @@ class HobberXAssembly {
   static function guardFootAccess(machine:FlexsplineHobber):Int {
     var derived=machine.derivedFasteners();if(derived==null)throw "Missing guard joints";
     var members=machine.components(),cache=new machinekit.assembly.PosedParts(),count=0;
-    var plugs=[for(p in machinekit.hobbing.HobberChipCover.plugs())p.id];
+    var plugs=[for(p in hobber.HobberChipCover.plugs())p.id];
     var travel=machine.travel.filter(t->t.id=="X")[0];
     for(front in [true,false]) {
       var state=new cadkit.modeling.AssemblyState(machine.definition());
-      state.setJoint("X",front?travel.upper:travel.lower);state.setJoint("Z",machinekit.hobbing.HobberLayout.get().zTravelMax);state.forwardKinematics();
+      state.setJoint("X",front?travel.upper:travel.lower);state.setJoint("Z",hobber.HobberLayout.get().zTravelMax);state.forwardKinematics();
       var poses=machine.solvedPoses(state);
       for(joint in derived.joints)if(joint.clampedFace=="pad"&&StringTools.startsWith(joint.clampedMember,front?"XcoverFront":"XcoverRear")) {
         var host=members.filter(m->m.id==joint.receivingMember)[0],hp=poses.get(host.id);if(hp==null)throw "Missing guard receiver pose";

@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 import machinekit.structural.MineralCasting;
@@ -182,8 +183,8 @@ class CastingTests {
       near(member.component.massProperties().mass, original.massProperties().mass, 1e-9, "assembly roundtrip mass");
     }
     var references:Array<MineralFoundation> = [
-      new machinekit.hobbing.MineralCastBed(),
-      new machinekit.hobbing.MineralCastColumn()
+      new hobber.MineralCastBed(),
+      new hobber.MineralCastColumn()
     ];
     for (reference in references) {
       check(!FoundationIntegrity.check(reference).hasErrors(), "hobber insert alignment");

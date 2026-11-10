@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblySets;
 import machinekit.standard.HexNut;
@@ -7,6 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 class SceneGroupTests {
   static function expect(value:Bool, message:String):Void { if (!value) throw message; }
   public static function main():Void {
+    HobberComponents.install();
     var child = new MachineAssembly();
     child.group("Drive");
     child.addComponent("nut", HexNut.metric("M5"));
@@ -59,7 +61,7 @@ class SceneGroupTests {
     expect(sets.filter(s -> s.id == "kind:Dowels")[0].members.join(",") == "unit/pin", "dowels from BOM identity");
     expect(sets.filter(s -> s.id == "kind:Purchased")[0].members.length == 4, "procurement category");
     var categories = new MachineAssembly(); categories.group("Fixtures");
-    categories.addComponent("shield", new machinekit.hobbing.HobberChipCover());
+    categories.addComponent("shield", new hobber.HobberChipCover());
     categories.addComponent("insert", new machinekit.structural.CastInsert(new machinekit.component.ComponentValues().setToken("role", materia.casting.InsertSpec.InsertRole.GenericMount)));
     categories.addComponent("motor", machinekit.motion.NemaStepper.frame(23));
     categories.addComponent("nutMount", new machinekit.milling.MillYNutMount());

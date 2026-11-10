@@ -10,7 +10,7 @@
   ],
   "sourceRoots": [
     "../casting-shop",
-    "."
+    ".", "../flexspline-hobber"
   ],
   "dependencies": {
     "cadkit": {

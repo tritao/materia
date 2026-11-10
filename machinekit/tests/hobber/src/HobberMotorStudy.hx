@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
@@ -32,14 +33,14 @@ class HobberMotorStudy {
       for (j in def.joints) if (group.indexOf(j.parent) >= 0 && group.indexOf(j.child) < 0) {group.push(j.child); expanded = true;}
     }
     var dynamics = HobberFrameChecks.spindleDrive(machine);
-    var back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), face = F.compose(back, poses.get("swivel/output"));
+    var back = F.inverse(hobber.HobberFrame.workToMachine()), face = F.compose(back, poses.get("swivel/output"));
     var lines = ["P3: one installed top layout; beside layouts below are geometric studies. Adapter and joint stiffness assumptions are explicit."];
     var model = new cadkit.modeling.AssemblyModel("mm"); machine.addTo(model, "");
     // Independent study snapshot extends linear limits by the design overtravel.
     // The installed machine definition and its operational limits stay intact.
     var studyDefinition = model.definition("motor-layout-study");
     for (j in studyDefinition.joints) {
-      if (j.id == "X") {j.limits.lower = machinekit.hobbing.HobberLayout.get().xMin - 5; j.limits.upper = 115;}
+      if (j.id == "X") {j.limits.lower = hobber.HobberLayout.get().xMin - 5; j.limits.upper = 115;}
       if (j.id == "Y") {j.limits.lower = -15; j.limits.upper = 15;}
       if (j.id == "Z") {j.limits.lower = -15; j.limits.upper = 195;}
     }
@@ -48,7 +49,7 @@ class HobberMotorStudy {
     var adapter = Part.box(10, 89, 72).translated(new Vector(-53, 194.5, HobberLayout.get().nativeHobCentreZ - 36));
     var adapterMass = adapter.volume() * 1e-9 * 7850;
     var targets = ["bed/casting", "column/casting", "Xbridge", "Zplate", "Ymodule/carriage", "Ymodule/base", "Ymodule/railLeft", "Ymodule/railRight", "Ymodule/base", "Ymodule/base", "Ymodule/carriage", "ZdriveFixedBar", "ZdriveFloatingBar"];
-    var lower = machinekit.hobbing.HobberLayout.get().xMin;
+    var lower = hobber.HobberLayout.get().xMin;
     for (side in [0, -1, 1]) {
       var c = side == 0 ? 1.0 : 0.0, s = side * 1.0;
       var rotate = F.fromRotationMatrix(0, 0, 0, [c, -s, 0, s, c, 0, 0, 0, 1]);

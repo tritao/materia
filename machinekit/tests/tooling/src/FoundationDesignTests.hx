@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.structural.MineralCasting;
 import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
@@ -413,8 +414,8 @@ class FoundationDesignTests {
     }
     if (Sys.args().indexOf("--export-approved-hobber") >= 0) {
       var sources:Array<{id:String, part:machinekit.structural.MineralFoundation}> = [
-        {id: "hobber-bed", part: new machinekit.hobbing.MineralCastBed()},
-        {id: "hobber-column", part: new machinekit.hobbing.MineralCastColumn()}
+        {id: "hobber-bed", part: new hobber.MineralCastBed()},
+        {id: "hobber-column", part: new hobber.MineralCastColumn()}
       ];
       for (row in sources) {
         var part = row.part.body.geometry();
@@ -451,8 +452,8 @@ class FoundationDesignTests {
       {id: "mill-column", part: frame.column}
     ];
     if (!millOnly) {
-      foundations.push({id: "hobber-bed", part: new machinekit.hobbing.MineralCastBed()});
-      foundations.push({id: "hobber-column", part: new machinekit.hobbing.MineralCastColumn()});
+      foundations.push({id: "hobber-bed", part: new hobber.MineralCastBed()});
+      foundations.push({id: "hobber-column", part: new hobber.MineralCastColumn()});
     }
     var baseline:Dynamic = haxe.Json.parse(sys.io.File.getContent(root
       + "/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
@@ -489,7 +490,7 @@ class FoundationDesignTests {
         == machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Supported;
       var boxes = boxSupported ? row.part.body.materialBoxes() : null;
       var half = row.id == "hobber-bed"
-        ? machinekit.hobbing.HobberLayout.get().xNominal().footSpan / 2 : row.part.body.parameterNumber("width") / 2;
+        ? hobber.HobberLayout.get().xNominal().footSpan / 2 : row.part.body.parameterNumber("width") / 2;
       currentRows.push({
         id: row.id,
         sourceFingerprint: materia.tooling.ToolingCodec.inputFingerprint(sourceInput),

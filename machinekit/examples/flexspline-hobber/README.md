@@ -187,3 +187,9 @@ and `HobberServiceAccess` owns the declared service paths.
 The project variants include an isolated preview of each unit. Their entry
 functions are in `HobberUnitPreview`; `haxeon.units.json` runs the foundation
 preview directly.
+
+The `hobber` package beside the example owns this machine's layout, foundation
+rules, fitted parts and FE data. Reusable hobbing components remain under
+`machinekit.hobbing`. `HobberComponents` registers the application recipes with
+the same catalogue IDs and part numbers; tools rebuilding a saved machine can
+pass `HobberComponents.registry()` to `MachineAssembly.decode`.

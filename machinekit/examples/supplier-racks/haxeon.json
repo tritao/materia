@@ -8,7 +8,7 @@
     "../../tests/src",
     ".",
     "../press-brake",
-    ".."
+    "..", "../flexspline-hobber"
   ],
   "dependencies": {
     "collisionkit-native": {

@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import machinekit.assembly.PosedParts;
 import materia.assembly.AssemblyFrames as F;
 import cadkit.modeling.AssemblyModel;
@@ -15,7 +16,7 @@ class HobberZDriveChecks {
     m.addTo(model, "");
     var state = model.initialState();
     state.forwardKinematics();
-    var members = m.components(), work = F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), cache = new PosedParts();
+    var members = m.components(), work = F.inverse(hobber.HobberFrame.workToMachine()), cache = new PosedParts();
     function pose(id:String):materia.assembly.AssemblyRecord.AssemblyFrame return F.compose(work, state.worldPose(id));
     var a = pose("railZLeft"), b = pose("railZRight"),
       screw = pose("Zscrew"), fixed = pose("Zfixed"), floating = pose("Zfloating"), motor = pose("Zmotor");

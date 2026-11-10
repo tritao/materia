@@ -3,7 +3,7 @@
 	"package": { "name": "machinekit-motor-shaft-example" },
 	"entry": "MotorShaftBearingsPreview",
 	"sources": ["MotorShaftBearings.hx", "MotorShaftBearingsPreview.hx"],
-	"sourceRoots": ["."],
+	"sourceRoots": [".", "flexspline-hobber"],
 	"dependencies": {
 		"projectkit": { "path": "../../projectkit" },
 		"cadkit": { "path": "../../cadkit" },

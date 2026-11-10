@@ -10,7 +10,7 @@
     "../cnc-router",
     "build/assets",
     "../machine-tending",
-    "../casting-shop"
+    "../casting-shop", "../flexspline-hobber"
   ],
   "dependencies": {
     "robotkit-autonomy": {

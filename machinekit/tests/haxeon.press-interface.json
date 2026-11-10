@@ -5,7 +5,7 @@
 	},
 	"entry": "PressBrakeInterfaceTests",
 	"sourceRoots": [
-		"src"
+		"src", "../examples/flexspline-hobber"
 	],
 	"dependencies": {
 		"processkit": {

@@ -10,7 +10,7 @@
     "../../../machinekit/examples/mobile-base",
     "../../../machinekit/examples/robot-arm",
     "../../../machinekit/examples/printer",
-    "../../../processkit/tests/moonraker"
+    "../../../processkit/tests/moonraker", "../../../machinekit/examples/flexspline-hobber"
   ],
   "dependencies": {
     "haxeon-platform": {

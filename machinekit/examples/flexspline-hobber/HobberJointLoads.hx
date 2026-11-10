@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.assembly.JointSlip.JointLoad;
 import machinekit.assembly.JointSlip.LoadCase;
 import machinekit.motion.ErobActuatorData;
@@ -54,7 +55,7 @@ class HobberJointLoads {
     // Conservative column interface shear: the whole X-moving mass is charged
     // to this joint. Gravity is normal to this horizontal interface, not shear.
     var xCrash = HobberCrashProtection.axis(machine, "X");
-    for (pad in machinekit.hobbing.HobberLayout.get().columnSolePads()) loads.push({
+    for (pad in hobber.HobberLayout.get().columnSolePads()) loads.push({
       label: "Column sole pad " + pad.id + " on the X carriage (whole shear charged to each pad)",
       between: ["column/"+pad.id, "Xbridge"],
       shear: {peak: xCrash.movingKg * 0.5 + CUTTING_FORCE,
@@ -80,7 +81,7 @@ class HobberJointLoads {
       {id:"Z",carriage:"Zplate",block:"ZnutBlock",insert:"column/driveSeat"}
     ]) {
       var crash=HobberCrashProtection.axis(machine,axis.id),design=crash.limit.designThrust,jam=crash.limit.thrust+crash.gravityN;
-      var fixed=machinekit.hobbing.HobberDrives.barMember(axis.id,"fixed"),floating=machinekit.hobbing.HobberDrives.barMember(axis.id,"floating");
+      var fixed=hobber.HobberDrives.barMember(axis.id,"fixed"),floating=hobber.HobberDrives.barMember(axis.id,"floating");
       loads.push({label:axis.id+" screw thrust on fixed support",between:[fixed,axis.id+"fixed"],shear:{peak:design,momentary:jam}});
       loads.push({label:axis.id+" fixed ground bar on casting insert",between:[fixed,axis.insert],shear:{peak:design,momentary:jam}});
       // ASSUMED10 N handling allowance; the floating bearing takes no axial drive thrust.
@@ -96,7 +97,7 @@ class HobberJointLoads {
     // passes through the nut/fixed support; a Y stop takes a Y-axis crash.
     // Charge the whole moving weight and the assumed100 N guide drag to EACH
     // rail, then add the100 N cutting bound in its worst direction.
-    var angle=machinekit.hobbing.HobberLayout.get().swivelRange,along=yg*Math.sin(angle)+100,across=yg*Math.cos(angle);
+    var angle=hobber.HobberLayout.get().swivelRange,along=yg*Math.sin(angle)+100,across=yg*Math.cos(angle);
     var fPeak=row.peakTorque/(ys.railSpacing/1000)+along,fCrash=row.momentaryTorque/(ys.railSpacing/1000)+along;
     var railPeak=Math.sqrt(fPeak*fPeak+across*across)+CUTTING_FORCE,railCrash=Math.sqrt(fCrash*fCrash+across*across)+CUTTING_FORCE;
     var railLoad:LoadCase={peak:railPeak,momentary:railCrash};
@@ -130,8 +131,8 @@ class HobberJointLoads {
     // Chip guards carry their own mass with the axis acceleration and an assumed
     // 2 N debris/handling force, not cutting thrust. Apply the whole fixed X
     // assembly weight to each foot conservatively; all loads remain joint-derived.
-    var fixedGuardWeight=massOf(machine,machinekit.hobbing.HobberChipCover.fixedMembers())*(g+0.5)+2;
-    for(r in machinekit.hobbing.HobberChipCover.installations()) {
+    var fixedGuardWeight=massOf(machine,hobber.HobberChipCover.fixedMembers())*(g+0.5)+2;
+    for(r in hobber.HobberChipCover.installations()) {
       var shear=r.parent=="bed/driveSeat"?fixedGuardWeight:massOf(machine,[r.id])*(g+0.5)+2;
       loads.push({label:"Chip guard "+r.id,between:[r.id,r.parent],shear:{peak:shear}});
     }
@@ -143,7 +144,7 @@ class HobberJointLoads {
       if(!upper)loads.push({label:cover.id+" fixed flange",between:[cover.fixedMember,"Xbridge"],shear:{peak:load}});
       else {
         var fixed=cover.id+"FixedMount",side=cover.id.indexOf("Left")>=0?-1:1;
-        var rail=machinekit.hobbing.HobberLayout.get().rails("column",machinekit.hobbing.HobberLayout.get().foundationPlacements("column")).filter(r->side*r.contact.y>0)[0];
+        var rail=hobber.HobberLayout.get().rails("column",hobber.HobberLayout.get().foundationPlacements("column")).filter(r->side*r.contact.y>0)[0];
         loads.push({label:cover.id+" fixed flange",between:[cover.fixedMember,fixed],shear:{peak:load}});
         loads.push({label:cover.id+" fixed bracket",between:[fixed,"column/"+rail.insertId],shear:{peak:load}});
       }

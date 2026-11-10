@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "screw-controller-tests" },
 	"entry": "ScrewControllerTests",
-	"sourceRoots": ["../src"],
+	"sourceRoots": ["../src", "../../examples/flexspline-hobber"],
 	"dependencies": { "processkit": { "path": "../../../processkit" } },
 	"target": "host",
 	"outputDir": "build"

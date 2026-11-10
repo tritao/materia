@@ -1,3 +1,4 @@
+import hobber.*;
 import cadkit.modeling.Scope;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.Box3;
@@ -31,11 +32,11 @@ class CastingAggregateReview {
       }
     ];
     if (only == null || only == "plinth") {
-      var source = new machinekit.hobbing.MineralCastBed(), document = HobberMoldSetup.document(source);
+      var source = new hobber.MineralCastBed(), document = HobberMoldSetup.document(source);
       entries.push({id: "plinth", document: document, options: HobberMoldSetup.options(document.input)});
     }
     if (only == null || only == "hobber-column") {
-      var source = new machinekit.hobbing.MineralCastColumn(), document = HobberMoldSetup.document(
+      var source = new hobber.MineralCastColumn(), document = HobberMoldSetup.document(
         source,
         HobberMoldSetup.HobberMoldCasting.Column
       );

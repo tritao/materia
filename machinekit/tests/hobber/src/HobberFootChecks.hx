@@ -1,5 +1,6 @@
-import machinekit.hobbing.HobberLayout;
-import machinekit.hobbing.MineralCastBed;
+import hobber.*;
+import hobber.HobberLayout;
+import hobber.MineralCastBed;
 import machinekit.structural.LevelingFoot;
 import machinekit.component.MachineKitComponents;
 import machinekit.assembly.MachineAssembly;
@@ -27,7 +28,7 @@ class HobberFootChecks {
       || feature.id.indexOf("stem-upper") >= 0).length == 0,
       "no cast plate registers or upper stud passages"
     );
-    var restored = MachineAssembly.decode(machine.encode(), MachineKitComponents.standard());
+    var restored = MachineAssembly.decode(machine.encode(), HobberComponents.registry());
     check(restored.components().length == members.length, "separate foot hardware persists");
     var body = machine.bed.body.geometry(), plate = LevelingFoot.of(Plate(
       MineralCastBed.FOOT_PLATE_WIDTH,

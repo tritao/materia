@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.PosedParts;
 import machinekit.assembly.PosedParts.PartBox;
@@ -107,10 +108,10 @@ class HobberEnclosurePreview {
       var loading:PartBox = {
         minX: origin.x - r - 25,
         maxX: origin.x + r + 25,
-        minY: Math.min(origin.y - machinekit.hobbing.HobberLayout.get().frontApproach - r - 80, swept.minY - 225),
+        minY: Math.min(origin.y - hobber.HobberLayout.get().frontApproach - r - 80, swept.minY - 225),
         maxY: origin.y + 15,
         minZ: origin.z - 60,
-        maxZ: origin.z + 80 + machinekit.hobbing.HobberLayout.get().frontLift
+        maxZ: origin.z + 80 + hobber.HobberLayout.get().frontLift
       };
       // Tray overlaps the casting perimeter by the rebate width.
       var a = machinekit.enclosure.TraySeat.WIDTH;
@@ -159,8 +160,8 @@ class HobberEnclosurePreview {
   } {
     var machine = source == null ? new FlexsplineHobber() : source,
       fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout, {
-        halfWidth: machinekit.hobbing.HobberChipCover.OUTER_HALF_WIDTH + machinekit.enclosure.TraySeat.SEAM,
-        rearY: machinekit.hobbing.HobberChipCover.REAR_END
+        halfWidth: hobber.HobberChipCover.OUTER_HALF_WIDTH + machinekit.enclosure.TraySeat.SEAM,
+        rearY: hobber.HobberChipCover.REAR_END
       }), assembly = new MachineAssembly();
     assembly.includeAsGroup("Machine", "machine", machine);
     assembly.includeAsGroup(ENCLOSURE_GROUP, SHELL_ID, shell);
@@ -304,9 +305,9 @@ class HobberEnclosurePreview {
         wall: machine.mandrel.parameterNumber("sleeveWall"),
         length: machine.mandrel.parameterNumber("sleeveLength"),
         radialTravel: machine.mandrel.parameterNumber("radialFitGap"),
-        retractX: machinekit.hobbing.HobberLayout.get().xRetract,
-        frontApproachMm: machinekit.hobbing.HobberLayout.get().frontApproach,
-        liftMm: machinekit.hobbing.HobberLayout.get().frontLift
+        retractX: hobber.HobberLayout.get().xRetract,
+        frontApproachMm: hobber.HobberLayout.get().frontApproach,
+        liftMm: hobber.HobberLayout.get().frontLift
       };
     }
     if (scene.project == null) scene.project = {dynamicParts: [], motions: []};

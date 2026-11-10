@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import machinekit.assembly.MachineAssembly;
 import machinekit.enclosure.GeneratedEnclosure;
 import machinekit.structural.BlockBracket;

@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import machinekit.component.ComponentValues;
 import machinekit.structural.MineralFoundation;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;

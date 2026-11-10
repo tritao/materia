@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-eoat-example" },
 	"entry": "eoat.EndEffectorExampleChecks",
-	"sourceRoots": [".."],
+	"sourceRoots": ["..", "../flexspline-hobber"],
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },
 		"cadkit": { "path": "../../../cadkit" },

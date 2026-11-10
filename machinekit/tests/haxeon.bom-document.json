@@ -17,7 +17,7 @@
     "../haxe/src/machinekit/component/BomReleases.hx"
   ],
   "sourceRoots": [
-    "src"
+    "src", "../examples/flexspline-hobber"
   ],
   "dependencies": {
     "machinekit": {

@@ -1,3 +1,4 @@
+import hobber.*;
 import materia.casting.Box3;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingBounds;
@@ -22,7 +23,7 @@ class FoundationStudyGeometry {
   public static function bounds(row:FoundationStudyRegion):Array<Float> return BoxAlgebra.limits(row.box);
 
   public static function designRegions():Array<FoundationStudyRegion> {
-    var body = new machinekit.hobbing.MineralCastBed().body;
+    var body = new hobber.MineralCastBed().body;
     var kinds = new Map<String, CastingFeatureKind>();
     for (feature in body.castingFeatures()) kinds.set(feature.id, feature.kind);
     var result:Array<FoundationStudyRegion> = [];
@@ -38,7 +39,7 @@ class FoundationStudyGeometry {
     return result;
   }
 
-  public static function insertRegion(row:machinekit.hobbing.HobberLayout.InsertLocation):FoundationStudyRegion {
+  public static function insertRegion(row:hobber.HobberLayout.InsertLocation):FoundationStudyRegion {
     row.part.boxDimensions(row.id); // Explicit source-ID gate; this study cannot approximate a round insert.
     return {
       id: row.id,

@@ -1,12 +1,13 @@
+import hobber.*;
 import HobberMoldSetup.HobberMoldCasting;
 
 /** Same native planner, scene and fabrication exporter as the mill kits. */
 class HobberMoldPreview {
   static function foundation(casting:HobberMoldCasting):machinekit.structural.MineralFoundation return switch casting {
     case HobberMoldCasting.Plinth:
-      new machinekit.hobbing.MineralCastBed();
+      new hobber.MineralCastBed();
     case HobberMoldCasting.Column:
-      new machinekit.hobbing.MineralCastColumn();
+      new hobber.MineralCastColumn();
     default:
       throw "Unknown hobber mold casting: " + casting;
   };

@@ -30,7 +30,7 @@
 		".",
 		"../bench-mill",
 		"../casting-shop",
-		"../cnc-router"
+		"../cnc-router", "../flexspline-hobber"
 	],
 	"dependencies": {
 		"processkit": {"path": "../../../processkit"},

@@ -8,7 +8,7 @@
     "src",
     "../src",
     "../../examples/sheet-router",
-    "../../../projectkit/tests/src"
+    "../../../projectkit/tests/src", "../../examples/flexspline-hobber"
   ],
   "dependencies": {
     "machinekit": {

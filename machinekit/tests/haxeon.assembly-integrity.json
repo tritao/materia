@@ -5,7 +5,7 @@
 	},
 	"entry": "AssemblyIntegrityTests",
 	"sourceRoots": [
-		"src"
+		"src", "../examples/flexspline-hobber"
 	],
 	"dependencies": {
 		"cadkit": {

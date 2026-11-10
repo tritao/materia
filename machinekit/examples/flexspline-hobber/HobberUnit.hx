@@ -1,3 +1,4 @@
+import hobber.*;
 import cadkit.modeling.AssemblyState;
 import gearkit.*;
 import machinekit.assembly.*;
@@ -22,7 +23,7 @@ typedef HobberMount = {
 class HobberUnit extends MachineAssembly {
   public final key:String;
   public final layout:HobberLayout;
-  public final heights:machinekit.hobbing.HobberLayout.HobberHeightStack;
+  public final heights:hobber.HobberLayout.HobberHeightStack;
   public final mounts:Array<HobberMount> = [];
   public final mountContacts:Array<{parent:String, child:String}> = [];
   final hosts:Map<String, {member:String, connector:Null<String>}> = [];

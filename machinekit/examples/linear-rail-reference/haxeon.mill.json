@@ -8,7 +8,7 @@
     ".",
     "../bench-mill",
     "../cnc-router",
-    "../casting-shop"
+    "../casting-shop", "../flexspline-hobber"
   ],
   "dependencies": {
     "robotkit-autonomy": {

@@ -21,7 +21,7 @@
 		"../examples/gantry-picker",
 		"../examples/track-arm",
 		"../examples/overhead-arm",
-		"../examples/robot-screwdriver"
+		"../examples/robot-screwdriver", "../examples/flexspline-hobber"
 	],
 	"dependencies": {
 		"collisionkit-native": {

@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingCavities;
 import materia.casting.CastingPatterns;
@@ -6,7 +7,7 @@ import materia.assembly.AssemblyFrames as F;
 
 /** Approved source declarations, independent of artifact export. Native kit
  * review still proves reconstruction, fixture clearance and both motion graphs. */
-@:access(machinekit.hobbing.HobberFoundationSizing) class HobberSourceTests {
+@:access(hobber.HobberFoundationSizing) class HobberSourceTests {
   static var assertions = 0;
   static function check(value:Bool, message:String):Void {
     assertions++;
@@ -73,7 +74,7 @@ import materia.assembly.AssemblyFrames as F;
       ];
     for (kind in selections) {
       var foundation:machinekit.structural.MineralFoundation = kind
-        == Plinth ? new machinekit.hobbing.MineralCastBed() : new machinekit.hobbing.MineralCastColumn();
+        == Plinth ? new hobber.MineralCastBed() : new hobber.MineralCastColumn();
       var document = HobberMoldSetup.document(foundation, kind), input = document.input;
       var axis = kind == Plinth ? F.transformVector(document.setup.sourceToMold, 0, 0, 1) : F.transformVector(
         document.setup.sourceToMold,
@@ -98,7 +99,7 @@ import materia.assembly.AssemblyFrames as F;
       );
       for (point in points.filter(point -> point.id == "liftLeft" || point.id == "liftRight")) {
         var expectedX = kind == Plinth
-          ? -150 - machinekit.hobbing.HobberLayout.get().xNominal().bedCentre : (point.id == "liftLeft" ? -160.0 : 160.0);
+          ? -150 - hobber.HobberLayout.get().xNominal().bedCentre : (point.id == "liftLeft" ? -160.0 : 160.0);
         var expectedY = kind == Plinth ? (point.id == "liftLeft" ? -310.0 : 310.0) : -40.0;
         check(
           Math.abs(point.x - expectedX) + Math.abs(point.y - expectedY) < 1e-7,

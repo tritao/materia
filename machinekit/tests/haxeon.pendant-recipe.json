@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-pendant-recipe-tests"},
   "entry": "PendantRecipeTests",
-  "sourceRoots": ["src"],
+  "sourceRoots": ["src", "../examples/flexspline-hobber"],
   "dependencies": {"machinekit": {"path": ".."}},
   "target": "host",
   "outputDir": "build/pendant-recipe"

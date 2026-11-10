@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.assembly.PosedParts;
 import cadkit.modeling.AssemblyModel;
 import gearkit.GearSpec;
@@ -132,7 +133,7 @@ class HobberInterferenceChecks {
               sb.close();
               var local = PosedParts.moved(
                 common,
-                materia.assembly.AssemblyFrames.inverse(machinekit.hobbing.HobberFrame.workToMachine())
+                materia.assembly.AssemblyFrames.inverse(hobber.HobberFrame.workToMachine())
               );
               common.close();
               var bb = PosedParts.boxOf(local);

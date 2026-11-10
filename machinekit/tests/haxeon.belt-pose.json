@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-belt-pose-tests"},
   "entry": "BeltPoseTests",
-  "sourceRoots": ["src", "../examples/corexy"],
+  "sourceRoots": ["src", "../examples/corexy", "../examples/flexspline-hobber"],
   "dependencies": {"machinekit": {"path": ".."}, "projectkit": {"path": "../../projectkit"}, "cadkit": {"path": "../../cadkit"}},
   "target": "host",
   "outputDir": "build/belt-pose"

@@ -5,7 +5,7 @@
 	},
 	"entry": "NutBlockTests",
 	"sourceRoots": [
-		"src"
+		"src", "../examples/flexspline-hobber"
 	],
 	"dependencies": {
 		"cadkit": {

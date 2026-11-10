@@ -1,7 +1,8 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import machinekit.assembly.PosedParts;
-import machinekit.hobbing.MineralCastBed;
-import machinekit.hobbing.MineralCastColumn;
+import hobber.MineralCastBed;
+import hobber.MineralCastColumn;
 import machinekit.structural.CastInsert;
 import machinekit.structural.CastingCavityCad;
 import machinekit.structural.MineralFoundation;

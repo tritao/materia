@@ -15,7 +15,7 @@
     "../examples/bench-mill",
     "../examples/cobot-arm",
     "../examples/machine-tending",
-    "../examples/gantry-picker"
+    "../examples/gantry-picker", "../examples/flexspline-hobber"
   ],
   "dependencies": {
     "collisionkit-native": {"path": "../../collisionkit/native"},

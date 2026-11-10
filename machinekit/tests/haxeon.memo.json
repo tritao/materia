@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-memo-tests"},
   "entry": "MemoTests",
-  "sourceRoots": ["src"],
+  "sourceRoots": ["src", "../examples/flexspline-hobber"],
   "dependencies": {"machinekit": {"path": ".."}},
   "target": "host",
   "outputDir": "build/memo"

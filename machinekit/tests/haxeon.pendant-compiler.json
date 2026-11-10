@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-pendant-compiler-tests"},
   "entry": "PendantCompilerTests",
-  "sourceRoots": ["src"],
+  "sourceRoots": ["src", "../examples/flexspline-hobber"],
   "dependencies": {"machinekit": {"path": ".."}},
   "target": "host",
   "outputDir": "build/pendant-compiler"

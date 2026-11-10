@@ -22,7 +22,7 @@
     "src",
     "../examples/bench-mill",
     "../examples/cnc-router",
-    "../examples/casting-shop"
+    "../examples/casting-shop", "../examples/flexspline-hobber"
   ],
   "dependencies": {
     "robotkit-autonomy": {

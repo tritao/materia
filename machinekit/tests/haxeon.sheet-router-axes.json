@@ -23,7 +23,7 @@
     "../examples/overhead-arm",
     "../examples/robot-screwdriver",
     "../examples/gantry-welder",
-    "../examples/overhead-arm"
+    "../examples/overhead-arm", "../examples/flexspline-hobber"
   ],
   "dependencies": {
     "collisionkit-native": {

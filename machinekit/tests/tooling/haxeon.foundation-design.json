@@ -26,7 +26,7 @@
     "../../examples/casting-shop",
     "src",
     "../../examples/bench-mill",
-    "../../examples/cnc-router"
+    "../../examples/cnc-router", "../../examples/flexspline-hobber"
   ],
   "dependencies": {
     "robotkit-autonomy": {

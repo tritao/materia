@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-sheet-router-parts-tests"},
   "entry": "SheetRouterPartsTests",
-  "sourceRoots": ["src"],
+  "sourceRoots": ["src", "../examples/flexspline-hobber"],
   "dependencies": {"machinekit": {"path": ".."}},
   "target": "host",
   "outputDir": "build"

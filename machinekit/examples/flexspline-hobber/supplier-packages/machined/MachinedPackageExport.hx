@@ -1,3 +1,4 @@
+import hobber.*;
 import cadkit.MeshFeatureEdges;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
@@ -7,7 +8,7 @@ import machinekit.assembly.PosedParts;
 import machinekit.component.MachineComponent;
 import machinekit.component.ManufacturingRoute;
 import machinekit.component.ManufacturingRoute.RouteHole;
-import machinekit.hobbing.HobberDrives;
+import hobber.HobberDrives;
 import machinekit.hobbing.*;
 import machinekit.motion.BallNut;
 import machinekit.motion.NutBlock;
@@ -218,7 +219,7 @@ class MachinedPackageExport {
       var part=item.component,holes=part.derivedRouteHoles();
       if(Std.isOfType(part,HobberMadePart))holes=cast(part,HobberMadePart).holes();
       else if(Std.isOfType(part,NutBlock))holes=cast(part,NutBlock).holes();
-      else if(Std.isOfType(part,machinekit.hobbing.HobberChipCover))holes=holes.concat(cast(part,machinekit.hobbing.HobberChipCover).toolHoles());
+      else if(Std.isOfType(part,hobber.HobberChipCover))holes=holes.concat(cast(part,hobber.HobberChipCover).toolHoles());
       else if(Std.isOfType(part,machinekit.motion.ScrewLinearModulePart)) {
         var modulePart=cast(part,machinekit.motion.ScrewLinearModulePart),s=modulePart.spec;
         if(modulePart.role=="nutCarrier") {

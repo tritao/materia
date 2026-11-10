@@ -1,17 +1,18 @@
-import machinekit.hobbing.HobberLayout;
-import machinekit.hobbing.MineralCastBed;
-import machinekit.hobbing.HobberDrives;
+import hobber.*;
+import hobber.HobberLayout;
+import hobber.MineralCastBed;
+import hobber.HobberDrives;
 import machinekit.assembly.AssemblyIntegrity;
 import machinekit.assembly.PosedParts;
 import machinekit.design.DesignRequirement;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
 import machinekit.hobbing.HobSpindle;
-import machinekit.hobbing.HobberFeResults;
-import machinekit.hobbing.HobberCastingPockets;
+import hobber.HobberFeResults;
+import hobber.HobberCastingPockets;
 import machinekit.hobbing.*;
-import machinekit.hobbing.HobberSpindleRelief;
-import machinekit.hobbing.HobberScales;
+import hobber.HobberSpindleRelief;
+import hobber.HobberScales;
 import machinekit.hobbing.SpindleHousing;
 import materia.assembly.AssemblyFrames as F;
 
@@ -28,7 +29,7 @@ class HobberFrameChecks {
         {member: "column/", fastened: ["Xbridge"], faces: ["blockL1", "blockL2", "blockR1", "blockR2", "nut-block"]},
         {member: "XscaleHead", fastened: ["Xrib-scale"], faces: ["plate"]},
         // Tighten the sole after lowering the column, before fitting its removable skirt.
-        {member: "Xskirt", fastened: ["Xbridge"], faces: [for (pad in machinekit.hobbing.HobberLayout.get().columnSolePads()) "column-sole-"+pad.id]},
+        {member: "Xskirt", fastened: ["Xbridge"], faces: [for (pad in hobber.HobberLayout.get().columnSolePads()) "column-sole-"+pad.id]},
         // Indicate the housing on its carrier before mounting the carriage.
         {member:"Ymodule/carriage",fastened:["outboard"]},
         // The servo goes on the cradle after the cradle is bolted to the seat (the floor bolts' heads are under the servo).
@@ -109,7 +110,7 @@ class HobberFrameChecks {
   /** Rigid stock/metal envelopes use the old plate's work-Y width. Cable and
    * purge-hose routing are reported separately, not mistaken for plate width. */
   public static function v2GeometryGates(machine:FlexsplineHobber):Array<String> {
-    var poses=machine.solvedPoses(),back=F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var poses=machine.solvedPoses(),back=F.inverse(hobber.HobberFrame.workToMachine());
     var widest="",rigidMax=0.0,routing="",routingMax=0.0;
     PosedParts.scope(cache->{
       for(member in machine.components())if(StringTools.startsWith(member.id,"Ymodule/")||member.id=="outboardCarrier") {
@@ -143,11 +144,11 @@ class HobberFrameChecks {
     // running gap for every Z, and is invariant under common X travel.
     var housing=machine.swivel.housing.geometry();
     var placed=PosedParts.moved(housing,HobberLayout.get().swivelDatum());housing.close();
-    var outside=machinekit.component.Solids.cut(placed,[machinekit.hobbing.HobberLayout.get().envelope(0,0,0)]);
+    var outside=machinekit.component.Solids.cut(placed,[hobber.HobberLayout.get().envelope(0,0,0)]);
     var escaped=outside.volume();outside.close();
     if(escaped>0.001)throw 'Actual eRob housing escapes the Z clearance envelope: $escaped mm3';
     var range=HobberScales.stroke("Z"),over=HobberScales.overtravel();
-    var swept=machinekit.hobbing.HobberLayout.get().envelope(range.lower-over,range.upper+over,0);
+    var swept=hobber.HobberLayout.get().envelope(range.lower-over,range.upper+over,0);
     var bars=machine.components().filter(m->m.id=="ZdriveFloatingBar");if(bars.length!=1)throw "Missing Z floating bar";
     var bar=bars[0].component.geometry(),gap=bar.shape.distance(swept.shape);bar.close();swept.close();
     if(gap<2-1e-6)throw 'v2 Z bar/eRob continuous-sweep gap $gap mm is below2';
@@ -308,7 +309,7 @@ class HobberFrameChecks {
    */
   public static function scales(machine:FlexsplineHobber):Array<String> {
     var poses = machine.solvedPoses(), lines = [];
-    var back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var back = F.inverse(hobber.HobberFrame.workToMachine());
     var tool = F.compose(poses.get("hob"), machine.hob.connector("centre").frame);
     var toolWork = F.transformPoint(back, tool.x, tool.y, tool.z);
     for (a in HobberScales.all()) {
@@ -346,7 +347,7 @@ class HobberFrameChecks {
    * Returns one line per quantity; throws when the demand exceeds a rating that is known.
    */
   public static function swivelLoad(machine:FlexsplineHobber, ?worldPoses:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>):Array<String> {
-    var def = machine.definition(), poses = worldPoses ?? machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var def = machine.definition(), poses = worldPoses ?? machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine());
     var turning = new Map<String, Bool>();
     turning.set("swivel/output", true);
     var changed = true;
@@ -455,7 +456,7 @@ class HobberFrameChecks {
    * mode lies inside that band.
    */
   public static function spindleDrive(machine:FlexsplineHobber):{lines:Array<String>, modes:Array<{name:String, f:Float}>, modalMass:Float} {
-    var spindle = machine.spindle, rating = spindle.motor.rating, poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var spindle = machine.spindle, rating = spindle.motor.rating, poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine());
     function r(v:Float, digits:Int = 2):Float return Math.round(v * Math.pow(10, digits)) / Math.pow(10, digits);
     var lines = [];
     // Belt pull on the cartridge pulley.
@@ -639,7 +640,7 @@ class HobberFrameChecks {
 
   /** The members that move with the Z joint (the Z saddle and everything carried on it), and their mass and centre of mass in the work frame. */
   static function zMoving(machine:FlexsplineHobber):{mass:Float, x:Float, y:Float, z:Float, ids:Array<String>} {
-    var def = machine.definition(), poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var def = machine.definition(), poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine());
     var moving = new Map<String, Bool>();
     moving.set("blockZLeft", true);
     var changed = true;
@@ -670,7 +671,7 @@ class HobberFrameChecks {
    * only). Returns the lines; throws when the sign is wrong or a block is over its rating.
    */
   public static function zOffsetMoments(machine:FlexsplineHobber):Array<String> {
-    var z = zMoving(machine), g = 9.80665, offset = HobberLayout.get().zAxisY(), result = machinekit.hobbing.HobberLayout.get().zOffset();
+    var z = zMoving(machine), g = 9.80665, offset = HobberLayout.get().zAxisY(), result = hobber.HobberLayout.get().zOffset();
     if (offset * (z.y - 0) <= 0) throw 'Z screw at y ${offset} is on the opposite side of the moving mass centre (y ${z.y})';
     var report:Dynamic = FlexsplineHobberLayoutReport.measure(machine), mass = z.mass, q = 0.005 / (2 * Math.PI);
     var nut:machinekit.motion.BallNut = cast machine.components().filter(m -> m.id == "Znut")[0].component;
@@ -704,7 +705,7 @@ class HobberFrameChecks {
    * length. Internal bearing seats are part of the purchase, not an invented housing design. Returns the line; throws otherwise.
    */
   public static function spindleSeat(machine:FlexsplineHobber):Array<String> {
-    var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
+    var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(hobber.HobberFrame.workToMachine());
     var seat = HobberSpindleSeat.spindleSeatRange(), toHousing = F.inverse(F.compose(back, housing));
     function zOf(y:Float):Float return F.transformPoint(toHousing, 0, y, HobberLayout.get().nativeHobCentreZ).z;
     var a = zOf(seat.y0), b = zOf(seat.y1), from = Math.min(a, b), to = Math.max(a, b);
@@ -729,7 +730,7 @@ class HobberFrameChecks {
     var model = new cadkit.modeling.AssemblyModel("mm");
     machine.addTo(model, "");
     var state = model.initialState();
-    var toMachine = machinekit.hobbing.HobberFrame.workToMachine(), zero = HobberSpindleRelief.motorZeroPose(HobSpindle.MOTOR_CLOCKING);
+    var toMachine = hobber.HobberFrame.workToMachine(), zero = HobberSpindleRelief.motorZeroPose(HobSpindle.MOTOR_CLOCKING);
     function analytic(x:Float, y:Float, z:Float, a:Float) return F.compose(toMachine, F.compose(HobberSpindleRelief.motion(x, y, z, a), zero));
     // (1) the chain.
     var xl = machine.travel.filter(t -> t.id == "X")[0].lower, xu = machine.travel.filter(t -> t.id == "X")[0].upper;
@@ -816,7 +817,7 @@ class HobberFrameChecks {
 
   /** The machine survives encode and decode with its member recipes and collision hulls. */
   public static function roundTrip(machine:FlexsplineHobber):Void {
-    var rebuilt = MachineAssembly.decode(machine.encode(), MachineKitComponents.standard());
+    var rebuilt = MachineAssembly.decode(machine.encode(), HobberComponents.registry());
     if (rebuilt.components().length != machine.components().length) throw "the machine lost members in persistence";
   }
 
@@ -912,8 +913,8 @@ class HobberFrameChecks {
     if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine).lines) Sys.println(line);
     if (args.indexOf("zsaddle") >= 0) for (line in zSaddleModes(machine)) Sys.println(line);
     if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
-    if (args.indexOf("nutblocks") >= 0) for (d in machinekit.hobbing.HobberDrives.all().filter(axis->axis.id!="Y")) {
-      var nut = new machinekit.motion.BallNut(), b = machinekit.hobbing.HobberDrives.nutBlock(d, nut), pose = machinekit.hobbing.HobberDrives.nutBlockPose(d, nut);
+    if (args.indexOf("nutblocks") >= 0) for (d in hobber.HobberDrives.all().filter(axis->axis.id!="Y")) {
+      var nut = new machinekit.motion.BallNut(), b = hobber.HobberDrives.nutBlock(d, nut), pose = hobber.HobberDrives.nutBlockPose(d, nut);
       function w(x:Float, y:Float, z:Float) {
         var p = F.transformPoint(pose, x, y, z);
         return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.z * 10) / 10];
@@ -927,10 +928,10 @@ class HobberFrameChecks {
       // Expand only the validation snapshot to the declared Z overtravel.
       // The machine's operating limits and its saved design remain unchanged.
       var record=machine.describe();
-      for(j in record.mechanical.joints)if(j.id=="Z"){j.limits.lower=machinekit.hobbing.HobberLayout.get().zBellowsLowerLimit();j.limits.upper=machinekit.hobbing.HobberLayout.get().zBellowsUpperLimit();}
-      var copy=MachineAssembly.fromDescription(record,MachineKitComponents.standard()),states:Array<Map<String,Float>>=[];
+      for(j in record.mechanical.joints)if(j.id=="Z"){j.limits.lower=hobber.HobberLayout.get().zBellowsLowerLimit();j.limits.upper=hobber.HobberLayout.get().zBellowsUpperLimit();}
+      var copy=MachineAssembly.fromDescription(record,HobberComponents.registry()),states:Array<Map<String,Float>>=[];
       var x=machine.travel.filter(t->t.id=="X")[0],y=machine.travel.filter(t->t.id=="Y")[0];
-      for(xx in [x.lower,x.upper])for(yy in [y.lower,y.upper])for(zz in [machinekit.hobbing.HobberLayout.get().zBellowsLowerLimit(),machinekit.hobbing.HobberLayout.get().zBellowsUpperLimit()])for(a in [-HobberLayout.get().swivelRange,0.0,HobberLayout.get().swivelRange])
+      for(xx in [x.lower,x.upper])for(yy in [y.lower,y.upper])for(zz in [hobber.HobberLayout.get().zBellowsLowerLimit(),hobber.HobberLayout.get().zBellowsUpperLimit()])for(a in [-HobberLayout.get().swivelRange,0.0,HobberLayout.get().swivelRange])
         states.push(["X"=>xx,FlexsplineHobber.Y=>yy,"Z"=>zz,FlexsplineHobber.A=>a]);
       var report=AssemblyIntegrity.check(copy,{sweepStates:states,runningGap:2.0,processContacts:machine.processContacts(),serviceProcedures:[],fasteners:false});
       var own=[for(e in report.errors())if(e.message.indexOf("Zbellows")>=0)e];
@@ -946,7 +947,7 @@ class HobberFrameChecks {
     }
     if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
     if (args.indexOf("fasteners") >= 0) {
-      Sys.println(machinekit.hobbing.HobberCarriageStockCheck.report());
+      Sys.println(hobber.HobberCarriageStockCheck.report());
       for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
     }
     var checkedIntegrity:Null<Array<String>> = null;

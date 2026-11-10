@@ -1,5 +1,6 @@
+import hobber.*;
 import machinekit.hobbing.*;
-import machinekit.hobbing.HobberLayout;
+import hobber.HobberLayout;
 import machinekit.assembly.PosedParts;
 
 /** Geometric rack support and mounting checks; generic device mounting holes remain unspecified. */

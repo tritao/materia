@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import machinekit.hobbing.*;
 import machinekit.component.MachineComponent;
 import materia.assembly.AssemblyFrames as F;
@@ -49,7 +50,7 @@ class HobberFemExport {
     sys.FileSystem.createDirectory(dir);
     var machine = new FlexsplineHobber();
     if(args.length==2&&args[1]=="y-module") {exportY(machine,dir);return;}
-    var poses = machine.solvedPoses(), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine()), seatZ = HobberLayout.get().nativeHobCentreZ;
+    var poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine()), seatZ = HobberLayout.get().nativeHobCentreZ;
     var partList:Array<Dynamic> = [];
     var out:Dynamic = {parts: partList};
     function at(id:String, x:Float, y:Float, z:Float) return F.transformPoint(F.compose(back, poses.get(id)), x, y, z);

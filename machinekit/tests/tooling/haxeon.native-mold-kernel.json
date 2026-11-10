@@ -6,7 +6,7 @@
   "entry": "NativeMoldKernelTests",
   "sourceRoots": [
     "src",
-    "../../examples/box-mold"
+    "../../examples/box-mold", "../../examples/flexspline-hobber"
   ],
   "dependencies": {
     "machinekit": {

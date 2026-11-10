@@ -1,3 +1,4 @@
+import hobber.*;
 import machinekit.structural.FoundationIntegrity;
 import machinekit.structural.MineralFoundation;
 import machinekit.motion.*;
@@ -45,7 +46,7 @@ class HobberPartTests {
     new CastInsert(new ComponentValues().setToken("role", "generic-mount"))
   ];
   public static function run():Void {
-    var registry = MachineKitComponents.standard(), parts = members();
+    var registry = HobberComponents.registry(), parts = members();
     rejects(() -> ManufacturingRoute.foldedSheet(0, 1, 2), "formed sheet rejects zero thickness");
     rejects(() -> ManufacturingRoute.foldedSheet(2, 0, 2), "formed sheet needs bends");
     for (role in HobberChipCover.MADE) {
@@ -135,7 +136,7 @@ class HobberPartTests {
     near(new MineralCastBed().body.parameterNumber("depth"), 800, 0, "current bed uses moving-column footprint");
     near(
       new MineralCastBed().body.parameterNumber("width"),
-      machinekit.hobbing.HobberLayout.get().xNominal().bedLength,
+      hobber.HobberLayout.get().xNominal().bedLength,
       0,
       "bed radial length covers loading retract"
     );
@@ -507,7 +508,7 @@ class HobberPartTests {
       check(shape.solidCount()==1,"Z bellows end remains connected after flange trimming");
       check(b.maxY<=p.shape.hostMax+1e-6,"Z bellows flange stays behind Z saddle");
       check(made.holes().length>=4,"Z bellows retains both rows of side fastenings");
-      var rebuilt=MachineKitComponents.standard().byId(HobberZBellowsPart.recipeType().id).create(made.values());
+      var rebuilt=HobberComponents.registry().byId(HobberZBellowsPart.recipeType().id).create(made.values());
       check(rebuilt.materialSpec()==made.materialSpec(),"Z bellows steel flange survives recipe roundtrip");
       shape.close();
     }
@@ -517,6 +518,7 @@ class HobberPartTests {
     Sys.println('Hobber Z bellows: $assertions assertions passed');
   }
   public static function main():Void {
+    HobberComponents.install();
     if(Sys.args().length>0 && Sys.args()[0]=="z-bellows"){zBellows();return;}
 
     if (Sys.args().length > 0 && Sys.args()[0] == "hob-mesh") {

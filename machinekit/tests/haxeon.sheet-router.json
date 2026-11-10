@@ -24,7 +24,7 @@
     "../examples/robot-screwdriver",
     "../examples/gantry-welder",
     "../examples/overhead-arm",
-    "../examples/sheet-router"
+    "../examples/sheet-router", "../examples/flexspline-hobber"
   ],
   "dependencies": {
     "collisionkit-native": {

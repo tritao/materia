@@ -5,7 +5,7 @@
   },
   "entry": "DraftGeometryTests",
   "sourceRoots": [
-    "src"
+    "src", "../../examples/flexspline-hobber"
   ],
   "dependencies": {
     "machinekit": {

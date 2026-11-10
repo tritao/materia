@@ -1,5 +1,5 @@
 {
   "version":1,"package":{"name":"machinekit-linear-module-checks"},
-  "entry":"ScrewLinearModuleChecks","sourceRoots":["src"],
+  "entry":"ScrewLinearModuleChecks","sourceRoots":["src", "../../examples/flexspline-hobber"],
   "dependencies":{"machinekit":{"path":"../.."}},"target":"host","outputDir":"build"
 }

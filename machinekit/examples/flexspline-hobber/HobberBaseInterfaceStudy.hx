@@ -1,4 +1,5 @@
-import machinekit.hobbing.HobberLayout;
+import hobber.*;
+import hobber.HobberLayout;
 import FoundationStudyGeometry.FoundationStudyRegion;
 import FoundationStudyGeometry as Geometry;
 import materia.casting.CastingFeature.CastingFeatureKind;

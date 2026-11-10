@@ -21,7 +21,7 @@
     "../../../machinekit/examples/cobot-arm",
     "../../../machinekit/examples/gantry-picker",
     "../../../machinekit/examples/track-arm",
-    "../../../machinekit/examples/overhead-arm"
+    "../../../machinekit/examples/overhead-arm", "../../../machinekit/examples/flexspline-hobber"
   ],
   "scopeSourceRoots": false,
   "dependencies": {
