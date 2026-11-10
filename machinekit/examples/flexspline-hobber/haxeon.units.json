@@ -1,6 +1,0 @@
-{
-  "version": 1, "package": {"name":"hobber-units"},
-  "entry":"HobberUnitPreview", "sourceRoots":["."],
-  "dependencies":{"machinekit":{"path":"../.."}},
-  "target":"host", "outputDir":"build/units"
-}

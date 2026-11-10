@@ -4,9 +4,7 @@
     "name": "hobber-enclosure-checks"
   },
   "entry": "HobberEnclosureChecks",
-  "sourceRoots": [
-    "."
-  ],
+  "sourceRoots": ["machine", "scenes", "checks", "studies", "../../tests/hobber/src"],
   "dependencies": {
     "machinekit": {
       "path": "../.."

@@ -4,9 +4,7 @@
 		"name": "machinekit-assembly-integrity-tests"
 	},
 	"entry": "AssemblyIntegrityTests",
-	"sourceRoots": [
-		"src", "../examples/flexspline-hobber"
-	],
+	"sourceRoots": ["src", "../examples/flexspline-hobber/machine", "../examples/flexspline-hobber/scenes", "../examples/flexspline-hobber/checks", "../examples/flexspline-hobber/studies"],
 	"dependencies": {
 		"cadkit": {
 			"path": "../../cadkit"

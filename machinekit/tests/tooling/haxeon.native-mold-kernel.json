@@ -4,10 +4,7 @@
     "name": "machinekit-native-mold-kernel-tests"
   },
   "entry": "NativeMoldKernelTests",
-  "sourceRoots": [
-    "src",
-    "../../examples/box-mold", "../../examples/flexspline-hobber"
-  ],
+  "sourceRoots": ["src", "../../examples/box-mold", "../../examples/flexspline-hobber/machine", "../../examples/flexspline-hobber/scenes", "../../examples/flexspline-hobber/checks", "../../examples/flexspline-hobber/studies"],
   "dependencies": {
     "machinekit": {
       "path": "../.."

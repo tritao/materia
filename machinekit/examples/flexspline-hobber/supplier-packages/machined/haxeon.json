@@ -4,10 +4,7 @@
     "name": "flexspline-machined-package-export"
   },
   "entry": "MachinedPackageExport",
-  "sourceRoots": [
-    ".",
-    "../.."
-  ],
+  "sourceRoots": [".", "../../machine", "../../scenes", "../../checks", "../../studies"],
   "dependencies": {
     "machinekit": {
       "path": "../../../.."

@@ -4,9 +4,7 @@
     "name": "flexspline-casting-package-export"
   },
   "entry": "CastingPackageExport",
-  "sourceRoots": [
-    ".", "../.."
-  ],
+  "sourceRoots": [".", "../../machine", "../../scenes", "../../checks", "../../studies"],
   "dependencies": {
     "machinekit": {
       "path": "../../../.."

@@ -421,7 +421,7 @@ Run the smoke tests after building CadKit's native library:
 Set `CADKIT_BUILD_ROOT` when CadKit was built somewhere other than
 `cadkit/build/debug`.
 
-The [flexspline hobber reference parts](examples/flexspline-hobber/PARTS.md) add
+The [flexspline hobber reference parts](examples/flexspline-hobber/docs/PARTS.md) add
 recipe-backed precision rotary drives, bearings, encoders and hobbing packages.
 Their assumed ratings and error bounds survive assembly save/load; the part checks
 are in `tests/hobbing`.

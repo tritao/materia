@@ -4,11 +4,7 @@
     "name": "flexspline-hobber-fem-export"
   },
   "entry": "HobberFemExport",
-  "sourceRoots": [
-    ".",
-    "..",
-    "../../../tests/hobber/src"
-  ],
+  "sourceRoots": [".", "../machine", "../scenes", "../checks", "../studies", "../../../tests/hobber/src"],
   "dependencies": {
     "machinekit": {
       "path": "../../.."

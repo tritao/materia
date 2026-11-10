@@ -105,7 +105,7 @@ are taken from the browser build of the editor.
 <a href="/product/gallery/#mobile-base"><img src="/screens/mobile-base.webp" width="640" height="400" alt="Mobile base" loading="lazy"><span>Mobile base</span></a>
 </div>
 
-[All examples](product/gallery.md) · [Every component, in 3D](/components/)
+[All examples](product/gallery.md) · [Every component, in 3D](../../../../../components/)
 
 ## Where to start
 
@@ -117,7 +117,7 @@ are taken from the browser build of the editor.
 
 Follow [the tutorial](tutorials/gantry-picker.md), then read
 [the life of a machine](concepts/start/life-of-a-machine.md) and the
-[API reference](/reference/).
+[API reference](../../../../../reference/).
 
 </section>
 

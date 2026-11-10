@@ -1,1 +1,0 @@
-{"version":1,"entry":"HobberBaseInterfaceStudy","sourceRoots":["."],"dependencies":{"machinekit":{"path":"../.."}},"target":"host","outputDir":"build/base-interface-run"}

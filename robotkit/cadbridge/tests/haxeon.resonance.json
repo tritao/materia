@@ -4,14 +4,7 @@
     "name": "cadbridge-resonance-tests"
   },
   "entry": "tests.BeltResonanceTests",
-  "sourceRoots": [
-    "src",
-    "../../../machinekit/examples",
-    "../../../machinekit/examples/mobile-base",
-    "../../../machinekit/examples/robot-arm",
-    "../../../machinekit/examples/printer",
-    "../../../processkit/tests/moonraker", "../../../machinekit/examples/flexspline-hobber"
-  ],
+  "sourceRoots": ["src", "../../../machinekit/examples", "../../../machinekit/examples/mobile-base", "../../../machinekit/examples/robot-arm", "../../../machinekit/examples/printer", "../../../processkit/tests/moonraker", "../../../machinekit/examples/flexspline-hobber/machine", "../../../machinekit/examples/flexspline-hobber/scenes", "../../../machinekit/examples/flexspline-hobber/checks", "../../../machinekit/examples/flexspline-hobber/studies"],
   "dependencies": {
     "haxeon-platform": {
       "path": "../../../haxeon/packages/platform"

@@ -4,10 +4,7 @@
     "name": "hobber-enclosure-preview"
   },
   "entry": "HobberEnclosurePreview",
-  "sourceRoots": [
-    ".",
-    "../casting-shop"
-  ],
+  "sourceRoots": ["machine", "scenes", "checks", "studies", "../casting-shop"],
   "dependencies": {
     "machinekit": {
       "path": "../.."

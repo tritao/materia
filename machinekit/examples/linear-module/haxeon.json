@@ -4,7 +4,7 @@
     "name": "machinekit-linear-module-example"
   },
   "entry": "LinearModulePreview",
-  "sourceRoots": [".", "../flexspline-hobber"],
+  "sourceRoots": [".", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
   "dependencies": {
     "machinekit": {
       "path": "../.."

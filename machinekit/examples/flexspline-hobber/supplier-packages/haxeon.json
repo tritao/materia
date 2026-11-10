@@ -4,9 +4,7 @@
     "name": "flexspline-supplier-package-export"
   },
   "entry": "SupplierPackageExport",
-  "sourceRoots": [
-    ".", ".."
-  ],
+  "sourceRoots": [".", "../machine", "../scenes", "../checks", "../studies"],
   "dependencies": {
     "gearkit": {
       "path": "../../../../gearkit"

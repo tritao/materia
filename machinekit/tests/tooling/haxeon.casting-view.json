@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "casting-mold-view-tests"},
   "entry": "CastingMoldViewTests",
-  "sourceRoots": ["src", "../../haxe/src", "../../examples/flexspline-hobber"],
+  "sourceRoots": ["src", "../../haxe/src", "../../examples/flexspline-hobber/machine", "../../examples/flexspline-hobber/scenes", "../../examples/flexspline-hobber/checks", "../../examples/flexspline-hobber/studies"],
   "sources": ["src/CastingMoldViewTests.hx", "../../haxe/src/machinekit/tooling/CastingMoldView.hx"],
   "dependencies": {"projectkit": {"path": "../../../projectkit"}},
   "target": "host",

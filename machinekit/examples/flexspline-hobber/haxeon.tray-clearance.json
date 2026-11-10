@@ -1,9 +1,7 @@
 {
   "version": 1,
   "entry": "HobberTrayClearanceStudy",
-  "sourceRoots": [
-    "."
-  ],
+  "sourceRoots": ["machine", "scenes", "checks", "studies"],
   "dependencies": {
     "machinekit": {
       "path": "../.."

@@ -102,7 +102,7 @@ and trace superposition within the stated tolerance. Runtime is about 51–55 s,
 using 126 MiB. Run it with:
 
 ```
-machinekit/examples/flexspline-hobber/check-quick.sh errors
+machinekit/examples/flexspline-hobber/checks/check-quick.sh errors
 ```
 
 The full reference-part source budget, measured HB7 source-disable studies and
@@ -221,7 +221,7 @@ combined cut at the reference **0.000025 mm sweep tolerance / 8 threads**, in
 
 ### Complete hobber reference study
 
-`machinekit/examples/flexspline-hobber/check-reference-budget.sh all` runs baseline,
+`machinekit/examples/flexspline-hobber/checks/check-reference-budget.sh all` runs baseline,
 13 installed sources and combined cuts on the HB8 feed trajectory, at 8 threads,
 0.000025 mm sweep / 0.0000015625 mm path tolerances, 0.0015 mm radial / 0.04 mm
 axial sampling. Each completed inspection is saved before the next case. Progress,

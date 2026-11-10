@@ -29,7 +29,7 @@ class RotaryClamp extends MachineComponent implements machinekit.motion.MotorBra
       "Static rotary clamp",
       "ROTARY-CLAMP-100NM",
       parameters(),
-      "machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)"
+      "machinekit/examples/flexspline-hobber/docs/PLAN.md (assumed reference design)"
     );
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

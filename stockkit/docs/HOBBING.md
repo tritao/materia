@@ -62,7 +62,7 @@ argument runs the heavy full-face hobbing acceptance case.
 The HB4 reference's aggregate convergence failure has a small boundary diagnostic:
 
 ```sh
-machinekit/examples/flexspline-hobber/check-hb4-boundary.sh
+machinekit/examples/flexspline-hobber/checks/check-hb4-boundary.sh
 ```
 
 This reuses the validated native provider (`HB4_PROBE_NATIVE` overrides its path),

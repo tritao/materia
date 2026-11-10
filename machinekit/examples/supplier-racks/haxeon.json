@@ -4,12 +4,7 @@
     "name": "gear-rack-checks"
   },
   "entry": "GearRackChecks",
-  "sourceRoots": [
-    "../../tests/src",
-    ".",
-    "../press-brake",
-    "..", "../flexspline-hobber"
-  ],
+  "sourceRoots": ["../../tests/src", ".", "../press-brake", "..", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
   "dependencies": {
     "collisionkit-native": {
       "path": "../../../collisionkit/native"

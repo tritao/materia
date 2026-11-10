@@ -30,7 +30,7 @@ persistent face names. Joints are the real mechanism: a screw turns, a nut
 slides.
 
 [Modelling features](features.md#modelling-describing-a-machine) ·
-[Every component, in 3D](/components/)
+[Every component, in 3D](../../../../../../components/)
 
 </div>
 
@@ -99,7 +99,7 @@ and in the browser.
 
 - [Gallery](gallery.md): every example machine, what it shows, and how to
   open it.
-- [Components](/components/): every parametric part, with its parameters and
+- [Components](../../../../../../components/): every parametric part, with its parameters and
   where its catalogue data comes from.
 - [Roadmap](roadmap.md): what is being built now and what is planned (draft).
 - [Licensing](licensing.md) and [open core](../OPEN_CORE.md): what is open,

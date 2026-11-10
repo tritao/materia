@@ -27,12 +27,7 @@
     "TendingEndEffectorPreview.hx",
     "TendingPresentationChecks.hx"
   ],
-  "sourceRoots": [
-    ".",
-    "../bench-mill",
-    "../cnc-router",
-    "../casting-shop", "../flexspline-hobber"
-  ],
+  "sourceRoots": [".", "../bench-mill", "../cnc-router", "../casting-shop", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
   "dependencies": {
     "processkit": {
       "path": "../../../processkit"

@@ -68,7 +68,7 @@ native libraries. Ring-stock/rake native sources are unchanged.
 
 ## Fast smoke cut
 
-`machinekit/examples/flexspline-hobber/check-quick.sh force` runs a complete
+`machinekit/examples/flexspline-hobber/checks/check-quick.sh force` runs a complete
 m0.3/z40/1 mm ideal cut at 5 mm/work rev, with four gashes and a coarse grid.
 Measured here: 391 windows, 10.5614 mm³ removed, 72.13 N overlapping window mean,
 360.66 W and 1.154 Nm hob torque. It passes the 20% spindle reserve check and
@@ -78,7 +78,7 @@ smoke check complements the full reference-stroke acceptance.
 The complete reference-stroke and installed-rating check can be run with:
 
 ```sh
-machinekit/examples/flexspline-hobber/check-reference-force.sh
+machinekit/examples/flexspline-hobber/checks/check-reference-force.sh
 ```
 
 This uses the existing native dependencies (the same `HOBBER_NATIVE_CACHE` and

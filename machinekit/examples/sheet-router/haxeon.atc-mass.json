@@ -4,27 +4,7 @@
     "name": "sheet-router-atc-mass"
   },
   "entry": "SheetRouterAtcMass",
-  "sourceRoots": [
-    ".",
-    "../../tests/src",
-    "../press-brake",
-    "..",
-    "../robot-arm",
-    "../cnc-router",
-    "../mobile-base",
-    "../robot-welder",
-    "../corexy",
-    "../printer",
-    "../bench-mill",
-    "../cobot-arm",
-    "../machine-tending",
-    "../../tests/mobile-welder/src",
-    "../gantry-picker",
-    "../track-arm",
-    "../overhead-arm",
-    "../robot-screwdriver",
-    "../gantry-welder", "../flexspline-hobber"
-  ],
+  "sourceRoots": [".", "../../tests/src", "../press-brake", "..", "../robot-arm", "../cnc-router", "../mobile-base", "../robot-welder", "../corexy", "../printer", "../bench-mill", "../cobot-arm", "../machine-tending", "../../tests/mobile-welder/src", "../gantry-picker", "../track-arm", "../overhead-arm", "../robot-screwdriver", "../gantry-welder", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
   "dependencies": {
     "collisionkit-native": {
       "path": "../../../collisionkit/native"

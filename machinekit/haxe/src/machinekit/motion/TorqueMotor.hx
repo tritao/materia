@@ -47,7 +47,7 @@ class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDri
       "Frameless direct-drive torque motor",
       "TORQUE-MOTOR-10NM",
       parameters(),
-      "machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)"
+      "machinekit/examples/flexspline-hobber/docs/PLAN.md (assumed reference design)"
     );
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

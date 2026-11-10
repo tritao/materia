@@ -4,7 +4,7 @@ Run from the repository root; the scheduler retains its normal memory guard.
 """
 import tempfile,json,hashlib,subprocess,shutil
 from pathlib import Path
-script=Path('machinekit/examples/flexspline-hobber/run-reference-budget.py').resolve()
+script=Path('machinekit/examples/flexspline-hobber/checks/run-reference-budget.py').resolve()
 settings=dict(moduleMm=.3,teeth=200,faceWidthMm=8,threads=4,workers=4,
  sweepToleranceMm=.000025,pathToleranceMm=.0000015625,radialStepMm=.0015,axialStepMm=.04,windows=92151,
  sourceIds=['mandrel','table-radial','table-axial','encoder-eccentricity','encoder-graduation',
@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='hb11-upgrade-') as temp:
  r=subprocess.run(base+['--native',str(new)],capture_output=True,text=True);assert r.returncode==0,r.stderr
  # A dead adoption with only a partial log must retry, preserving the original
  # evidence. Use a synthetic launcher root so no real HashLink/native cut can run.
- synthetic=p/'synthetic';copied=synthetic/'machinekit/examples/flexspline-hobber/run-reference-budget.py'
+ synthetic=p/'synthetic';copied=synthetic/'machinekit/examples/flexspline-hobber/checks/run-reference-budget.py'
  copied.parent.mkdir(parents=True);shutil.copyfile(script,copied)
  fake=synthetic/'haxeon/scripts/hl';fake.parent.mkdir(parents=True)
  fake.write_text("#!/usr/bin/env python3\nimport sys,json\nfrom pathlib import Path\np=Path(sys.argv[4]);mode=sys.argv[5]\n(p/(mode+'.json')).write_text("+repr(json.dumps(raw))+ ")\nprint('HOBBING_ERROR_RESULT '+json.dumps(dict(wallSeconds=.01,threads=4)))\n")

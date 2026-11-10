@@ -3,12 +3,12 @@
 A vertical GE-class moving-column hobber: fixed direct-drive work table, radial
 column infeed, vertical head feed, direct swivel and twin-rail hob shift.
 
-See [MACHINE_DESIGN.md](MACHINE_DESIGN.md) for datums, travel, support and
-acceptance scope, [PLAN.md](PLAN.md) for engineering evidence and open gates, and
-[INSPECTION.md](INSPECTION.md) for physical gear inspection, and
-[ALIGNMENT.md](ALIGNMENT.md) for how the axes are aligned at assembly.
+See [MACHINE_DESIGN.md](docs/MACHINE_DESIGN.md) for datums, travel, support and
+acceptance scope, [PLAN.md](docs/PLAN.md) for engineering evidence and open gates, and
+[INSPECTION.md](docs/INSPECTION.md) for physical gear inspection, and
+[ALIGNMENT.md](docs/ALIGNMENT.md) for how the axes are aligned at assembly.
 The project entry point is `materia.project.json`; run it through Materia's
-project-source loader. `check-quick.sh app` runs the coarse app/cycle smoke check.
+project-source loader. `checks/check-quick.sh app` runs the coarse app/cycle smoke check.
 Full reference metrology and error-budget cuts are separate, expensive checks.
 
 Open `hobber.scene.json` and use the enclosure viewing controls for mechanical
@@ -16,7 +16,7 @@ inspection. The electrical rack starts hidden; its wiring and drives remain in
 the assembly.
 
 The head has a front-mounted compact swivel and vertical twin-rail Y stage.
-[LAYOUT_SECTION.svg](LAYOUT_SECTION.svg) shows the dimensioned radial stack.
+[LAYOUT_SECTION.svg](docs/diagrams/LAYOUT_SECTION.svg) shows the dimensioned radial stack.
 
 The inspection assembly now selects full supplier HGH15CA/HGH25CA blocks and a
 matching HGR25R X rail profile. Before generating it on a fresh checkout, run
@@ -44,7 +44,7 @@ Sensors/CNC; orbit, pan and zoom there do not move the main camera.
 The hob spindle now includes a hollow shaft, nose, opposed bearings near the
 tool, bearing retention and a drawbar-retained taper-and-face arbor with drive
 pins. It is an assumed custom interface, not a qualified HSK interface; see
-[MACHINE_DESIGN.md](MACHINE_DESIGN.md#hob-spindle-cartridge-2026-10-19).
+[MACHINE_DESIGN.md](docs/MACHINE_DESIGN.md#hob-spindle-cartridge-2026-10-19).
 
 
 ### Cup loading demonstration
@@ -79,8 +79,8 @@ The HB-D11 foundation is a 930 × 800 × 800 mm monolithic plinth on three rigid
 levelling feet in side-access cast pockets, with removable steel load plates
 and accessible support/lock nuts. The tooth band is 1000 mm above the floor. The default bought DD table has a Ø200 mm face, 210 mm height and Ø40 mm bore;
 unpublished accuracy/stiffness and mounting details remain assumed. The built-up
-table remains selectable through the same interface. See PURCHASED_TABLE_REPORT.json.
-See [MACHINE_DESIGN.md](MACHINE_DESIGN.md#heavy-plinth-acceptance-hb-d11) for mass,
+table remains selectable through the same interface. See `checks/evidence/PURCHASED_TABLE_REPORT.json`.
+See [MACHINE_DESIGN.md](docs/MACHINE_DESIGN.md#heavy-plinth-acceptance-hb-d11) for mass,
 support and preliminary stiffness evidence. The app's machining time excludes
 the illustrative loading/unloading sequence.
 
@@ -94,7 +94,7 @@ and `flexspline-hb11-plinth-review` (`journalctl --user -u UNIT -f`).
 To resume after the unit has stopped, use the same frozen evidence and provider:
 
 ```sh
-python3 machinekit/examples/flexspline-hobber/run-plinth-budget.py \
+python3 machinekit/examples/flexspline-hobber/studies/run-plinth-budget.py \
   build/flexspline-reference-budget-plinth \
   --previous build/flexspline-reference-budget-parallel \
   --native build/flexspline-shared-sweep/native-pair
@@ -105,20 +105,20 @@ its frozen binary during a run. HB4 convergence and HB12 reference acceptance
 remain open; a completed numerical budget does not establish ISO certification.
 
 Z now uses a centered, recessed 420 mm ball screw between the guides, with its
-fixed bearing and motor at the top. See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg).
+fixed bearing and motor at the top. See [Z_DRIVE_SECTION.svg](docs/diagrams/Z_DRIVE_SECTION.svg).
 
-The replacement rectangular-tray proposal has its own [BOM](tray-bom.json) and
-[supplier records](tray-anchor-sourcing.json); see [enclosure notes](ENCLOSURE.md#tray-proposal-bom-and-sourcing-exports).
+The replacement rectangular-tray proposal has its own [BOM](studies/data/tray-bom.json) and
+[supplier records](studies/data/tray-anchor-sourcing.json); see [enclosure notes](docs/ENCLOSURE.md#tray-proposal-bom-and-sourcing-exports).
 Run the proposal generator and `haxeon.tray-bom.json` to refresh its sourced JSON
 and CSV exports in `build/tray-mounting/`. It remains separate from the installed
 enclosure BOM until the replacement is integrated.
 
-The [two-socket mould fixture](SOCKET_FIXTURE.md) demonstrates the cast-in socket
+The [two-socket mould fixture](docs/SOCKET_FIXTURE.md) demonstrates the cast-in socket
 positioning method with its own Materia scenes, tooling BOM and panel drawings.
 
 ## Socket fixture presentation
 
-The [socket fixture coupon](SOCKET_FIXTURE.md) opens in **Assembled**. The viewport
+The [socket fixture coupon](docs/SOCKET_FIXTURE.md) opens in **Assembled**. The viewport
 view picker also offers **See inside**, with transparent plates and casting and a section
 through both socket axes, and **Socket mounting**, with the bed hidden and an
 underside close-up of one screw-and-washer stack. Reset view returns to Assembled.
@@ -185,11 +185,18 @@ stable across composition. Construction placements live in `MachineAssembly`,
 and `HobberServiceAccess` owns the declared service paths.
 
 The project variants include an isolated preview of each unit. Their entry
-functions are in `HobberUnitPreview`; `haxeon.units.json` runs the foundation
-preview directly.
+functions are in `HobberUnitPreview`; the project selects them without separate build manifests.
 
-The `hobber` package beside the example owns this machine's layout, foundation
+The `machine/hobber` package owns this machine's layout, foundation
 rules, fitted parts and FE data. Reusable hobbing components remain under
 `machinekit.hobbing`. `HobberComponents` registers the application recipes with
 the same catalogue IDs and part numbers; tools rebuilding a saved machine can
 pass `HobberComponents.registry()` to `MachineAssembly.decode`.
+
+The example is organized into `machine/` (assemblies and fitted parts),
+`scenes/` (presentation entry points), `checks/` (reports and review rules),
+`studies/` (independent investigations) and `docs/`. Machine check suites live
+under `machinekit/tests/hobber`. Unit and mold previews use project variants;
+standalone manifests remain for checks and studies that export their own data.
+The retired box-only interface/anchor screens are preserved only as historical
+evidence; the installed machine uses the accepted socket definitions.

@@ -47,7 +47,7 @@ the [workspace](manual/workspace.md), the [3D view](manual/viewport.md),
 <p class="landing-card-title">API reference</p>
 
 Every public type in the kits, generated from the source, with the concept
-pages that use it. [Browse the reference](/reference/).
+pages that use it. [Browse the reference](../../../../../reference/).
 
 </section>
 
@@ -59,7 +59,7 @@ pages that use it. [Browse the reference](/reference/).
   [assemblies and mates](concepts/modelling/assemblies-and-mates.md),
   [machine components](concepts/modelling/machine-components.md) and
   [transmissions](concepts/modelling/transmissions.md). The
-  [component catalogue](/components/) shows every part you can use.
+  [component catalogue](../../../../../components/) shows every part you can use.
 - **Make it move and do work.**
   [Execution plans](concepts/motion/execution-plans.md),
   [toolpaths](concepts/process/toolpaths.md) and

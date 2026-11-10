@@ -131,7 +131,7 @@ import materia.assembly.AssemblyFrames as F;
           mass.centreOfMass.z
         )
       };
-      var liftingChecks = HobberMoldChecks.liftingReview(document, handling);
+      var liftingChecks = HobberMoldReview.liftingReview(document, handling);
       check(
         liftingChecks.filter(row -> row.status
         == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length == 0,
@@ -269,7 +269,7 @@ import materia.assembly.AssemblyFrames as F;
           "Every declared source fixture thread has a supported screw chase: " + fixture.insertId
         );
         var review = machinekit.tooling.CastingMoldCad.review(planned);
-        HobberMoldChecks.run(planned, review);
+        HobberMoldReview.run(planned, review);
         check(review.symmetricDifferenceMm3 < 1e-3, "Exact corrected hobber reconstruction: " + kind);
         for (rule in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"]) check(
           review.validation.filter(row -> row.rule == "tooling.cad." + rule && row.status == "pass").length == 1,

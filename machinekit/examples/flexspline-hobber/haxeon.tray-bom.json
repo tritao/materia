@@ -1,9 +1,7 @@
 {
   "version": 1,
   "entry": "HobberTrayBom",
-  "sourceRoots": [
-    "."
-  ],
+  "sourceRoots": ["machine", "scenes", "checks", "studies"],
   "dependencies": {
     "materia-sourcing": { "path": "../../../tools/suppliers" },
     "machinekit": {

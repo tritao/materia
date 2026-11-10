@@ -8,10 +8,7 @@
     "ReferenceHousing.hx",
     "ReferenceHousingChecks.hx"
   ],
-  "sourceRoots": [
-    "../casting-shop",
-    ".", "../flexspline-hobber"
-  ],
+  "sourceRoots": ["../casting-shop", ".", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
   "dependencies": {
     "cadkit": {
       "path": "../../../cadkit"

@@ -4,14 +4,7 @@
     "name": "machine-group-tree-tests"
   },
   "entry": "tests.MachineGroupTreeTests",
-  "sourceRoots": [
-    "machine-groups",
-    "../../processkit/tests/moonraker",
-    "../../machinekit/examples/flexspline-hobber",
-    "../../machinekit/examples/bench-mill",
-    "../../machinekit/examples/cnc-router",
-    "../../machinekit/examples/casting-shop"
-  ],
+  "sourceRoots": ["machine-groups", "../../processkit/tests/moonraker", "../../machinekit/examples/flexspline-hobber/machine", "../../machinekit/examples/flexspline-hobber/scenes", "../../machinekit/examples/flexspline-hobber/checks", "../../machinekit/examples/flexspline-hobber/studies", "../../machinekit/examples/bench-mill", "../../machinekit/examples/cnc-router", "../../machinekit/examples/casting-shop"],
   "scopeSourceRoots": false,
   "dependencies": {
     "app": {

@@ -4,12 +4,7 @@
     "name": "machinekit-hybrid-rail-mill"
   },
   "entry": "HybridMillPreview",
-  "sourceRoots": [
-    ".",
-    "../bench-mill",
-    "../cnc-router",
-    "../casting-shop", "../flexspline-hobber"
-  ],
+  "sourceRoots": [".", "../bench-mill", "../cnc-router", "../casting-shop", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
   "dependencies": {
     "robotkit-autonomy": {
       "path": "../../../robotkit/autonomy"

@@ -23,12 +23,7 @@
     "MillLiftingPattern.hx",
     "MillScrewDrivePlacementChecks.hx"
   ],
-  "sourceRoots": [
-    "../casting-shop",
-    ".",
-    "../cnc-router",
-    "../../tests/src", "../flexspline-hobber"
-  ],
+  "sourceRoots": ["../casting-shop", ".", "../cnc-router", "../../tests/src", "../flexspline-hobber/machine", "../flexspline-hobber/scenes", "../flexspline-hobber/checks", "../flexspline-hobber/studies"],
   "dependencies": {
     "robotkit-autonomy": {
       "path": "../../../robotkit/autonomy"
