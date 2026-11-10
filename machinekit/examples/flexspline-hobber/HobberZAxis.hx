@@ -30,7 +30,7 @@ class HobberZAxis extends HobberUnit implements machinekit.cover.WayCover.CoverM
       if (id == "blockZLeft") {
         addComponent(id, block, pose);
         moving("Z", Prismatic, "railZLeft", id, HobberFrame.partAt(0, centre + heights.zGuideOriginY, heights.hobCentreZ), [0.0, 0, 1], 0, layout.zTravelMin, layout.zTravelMax);
-        fixedPart("Zplate", new HobberSaddle("GE-Z-saddle"), HobberFrame.partAt(0, centre, heights.hobCentreZ), id, face);
+        fixedPart("Zplate", new HobberZSaddle(), HobberFrame.partAt(0, centre, heights.hobCentreZ), id, face);
       } else fixedPart(id, block, pose, "Zplate", face);
     }
     host("saddle","Zplate");
@@ -38,14 +38,14 @@ class HobberZAxis extends HobberUnit implements machinekit.cover.WayCover.CoverM
     var axis=HobberDrives.z();
       for(support in ["fixed","floating"]) {
         var id=HobberDrives.barMember(axis.id,support),face=HobberPadBolts.face(axis,support);
-        externalPart(id,new HobberSaddle(HobberDrives.barDesign(axis.id,support)),HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z),"foundation",axis.id=="X"?"bed-driveSeat":"column-driveSeat",HobberFrame.sourcePose(face.frame),true);
+        externalPart(id,new HobberDriveBar(axis.id,support),HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z),"foundation",axis.id=="X"?"bed-driveSeat":"column-driveSeat",HobberFrame.sourcePose(face.frame),true);
       }
     drive(axis,HobberDrives.barMember("Z","fixed"),HobberDrives.barMember("Z","floating"),"Zplate",0);
     var scaleZ=HobberScales.z();
     group("Scale");
-    externalPart("ZscaleSeat", new HobberSaddle("GE-Z-scale-seat"), HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z), "foundation", "column-casting", scaleBarContact(scaleZ));
+    externalPart("ZscaleSeat", new HobberScaleSeat("Z"), HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z), "foundation", "column-casting", scaleBarContact(scaleZ));
     var armFace = HobberScales.headFace(scaleZ);
-    fixedPart("ZscaleArm", new HobberSaddle("GE-Z-scale-arm"), HobberFrame.partAt(0, 0, heights.hobCentreZ), "Zplate",
+    fixedPart("ZscaleArm", new HobberZScaleArm(), HobberFrame.partAt(0, 0, heights.hobCentreZ), "Zplate",
       F.alongY(-(armFace[1] - HobberScales.Z_ARM_THICKNESS / 2), 148, HobberFrame.PART_DATUM_Z + armFace[2], 0, 1, 0));
     scale(scaleZ,"ZscaleSeat","ZscaleArm");
     installZBellows();

@@ -164,7 +164,7 @@ class HobberLayout {
     if (guide == null) throw "Missing X guide";
     var rail = HobberFrame.PART_DATUM_Z + bedRailSeatTop();
     var bottom = rail + guide.blockHeight;
-    var top = bottom + HobberSaddle.X_CARRIAGE_THICKNESS;
+    var top = bottom + HobberXCarriage.X_CARRIAGE_THICKNESS;
     var zGuide = machinekit.motion.LinearRailSystem.catalog().get("HGH15CA");
     if (zGuide == null) throw "Missing Z guide";
     var zSeat = zSeatFaceNativeX + zSpineFrontColumnY - MineralCastColumn.RAIL_NATIVE_Y - MineralCastColumn.RAIL_INSERT_THICKNESS;
@@ -212,7 +212,7 @@ class HobberLayout {
   public function bedRailSeatTop():Float return nativeTableSeat - MineralCastBed.TABLE_SEAT_HEIGHT
     + MineralCastBed.RAIL_SEAT_HEIGHT + MineralCastBed.BED_RAIL_INSERT_THICKNESS;
 
-  public function columnSoleTop():Float return HobberSaddle.xCarriageTop() + MineralCastColumn.COLUMN_SOLE_THICKNESS;
+  public function columnSoleTop():Float return HobberXCarriage.xCarriageTop() + MineralCastColumn.COLUMN_SOLE_THICKNESS;
 
   public final columnRailCentre:Float;
 
@@ -843,7 +843,7 @@ class HobberLayout {
   public function moduleLift():Float return 145;
 
   public function modulePose():materia.assembly.AssemblyRecord.AssemblyFrame {
-    var s=moduleSpec(),back=HobberSaddle.headFaceX()+s.carriageThickness+s.carriageBottom();
+    var s=moduleSpec(),back=HobberSpindleSeat.headFaceX()+s.carriageThickness+s.carriageBottom();
     return materia.assembly.AssemblyFrames.fromRotationMatrix(back,s.carriageCentre+60,nativeHobCentreZ+moduleLift(),[0.0,0,-1,-1,0,0,0,1,0]);
   }
 
@@ -875,7 +875,7 @@ class HobberLayout {
       // passage. A single low-Z slab misses material near its lower face.
       var skirtBox=cadkit.modeling.Part.box(b.maxX-b.minX+2*gap,b.maxY-b.minY+2*gap,b.maxZ-b.minZ+2*gap+drop);
       var skirtKeep=skirtBox.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ-gap-drop));skirtBox.close();
-      var deck=machinekit.component.Solids.union([HobberSaddle.xDeckKeepout(gap,drop),skirtKeep]);
+      var deck=machinekit.component.Solids.union([HobberXCarriage.xDeckKeepout(gap,drop),skirtKeep]);
       var low=nativeHobCentreZ+zTravelMin-HobberScales.overtravel();
       var local=machinekit.assembly.PosedParts.moved(deck,materia.assembly.AssemblyFrames.translation(0,0,-low));deck.close();
       var copies:Array<cadkit.modeling.Part>=[];
@@ -1216,15 +1216,15 @@ class HobberLayout {
     var height=g.railHeight+ScrewLinearModuleSpec.GAP+0.2;
     var space=Math.ceil((row.foldCompressed*Math.ceil((zBellowsUpperLimit()-zBellowsLowerLimit())/(row.ratio-1)/row.foldCompressed)+2*row.flangeThickness)/10)*10;
     return new WayCoverPlan(row,width,height,zBellowsUpperLimit()-zBellowsLowerLimit(),space,
-      WayCoverPlan.boxCover(0,zBellowsSurfaceX()-HobberSaddle.SWIVEL_PLATE_BACK-2*ScrewLinearModuleSpec.GAP,100000,true));
+      WayCoverPlan.boxCover(0,zBellowsSurfaceX()-HobberZSaddle.SWIVEL_PLATE_BACK-2*ScrewLinearModuleSpec.GAP,100000,true));
   }
   public function zBellowsMovingZ(upper:Bool):Float return upper
     ?nativeHobCentreZ+zBlockSpacing+zBellowsGuide().blockLength/2+ScrewLinearModuleSpec.GAP+zBellowsPlan().row.flangeThickness
-    :HobberSaddle.xCarriageTop()+zBellowsPlan().space-zBellowsLowerLimit();
-  public function zBellowsFixedZ(upper:Bool):Float return upper?zBellowsMovingZ(true)+zBellowsUpperLimit()+zBellowsPlan().space:HobberSaddle.xCarriageTop();
+    :HobberXCarriage.xCarriageTop()+zBellowsPlan().space-zBellowsLowerLimit();
+  public function zBellowsFixedZ(upper:Bool):Float return upper?zBellowsMovingZ(true)+zBellowsUpperLimit()+zBellowsPlan().space:HobberXCarriage.xCarriageTop();
   public function zBellowsPose(side:Int,upper:Bool,fixed:Bool):AssemblyFrame return AxisBuilder.orient(zBellowsSurfaceX(),side*columnRailCentre,fixed?zBellowsFixedZ(upper):zBellowsMovingZ(upper),[-1.0,0,0],[0.0,0,(upper?1.0:-1.0)*(fixed?-1:1)]);
   public function zBellowsMovingMount():WayCoverMount {
-    var p=zBellowsPlan(),half=p.fullPlateHalf(),offset=zBellowsSurfaceX()-HobberSaddle.SWIVEL_PLATE_BACK;
+    var p=zBellowsPlan(),half=p.fullPlateHalf(),offset=zBellowsSurfaceX()-HobberZSaddle.SWIVEL_PLATE_BACK;
     var leg=24.0;
     var stock:Array<MountStock>=[{x0:-half,x1:half,y0:offset-4,y1:offset,z0:0.0,z1:8.0}];
     for(side in [-1,1])stock.push({x0:side<0?-half:p.width/2,x1:side<0?-p.width/2:half,y0:offset-4,y1:offset,z0:-leg,z1:0.0});
@@ -1272,7 +1272,7 @@ class HobberLayout {
     var p=zBellowsPlan(),out=[];
     for(side in [-1,1]) {
       var frame=F.compose(F.compose(zBellowsPose(side,false,true),F.translation(0,p.shape.hostMax/2,0)),F.fromRotationMatrix(0,0,0,[1.0,0,0,0,-1,0,0,0,-1]));
-      out.push(BoltedFace.drilledToSuit("z-bellows-"+side,frame,2*p.fullPlateHalf(),p.shape.hostMax,8,HobberSaddle.X_CARRIAGE_THICKNESS,BoltedFace.ThreadMaterial.Steel,"M3"));
+      out.push(BoltedFace.drilledToSuit("z-bellows-"+side,frame,2*p.fullPlateHalf(),p.shape.hostMax,8,HobberXCarriage.X_CARRIAGE_THICKNESS,BoltedFace.ThreadMaterial.Steel,"M3"));
     }
     return out;
   }

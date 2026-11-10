@@ -6,7 +6,7 @@ package machinekit.hobbing;
  * geometry no longer matches `CRADLE_DESIGN` (the FE reference is then stale) or when its hand model and the FE disagree by more than 25 %.
  */
 class HobberFeResults {
-  /** The cradle geometry the FE below was run on (`HobberSaddle.cradleSignature`). */
+  /** The cradle geometry the FE below was run on (`HobberMotorCradle.cradleSignature`). */
   public static final CRADLE_DESIGN = "wall 8, rib 6 from y 192 windowed y 209..232 z 95..160, floor 12/8 from y 125, foot 18, bolts -30,135 30,135 -30,232 30,232, rest x -44..36 y 145..200 top 81.2, x -56..31";
 
   /**

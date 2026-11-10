@@ -9,7 +9,7 @@ import machinekit.component.MachineKitComponents;
 import machinekit.hobbing.HobSpindle;
 import machinekit.hobbing.HobberFeResults;
 import machinekit.hobbing.HobberCastingPockets;
-import machinekit.hobbing.HobberSaddle;
+import machinekit.hobbing.*;
 import machinekit.hobbing.HobberSpindleRelief;
 import machinekit.hobbing.HobberScales;
 import machinekit.hobbing.SpindleHousing;
@@ -480,7 +480,7 @@ class HobberFrameChecks {
       if (m.id == "motorCradle") cradle = props.mass;
       else servo.push({m: props.mass, x: at.x, y: at.y, z: at.z - HobberLayout.get().nativeHobCentreZ});
     }
-    var sec = HobberSaddle.cradleSection(), dims = HobberSaddle.cradleDimensions(), rest = HobberSaddle.cradleRest(), faceY = HobberSaddle.cradleFaceY();
+    var sec = HobberMotorCradle.cradleSection(), dims = HobberMotorCradle.cradleDimensions(), rest = HobberMotorCradle.cradleRest(), faceY = HobberMotorCradle.cradleFaceY();
     var com = {x: mx / mass, y: my / mass, z: mz / mass}, ahead = faceY - com.y, height = com.z - sec.floorTop;
     var motor = machine.spindle.motor, face = motor.rating.bodyDiameter, bodyLength = motor.rating.bodyLength;
     // ---- Hand model of the servo group on the cradle, validated against the C3D10 FE (HobberFeResults, fem/): two coupled-pair modes.
@@ -494,7 +494,7 @@ class HobberFrameChecks {
     for (h in flange.holes) zTop = Math.max(zTop, zq + h.y);
     var eta = HobberFeResults.RIB_PARTICIPATION, hq = zTop - base, steps = Math.round(hq);
     function props(z:Float, withRib:Bool, axis:Int) {
-      var area = 0.0, sx = 0.0, slabs = HobberSaddle.cradleSlabs(z, withRib);
+      var area = 0.0, sx = 0.0, slabs = HobberMotorCradle.cradleSlabs(z, withRib);
       for (sl in slabs) {
         var a = (sl.x1 - sl.x0) * (sl.y1 - sl.y0);
         area += a;
@@ -559,7 +559,7 @@ class HobberFrameChecks {
     // lateral: u_x(cg) = u + phi rz
     var fl = wallFlex(1), kbl = HobberFeResults.BASE_ROLL_N_MM_PER_RAD;
     var kLat = invert([fl[0] + hq * hq / kbl, fl[1] + hq / kbl, fl[2] + 1 / kbl]);
-    var restWidth = rest.x1 - rest.x0, restOffset = 0.5 * (rest.x0 + rest.x1) - HobberSaddle.cradleMotorX();
+    var restWidth = rest.x1 - rest.x0, restOffset = 0.5 * (rest.x0 + rest.x1) - HobberMotorCradle.cradleMotorX();
     kLat[2] += packSeries * (restWidth * restWidth / 12 + restOffset * restOffset);
     var mLat = [mt, mt * rz, mt * rz * rz + iyy * tonne];
     var fLat = eigen2(kLat, mLat);
@@ -571,7 +571,7 @@ class HobberFrameChecks {
     var gashes = machine.hob.parameterCount("gashes"), diameter = machine.hob.design.outsideDiameter;
     var nLow = 100000 / (Math.PI * diameter), hobRpmTop = 3 * nLow, fLow = nLow * gashes / 60, fOp = hobRpmTop * gashes / 60, fHigh = nTop * gashes / 60;
     var lo = 0.8 * fLow, opHi = 1.2 * fOp, hi = 1.2 * fHigh;
-    var feSig = HobberFeResults.CRADLE_DESIGN, signature = HobberSaddle.cradleSignature();
+    var feSig = HobberFeResults.CRADLE_DESIGN, signature = HobberMotorCradle.cradleSignature();
     var fePre = Math.min(HobberFeResults.CRADLE_PRELOADED_HZ[0], HobberFeResults.CRADLE_PRELOADED_HZ[1]), feUnpre = HobberFeResults.CRADLE_UNPRELOADED_HZ[0], feOpen = HobberFeResults.CRADLE_UNPRELOADED_HZ[1];
     lines.push('B servo group: ${r(mass)} kg (motor, shaft, pulley, encoder and a third of the ${r(cradle)} kg cradle), centre ${r(ahead, 1)} mm ahead of the flange, ${r(height, 1)} mm above the floor; '
       + 'hand-model servo ${r(mServo)} kg, inertia ${Math.round(ixx)} kg mm2 about x / ${Math.round(iyy)} about y, attachment at the upper flange bolt row, ${r(hq, 1)} mm above the foot; rest block ${r(restWidth, 0)} x ${r(rest.y1 - rest.y0, 0)} mm, '
@@ -705,7 +705,7 @@ class HobberFrameChecks {
    */
   public static function spindleSeat(machine:FlexsplineHobber):Array<String> {
     var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(machinekit.hobbing.HobberFrame.workToMachine());
-    var seat = HobberSaddle.spindleSeatRange(), toHousing = F.inverse(F.compose(back, housing));
+    var seat = HobberSpindleSeat.spindleSeatRange(), toHousing = F.inverse(F.compose(back, housing));
     function zOf(y:Float):Float return F.transformPoint(toHousing, 0, y, HobberLayout.get().nativeHobCentreZ).z;
     var a = zOf(seat.y0), b = zOf(seat.y1), from = Math.min(a, b), to = Math.max(a, b);
     var screws = [for (y in seat.clampYs) zOf(y)];

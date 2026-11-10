@@ -14,7 +14,7 @@ class HobberCarriageStockCheck {
   public static inline final PAD_COPLANARITY_MM = 0.01;
   public static function result():{stockFlatnessMm:Float, hiwinMountHeightMm:Float,
     blockHeightVariationMm:Float, requiredMm:Float, finishingRequired:Bool, assumedStock:Bool} {
-    var stock = GroundStock.plate(GroundStock.STEEL, HobberSaddle.X_CARRIAGE_THICKNESS);
+    var stock = GroundStock.plate(GroundStock.STEEL, HobberXCarriage.X_CARRIAGE_THICKNESS);
     var spacing = 2 * HobberLayout.get().bedRailCentre;
     var allowance = 0.085 * spacing / 500;
     var flatness = stock.flatness * spacing / 100;

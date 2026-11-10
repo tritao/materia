@@ -129,9 +129,7 @@ class HobberTableWork extends HobberUnit {
     fixedPart("blank", blank, HobberFrame.partAt(0, 0, heights.hobCentreZ), "mandrel");
       externalPart(
         "chipTray",
-        new HobberSaddle(
-          "GE-chip-tray",
-          new ComponentValues().setNumber("tableFaceDiameter", tableSpec.number("faceDiameter")).setNumber(
+        new HobberChipTray(new ComponentValues().setNumber("tableFaceDiameter", tableSpec.number("faceDiameter")).setNumber(
             "tableHousingDiameter",
             tableSpec.number("housingDiameter")
           ).setNumber(

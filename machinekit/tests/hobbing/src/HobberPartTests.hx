@@ -275,7 +275,7 @@ class HobberPartTests {
       "pulley bores are the motor shaft and the Ø20 stub");
     check(HobSpindle.pulleyFront(spindle.motor.rating.shaftLength) - HobSpindle.PULLEY_WIDTH >= HobSpindle.SHAFT_REAR,
       "the cartridge stub reaches past the pulley");
-    var cradle = new machinekit.hobbing.HobberSaddle("GE-motor-cradle"), cradleHoles = cradle.holes();
+    var cradle = new HobberMotorCradle(), cradleHoles = cradle.holes();
     check(machinekit.component.ManufacturingRoute.of(cradle) != null && cradleHoles.filter(h -> h.kind == "tapped").length == 1
       && cradleHoles.filter(h -> h.kind == "dowel").length == 0 && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M8").length == 0
       && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M6" && h.slotLength == 2 * HobSpindle.TENSION_TRAVEL).length == 4,

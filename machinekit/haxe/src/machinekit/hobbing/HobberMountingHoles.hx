@@ -79,7 +79,7 @@ class HobberMountingHoles {
   /** Reserve the sole joint's transferred service threads before choosing
    * cast anchors. The clamped face owns the pattern; no second hole list. */
   static function addSoleHoles(row:CastInsertPlacement,pad:HobberLayout.ColumnSolePad):CastInsert {
-    var face=HobberSaddle.columnSoleFace(pad);
+    var face=HobberXCarriage.columnSoleFace(pad);
     var size=switch face.role {
       case Clamped(thread,_,_,_): if (thread==null) throw "Sole joint needs a selected thread"; thread;
       case _: throw "Sole source needs its clamped joint face";

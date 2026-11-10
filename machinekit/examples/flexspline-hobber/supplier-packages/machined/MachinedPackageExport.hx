@@ -8,7 +8,7 @@ import machinekit.component.MachineComponent;
 import machinekit.component.ManufacturingRoute;
 import machinekit.component.ManufacturingRoute.RouteHole;
 import machinekit.hobbing.HobberDrives;
-import machinekit.hobbing.HobberSaddle;
+import machinekit.hobbing.*;
 import machinekit.motion.BallNut;
 import machinekit.motion.NutBlock;
 
@@ -216,7 +216,7 @@ class MachinedPackageExport {
     for(key in order) {
       var item=grouped.get(key);if(item==null)throw "Missing routed part: "+key;
       var part=item.component,holes=part.derivedRouteHoles();
-      if(Std.isOfType(part,HobberSaddle))holes=cast(part,HobberSaddle).holes();
+      if(Std.isOfType(part,HobberMadePart))holes=cast(part,HobberMadePart).holes();
       else if(Std.isOfType(part,NutBlock))holes=cast(part,NutBlock).holes();
       else if(Std.isOfType(part,machinekit.hobbing.HobberChipCover))holes=holes.concat(cast(part,machinekit.hobbing.HobberChipCover).toolHoles());
       else if(Std.isOfType(part,machinekit.motion.ScrewLinearModulePart)) {

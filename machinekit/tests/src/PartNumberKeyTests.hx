@@ -1,3 +1,4 @@
+import machinekit.hobbing.*;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
@@ -656,7 +657,7 @@ class PartNumberKeyTests {
     if (mandrel != "MANDREL-ASSUMED-D59-E0.05" || rotaryClamp != "CLAMP-ASSUMED-100NM-120x150"
       || PartNumberLint.problems(mandrel).length != 0 || PartNumberLint.problems(rotaryClamp).length != 0)
       throw 'Mandrel or rotary clamp identity: $mandrel, $rotaryClamp';
-    var saddle = machinekit.hobbing.HobberSaddle.recipeType();
+    var saddle = HobberMadePart.recipeType();
     var saddleZ = saddle.create().bom.partNumber;
     var saddleX = saddle.create(new ComponentValues().setToken("design", "GE-X-carriage")).bom.partNumber;
     var spindlePart = machinekit.hobbing.HobSpindlePart.recipeType().create().bom.partNumber;

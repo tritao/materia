@@ -30,7 +30,7 @@ class HobberXAxis extends HobberUnit {
       if (id == "blockXLeft") {
         addComponent(id, block, pose);
         moving("X", Prismatic, "railXLeft", id, HobberFrame.partAt(0, 0, heights.xGuideOriginZ), [0.0, 1, 0], cutDistance, minX, layout.xRetract);
-        fixedPart("Xbridge", new HobberSaddle("GE-X-carriage"), HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z), id, top);
+        fixedPart("Xbridge", new HobberXCarriage(), HobberFrame.partAt(0, centre, HobberFrame.PART_DATUM_Z), id, top);
       } else fixedPart(id, block, pose, "Xbridge", top);
     }
     for (role in HobberCarriageRib.ROLES) {
@@ -44,12 +44,12 @@ class HobberXAxis extends HobberUnit {
     var axis=HobberDrives.x();
       for(support in ["fixed","floating"]) {
         var id=HobberDrives.barMember(axis.id,support),face=HobberPadBolts.face(axis,support);
-        externalPart(id,new HobberSaddle(HobberDrives.barDesign(axis.id,support)),HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z),"foundation",axis.id=="X"?"bed-driveSeat":"column-driveSeat",HobberFrame.sourcePose(face.frame),true);
+        externalPart(id,new HobberDriveBar(axis.id,support),HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z),"foundation",axis.id=="X"?"bed-driveSeat":"column-driveSeat",HobberFrame.sourcePose(face.frame),true);
       }
     drive(axis,HobberDrives.barMember("X","fixed"),HobberDrives.barMember("X","floating"),"Xbridge",cutDistance);
     var scaleX=HobberScales.x();
     group("Scale");
-    externalPart("XscaleSeat", new HobberSaddle("GE-X-scale-seat"), HobberFrame.partAt(0,0,HobberFrame.PART_DATUM_Z), "foundation", "bed-casting", scaleBarContact(scaleX));
+    externalPart("XscaleSeat", new HobberScaleSeat("X"), HobberFrame.partAt(0,0,HobberFrame.PART_DATUM_Z), "foundation", "bed-casting", scaleBarContact(scaleX));
     scale(scaleX,"XscaleSeat","Xrib-scale");
     group("Protection");
     for (r in HobberChipCover.installations()) {

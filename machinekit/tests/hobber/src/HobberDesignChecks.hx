@@ -2,7 +2,7 @@ import machinekit.hobbing.HobberDrives;
 import machinekit.assembly.PosedParts;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
-import machinekit.hobbing.HobberSaddle;
+import machinekit.hobbing.*;
 import materia.assembly.AssemblyFrames as F;
 
 /** Physical load paths and recipe reconstruction, independent of scene collision exclusions. */
@@ -55,7 +55,7 @@ class HobberDesignChecks {
       var mount = F.compose(canonical, poses.get("swivel/housing"));
       count++;
       if (Math.abs(face.x - centre.x - machinekit.hobbing.HobberLayout.get().swivelNativeX) > 1e-8
-        || Math.abs(mount.x - face.x) > 1e-8 || face.x >= centre.x + machinekit.hobbing.HobberSaddle.SWIVEL_PLATE_FRONT - 2) throw "swivel output face must be in front of the Z saddle plate by its running gap";
+        || Math.abs(mount.x - face.x) > 1e-8 || face.x >= centre.x + HobberZSaddle.SWIVEL_PLATE_FRONT - 2) throw "swivel output face must be in front of the Z saddle plate by its running gap";
       var screw = F.compose(canonical, poses.get("Xscrew"));
       count++;
       if (Math.abs(screw.y) > 1e-8
@@ -75,7 +75,7 @@ class HobberDesignChecks {
       var motor = F.compose(canonical, poses.get("Xmotor"));
       count++;
       if (motor.x < screw.x) throw "X motor must be at rear end of central drive";
-      for (m in members) if (Std.isOfType(m.component, HobberSaddle)) {
+      for (m in members) if (Std.isOfType(m.component, HobberMadePart)) {
         count++;
         if (["A-yoke", "Y-saddle", "X-bridge",
           "Z-saddle"].indexOf(m.component.values().token("design")) >= 0) throw "retired overhead saddle installed";
@@ -97,7 +97,7 @@ class HobberDesignChecks {
         count++;
         if (gap > 0.000001) throw 'unsupported mount ${first.id}/${second.id}: $gap mm gap';
       }
-      for (m in members) if (Std.isOfType(m.component, HobberSaddle)) {
+      for (m in members) if (Std.isOfType(m.component, HobberMadePart)) {
         count++;
         if (cache.local(m.component).solidCount() != 1) throw 'disconnected designed weldment ${m.id}';
       }

@@ -27,15 +27,15 @@ class HobberElectricalRack extends HobberUnit {
     );
     // The rack is a free-standing floor unit with its own base plate on the floor, not part of the machine's structure (it was
     // mated to the bed's lifting seat 650 mm away); the wiring to the machine is by ports, not by a mate.
-    addComponent("electricalPanel", new HobberSaddle("electrical-panel"), layout.electricalPanelPose());
+    addComponent("electricalPanel", new HobberElectricalPanel(), layout.electricalPanelPose());
     fixedPart("powerSupply", supply, layout.electricalDevicePose(0, 130), "electricalPanel");
     exposePort("mains", "powerSupply", "mains");
     // The 48 V bus for the A actuator, from the same mains: it takes back what the actuator regenerates in a brake chopper and resistor.
     fixedPart("supply48", new ThreePhaseDcSupply(new AcMains(ThreePhase, new AcRmsVoltage(400), 50), 48, 20, 1, 125, 125, 120, 300),
-      layout.electricalDevicePose(-105, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
+      layout.electricalDevicePose(-105, HobberElectricalPanel.ELECTRICAL_HEIGHT - 120), "electricalPanel");
     exposePort("mains48", "supply48", "mains");
     // The three sealed scales are read by a BiSS-C master module of the controller.
-    fixedPart("bissMaster", new BissMaster(4), layout.electricalDevicePose(110, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
+    fixedPart("bissMaster", new BissMaster(4), layout.electricalDevicePose(110, HobberElectricalPanel.ELECTRICAL_HEIGHT - 120), "electricalPanel");
     var ids=["Xdrive","Zdrive","Ydrive","table-drive","hob-drive"];
     for (i in 0...ids.length) {
       var id=ids[i];

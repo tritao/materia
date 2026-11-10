@@ -37,7 +37,7 @@ class HobberYPart extends MachineComponent {
       var grip=length-1.25*bolt.diameter;
       out.push(BoltedFace.clamped("actuator-output",ScrewLinearModulePart.plane(at.x,at.y,at.z,1),[for(i in 0...ErobActuatorData.OUTPUT_BOLT_COUNT){x:ErobActuatorPart.outputBolt(i).x,y:-ErobActuatorPart.outputBolt(i).y}],ErobActuatorData.OUTPUT_CLEARANCE_HOLE,grip,"M4",{diameter:bolt.counterboreDiameter,depth:spec.baseThickness-at.z-grip},false));
     }
-    if(role=="carriage")for(face in HobberSaddle.yHeadFaces())switch face.role {
+    if(role=="carriage")for(face in HobberYPart.yHeadFaces())switch face.role {
       case Clamped(size,clearance,grip,recess):
         var holes=face.holes;if(holes==null)throw "Head interface needs its pattern";
         out.push(BoltedFace.clamped(face.id,F.compose(HobberLayout.get().headInModule(),face.frame),holes,clearance,spec.carriageThickness,size,recess,false,true));
@@ -47,7 +47,7 @@ class HobberYPart extends MachineComponent {
   }
   override public function pinnedFaces():Array<PinnedFace> {
     var out:Array<PinnedFace>=body().pinnedFaces();
-    if(role=="carriage")for(face in HobberSaddle.yHeadPins())out.push(new PinnedFace(face.id,F.compose(HobberLayout.get().headInModule(),face.frame),face.holes,face.diameter,face.through?spec.carriageThickness:face.depth,face.through,false,face.fit));
+    if(role=="carriage")for(face in HobberYPart.yHeadPins())out.push(new PinnedFace(face.id,F.compose(HobberLayout.get().headInModule(),face.frame),face.holes,face.diameter,face.through?spec.carriageThickness:face.depth,face.through,false,face.fit));
     return out;
   }
   static function box(a:Float,b:Float,c:Float,d:Float,e:Float,f:Float):Part {
@@ -82,4 +82,11 @@ class HobberYPart extends MachineComponent {
     }
     return made;
   }
+
+  public static function yHeadFaces():Array<BoltedFace> return [
+    BoltedFace.clamped("outboard-carrier",HobberOutboardCarrier.outboardCarrierFrame(1),[for(y in [-8.0,8.0])for(z in [-45.0,45.0]){x:y,y:z}],4.5,12,"M4",null,false,true),
+    BoltedFace.clamped("seat",BoltedFace.frameOf({x:HobberSpindleSeat.SEAT_X1,y:0.0,z:0.0},{x:1.0,y:0,z:0},{x:0.0,y:1,z:0}),HobberSpindleSeat.seatBolts(),9,12,"M8",null,false)
+  ];
+  public static function yHeadPins():Array<PinnedFace> return [HobberOutboardCarrier.outboardCarrierPins(1),PinnedFace.atPoints("seat-pins",BoltedFace.frameOf({x:HobberSpindleSeat.SEAT_X1,y:0.0,z:0.0},{x:1.0,y:0,z:0},{x:0.0,y:1,z:0}),[for(z in [-HobberSpindleSeat.SEAT_PIN_Z,HobberSpindleSeat.SEAT_PIN_Z]){x:HobberSpindleSeat.SEAT_X1+10,y:HobberSpindleSeat.SEAT_PIN_Y,z:z}],4,6,true)];
+
 }

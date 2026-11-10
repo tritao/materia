@@ -1,3 +1,4 @@
+import machinekit.hobbing.*;
 import machinekit.hobbing.HobberLayout;
 import machinekit.hobbing.HobberCarriageRib;
 
@@ -189,8 +190,8 @@ class HobberXAssembly {
   /** Friction-only VQ/I screen. Charge the full X mass to the beam shear,
    * with 2x uneven sharing ASSUMED; no bond or assembly-dowel capacity. */
   static function ribSlip(machine:FlexsplineHobber):Int {
-    var bottom=machinekit.hobbing.HobberSaddle.xCarriageBottom(), thickness=machinekit.hobbing.HobberSaddle.X_CARRIAGE_THICKNESS;
-    var sections=[{width:2*machinekit.hobbing.HobberSaddle.xCarriageHalfWidth(),height:thickness,z:bottom+thickness/2}];
+    var bottom=HobberXCarriage.xCarriageBottom(), thickness=HobberXCarriage.X_CARRIAGE_THICKNESS;
+    var sections=[{width:2*HobberXCarriage.xCarriageHalfWidth(),height:thickness,z:bottom+thickness/2}];
     var ribs=[for (p in machine.components()) if (StringTools.startsWith(p.id,"Xrib-")) p];
     for (entry in ribs) {
       var rib:HobberCarriageRib=cast entry.component, band=rib.band();

@@ -36,9 +36,9 @@ class HobberCarriageRib extends MachineComponent {
   override public function machinable():Bool return true;
   public function band():{low:Float, high:Float, bottom:Float} return bandFor(role);
   static function bandFor(role:String):{low:Float, high:Float, bottom:Float} return switch role {
-    case "leftOuter": {low: -180.0, high: -160.0, bottom: HobberSaddle.xCarriageBottom() - 40.0};
-    case "leftInner": {low: -140.0, high: -120.0, bottom: HobberSaddle.xCarriageBottom() - 40.0};
-    case "rightInner": {low: 120.0, high: 140.0, bottom: HobberSaddle.xCarriageBottom() - 40.0};
+    case "leftOuter": {low: -180.0, high: -160.0, bottom: HobberXCarriage.xCarriageBottom() - 40.0};
+    case "leftInner": {low: -140.0, high: -120.0, bottom: HobberXCarriage.xCarriageBottom() - 40.0};
+    case "rightInner": {low: 120.0, high: 140.0, bottom: HobberXCarriage.xCarriageBottom() - 40.0};
     case "scale":
       var box = HobberScales.carrierBox(HobberScales.x(), HobberScales.HEAD_CARRIER_MARGIN);
       {low: box[2], high: box[3], bottom: HobberScales.headFace(HobberScales.x())[2]};
@@ -46,7 +46,7 @@ class HobberCarriageRib extends MachineComponent {
   };
   static function routeFor(role:String):ManufacturingRoute {
     var b = bandFor(role);
-    var width = HobberSaddle.xCarriageBottom() - b.bottom;
+    var width = HobberXCarriage.xCarriageBottom() - b.bottom;
     var thickness = b.high - b.low;
     // The scale carrier is a deliberate height/width interface, milled from
     // the next five-mm nominal square. No stock tolerance is called vendor data.
@@ -62,7 +62,7 @@ class HobberCarriageRib extends MachineComponent {
   }
   public function interfaceFrame(into:Float):materia.assembly.AssemblyRecord.AssemblyFrame {
     var b = band();
-    return BoltedFace.frameOf({x: 263, y: (b.low + b.high) / 2, z: HobberSaddle.xCarriageBottom()},
+    return BoltedFace.frameOf({x: 263, y: (b.low + b.high) / 2, z: HobberXCarriage.xCarriageBottom()},
       {x: 0, y: 0, z: into}, {x: 1, y: 0, z: 0});
   }
   public function boltSize():String return role == "scale" ? "M5" : "M6";
@@ -83,15 +83,15 @@ class HobberCarriageRib extends MachineComponent {
     var recess = screw.headHeight + 0.5;
     var faces = [BoltedFace.clamped("plate", interfaceFrame(-1),
       [for (x in boltXs()) {x: x - 263, y: 0.0}], screw.clearanceMedium,
-      HobberSaddle.xCarriageBottom() - b.bottom - recess, boltSize(), {diameter: screw.headDiameter + 2, depth: recess}, false)];
-    if (role == "scale") faces.push(HobberScales.carrierFace(HobberScales.x(), [0.0, 0, 0], 8, HobberSaddle.xCarriageBottom() - b.bottom));
+      HobberXCarriage.xCarriageBottom() - b.bottom - recess, boltSize(), {diameter: screw.headDiameter + 2, depth: recess}, false)];
+    if (role == "scale") faces.push(HobberScales.carrierFace(HobberScales.x(), [0.0, 0, 0], 8, HobberXCarriage.xCarriageBottom() - b.bottom));
     return faces;
   }
   override public function pinnedFaces():Array<PinnedFace> return [new PinnedFace("plate-pins",
     interfaceFrame(-1), [for (x in pinXs()) {x: x - 263, y: 0.0}], 4, 8)];
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var b = band();
-    var raw = Part.box(246, b.high - b.low, HobberSaddle.xCarriageBottom() - b.bottom);
+    var raw = Part.box(246, b.high - b.low, HobberXCarriage.xCarriageBottom() - b.bottom);
     var placed = raw.translated(new Vector(263, (b.low + b.high) / 2, b.bottom));
     raw.close();
     return machined(placed);

@@ -1,5 +1,5 @@
 import machinekit.hobbing.HobberLayout;
-import machinekit.hobbing.HobberSaddle;
+import machinekit.hobbing.*;
 import machinekit.component.MachineComponent;
 import materia.assembly.AssemblyFrames as F;
 
@@ -58,7 +58,7 @@ class HobberFemExport {
       throw "no part " + designation;
     }
     for (design in ["GE-X-carriage", "GE-Z-saddle", "GE-spindle-seat", "GE-motor-cradle"]) {
-      var saddle = cast(member("HOBBER-" + design), HobberSaddle);
+      var saddle = cast(member("HOBBER-" + design), HobberMadePart);
       var geo = saddle.geometry(), entryId = "";
       for (entry in machine.components()) if (entry.component == cast saddle) entryId = entry.id;
       var o = at(entryId, 0, 0, 0), ax = at(entryId, 1, 0, 0), ay = at(entryId, 0, 1, 0), az = at(entryId, 0, 0, 1);
@@ -111,7 +111,7 @@ class HobberFemExport {
     }
     var cradle = member("HOBBER-GE-motor-cradle").massProperties();
     var cc = at("motorCradle", cradle.centreOfMass.x, cradle.centreOfMass.y, cradle.centreOfMass.z);
-    out.cradle = {bolts: [for (b in HobberSaddle.cradleFloorBolts()) [b.x, b.y]], rest: HobberSaddle.cradleRest()};
+    out.cradle = {bolts: [for (b in HobberMotorCradle.cradleFloorBolts()) [b.x, b.y]], rest: HobberMotorCradle.cradleRest()};
     out.servo = {mass: servo.mass, com: [r(servo.x / servo.mass), r(servo.y / servo.mass), r(servo.z / servo.mass)], members: parts, motorBody: {face: machine.spindle.motor.rating.bodyDiameter, length: machine.spindle.motor.rating.bodyLength},
       cradleComWork: [r(cc.x), r(cc.y), r(cc.z - seatZ)], cradleComAuthored: [r(cradle.centreOfMass.x), r(cradle.centreOfMass.y), r(cradle.centreOfMass.z)]};
     // Head on the A flange.
@@ -173,8 +173,8 @@ class HobberFemExport {
       xmin=Math.min(xmin,box.minX);xmax=Math.max(xmax,box.maxX);
     }
     if (footprints.length==0) throw "Carriage FE export needs column steel contacts";
-    out.columnSoleJoint={contactCentreLocal:[r((xmin+xmax)/2,6),0.0,HobberSaddle.xCarriageTop()],
-      deckThicknessMm:HobberSaddle.X_CARRIAGE_THICKNESS,contactFootprints:footprints};
+    out.columnSoleJoint={contactCentreLocal:[r((xmin+xmax)/2,6),0.0,HobberXCarriage.xCarriageTop()],
+      deckThicknessMm:HobberXCarriage.X_CARRIAGE_THICKNESS,contactFootprints:footprints};
     sys.io.File.saveContent('$dir/hobber-fem-export.json', haxe.Json.stringify(out, null, "  "));
     Sys.println("wrote " + dir + "/hobber-fem-export.json");
   }

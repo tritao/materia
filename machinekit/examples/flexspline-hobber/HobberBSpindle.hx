@@ -26,18 +26,18 @@ class HobberBSpindle extends HobberUnit {
     include("spindle", spindle, HobberFrame.partAt(-(layout.spindleNativeY), centre, heights.hobCentreZ, e0));
     // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
     // four M8 and two 4 mm drawing dowels into the plain Y carriage.
-    externalPart("spindleSeat", new HobberSaddle("GE-spindle-seat"), HobberFrame.partAt(0, centre, heights.hobCentreZ), "yStage", "carriage",
+    externalPart("spindleSeat", new HobberSpindleSeat(), HobberFrame.partAt(0, centre, heights.hobCentreZ), "yStage", "carriage",
       F.alongY(-105, centre + 45, heights.hobCentreZ, 0, 1, 0));
     fixedMembers("spindle-mount", "spindleSeat", "spindle/housing", F.alongY(-150, centre + 40, heights.hobCentreZ, 0, 1, 0));
     // The belt-drive servo stands above the cartridge on a milled cradle bolted to the top of the spindle seat block (the stiffest part
     // near it); its flange is on the cradle wall.
-    fixedPart("motorCradle", new HobberSaddle("GE-motor-cradle"), HobberFrame.partAt(0, centre, heights.hobCentreZ), "spindleSeat",
+    fixedPart("motorCradle", new HobberMotorCradle(), HobberFrame.partAt(0, centre, heights.hobCentreZ), "spindleSeat",
       F.alongY(-190, centre, heights.hobCentreZ + 58, 0, 0, 1));
     fixedMembers("motor-mount", "motorCradle", "spindle/motor",
       F.alongY(-(layout.spindleNativeY - HobSpindle.MOTOR_FACE_Z), centre - HobSpindle.MOTOR_OFFSET, HobberFrame.PART_DATUM_Z + (layout.nativeHobCentreZ + HobSpindle.motorHeight()), -1, 0, 0));
     fixedPart("hob", hob, HobberFrame.partAt(-20, centre, heights.hobCentreZ, e0), "spindle/arbor");
     group("Outboard support");
-    externalPart("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), HobberFrame.partAt(0, centre, heights.hobCentreZ), "yStage", "carriage",
+    externalPart("outboardCarrier", new HobberOutboardCarrier(), HobberFrame.partAt(0, centre, heights.hobCentreZ), "yStage", "carriage",
       F.alongY(-30, centre + 45, heights.hobCentreZ, 0, 1, 0));
     var supportPose = F.compose(HobberFrame.partAt(0, centre, heights.hobCentreZ), layout.outboardDatum());
     fixedPart("outboard", new OutboardSupport(), supportPose, "outboardCarrier",
@@ -59,7 +59,7 @@ class HobberBSpindle extends HobberUnit {
     group("Ungrouped");
       externalPart(
         "coolantPort",
-        new HobberSaddle("GE-coolant"),
+        new HobberCoolantPort(),
         HobberFrame.partAt(0, centre, heights.hobCentreZ),
         "yStage", "carriage",
         F.alongY(-64.35, centre + 45, HobberFrame.PART_DATUM_Z + 435, 0, 1, 0)

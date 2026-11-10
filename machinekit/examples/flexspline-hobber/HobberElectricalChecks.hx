@@ -1,3 +1,4 @@
+import machinekit.hobbing.*;
 import machinekit.hobbing.HobberLayout;
 import machinekit.assembly.PosedParts;
 
@@ -20,7 +21,7 @@ class HobberElectricalChecks {
         var pose = poses.get(m.id), b = cache.box(m.component, pose);
         if (Math.abs(b.maxY - (panel.y - 10)) > 1e-6) throw '${m.id} mounting face does not meet the backplate';
         if (b.minX < panel.x - 210 || b.maxX > panel.x + 210 || b.minZ < panel.z + 20
-          || b.maxZ > panel.z + machinekit.hobbing.HobberSaddle.ELECTRICAL_HEIGHT) throw '${m.id} extends beyond the supported backplate area';
+          || b.maxZ > panel.z + HobberElectricalPanel.ELECTRICAL_HEIGHT) throw '${m.id} extends beyond the supported backplate area';
         var overlap = cache.overlap(m.component, pose, rack.component, rackPose);
         if (overlap > 0.001) throw '${m.id} penetrates the backplate/stand by $overlap mm3';
         for (other in devices) if (other.id != m.id && cache.overlap(
