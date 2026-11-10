@@ -55,6 +55,30 @@ import nativekit.scene.PerspectiveCamera;
     }
     viewport.dispose(); scene.dispose();
   }
+  /** A close-up on a hole rim in an exploded assembly: the exploded frame's box encloses the eye. */
+  static function explodedCloseUp():Void {
+    var camera = new PerspectiveCamera();
+    camera.setAngle(0.6, 0.35);
+    // Pivot on a 6 mm hole rim of a bracket exploded 0.4 m off a 2 m frame (metres).
+    camera.setTarget(0.4, 0.1, 0.55, 0.08);
+    var bracket = [0.37, 0.07, 0.53, 0.43, 0.13, 0.57];
+    var frame = [-1.0, -0.4, 0.0, 1.0, 0.4, 0.9];
+    var fasteners = [0.2, -0.1, 0.45, 0.6, 0.3, 0.75];
+    camera.fitClipRange([bracket, frame, fasteners], 16.0 / 9.0);
+    var step = camera.depthStepAt(camera.distance);
+    // The previous distance/10000 fallback gave ~48 um steps here (0.6 um now); edges lost to faces at hole rims.
+    check(step <= camera.distance * PerspectiveCamera.PIVOT_RELATIVE_DEPTH_STEP * 1.001,
+      'exploded close-up keeps pivot depth precision (step ${step} m)');
+    check(camera.clipNear < camera.distance * 0.01, "exploded close-up keeps geometry well ahead of the pivot");
+    var eye = camera.eyePosition(), back = camera.viewDirection(), farthest = 0.0;
+    for (corner in 0...8) {
+      var depth = 0.0;
+      for (axis in 0...3) depth -= (frame[(corner >> axis & 1) * 3 + axis] - eye[axis]) * back[axis];
+      farthest = Math.max(farthest, depth);
+    }
+    check(camera.clipFar >= farthest, "exploded close-up keeps the far side of the frame");
+  }
+
   public static function main():Int {
     viewportBounds();
     var camera = new PerspectiveCamera();
@@ -83,8 +107,12 @@ import nativekit.scene.PerspectiveCamera;
           "off-screen/behind-eye boxes preserve the visible depth range"
         );
       }
+      camera.fitClipRange([visible]);
+      var visibleNear = camera.clipNear;
       camera.fitClipRange([visible, crossing]);
-      check(camera.clipNear < 0.00001, "fixture straddles the eye in depth without entering the view");
+      check(camera.clipNear < visibleNear * 0.5, "fixture straddles the eye in depth without entering the view");
+      check(camera.depthStepAt(camera.distance) <= camera.distance * PerspectiveCamera.PIVOT_RELATIVE_DEPTH_STEP * 1.001,
+        "boxes straddling the eye keep the pivot's depth precision");
       var side = box(10, 8, 0.2);
       camera.fitClipRange([visible, side], 1);
       var narrowNear = camera.clipNear;
@@ -95,7 +123,7 @@ import nativekit.scene.PerspectiveCamera;
       camera.fitClipRange([visible, box(10, Math.tan(25 * Math.PI / 180) * 10, 1)], 1);
       check(camera.clipNear < narrowNear * 0.75, "boxes crossing a side plane stay included");
       camera.fitClipRange([visible, box(0, 0, 0.5)], 1);
-      check(camera.clipNear < 0.00001, "camera inside an on-screen box retains nearby geometry");
+      check(camera.clipNear < camera.distance * 0.01, "camera inside an on-screen box retains geometry ahead of the pivot");
       camera.fitClipRange([crossing], 1);
       check(camera.clipNear > 0 && camera.clipFar > camera.clipNear, "fully off-screen scene keeps valid clipping");
     }
@@ -111,6 +139,7 @@ import nativekit.scene.PerspectiveCamera;
       1085.0 / 689.0
     );
     check(camera.clipNear > 0.1 && camera.clipFar < 0.5, "saved mold view keeps its useful depth precision");
+    explodedCloseUp();
     Sys.println('Camera clip range: $assertions assertions passed');
     return 0;
   }

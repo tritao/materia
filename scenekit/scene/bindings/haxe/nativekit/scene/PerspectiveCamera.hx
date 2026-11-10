@@ -82,8 +82,28 @@ class PerspectiveCamera {
       return;
     }
     // A bounding box is conservative; the margin also prevents clipping while orbiting.
-    clipNear = crossesEye ? Math.max(0.000001, distance / 10000.0) : Math.max(0.000001, nearest * 0.8);
+    // Boxes reach much closer than their geometry (exploded parts, long frames
+    // enclosing the eye), so they never pull near below the plane that keeps
+    // the pivot's depth precision. Geometry closer than that floor is clipped.
+    var floor = precisionNear(distance);
+    clipNear = crossesEye ? floor : Math.max(floor, nearest * 0.8);
     clipFar = Math.max(clipNear * 2.0, farthest * 1.2);
+  }
+
+  /** Depth step of the D24 buffer the scene renders into, as a fraction of its 0..1 range. */
+  public static inline var DEPTH_STEP:Float = 1.0 / 16777216.0;
+
+  /** Largest depth step at the pivot, relative to its distance (~1/50 px at 1000 px, 50° FOV). */
+  public static inline var PIVOT_RELATIVE_DEPTH_STEP:Float = 2e-5;
+
+  /** Nearest plane whose pivot-depth step stays within PIVOT_RELATIVE_DEPTH_STEP. */
+  static function precisionNear(pivot:Float):Float {
+    return Math.max(0.000001, pivot / (PIVOT_RELATIVE_DEPTH_STEP / DEPTH_STEP));
+  }
+
+  /** World-space depth step at view depth `depth` for the current clip range. */
+  public function depthStepAt(depth:Float):Float {
+    return depth * depth * (clipFar - clipNear) / (clipFar * clipNear) * DEPTH_STEP;
   }
 
   public function orbit(deltaX:Float, deltaY:Float):Void {
