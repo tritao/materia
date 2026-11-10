@@ -208,6 +208,8 @@ class ScrewSupportUnit extends MachineComponent {
 	 * (a shim) sets it false for that instance, and the support's fasteners are then not derived.
 	 */
   public var footBolted = true;
+  /** External packing included in the clamp grip; the bought support geometry is unchanged. */
+  public var footSpacer:Float = 0;
 
   /**
    * The screw size a machine bolts the foot with when it chooses a smaller one than the largest the maker's hole passes
@@ -228,11 +230,11 @@ class ScrewSupportUnit extends MachineComponent {
     if (screw == null) throw 'No catalogue screw passes the ${hole} mm foot holes of $designation';
     return [machinekit.component.BoltedFace.clamped(
       "foot",
-      machinekit.component.BoltedFace.frameOf({x: 0, y: -spec.shaftHeight, z: 0}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+      machinekit.component.BoltedFace.frameOf({x: 0, y: -spec.shaftHeight-footSpacer, z: 0}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
       // The face's y axis runs along -Z of the support.
       [for (p in mountingPositions()) {x: p.x, y: -p.z}],
       hole,
-      boltSeatY(),
+      boltSeatY()+footSpacer,
       screw.size,
       {diameter: spec.counterbore, depth: screw.headHeight}
     )];
@@ -250,10 +252,10 @@ class ScrewSupportUnit extends MachineComponent {
 	 */
   override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
     if (!spec.base || !footBolted || !footPinned) return [];
-    var holes = [for (p in SupportedScrewDrive.dowelPoints([for (p in mountingPositions()) {x: p.x, y: 0.0, z: p.z}])) {x: p.x, y: -p.z}];
+    var holes = [for (p in SupportedScrewDrive.dowelPoints([for (p in mountingPositions()) {x: p.x, y: 0.0, z: p.z}],SupportedScrewDrive.footDowelInset(drawingSource().holeDiameter,footSpacer))) {x: p.x, y: -p.z}];
     if (holes.length == 0) return [];
-    return [new machinekit.component.BoltedFace.PinnedFace("foot-pins", machinekit.component.BoltedFace.frameOf({x: 0, y: -spec.shaftHeight, z: 0},
-      {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), holes, SupportedScrewDrive.DOWEL_DIAMETER, boltSeatY(), false, true)];
+    return [new machinekit.component.BoltedFace.PinnedFace("foot-pins", machinekit.component.BoltedFace.frameOf({x: 0, y: -spec.shaftHeight-footSpacer, z: 0},
+      {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), holes, SupportedScrewDrive.DOWEL_DIAMETER, (footSpacer>0?6:boltSeatY())+footSpacer, false, true)];
   }
 
   override public function carriesJournal():Bool return true;
@@ -425,17 +427,18 @@ class ScrewSupportUnit extends MachineComponent {
         ComponentRecipeSupport.choice("model", ScrewSupportCatalog.models(), "BK12"),
         ComponentRecipeSupport.choice("geometry", [NOMINAL, "vallder", "hzmotion"], NOMINAL),
         ComponentRecipeSupport.flag("footPinned",false),
+        ComponentRecipeSupport.length("footSpacer",0),
         ComponentRecipeSupport.flag("footBolted",true),
         ComponentRecipeSupport.text("screwSize","auto")
       ],
       v -> {
         var support=new ScrewSupportUnit(v.token("model"),v.token("geometry"));
-        support.footPinned=v.boolean("footPinned");support.footBolted=v.boolean("footBolted");
+        support.footPinned=v.boolean("footPinned");support.footSpacer=v.number("footSpacer");support.footBolted=v.boolean("footBolted");
         var size=v.token("screwSize");support.screwSize=size=="auto"?null:size;return support;
       },
       true,
       false,
-      ["geometry"]
+      ["geometry","footSpacer"]
     ).numbered(v -> v.token("model")).procured(_ -> Buy(null, null, null)));
   }
 
@@ -447,5 +450,5 @@ class ScrewSupportUnit extends MachineComponent {
   ).setToken(
     "material",
     materialSpec()
-  ).setBoolean("footPinned",footPinned).setBoolean("footBolted",footBolted).setToken("screwSize",screwSize==null?"auto":screwSize);
+  ).setBoolean("footPinned",footPinned).setNumber("footSpacer",footSpacer).setBoolean("footBolted",footBolted).setToken("screwSize",screwSize==null?"auto":screwSize);
 }

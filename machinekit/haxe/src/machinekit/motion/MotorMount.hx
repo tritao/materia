@@ -352,6 +352,9 @@ class MotorMount extends MachineComponent {
    * and measured thread depth, in the mount's material). `foot`: the base holes, clearance holes the screws pass, bearing on the
    * bolt seat where the reviewed CAD measured it (none otherwise: a mount whose seat is not measured is not derived).
    */
+  /** External packing under the foot, mm; part of the clamp grip, not supplier geometry. */
+  public var footSpacer:Float = 0;
+
   override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
     var faces:Array<machinekit.component.BoltedFace> = [];
     var depth = spec.threadDepth ?? 2 * machinekit.standard.SocketHeadCapScrew.catalog().get(spec.thread).diameter;
@@ -372,11 +375,11 @@ class MotorMount extends MachineComponent {
       var recess = hole.counterboreDiameter != null && hole.counterboreDepth != null ? {diameter: hole.counterboreDiameter, depth: hole.counterboreDepth} : null;
       faces.push(machinekit.component.BoltedFace.clamped(
         "foot",
-        machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+        machinekit.component.BoltedFace.frameOf({x: 0, y: -footSpacer, z: 0}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
         // The face's y axis runs along -Z of the mount.
         [for (h in spec.baseHoles) {x: h.x, y: -h.z}],
         hole.diameter,
-        seat,
+        seat + footSpacer,
         bolt.name,
         recess
       ));
@@ -387,14 +390,22 @@ class MotorMount extends MachineComponent {
   /** Whether the machine locates the foot with two dowels reamed at assembly (see `ScrewSupportUnit.footPinned`). */
   public var footPinned = false;
 
+  /** Installation match-pin sites in the foot frame; packed M60D uses its solid rear block.
+   * ASSUMED installer sites, verified against the supplier solid by the module checks. */
+  public function footDowelPoints():Array<{x:Float,y:Float,z:Float}> {
+    if(model=="M60D-BK12-C"&&footSpacer>0)return [{x:-8.0,y:0.0,z:70.0},{x:8.0,y:0.0,z:70.0}];
+    return SupportedScrewDrive.dowelPoints([for(h in spec.baseHoles){x:h.x,y:0.0,z:h.z}],
+      spec.baseHoles.length==0?SupportedScrewDrive.DOWEL_INBOARD:SupportedScrewDrive.footDowelInset(spec.baseHoles[0].diameter,footSpacer));
+  }
+
   /** The foot's two dowels (`SupportedScrewDrive.dowelPoints`), on the base plane, the bore running to the bolt seat. */
   override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
     var seat = spec.boltSeatY;
     if (!footPinned || seat == null || spec.baseHoles.length == 0) return [];
-    var holes = [for (p in SupportedScrewDrive.dowelPoints([for (h in spec.baseHoles) {x: h.x, y: 0.0, z: h.z}])) {x: p.x, y: -p.z}];
+    var holes = [for (p in footDowelPoints()) {x: p.x, y: -p.z}];
     if (holes.length == 0) return [];
-    return [new machinekit.component.BoltedFace.PinnedFace("foot-pins", machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 1, z: 0},
-      {x: 1, y: 0, z: 0}), holes, SupportedScrewDrive.DOWEL_DIAMETER, seat, false, true)];
+    return [new machinekit.component.BoltedFace.PinnedFace("foot-pins", machinekit.component.BoltedFace.frameOf({x: 0, y: -footSpacer, z: 0}, {x: 0, y: 1, z: 0},
+      {x: 1, y: 0, z: 0}), holes, SupportedScrewDrive.DOWEL_DIAMETER, (model=="M60D-BK12-C"&&footSpacer>0?6:seat) + footSpacer, false, true)];
   }
 
   override public function carriesJournal():Bool return true;
@@ -543,13 +554,14 @@ class MotorMount extends MachineComponent {
       P.choice("revision", revisions(), HzMotionCatalog.revision()),
       P.choice("bearingGrade", ["unspecified", "C3", "C4", "C5"], "unspecified"),
       P.choice("geometry", [NOMINAL, "hzmotion", "vallder"], NOMINAL),
-      P.flag("footPinned",false)
+      P.flag("footPinned",false),
+      P.length("footSpacer",0)
     ], v -> {var model = v.token("model"), revision = v.token("revision");
     // A revision belongs to one maker's tables; the default follows the model.
     if ((rbkModels().indexOf(model) >= 0) != (revision == "vallder-rbk-v1")) revision = defaultRevision(model);
     var mount=new MotorMount(model, revision, v.token("geometry"), v.token("bearingGrade"));
-    mount.footPinned=v.boolean("footPinned");return mount;
-    }, true, false, ["geometry"], false).procured(_ -> Buy(null, null, null)));
+    mount.footPinned=v.boolean("footPinned");mount.footSpacer=v.number("footSpacer");return mount;
+    }, true, false, ["geometry","footSpacer"], false).procured(_ -> Buy(null, null, null)));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();
@@ -563,5 +575,5 @@ class MotorMount extends MachineComponent {
   ).setToken(
     "geometry",
     drawing
-  ).setBoolean("footPinned",footPinned);
+  ).setBoolean("footPinned",footPinned).setNumber("footSpacer",footSpacer);
 }

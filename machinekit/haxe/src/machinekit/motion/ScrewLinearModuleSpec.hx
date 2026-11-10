@@ -23,6 +23,7 @@ class ScrewLinearModuleSpec {
   public final baseThickness:Float;
   public final carriageThickness:Float;
   public final wallHeight:Float;
+  public final supportLift:Float;
   public final wallWidth:Float;
   public final railLength:Float;
   public final carriageLength:Float;
@@ -39,6 +40,7 @@ class ScrewLinearModuleSpec {
   public final carrierWidth:Float;
   public final carrierThickness:Float;
   public static inline final GAP=2.0;
+  public static inline final SCALE_PACKING=7.0;
   public static inline final KEY_LEG=5.5; // ASSUMED exposed AF3 leg; confirm the actual key before assembly.
   public function new(profile:String="HGH15CA",stroke:Float=20,railSpacing:Float=150,blockSpacing:Float=80,overtravel:Float=5,hostLength:Float=0,hostWidth:Float=0) {
     for(n in [stroke,railSpacing,blockSpacing,overtravel])if(!Math.isFinite(n)||n<=0)throw "Invalid linear module dimensions";
@@ -49,15 +51,20 @@ class ScrewLinearModuleSpec {
     drive=SupportedScrewDrive.m60dBk12(true);drive.fixed.footPinned=true;drive.floating.footPinned=true;
     var nut=new BallNut(), mount=drive.fixed.spec, bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(guide.blockMountThread);
     var scale=SealedScalePart.pair("JFT-40",stroke+2*overtravel,"3","5",false,
-      new ComponentValues().setToken("airPort","end").setToken("headSide","+x").setToken("cableBend","-y"));
+      new ComponentValues().setToken("airPort","end").setToken("headSide","+x").setToken("cableBend","-y").setNumber("mountSpacer",SCALE_PACKING));
     scaleHousing=scale.housing;scaleHead=scale.head;
     baseThickness=GroundStock.atLeast("plate",12);carriageThickness=GroundStock.atLeast("plate",10);
     carrierThickness=GroundStock.atLeast("flat bar",16);
     carrierWidth=80; // M6 base bolts at +/-33; match-pins at +/-20, clear of flange bores.
-    wallHeight=GroundStock.atLeast("flat bar",Math.max(mount.shaftHeight+nut.flangeDiameter/2+4-guide.blockHeight,mount.shaftHeight+mount.face/2+GAP-guide.blockHeight));
-    // Ground wall stock also clears the short key outside the guide block.
-    var widths=GroundStock.barWidths().filter(w->w>=Math.max(wallHeight,(guide.railWidth+guide.blockWidth)/2+KEY_LEG+GAP));
-    if(widths.length==0)throw "No ground wall section";wallWidth=widths[0];
+    // Keep the nut flange/carrier clear of the unpocketed floor by GAP + 1 mm.
+    supportLift=Math.max(0.0,GAP+1-(mount.shaftHeight-carrierReach()));
+    drive.fixed.footSpacer=supportLift;drive.floating.footSpacer=supportLift;
+    var railBolt=machinekit.standard.SocketHeadCapScrew.catalog().get(guide.railMountScrew.size);
+    wallWidth=GroundStock.atLeast("flat bar",guide.railWidth+2*railBolt.diameter);
+    var height=Math.max(mount.shaftHeight+nut.flangeDiameter/2+4-guide.blockHeight,mount.shaftHeight+mount.face/2+GAP-guide.blockHeight)+supportLift;
+    // Stand the stock on edge: 32 x 25 ground bar gives a 25-wide, 32-high wall.
+    var heights=GroundStock.barWidths().filter(h->h>=Math.max(wallWidth,height));
+    if(heights.length==0)throw "No ground wall section";wallHeight=heights[0];
     railLength=Math.ceil((blockSpacing+guide.blockLength+stroke+2*overtravel+2*guide.railEndMargin)/20)*20;
     carriageLength=Math.ceil(Math.max(hostLength,blockSpacing+guide.blockHoleSpacingAlong+3*bolt.diameter)/10)*10;
     carriageWidth=Math.ceil(Math.max(hostWidth,carriageMaxY()-(scaleFootMaxY()-44))/10)*10;
@@ -66,7 +73,7 @@ class ScrewLinearModuleSpec {
     // The raised guide stack clears the end block; the plain plate may overlap it.
     var fixedReach=nutLength+carrierThickness/2;
     var floatingReach=carrierThickness/2;
-    if(baseThickness+drive.floating.height>=carriageBottom()-GAP)floatingReach=Math.max(floatingReach,carriageLength/2);
+    if(baseThickness+supportLift+drive.floating.height>=carriageBottom()-GAP)floatingReach=Math.max(floatingReach,carriageLength/2);
     var low=drive.floatingEnd+drive.floating.length/2+floatingReach+half+GAP+1;
     var high=drive.faceToStart()-mount.length-fixedReach-half-GAP;
     high=Math.min(high,-drive.fixedEnd-nutLength-carrierThickness/2-half-GAP);
@@ -94,15 +101,16 @@ class ScrewLinearModuleSpec {
   public function scaleMountX():Float return carriageCentre-18;
   public function scaleMountY():Float return railY(-1)-guide.blockWidth/2-GAP-19;
   public function scaleFootMaxY():Float return scaleMountY()+14;
-  public function scaleReadingY():Float return wallY(-1)-wallWidth/2-scaleHousing.series.housingThickness;
+  public function scaleReadingY():Float return wallY(-1)-wallWidth/2-SCALE_PACKING-scaleHousing.series.housingThickness;
   public function scaleHoleY():Float return scaleReadingY();
   public function scaleHeadY():Float return scaleReadingY();
   public function scaleCarrierY():Float return scaleReadingY()-6;
   public function scaleStart():Float return scaleCentre+scaleHousing.startOffset()+scaleHousing.measuringLength/2;
-  public function scaleHeadTop():Float return baseThickness+14+scaleHousing.series.housingWidth-(scaleHousing.series.holeOffset??scaleHousing.series.housingWidth/2)+scaleHousing.gap()+scaleHead.series.headWidth;
-  public function scalePose(head:Bool=false):AssemblyFrame return F.fromRotationMatrix(head?scaleCentre:scaleStart(),scaleReadingY(),baseThickness+14,[0.0,0,-1,0,1,0,1,0,0]);
+  public function scaleMountHeight():Float return 14+supportLift;
+  public function scaleHeadTop():Float return baseThickness+scaleMountHeight()+scaleHousing.series.housingWidth-(scaleHousing.series.holeOffset??scaleHousing.series.housingWidth/2)+scaleHousing.gap()+scaleHead.series.headWidth;
+  public function scalePose(head:Bool=false):AssemblyFrame return F.fromRotationMatrix(head?scaleCentre:scaleStart(),scaleReadingY(),baseThickness+scaleMountHeight(),[0.0,0,-1,0,1,0,1,0,0]);
   public function axis():SupportedScrewDrive.ScrewDriveAxis return {start:[screwLength,0.0,axisHeight()],direction:[-1.0,0,0],normal:[0.0,0,1]};
-  public function axisHeight():Float return baseThickness+drive.fixed.spec.shaftHeight;
+  public function axisHeight():Float return baseThickness+supportLift+drive.fixed.spec.shaftHeight;
   public function carriageBottom():Float return baseThickness+wallHeight+guide.blockHeight;
   public function carrierReach():Float {
     var nut=new BallNut(), reach=0.0;

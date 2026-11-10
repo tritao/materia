@@ -16,11 +16,11 @@ class ScrewLinearModulePart extends MachineComponent {
   static final recipe=new machinekit.cache.Once<ComponentType>();
   public final spec:ScrewLinearModuleSpec;
   public final role:String;
-  public static final ROLES=["base","wallLeft","wallRight","carriage","nutCarrier","stopFront","stopRear","scaleHeadCarrier"];
+  public static final ROLES=["base","wallLeft","wallRight","carriage","nutCarrier","stopFront","stopRear","scaleHeadCarrier","fixedPad","floatingPad","scaleSpacer"];
   public static function parameters():Array<ComponentParameter> return [P.choice("role",ROLES,"base"),
     P.text("profile","HGH15CA"),P.length("stroke",20),P.length("railSpacing",150),P.length("blockSpacing",80),P.length("overtravel",5),P.scalar("hostLength",0),P.scalar("hostWidth",0)];
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.motion.screw-linear-module-part",parameters(),v->new ScrewLinearModulePart(v),false,false,null,false)
-    .versioned(4).numbered(numberFor).procured(_->Make("ground plate/flat bar, cut and joint-drilled")));
+    .versioned(5).numbered(numberFor).procured(_->Make("ground plate/flat bar, cut and joint-drilled")));
   static function numberFor(v:ComponentValues):String {
     var keys=[v.token("profile")];for(k in ["stroke","railSpacing","blockSpacing","overtravel","hostLength","hostWidth"])keys.push(ComponentNumberKey.encode(v.number(k)));
     return PartNumbers.geometry("SCREW-MODULE",v.token("role"),keys.join("|"));
@@ -28,19 +28,21 @@ class ScrewLinearModulePart extends MachineComponent {
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"),v.number("hostLength"),v.number("hostWidth"));role=v.token("role");
     super(numberFor(v),"Precision screw module "+role,"steel",false,v);
-    var stock=role=="scaleHeadCarrier"?GroundStock.bar(headCarrierStockWidth(spec),GroundStock.atLeast("flat bar",spec.carriageBottom()-headCarrierBottom(spec)))
-      :StringTools.startsWith(role,"wall")?GroundStock.bar(spec.wallWidth,spec.wallHeight)
+    var stock=isScaleSpacer()?GroundStock.bar(40,8):isPad()?GroundStock.bar(GroundStock.barWidths().filter(w->w>=padBounds(spec,role=="fixedPad"?"fixed":"floating").maxY*2)[0],3):role=="scaleHeadCarrier"?GroundStock.bar(headCarrierStockWidth(spec),GroundStock.atLeast("flat bar",spec.carriageBottom()-headCarrierBottom(spec)))
+      :StringTools.startsWith(role,"wall")?GroundStock.bar(Math.max(spec.wallWidth,spec.wallHeight),Math.min(spec.wallWidth,spec.wallHeight))
       :StringTools.startsWith(role,"stop")?GroundStock.bar(60,20)
       :role=="nutCarrier"?GroundStock.bar(spec.carrierWidth,spec.carrierThickness)
       :GroundStock.plate(GroundStock.STEEL,role=="carriage"?spec.carriageThickness:spec.baseThickness);
-    addFacet(ManufacturingRoute.groundStock(stock,[{name:"joint interfaces; inspect stock before assembly, supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]));
+    addFacet(ManufacturingRoute.groundStock(stock,[{name:isScaleSpacer()?"finish scale-housing packing to 7 mm from 8 mm ground stock; ASSUMED supplier capability":isPad()?"finish matched support packing to 2 mm from 3 mm ground stock; ASSUMED supplier capability":"joint interfaces; inspect stock before assembly, supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis","Assumed").setToken("ratingsBasis","Assumed").setToken("source","Stock tolerances and process acceptance unqualified")));
     addConnector("mount",Mount,F.identity());
-    addConnector("interface",Mount,F.translation(spec.carriageCentre,0,spec.carriageBottom()+spec.carriageThickness));
+    addConnector("interface",Mount,isScaleSpacer()?F.translation(0,0,ScrewLinearModuleSpec.SCALE_PACKING):F.translation(spec.carriageCentre,0,spec.carriageBottom()+spec.carriageThickness));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function machinable():Bool return true;
   public static function plane(x:Float,y:Float,z:Float,into:Float):AssemblyFrame return BoltedFace.frameOf({x:x,y:y,z:z},{x:0.0,y:0,z:into},{x:1.0,y:0,z:0});
+  function isScaleSpacer():Bool return role=="scaleSpacer";
+  function isPad():Bool return role=="fixedPad"||role=="floatingPad";
   function side():Int return StringTools.endsWith(role,"Left")?-1:1;
   public function carrierFace(into:Float):AssemblyFrame return BoltedFace.frameOf({x:spec.centre+spec.carrierThickness/2,y:0.0,z:spec.axisHeight()},{x:into,y:0.0,z:0},{x:0.0,y:0,z:1});
   public static function carrierPins():Array<BoltHole> return [{x:0.0,y:-20.0},{x:0.0,y:20.0}];
@@ -51,6 +53,7 @@ class ScrewLinearModulePart extends MachineComponent {
   }
   override public function fasteningFaces():Array<BoltedFace> {
     var s=spec, faces:Array<BoltedFace>=[];
+    if(isPad()||isScaleSpacer())return faces;
     if(role=="base") {
       // Non-overlapping receiver footprints, independently indicated and pinned.
       for(support in ["fixed","floating"]) {
@@ -68,7 +71,7 @@ class ScrewLinearModulePart extends MachineComponent {
       var y=s.wallY(side()), screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M6");
       faces.push(BoltedFace.clamped("stock-base",plane(s.carriageCentre,y,s.baseThickness,1),[for(x in s.wallBolts()){x:x-s.carriageCentre,y:0.0}],screw.clearanceMedium,s.wallHeight-7,"M6",{diameter:screw.counterboreDiameter,depth:7},false));
       faces.push(BoltedFace.drilledToSuit("rail",plane(s.carriageCentre,s.railY(side()),s.baseThickness+s.wallHeight,-1),s.baseMax-s.baseMin,s.wallWidth,10,s.wallHeight,BoltedFace.ThreadMaterial.Steel,s.guide.railMountScrew.size));
-      if(side()<0)faces.push(BoltedFace.drilledToSuit("scale",BoltedFace.frameOf({x:s.scaleStart()-s.scaleHousing.overallLength()/2,y:s.wallY(-1)-s.wallWidth/2,z:s.baseThickness+14},{x:0.0,y:1,z:0},{x:-1.0,y:0,z:0}),s.scaleHousing.overallLength(),s.wallHeight,14,s.wallWidth,BoltedFace.ThreadMaterial.Steel,"M8"));
+      if(side()<0)faces.push(BoltedFace.drilledToSuit("scale",BoltedFace.frameOf({x:s.scaleStart()-s.scaleHousing.overallLength()/2,y:s.wallY(-1)-s.wallWidth/2,z:s.baseThickness+s.scaleMountHeight()},{x:0.0,y:1,z:0},{x:-1.0,y:0,z:0}),s.scaleHousing.overallLength(),s.wallHeight,14,s.wallWidth,BoltedFace.ThreadMaterial.Steel,"M8"));
     } else if(role=="carriage") {
       var screw=machinekit.standard.SocketHeadCapScrew.catalog().get(s.guide.blockMountThread);
       for(side in [-1,1])for(row in [-1,1])faces.push(BoltedFace.clamped("block"+side+row,plane(s.carriageCentre+row*s.blockSpacing/2,s.railY(side),s.carriageBottom(),1),
@@ -111,23 +114,39 @@ class ScrewLinearModulePart extends MachineComponent {
   static function box(x0:Float,x1:Float,y0:Float,y1:Float,z0:Float,z1:Float):Part {
     var raw=Part.box(x1-x0,y1-y0,z1-z0),out=raw.translated(new Vector((x0+x1)/2,(y0+y1)/2,z0));raw.close();return out;
   }
-  public static function floorClearance(s:ScrewLinearModuleSpec):Part {
-    var reach=s.carrierReach(),depth=Math.max(0.0,ScrewLinearModuleSpec.GAP+1-(s.drive.fixed.spec.shaftHeight-reach));
-    return box(s.centre-s.stroke/2-s.overtravel-s.carrierThickness/2-2,s.centre+s.stroke/2+s.overtravel+s.carrierThickness/2+2,
-      -s.carrierWidth/2-2,s.carrierWidth/2+2,s.baseThickness-depth,s.baseThickness+1);
+  public static function padBounds(s:ScrewLinearModuleSpec,support:String):{minX:Float,maxX:Float,minY:Float,maxY:Float} {
+    var lo=1e9,hi=-1e9;
+    var width=support=="fixed"?s.drive.fixed.spec.width:s.drive.floating.width;
+    for(h in s.drive.seatHoles(s.axis(),s.screwLength))if(h.support==support&&h.kind=="tapped") {
+      lo=Math.min(lo,h.position.x);hi=Math.max(hi,h.position.x);
+      var bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(h.thread);
+      width=Math.max(width,2*(Math.abs(h.position.y)+machinekit.assembly.JointFasteners.EDGE_DIAMETERS*bolt.diameter));
+    }
+    // Extend the BF pad toward the free end for a full bearing seat, away from nut travel.
+    return {minX:lo-(support=="floating"?16:9),maxX:hi+9,minY:-width/2,maxY:width/2};
   }
   static function headCarrierStockWidth(s:ScrewLinearModuleSpec):Float {
     var width=Math.max(s.scaleFootMaxY(),s.scaleCarrierY()+6)-Math.min(s.scaleFootMaxY()-44,s.scaleCarrierY()-6);
     for(stock in GroundStock.barWidths())if(stock>=width)return stock;
     throw "No ground bar width for the head bracket";
   }
-  public static function headCarrierBottom(s:ScrewLinearModuleSpec):Float return s.scaleHeadTop()-s.scaleHead.series.headWidth-s.scaleHousing.gap()+ScrewLinearModuleSpec.GAP;
+  public static function headCarrierBottom(s:ScrewLinearModuleSpec):Float return s.scaleHeadTop()-s.scaleHead.series.headWidth-s.scaleHousing.gap()+ScrewLinearModuleSpec.GAP+0.2;
   public static function headCarrierBridgeBottom(s:ScrewLinearModuleSpec):Float return s.baseThickness+s.wallHeight+s.guide.railHeight+ScrewLinearModuleSpec.GAP+0.2;
   override public function geometry(detail:ComponentDetail=Preview):Part {
     var s=spec,body:Part;
     if(role=="base") {
       body=box(s.baseMin,s.baseMax,-s.baseWidth/2,s.baseWidth/2,0,s.baseThickness);
-      body=Solids.cut(body,[floorClearance(s)]);
+
+    } else if(isScaleSpacer()) {
+      body=Solids.cut(box(-20,20,-15,15,0,ScrewLinearModuleSpec.SCALE_PACKING),[Part.cylinderSpan(4.2,-1,ScrewLinearModuleSpec.SCALE_PACKING+1)]);
+    } else if(isPad()) {
+      var support=role=="fixedPad"?"fixed":"floating",b=padBounds(s,support);
+      var holes:Array<Part>=[];
+      for(h in s.drive.seatHoles(s.axis(),s.screwLength))if(h.support==support) {
+        var diameter=h.kind=="dowel"?h.diameter:machinekit.standard.SocketHeadCapScrew.catalog().get(h.thread).clearanceMedium;
+        holes.push(Part.cylinderSpan(diameter/2,s.baseThickness-1,s.baseThickness+s.supportLift+1,h.position.x,h.position.y));
+      }
+      body=Solids.cut(box(b.minX,b.maxX,b.minY,b.maxY,s.baseThickness,s.baseThickness+s.supportLift),holes);
     } else if(StringTools.startsWith(role,"wall"))body=box(s.baseMin,s.baseMax,s.wallY(side())-s.wallWidth/2,s.wallY(side())+s.wallWidth/2,s.baseThickness,s.baseThickness+s.wallHeight);
     else if(role=="carriage")body=box(s.carriageCentre-s.carriageLength/2,s.carriageCentre+s.carriageLength/2,s.carriageMaxY()-s.carriageWidth,s.carriageMaxY(),s.carriageBottom(),s.carriageBottom()+s.carriageThickness);
     else if(role=="nutCarrier")body=Solids.cut(box(s.centre-s.carrierThickness/2,s.centre+s.carrierThickness/2,-s.carrierWidth/2,s.carrierWidth/2,s.axisHeight()-s.carrierReach(),s.carriageBottom()),

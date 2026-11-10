@@ -48,6 +48,8 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
   public final side:Float;
   public final airPort:String;
   public final cableBend:String;
+  /** Housing packing included in the bolt grip, not in the bought part geometry. */
+  public final mountSpacer:Float;
 
   public static function parameters():Array<ComponentParameter> return [
     P.choice("variant", [HOUSING, HEAD], HOUSING),
@@ -59,7 +61,8 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
     P.choice("interface", ["BiSS-C"], "BiSS-C"),
     P.choice("headSide", ["+x", "-x"], "+x"),
     P.choice("airPort", ["none", "start", "end"], "none"),
-    P.choice("cableBend", ["none", "+x", "-x", "+y", "-y"], "none")
+    P.choice("cableBend", ["none", "+x", "-x", "+y", "-y"], "none"),
+    P.length("mountSpacer",0)
   ];
 
   public function new(?overrides:ComponentValues) {
@@ -73,6 +76,7 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
     side = v.token("headSide") == "-x" ? -1.0 : 1.0;
     airPort = v.token("airPort");
     cableBend = v.token("cableBend");
+    mountSpacer=v.number("mountSpacer");
     if (airPort != "none" && series.airThread == null) throw '${series.series} has no air port';
     var ok = false;
     for (ml in series.lengths) if (Math.abs(ml - measuringLength) < 1e-9) ok = true;
@@ -147,7 +151,7 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
     // Installation choices: which side the head stands (`headSide`), the housing's air port and the head's cable bend; the head takes only the first and the last.
     if (options != null) for (name in ["headSide", "airPort", "cableBend"]) if (options.get(name) != null) values.setToken(name, options.token(name));
     return {
-      housing: new SealedScalePart(values.copy().setToken("variant", HOUSING)),
+      housing: new SealedScalePart(values.copy().setToken("variant", HOUSING).setNumber("mountSpacer",options==null||options.get("mountSpacer")==null?0:options.number("mountSpacer"))),
       head: new SealedScalePart(values.copy().setToken("variant", HEAD))
     };
   }
@@ -258,10 +262,10 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
       if (hole == null || bore == null || boreDepth == null) return [];
       return [machinekit.component.BoltedFace.clamped(
         "mount",
-        machinekit.component.BoltedFace.frameOf({x: 0, y: t, z: 0}, {x: 0, y: -1, z: 0}, {x: 0, y: 0, z: 1}),
+        machinekit.component.BoltedFace.frameOf({x: 0, y: t+mountSpacer, z: 0}, {x: 0, y: -1, z: 0}, {x: 0, y: 0, z: 1}),
         [{x: endHole(), y: 0.0}, {x: overallLength() - endHole(), y: 0.0}],
         hole,
-        t - boreDepth,
+        t - boreDepth + mountSpacer,
         "M8",
         {diameter: bore, depth: boreDepth}
       ).lowHeaded()];
@@ -363,7 +367,7 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
   static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    return recipe.get(() -> new ComponentType("machinekit.motion.sealed-scale-part", parameters(), v -> new SealedScalePart(v), true)
+    return recipe.get(() -> new ComponentType("machinekit.motion.sealed-scale-part", parameters(), v -> new SealedScalePart(v), true, false, ["mountSpacer"])
       .procured(_ -> Buy(SealedScaleData.MAKER, null, null)).requiring(v -> {
         var req = machinekit.component.Procurement.ProcurementCodec.requirement;
         var choice = machinekit.component.Procurement.ProcurementCodec.choice;

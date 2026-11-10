@@ -31,13 +31,18 @@ class ScrewLinearModule extends AxisBuilder {
       attach("block"+(side<0?"Left":"Right")+(row<0?"Front":"Rear"),LinearRailBlock.metric(s.profile,LinearRailBlock.SUPPLIER),blockPose(side,row),"carriage");
     attach("nutCarrier",made("nutCarrier"),F.identity(),"carriage");
     group("Screw drive");
+    for(role in ["fixedPad","floatingPad"])attach(role,made(role),F.identity(),"base");
     var screw=new HzMotionDrawingScrew(s.screwLength,s.drive.endProfile);
-    s.drive.place(this,s.axis(),{fixedHost:"base",floatingHost:"base",nutHost:"nutCarrier"},screw);
+    s.drive.place(this,s.axis(),{fixedHost:"fixedPad",floatingHost:"floatingPad",nutHost:"nutCarrier"},screw);
     attach("nut",new BallNut(),s.nutPose(),"nutCarrier");
     addTransmission("lead","travel","screw-turn",Transmission.LeadScrew("screw","nut"),Sense.Opposite);
     supportScrew("lead",ScrewSupport.Fixed,s.drive.floating.support);
     group("Sealed scale");
-    attach("scaleHousing",s.scaleHousing,s.scalePose(),"wallLeft");
+    var scaleFace=s.scaleHousing.fasteningFaces()[0],scaleHoles=scaleFace.holes;
+    if(scaleHoles==null)throw "Missing scale housing mounting holes";
+    for(i in 0...2)attach(i==0?"scaleSpacerFront":"scaleSpacerRear",made("scaleSpacer"),
+      F.compose(F.compose(s.scalePose(),scaleFace.frame),F.translation(scaleHoles[i].x,scaleHoles[i].y,0)),"wallLeft");
+    attach("scaleHousing",s.scaleHousing,s.scalePose(),"scaleSpacerFront");
     attach("scaleHeadCarrier",made("scaleHeadCarrier"),F.identity(),"carriage");
     attach("scaleHead",s.scaleHead,s.scalePose(true),"scaleHeadCarrier");
     addEncoder("position","travel","scaleHead");exposePort("position-feedback","scaleHead","biss");exposePort("scale-air","scaleHousing","air");
@@ -81,9 +86,9 @@ class ScrewLinearModule extends AxisBuilder {
   public function assemblySteps():Array<{parts:Array<String>,tools:Array<String>,measurement:String}> return [
     {parts:["base","wallLeft","wallRight"],tools:["straightedge-granite","dial-indicator","magnetic-base","torque-driver"],measurement:"Inspect bought stock; require 0.01 mm block-pad coplanarity, select accepted stock or supplier-finish failing small faces; replication is reserved for large casting surfaces. Fit drawing dowels after bolting full-length walls."},
     {parts:["railLeft","railRight","blockLeftFront","blockLeftRear","blockRightFront","blockRightRear"],tools:["straightedge-granite","dial-indicator","magnetic-base","block-transfer-sleeves"],measurement:"Locate rails on reference edges, indicate parallel and transfer matched blocks without losing balls."},
-    {parts:["motorMount","floatingBearing","screw","motor"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Fit supports and the actual screw loosely. After the carriage/nut carrier is fitted, indicate the screw parallel to rails at both travel ends, torque and match-pin supports. Catalogue motor pilot locates the motor."},
+    {parts:["fixedPad","floatingPad","motorMount","floatingBearing","screw","motor"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Finish the two matched pads to 2 mm, verify parallelism and fit them under the supports. The existing support screws and match-pins pass through the pads into the flat base. Fit supports and the actual screw loosely. After the carriage/nut carrier is fitted, indicate the screw parallel to rails at both travel ends, torque and match-pin supports. Catalogue motor pilot locates the motor."},
     {parts:["nut","nutCarrier","carriage"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Indicate nut carrier to screw at BOTH ends of travel, tighten then match-drill and ream; do not pre-drill carrier dowels. Adjust block pads to coplanarity target."},
-    {parts:["wallLeft","scaleHousing","scaleHeadCarrier","scaleHead"],tools:["dial-indicator","magnetic-base","feeler-gauges","af3-low-profile-key","air-fitting-socket"],measurement:"Bench-fit the carrier to the carriage before the host head/seat. Reference housing seat to guide edge. Indicate housing to 0.1 mm and head to 0.05 mm parallelism. Fit carrier face to measured stack (0.5 mm each-way allowance ASSUMED); set lateral offset within 0.2 mm, gap 1 +/-0.3 mm at the head; confirm the reading window and 75 mm cable bend. Head screws use the low-profile key from below and slide the head out longitudinally for service."},
+    {parts:["wallLeft","scaleSpacerFront","scaleSpacerRear","scaleHousing","scaleHeadCarrier","scaleHead"],tools:["dial-indicator","magnetic-base","feeler-gauges","af3-low-profile-key","air-fitting-socket"],measurement:"Bench-fit the carrier to the carriage before the host head/seat. Fit the two 7 mm scale spacers under the housing with its existing M8 fasteners. Reference housing seat to guide edge. Indicate housing to 0.1 mm and head to 0.05 mm parallelism. Fit carrier face to measured stack (0.5 mm each-way allowance ASSUMED); set lateral offset within 0.2 mm, gap 1 +/-0.3 mm at the head; confirm the reading window and 75 mm cable bend. Head screws use the low-profile key from below and slide the head out longitudinally for service."},
     {parts:["stopFront","stopRear"],tools:["dial-indicator","magnetic-base","torque-driver"],measurement:"Indicate each floor block against the nut carrier at its overtravel end, then tighten its two M6. Verify both stops engage before screw support contact. Fit the drawing dowels, which carry the crash; verify their model capacity. Host must limit torque to the bought bearing rating."}
   ];
   public function stopContacts():Array<{a:String,b:String}> return [{a:"nutCarrier",b:"stopFront"},{a:"nutCarrier",b:"stopRear"}];
@@ -122,14 +127,14 @@ class ScrewLinearModule extends AxisBuilder {
   public function scaleAdjustment():{normalStack:Float,normalFit:Float,gapStack:Float,gapAdjustment:Float} {
     var screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
     var headHole=spec.scaleHead.series.headHoleDiameter;if(headHole==null)throw "Scale head needs its catalogue mounting holes";
-    // ASSUMED: base flatness, wall height, block height, scale housing and carrier finish.
-    return {normalStack:0.10+0.05+0.02+0.05+0.02,normalFit:0.5,
-      gapStack:0.05+0.05+0.02+0.10,
+    // ASSUMED: base flatness, wall height, block height, scale housing and carrier finish; matched packing contributes another 0.02 mm.
+    return {normalStack:0.10+0.05+0.02+0.05+0.02+0.02,normalFit:0.5,
+      gapStack:0.05+0.05+0.02+0.10+0.02,
       gapAdjustment:(screw.clearanceMedium-screw.diameter)/2+(headHole-screw.diameter)/2};
   }
   public function stockAcceptance():String {
     var plate=machinekit.structural.GroundStock.plate(machinekit.structural.GroundStock.STEEL,spec.baseThickness);
-    var bar=machinekit.structural.GroundStock.bar(spec.wallWidth,spec.wallHeight);
+    var bar=machinekit.structural.GroundStock.bar(Math.max(spec.wallWidth,spec.wallHeight),Math.min(spec.wallWidth,spec.wallHeight));
     var worst=plate.flatness*Math.max(spec.baseMax-spec.baseMin,spec.baseWidth)/100+bar.flatness*spec.railLength/100+0.02;
     return 'ASSUMED conservative stock/block bound $worst mm (plate/bar figures per100 mm, block height variation0.02 ASSUMED) versus0.01 mm required block-pad coplanarity. Inspect bought ground stock, select accepted stock or supplier-finish failing small faces; replication is reserved for large casting surfaces; process qualification remains open.';
   }

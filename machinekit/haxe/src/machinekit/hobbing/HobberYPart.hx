@@ -17,7 +17,7 @@ class HobberYPart extends MachineComponent {
   public final role:String;
   public final spec:ScrewLinearModuleSpec;
   public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage"],"base")];
-  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(21).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->Make("ground plate, joint drilling")));
+  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(22).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->Make("ground plate, joint drilling")));
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberYLayout.moduleSpec();
     super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,role=="base"?"steel":"aluminium 6061",false,v);
@@ -33,7 +33,7 @@ class HobberYPart extends MachineComponent {
     var out=body().fasteningFaces().filter(face->face.id!="host");
     if(role=="base") {
       var at=actuatorPoint(),bolt=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
-      var length=machinekit.standard.SocketHeadCapScrew.standardLengthAtLeast(3*bolt.diameter);if(length==null)throw "No actuator screw";
+      var length=machinekit.standard.SocketHeadCapScrew.standardLengthAtLeast(spec.baseThickness-at.z-bolt.headHeight+1.25*bolt.diameter);if(length==null)throw "No actuator screw";
       var grip=length-1.25*bolt.diameter;
       out.push(BoltedFace.clamped("actuator-output",ScrewLinearModulePart.plane(at.x,at.y,at.z,1),[for(i in 0...ErobActuatorData.OUTPUT_BOLT_COUNT){x:ErobActuatorPart.outputBolt(i).x,y:-ErobActuatorPart.outputBolt(i).y}],ErobActuatorData.OUTPUT_CLEARANCE_HOLE,grip,"M4",{diameter:bolt.counterboreDiameter,depth:spec.baseThickness-at.z-grip},false));
     }
@@ -60,7 +60,7 @@ class HobberYPart extends MachineComponent {
       // The lobe overlaps the continuous rail/floor strip; no adapter.
       // The rail and drive floor is the broad face of ONE ground blank.
       shape=Solids.union([box(spec.baseMin,spec.baseMax,-half,half,0,spec.baseThickness),Part.cylinderSpan(ErobActuatorData.BODY_DIAMETER/2,0,spec.baseThickness,at.x,at.y)]);
-      shape=Solids.cut(shape,[ScrewLinearModulePart.floorClearance(spec),Part.cylinderSpan(ErobActuatorData.BODY_DIAMETER/2,-1,at.z,at.x,at.y),Part.cylinderSpan((ErobActuatorData.BORE_DIAMETER+0.4)/2,-1,spec.baseThickness+1,at.x,at.y)]);
+      shape=Solids.cut(shape,[Part.cylinderSpan(ErobActuatorData.BODY_DIAMETER/2,-1,at.z,at.x,at.y),Part.cylinderSpan((ErobActuatorData.BORE_DIAMETER+0.4)/2,-1,spec.baseThickness+1,at.x,at.y)]);
     } else {
       // The plain rectangle extends toward the head, rather than retaining
       // unused stock above the upper guide or adding a separate adapter.

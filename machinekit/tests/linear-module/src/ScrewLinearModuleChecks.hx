@@ -66,6 +66,34 @@ class ScrewLinearModuleChecks {
         check(step.parts.length>0&&step.tools.length>0&&step.measurement.length>0,"Assembly step declares parts tools and measurement");
         for(id in step.parts)check(axis.component(id)!=null,"Assembly step references a modelled part: "+id);
       }
+      // Match-pins are installer holes: verify the chosen sites in the bought feet.
+      var pinPoses=axis.solvedPoses();
+      for(id in ["motorMount","floatingBearing"]) {
+        var component=axis.component(id),rawFoot=component.geometry();
+        var foot=PosedParts.moved(rawFoot,pinPoses.get(id));rawFoot.close();
+        for(face in component.pinnedFaces())for(hole in face.holes) {
+          var outer=cadkit.modeling.Part.cylinderSpan(face.diameter/2+1,spec.supportLift+0.05,face.depth-0.05,hole.x,hole.y);
+          var inner=cadkit.modeling.Part.cylinderSpan(face.diameter/2+0.01,spec.supportLift,face.depth+1,hole.x,hole.y);
+          var ring=outer.subtract(inner);outer.close();inner.close();
+          var probe=PosedParts.moved(ring,F.compose(pinPoses.get(id),face.frame));ring.close();
+          var material=foot.intersect(probe);
+          var share=material.volume()/probe.volume();
+          check(share>0.99999,'Match-pin bearing material in $id at ${hole.x},${hole.y}: $share');
+          material.close();probe.close();
+        }
+        foot.close();
+      }
+      // The virtual foot joint includes packing: subtract it for actual foot bearing.
+      for(joint in fasteners.dowels)if(joint.memberA=="motorMount"||joint.memberB=="motorMount") {
+        var actualA=joint.engagementA-(joint.memberA=="motorMount"?spec.supportLift:0);
+        var actualB=joint.engagementB-(joint.memberB=="motorMount"?spec.supportLift:0);
+        var load=axis.loads({peak:1000.0,momentary:2000.0}).filter(l->l.label=="Fixed screw support")[0];
+        var result=machinekit.assembly.JointSlip.check(load,[],[{id:joint.id,diameter:joint.diameter,engagement:Math.min(actualA,actualB),points:joint.worldHoles}])[0];
+        check(result.peakFactor>=machinekit.assembly.JointSlip.PEAK_FACTOR,"Fixed support pins pass with packing excluded from bearing engagement");
+        var momentary=result.momentaryFactor;
+        check(momentary!=null&&momentary>=machinekit.assembly.JointSlip.MOMENTARY_FACTOR,"Fixed support pins pass peak motor thrust with actual foot engagement");
+        Sys.println('Packed support pin actual foot engagement '+Math.min(actualA,actualB)+' mm; bearing factors '+result.peakFactor+' / '+momentary+' (strengths ASSUMED).');
+      }
       axis.checkJointLoads(axis.loads({peak:1000.0,momentary:2000.0}));
       var normalFactor=1e30,crashFactor=1e30,scaleFactor=1e30;
       for(slip in fasteners.slips) {
@@ -107,10 +135,40 @@ class ScrewLinearModuleChecks {
         var wall=axis.component(id).geometry(),bounds=PosedParts.boxOf(wall);wall.close();
         check(Math.abs(bounds.minX-spec.baseMin)<0.001&&Math.abs(bounds.maxX-spec.baseMax)<0.001,"Walls span full body length");
       }
+      var floor=axis.component("base").geometry();
+      for(offset in [-spec.stroke/2-spec.overtravel,0.0,spec.stroke/2+spec.overtravel]) {
+        var raw=cadkit.modeling.Part.box(1,1,0.25);
+        var probe=raw.translated(new cadkit.modeling.Vector(spec.centre+offset,0,spec.baseThickness-0.5));raw.close();
+        var common=floor.intersect(probe);
+        check(common.volume()>0.2499,"Full floor thickness under the nut-carrier travel; no relief pocket");
+        common.close();probe.close();
+      }
+      floor.close();
+      // Packing is an intermediate clamped layer: inspect its real bolt lands too.
+      for(support in ["fixed","floating"]) {
+        var pad=axis.component(support=="fixed"?"fixedPad":"floatingPad").geometry();
+        for(h in spec.drive.seatHoles(spec.axis(),spec.screwLength))if(h.support==support&&h.kind=="tapped") {
+          var bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(h.thread);
+          var outside=cadkit.modeling.Part.cylinderSpan(JointFasteners.EDGE_DIAMETERS*bolt.diameter,spec.baseThickness+0.01,spec.baseThickness+0.21,h.position.x,h.position.y);
+          var inside=cadkit.modeling.Part.cylinderSpan(bolt.clearanceMedium/2+0.01,spec.baseThickness,spec.baseThickness+1,h.position.x,h.position.y);
+          var ring=outside.subtract(inside);outside.close();inside.close();
+          var supported=pad.intersect(ring);
+          check(supported.volume()/ring.volume()>0.99999,"Support pad has the required 1.5d clearance-hole land");
+          supported.close();ring.close();
+        }
+        pad.close();
+      }
+      for(id in ["fixedPad","floatingPad"]) {
+        var pad=axis.component(id).geometry(),bounds=PosedParts.boxOf(pad);pad.close();
+        check(Math.abs(bounds.maxZ-bounds.minZ-2)<1e-6,"Matched 2 mm screw-support pad");
+      }
       for(member in axis.components())check(!StringTools.startsWith(member.id,"riser")&&!StringTools.startsWith(member.id,"lip")&&!StringTools.startsWith(member.id,"retainer"),"No replaced v1 parts");
       cache.close();
       var rebuilt=MachineAssembly.decode(axis.encode());
       check(rebuilt.components().length==axis.components().length,"Module round trip");
+      check(rebuilt.components().filter(m->m.id=="scaleHousing")[0].component.values().number("mountSpacer")==7,"Scale housing packing survives persistence");
+      check(axis.component("scaleSpacerFront").bom.partNumber==axis.component("scaleSpacerRear").bom.partNumber,"Both scale spacers are one manufactured part design");
+      for(id in ["motorMount","floatingBearing"])check(rebuilt.components().filter(m->m.id==id)[0].component.values().number("footSpacer")==2,"Support clamp packing survives persistence");
       var savedPinEnds=0;for(member in rebuilt.components())for(face in member.component.pinnedFaces())savedPinEnds+=face.holes.length;
       check(savedPinEnds==2*fasteners.dowelCount(),"Both ends of every match-pin survive snapshot and persistence");
       var model=new cadkit.modeling.AssemblyModel("mm");axis.addTo(model,"");var state=model.initialState();

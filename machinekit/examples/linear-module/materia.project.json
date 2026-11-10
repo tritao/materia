@@ -28,14 +28,14 @@
       "label": "Standard v2 (20 mm)",
       "entrypoint": "standard",
       "kind": "configuration",
-      "summary": "Open ground-stock body: 230 mm base length, full-length side walls, centred screw and plain carriage. Optional covers omitted."
+      "summary": "Open body with a flat channel floor, 25 x 32 mm rail walls, two 2 mm screw-support pads and two 7 mm scale spacers. Optional covers omitted."
     },
     {
       "id": "hobber-y",
       "label": "Hobber Y v2 (30 mm)",
       "entrypoint": "hobber-y",
       "kind": "configuration",
-      "summary": "Compact fitted Y: 230 x 310.5 mm profiled base, 140 x 290 mm carriage, 220 mm rails and 180 mm screw; laid flat. Optional covers omitted."
+      "summary": "Compact fitted Y: 230 x 303.5 mm base with flat channel floor, 25 x 32 mm rail walls, 140 x 290 mm carriage and two screw-support pads; laid flat. Optional covers omitted."
     }
   ]
 }

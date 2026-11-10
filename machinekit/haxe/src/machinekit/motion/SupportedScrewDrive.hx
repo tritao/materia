@@ -241,7 +241,12 @@ class SupportedScrewDrive {
 	 * (none where they are closer than twice that). Points may be in any frame; the result is in the same one. The seat's holes and the
 	 * support's own dowel face (`ScrewSupportUnit`, `MotorMount`) both use it, so the two always agree.
 	 */
-  public static function dowelPoints(points:Array<{x:Float, y:Float, z:Float}>):Array<{x:Float, y:Float, z:Float}> {
+  /** Packed feet need room for a full made-pad bolt land beside each match-pin bore. */
+  public static function footDowelInset(holeDiameter:Float,packing:Float):Float return packing>0
+    ?Math.max(DOWEL_INBOARD,machinekit.assembly.JointFasteners.EDGE_DIAMETERS*machinekit.component.MountingFace.boltFor(holeDiameter).diameter+DOWEL_DIAMETER/2+1)
+    :DOWEL_INBOARD;
+
+  public static function dowelPoints(points:Array<{x:Float, y:Float, z:Float}>,inboard:Float=DOWEL_INBOARD):Array<{x:Float, y:Float, z:Float}> {
     var first = 0, second = 0, farthest = -1.0;
     for (i in 0...points.length) for (j in i + 1...points.length) {
       var dx = points[j].x - points[i].x, dy = points[j].y - points[i].y, dz = points[j].z - points[i].z;
@@ -253,9 +258,9 @@ class SupportedScrewDrive {
         second = j;
       }
     }
-    if (!(farthest > 2 * DOWEL_INBOARD)) return [];
+    if (!(farthest > 2 * inboard)) return [];
     return [for (pair in [[first, second], [second, first]]) {
-      var a = points[pair[0]], b = points[pair[1]], share = DOWEL_INBOARD / farthest;
+      var a = points[pair[0]], b = points[pair[1]], share = inboard / farthest;
       {x: a.x + (b.x - a.x) * share, y: a.y + (b.y - a.y) * share, z: a.z + (b.z - a.z) * share};
     }];
   }
@@ -289,7 +294,12 @@ class SupportedScrewDrive {
           direction: down
         });
       }
-      for (point in dowelPoints(points)) result.push({
+      var pins=name=="fixed"?[for(p in fixed.footDowelPoints()) {
+        x:base[0]+across.x*p.x+axis.direction[0]*p.z,
+        y:base[1]+across.y*p.x+axis.direction[1]*p.z,
+        z:base[2]+across.z*p.x+axis.direction[2]*p.z
+      }]:dowelPoints(points,holes.length==0?DOWEL_INBOARD:footDowelInset(holes[0].diameter,floating.footSpacer));
+      for (point in pins) result.push({
         kind: "dowel",
         support: name,
         thread: null,
