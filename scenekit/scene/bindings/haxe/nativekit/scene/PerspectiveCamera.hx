@@ -30,8 +30,16 @@ class PerspectiveCamera {
     clipFar = Math.max(100.0, distance * 100.0);
   }
 
-  /** Fits depth to world bounds; a positive aspect excludes boxes outside the view. */
-  public function fitClipRange(bounds:Array<Array<Float>>, aspect:Float = 0.0, fovYOverride:Float = 0.0):Void {
+  /**
+   * Fits depth to world bounds; a positive aspect excludes boxes outside the view.
+   * `precision` floors the near plane so the focus keeps sub-pixel depth steps.
+   */
+  public function fitClipRange(
+    bounds:Array<Array<Float>>,
+    precision:DepthPrecision,
+    aspect:Float = 0.0,
+    fovYOverride:Float = 0.0
+  ):Void {
     var eye = eyePosition(), backward = viewDirection();
     var forward = [-backward[0], -backward[1], -backward[2]];
     var sidePlanes:Array<Array<Float>> = [];
@@ -84,26 +92,33 @@ class PerspectiveCamera {
     // A bounding box is conservative; the margin also prevents clipping while orbiting.
     // Boxes reach much closer than their geometry (exploded parts, long frames
     // enclosing the eye), so they never pull near below the plane that keeps
-    // the pivot's depth precision. Geometry closer than that floor is clipped.
-    var floor = precisionNear(distance);
+    // the focus's depth steps sub-pixel. Geometry closer than that floor is clipped.
+    var floor = precisionNear(precision, fovYOverride);
     clipNear = crossesEye ? floor : Math.max(floor, nearest * 0.8);
     clipFar = Math.max(clipNear * 2.0, farthest * 1.2);
   }
 
-  /** Depth step of the D24 buffer the scene renders into, as a fraction of its 0..1 range. */
-  public static inline var DEPTH_STEP:Float = 1.0 / 16777216.0;
+  /**
+   * The nearest plane at which a depth step at the focus is FOCUS_STEP_PIXELS of
+   * its pixel footprint. A step at depth d is d^2 (f - n) / (f n 2^bits) <= d^2 / (n 2^bits);
+   * a pixel there spans 2 d tan(fov / 2) / height. Never past half the focus depth.
+   */
+  function precisionNear(precision:DepthPrecision, fovYOverride:Float):Float {
+    var focus = precision.focusDepth > 0.0 ? precision.focusDepth : distance;
+    var pixel = pixelSizeAt(focus, precision.viewportHeight, fovYOverride);
+    var near = focus * focus * precision.depthStep() / (DepthPrecision.FOCUS_STEP_PIXELS * pixel);
+    return Math.max(0.000001, Math.min(near, focus * 0.5));
+  }
 
-  /** Largest depth step at the pivot, relative to its distance (~1/50 px at 1000 px, 50° FOV). */
-  public static inline var PIVOT_RELATIVE_DEPTH_STEP:Float = 2e-5;
-
-  /** Nearest plane whose pivot-depth step stays within PIVOT_RELATIVE_DEPTH_STEP. */
-  static function precisionNear(pivot:Float):Float {
-    return Math.max(0.000001, pivot / (PIVOT_RELATIVE_DEPTH_STEP / DEPTH_STEP));
+  /** World size of one pixel at view depth `depth`. */
+  public function pixelSizeAt(depth:Float, viewportHeight:Float, fovYOverride:Float = 0.0):Float {
+    var fov = fovYOverride > 0.0 ? clamp(fovYOverride, 1.0, 170.0) : FOV_Y;
+    return 2.0 * depth * Math.tan(fov * Math.PI / 360.0) / Math.max(1.0, viewportHeight);
   }
 
   /** World-space depth step at view depth `depth` for the current clip range. */
-  public function depthStepAt(depth:Float):Float {
-    return depth * depth * (clipFar - clipNear) / (clipFar * clipNear) * DEPTH_STEP;
+  public function depthStepAt(depth:Float, depthBits:Int):Float {
+    return depth * depth * (clipFar - clipNear) / (clipFar * clipNear) / Math.pow(2.0, depthBits);
   }
 
   public function orbit(deltaX:Float, deltaY:Float):Void {

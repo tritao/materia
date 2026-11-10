@@ -177,6 +177,12 @@ typedef struct nkscene_render_update {
     uint64_t culled_items;
 } nkscene_render_update;
 
+/**
+ * Depth-buffer bits of every scene pass. Cameras size their near plane from this
+ * resolution; the renderer derives its depth format and stroke tie budget from it.
+ */
+enum { NKS_RENDER_DEPTH_BITS = 24 };
+
 /* ------------------------------------------------------------------------- */
 /* Spatial queries and picking                                               */
 /* ------------------------------------------------------------------------- */

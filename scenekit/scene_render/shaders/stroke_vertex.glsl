@@ -10,7 +10,7 @@ layout(location=5) in vec4 transform2;
 layout(location=6) in vec4 transform3;
 layout(location=7) in vec3 support_position;
 uniform mat4 view_projection;
-uniform vec4 stroke_view[5];
+uniform vec4 stroke_view[6];
 out vec3 line_coordinate_homogeneous;
 out float line_length;
 out float line_half_width;
@@ -54,7 +54,7 @@ void main() {
         line_half_width = stroke_view[0].z;
         float parity = sign(dot(transform0.xyz, cross(transform1.xyz,transform2.xyz)));
         support_sidedness = parity * (stroke_view[0].w > 1.5 ? 2.0 : 1.0);
-        vec4 dz = stroke_view[1] * (clip.w * (4.0 / 16777216.0));
+        vec4 dz = stroke_view[1] * (clip.w * stroke_view[5].x);
         world_depth_bias = dz.xyz - world_position * dz.w;
         return;
     }
@@ -120,8 +120,8 @@ void main() {
     gl_Position = clip;
     // Convert the constant depth-unit tie-break to a world-space displacement.
     // Differentiate homogeneous unprojection rather than subtracting nearly
-    // equal world positions. Two D24 units conservatively cover depth rounding.
-    vec4 dz = stroke_view[1] * (clip.w * (4.0 / 16777216.0));
+    // equal world positions. stroke_view[5].x is two depth-buffer steps of clip z.
+    vec4 dz = stroke_view[1] * (clip.w * stroke_view[5].x);
     world_depth_bias = dz.xyz - world_position * dz.w;
     // Recover screen-linear pixel coordinates after perspective interpolation.
     line_coordinate_homogeneous = vec3(

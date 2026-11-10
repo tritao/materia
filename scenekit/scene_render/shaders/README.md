@@ -37,8 +37,8 @@ pipeline uses only a constant depth-unit bias to resolve coplanar ties. At a
 section, its clipping predicate retreats into the kept half-space by the ribbon
 and antialiasing footprint (`half_width + 1` pixels), plus the depth tie budget.
 The plane-distance derivatives convert that footprint to plane units; the inverse
-view-projection's depth column, computed once on the CPU, converts two D24 depth
-units to a conservative world displacement. This also covers a nearly coplanar
+view-projection's depth column, computed once on the CPU, converts two depth-buffer steps
+(`NKS_RENDER_DEPTH_BITS`, passed as `stroke_view[5].x`) to a conservative world displacement. This also covers a nearly coplanar
 edge parallel to the plane, where plane-distance derivatives vanish. Both terms
 scale with the plane equation, so no world-unit epsilon or section displacement
 is needed. This prevents expanded, depth-biased B-rep edge remnants from reaching

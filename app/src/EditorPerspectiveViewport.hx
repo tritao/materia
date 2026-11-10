@@ -652,6 +652,8 @@ class EditorPerspectiveViewport implements View implements Observable {
   final clipBoundsScratch:Array<Array<Float>> = [];
   final clipBounds:Array<Array<Float>> = [];
   @:unobservable var clipBoundsRevision:String = "";
+  @:unobservable var focusDepthKey:String = "";
+  @:unobservable var focusDepth:Float = 0.0;
   final linkMarkerPath = new PathBuilder();
   final sensorMarkerPath = new PathBuilder();
   final sensorRayPath = new PathBuilder();
@@ -1619,9 +1621,35 @@ class EditorPerspectiveViewport implements View implements Observable {
     updateClipBounds();
     camera.fitClipRange(
       clipBounds,
+      new nativekit.scene.DepthPrecision(SceneRenderer.depthBits(), viewportHeight, centreFocusDepth()),
       aspect(),
       !readOnly ? 0.0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))
     );
+  }
+
+  /**
+   * View depth of the surface under the view centre, or zero when the centre
+   * shows background. Refreshed only when the camera or displayed scene moves.
+   */
+  function centreFocusDepth():Float {
+    var key = clipBoundsRevision + ":" + camera.revision;
+    if (key == focusDepthKey) return focusDepth;
+    focusDepthKey = key;
+    focusDepth = 0.0;
+    var eye = camera.eyePosition(), back = camera.viewDirection();
+    var view = sectionView(scene.configureRenderView(
+      new SceneView(),
+      camera.viewProjection(aspect()),
+      displayPoses(),
+      null,
+      -1,
+      null,
+      cosmeticThreadsVisible
+    ));
+    var hit = scene.pickHitRayWithView(view, eye[0], eye[1], eye[2], -back[0], -back[1], -back[2]);
+    if (hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z))
+      focusDepth = Math.max(0.0, -((hit.x - eye[0]) * back[0] + (hit.y - eye[1]) * back[1] + (hit.z - eye[2]) * back[2]));
+    return focusDepth;
   }
 
   function displayTransform(item:EditorSceneObject):Transform {

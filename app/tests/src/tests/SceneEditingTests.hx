@@ -235,6 +235,10 @@ import materia.project.MaterialLibrary;
     );
     scene.dispose();
   }
+  static function clipPrecision():nativekit.scene.DepthPrecision {
+    return new nativekit.scene.DepthPrecision(nativekit.scene.SceneRenderer.depthBits(), 600.0);
+  }
+
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
   }
@@ -340,7 +344,7 @@ import materia.project.MaterialLibrary;
       "shared projection rejects points behind the camera"
     );
     camera.reset();
-    camera.fitClipRange([[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]]);
+    camera.fitClipRange([[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]], clipPrecision());
     check(
       camera.clipNear > camera.distance * 0.5 && camera.clipFar < camera.distance * 2.0,
       "viewport depth range follows nearby scene bounds"
@@ -380,12 +384,12 @@ import materia.project.MaterialLibrary;
       "overlay projection retains grid lines beyond scene geometry"
     );
     var eye = camera.eyePosition();
-    camera.fitClipRange([[eye[0] - 0.5, eye[1] - 0.5, eye[2] - 0.5, eye[0] + 0.5, eye[1] + 0.5, eye[2] + 0.5]]);
+    camera.fitClipRange([[eye[0] - 0.5, eye[1] - 0.5, eye[2] - 0.5, eye[0] + 0.5, eye[1] + 0.5, eye[2] + 0.5]], clipPrecision());
     check(
-      camera.clipNear < 0.01 && camera.clipFar > camera.clipNear,
+      camera.clipNear < camera.distance * 0.01 && camera.clipFar > camera.clipNear,
       "camera inside visible bounds retains nearby geometry"
     );
-    camera.fitClipRange([]);
+    camera.fitClipRange([], clipPrecision());
     check(camera.clipNear > 0.0 && camera.clipFar > camera.clipNear, "empty scene retains a valid depth range");
     var ray = camera.screenRay(800, 450, 1600, 900);
     var planeDistance = (camera.targetZ - ray.originZ) / ray.directionZ;

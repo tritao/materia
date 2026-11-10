@@ -56,6 +56,12 @@ static_assert(sizeof(SceneVertex) == sizeof(float) * 12);
 static_assert(sizeof(PickVertex) == sizeof(float) * 4);
 static_assert(sizeof(StrokeVertex) == sizeof(float) * 11);
 
+// One depth format for scene, capture and pick passes, matching the published bit count.
+constexpr nkgpu_image_format kSceneDepthFormat = NKGPU_IMAGEFORMAT_DEPTH24_STENCIL8;
+static_assert(NKS_RENDER_DEPTH_BITS == 24, "kSceneDepthFormat must carry NKS_RENDER_DEPTH_BITS");
+// Two depth-buffer steps expressed in clip z (whose range is two window-depth units).
+constexpr float kStrokeDepthTie = 4.0f / static_cast<float>(1u << NKS_RENDER_DEPTH_BITS);
+
 struct StrokeUniformData {
     // w: ordinary single-sided (0), section contour (1), ordinary double-sided (2).
     std::array<float, 4> viewport_width_height_half_width{};
@@ -63,6 +69,8 @@ struct StrokeUniformData {
     std::array<float, 4> x_unprojection{};
     std::array<float, 4> y_unprojection{};
     std::array<float, 4> contour_plane{};
+    // x: coplanar tie budget in clip z, converted to world units for section clipping.
+    std::array<float, 4> depth_tie{kStrokeDepthTie, 0.0f, 0.0f, 0.0f};
 };
 
 struct InstanceData {
@@ -966,7 +974,7 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
             (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(StrokeUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view_params",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 5)) != NKGPU_OK ||
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 6)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(float) * 4)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color_params",
@@ -1480,7 +1488,7 @@ bool ensure_pick_targets(StateT &state, std::uint32_t width, std::uint32_t heigh
     depth.struct_size = sizeof(depth);
     depth.width = width;
     depth.height = height;
-    depth.format = NKGPU_IMAGEFORMAT_DEPTH24_STENCIL8;
+    depth.format = kSceneDepthFormat;
     depth.usage = NKGPU_IMAGE_DEPTH_STENCIL;
     depth.mip_count = 1;
     depth.sample_count = 1;
@@ -1566,7 +1574,7 @@ bool ensure_capture_targets(StateT &state, std::uint32_t width, std::uint32_t he
     depth.struct_size = sizeof(depth);
     depth.width = width;
     depth.height = height;
-    depth.format = NKGPU_IMAGEFORMAT_DEPTH24_STENCIL8;
+    depth.format = kSceneDepthFormat;
     depth.usage = NKGPU_IMAGE_DEPTH_STENCIL;
     depth.mip_count = 1;
     depth.sample_count = samples;
@@ -1608,7 +1616,7 @@ std::uint32_t supported_samples(StateT &state, std::uint32_t requested) {
     depth.struct_size = sizeof(depth);
     if (nkgpu_query_features(state.renderer, &features) != NKGPU_OK ||
         nkgpu_query_image_format_support(state.renderer, NKGPU_IMAGEFORMAT_RGBA8, &color) != NKGPU_OK ||
-        nkgpu_query_image_format_support(state.renderer, NKGPU_IMAGEFORMAT_DEPTH24_STENCIL8, &depth) !=
+        nkgpu_query_image_format_support(state.renderer, kSceneDepthFormat, &depth) !=
             NKGPU_OK ||
         !color.multisample || !depth.multisample)
         return 1;

@@ -34,6 +34,9 @@ class SceneRenderer {
   /** Creates an executor for a live renderer handle. Keep its owner alive. */
   public static function create(renderer:nkgpu_renderer):SceneRenderer return new SceneRenderer(renderer);
 
+  /** Depth-buffer bits of every scene pass; cameras size their near plane from it. */
+  public static function depthBits():Int return NativeKitSceneRenderConstants.NKS_RENDER_DEPTH_BITS;
+
   /** Creates the headless resource/command executor used by tests and tools. */
   public static function createHeadless():SceneRenderer return new SceneRenderer(new nkgpu_renderer());
 
