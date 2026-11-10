@@ -48,7 +48,7 @@ class HobberFrameChecks {
     // The scale heads' M4 enter from the seat side (their slots run through the head), so each head is fitted last on its carrier, with the carrier's neighbours already
     // bolted on: the Y head after the outboard support's screws (its access runs where the head stands), the Z head before the guide blocks that stand beside its arm (a driver
     // from the wall side passes the blocks' row), and, once the carrier is a separate part on the bench, the X head with the carriage off the rails.
-    options.fittedBefore = options.fittedBefore.concat([{member: "Ymodule/scaleHead", fastened: FlexsplineHobber.outboardMembers()},
+    options.fittedBefore = options.fittedBefore.concat([{member: "Ymodule/scaleHead", fastened: HobberBSpindle.outboardMembers()},
       {member: "blockZLeft", fastened: ["ZscaleArm"]}, {member: "blockZLeftUpper", fastened: ["ZscaleArm"]}]);
     var order=options.fittedBefore;if(order==null)throw "Missing assembly order";
     // Bar clamps are torqued before the drive subassembly covers their heads.

@@ -25,6 +25,54 @@
       "module": "HobberMoldPreview",
       "function": "columnScene",
       "cache": {}
+    },
+    "foundation": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "foundation",
+      "cache": {}
+    },
+    "tableWork": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "tableWork",
+      "cache": {}
+    },
+    "xAxis": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "xAxis",
+      "cache": {}
+    },
+    "zAxis": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "zAxis",
+      "cache": {}
+    },
+    "aHead": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "aHead",
+      "cache": {}
+    },
+    "yStage": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "yStage",
+      "cache": {}
+    },
+    "bSpindle": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "bSpindle",
+      "cache": {}
+    },
+    "electrical": {
+      "kind": "cad-preview",
+      "module": "HobberUnitPreview",
+      "function": "electrical",
+      "cache": {}
     }
   },
   "defaultVariant": "machine",
@@ -49,6 +97,62 @@
       "entrypoint": "column-mold",
       "kind": "study",
       "summary": "Column tooling and finished casting from the machine source."
+    },
+    {
+      "id": "foundation",
+      "label": "Foundation",
+      "entrypoint": "foundation",
+      "kind": "configuration",
+      "summary": "Foundation assembly in isolation."
+    },
+    {
+      "id": "tableWork",
+      "label": "Table and work",
+      "entrypoint": "tableWork",
+      "kind": "configuration",
+      "summary": "Table and work assembly in isolation."
+    },
+    {
+      "id": "xAxis",
+      "label": "X carriage",
+      "entrypoint": "xAxis",
+      "kind": "configuration",
+      "summary": "X carriage assembly in isolation."
+    },
+    {
+      "id": "zAxis",
+      "label": "Z saddle",
+      "entrypoint": "zAxis",
+      "kind": "configuration",
+      "summary": "Z saddle assembly in isolation."
+    },
+    {
+      "id": "aHead",
+      "label": "A swivel head",
+      "entrypoint": "aHead",
+      "kind": "configuration",
+      "summary": "A swivel head assembly in isolation."
+    },
+    {
+      "id": "yStage",
+      "label": "Y module",
+      "entrypoint": "yStage",
+      "kind": "configuration",
+      "summary": "Y module assembly in isolation."
+    },
+    {
+      "id": "bSpindle",
+      "label": "B spindle",
+      "entrypoint": "bSpindle",
+      "kind": "configuration",
+      "summary": "B spindle assembly in isolation."
+    },
+    {
+      "id": "electrical",
+      "label": "Electrical rack",
+      "entrypoint": "electrical",
+      "kind": "configuration",
+      "summary": "Electrical rack assembly in isolation."
     }
   ]
 }

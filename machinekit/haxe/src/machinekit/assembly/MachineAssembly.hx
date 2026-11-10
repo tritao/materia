@@ -387,8 +387,28 @@ typedef MachineAssemblyMassProperties = {
    * Include `assembly` as subassembly `id` that is the scene group `path`: its members are `id/...` as with `include`, but in the
    * tree they sit directly in `path` (and its own groups below it), without a second folder named after the include. Use it when
    * one include fills a group on its own; keep `include` when a group holds several includes that need their own folders.
+   * `keepMemberIds` copies a unit in the containing frame, retaining its member and joint IDs.
+   * Its groups go below `path`; the containing assembly chooses which service ports to expose.
    */
-  public function includeAsGroup(path:String, id:String, assembly:MachineAssembly, ?pose:AssemblyFrame):Void {
+  public function includeAsGroup(path:String, id:String, assembly:MachineAssembly, ?pose:AssemblyFrame,
+    keepMemberIds:Bool = false):Void {
+    if (keepMemberIds) {
+      // Inline a unit whose placements are already in this assembly's frame.
+      // Its physical IDs stay authoritative; no second namespace or aliases.
+      if (assembly == null || assembly == this || pose != null) throw "Inline group needs a distinct assembly in the containing frame";
+      InstancePath.segment(id);
+      checkedGroup(path);
+      var exposedPorts = services.exposures.length;
+      assembly.copyInto(this);
+      // As with a normal include, the containing assembly chooses its external ports.
+      services.exposures.resize(exposedPorts);
+      for (memberId in assembly.mechanical.order) {
+        var local = assembly.memberGroups.get(memberId);
+        assignGroup(memberId, local == null || local == "Ungrouped" ? path : path + "/" + local);
+      }
+      changed();
+      return;
+    }
     withGroup(path, () -> include(id, assembly, pose));
     groupIncludes.set(id, true);
     changed();
@@ -1397,6 +1417,20 @@ typedef MachineAssemblyMassProperties = {
       sensor.id,
       prefix
     ));
+  }
+
+  /** A member's declared construction placement, before this level's joints
+   * move it. Included assemblies contribute their own initial solved pose. */
+  public function constructionPose(id:String):AssemblyFrame {
+    var own = mechanical.member(id);
+    if (own != null) return copyFrame(own.pose);
+    var slash = id.indexOf("/");
+    if (slash < 0) throw 'Missing construction member "$id"';
+    var included = mechanical.subassembly(id.substr(0, slash));
+    if (included == null) throw 'Missing construction assembly "$id"';
+    var local = included.assembly.solvedPoses().get(id.substr(slash + 1));
+    if (local == null) throw 'Missing included construction pose "$id"';
+    return AssemblyFrames.compose(included.pose == null ? AssemblyFrames.identity() : included.pose, local);
   }
 
   /** Every member, subassembly members included, by path. */

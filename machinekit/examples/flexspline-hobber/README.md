@@ -174,3 +174,16 @@ The Explode slider at 100% (captured through the editor):
 ![Assembly separated with presentation offsets](images/socket-fixture-explode.png)
 
 The source project also offers **Machine — Plinth mold** and **Machine — Column mold**. Use **Open mold** on a casting in the machine tree and **Back to Machine** on its mold reference. These use the same mold planner and shop recipe as the verified kits; opening a view does not export a kit or run full verification.
+
+### Assembly units
+
+`FlexsplineHobber` composes the foundation, table/work, X carriage, Z saddle,
+A head, Y stage, B spindle and electrical rack. Each unit owns its parts and
+publishes named mating interfaces through `HobberUnit`; the machine joins those
+interfaces and installs the controls. Member IDs and functional groups stay
+stable across composition. Construction placements live in `MachineAssembly`,
+and `HobberServiceAccess` owns the declared service paths.
+
+The project variants include an isolated preview of each unit. Their entry
+functions are in `HobberUnitPreview`; `haxeon.units.json` runs the foundation
+preview directly.

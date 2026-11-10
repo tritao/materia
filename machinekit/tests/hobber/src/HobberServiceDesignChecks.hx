@@ -48,7 +48,7 @@ class HobberServiceDesignChecks {
         endClear=bounds.minX+stroke-HobberLayout.get().xNominal().bedRear;
       default:
     }
-    if(endClear<FlexsplineHobber.SERVICE_CLEARANCE-1e-7)throw "X screw stroke does not clear the rear of the bed";
+    if(endClear<HobberServiceAccess.SERVICE_CLEARANCE-1e-7)throw "X screw stroke does not clear the rear of the bed";
     cache.close();if(count==0)throw "no X flange driver axes checked";
     return ['X service: motor-side flange at X${flange.x}; block datum ${b.minX}..${b.maxX} retained. Whole-nut race reserve $reserve mm, barrel reserve $barrel mm at 5 mm overtravel.',
       'X flange access: $count joint-derived long-driver corridors clear to bed rear +5; maximum reach ${Math.ceil(reach)} mm. Motor, BK12 and BF ring removed; chip guards retained.',

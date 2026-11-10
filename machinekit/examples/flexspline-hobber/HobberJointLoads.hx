@@ -120,7 +120,7 @@ class HobberJointLoads {
       between: ["motorCradle", "spindleSeat"],
       shear: {peak: pull + massOf(machine, ["motorCradle", "spindle/motor"]) * g}
     });
-    var outboardWeight = massOf(machine, FlexsplineHobber.outboardMembers().concat(["outboardInnerSpacer", "outboardLocknut"])) * (g + 0.5);
+    var outboardWeight = massOf(machine, HobberBSpindle.outboardMembers().concat(["outboardInnerSpacer", "outboardLocknut"])) * (g + 0.5);
     loads.push({label: "Outboard carrier on the Y saddle", between: ["outboardCarrier", "Ymodule/carriage"],
       shear: {peak: CUTTING_FORCE + outboardWeight, momentary: jam + outboardWeight}});
     loads.push({label: "Indicated housing on its carrier", between: ["outboard", "outboardCarrier"],
