@@ -35,12 +35,14 @@ Counts: files outside `build/`, and test manifests under `machinekit/tests` that
 dh-gripper, leadshine-servos, supplier-fasteners, supplier-racks, enclosure-kit, eoat, tool-service, cable-harness, panel-tooling,
 spindle-drive-study.
 
-**To decide:**
-- reference-arms (101 files), zeroerr-arm (92 files, 12 docs), cobot-arm, robot-arm, track-arm, overhead-arm: arm designs or
-  reference data for the robotics kits?
-- pendant (55 files): a product (machine) or a MachineKit demo?
-- casting-shop (15 tests) and box-mold (20 tests): shared casting tooling used by several machines and library tests; candidates
-  for a library home (`manufacturingkit` or `machinekit.tooling`) rather than either examples or machines.
+**Decided (2026-11-10):**
+- Directory: `machines/`.
+- Arms: zeroerr-arm (the physical arm project and its J2 bench), cobot-arm (Reach850 wrist prototype), reference-arms (that arm's
+  design baseline and commercial-reference validation), track-arm and overhead-arm (complete cells) are **machines**; robot-arm
+  (the generic six-axis demo built from MachineKit parts) stays a **demo**.
+- pendant: a **product**, moves to `machines/`.
+- casting-shop and box-mold: shared casting tooling, move to a **library home** (`manufacturingkit`, or `machinekit.tooling` where
+  they depend on MachineKit parts), not to `machines/`.
 
 ## Fixtures
 
