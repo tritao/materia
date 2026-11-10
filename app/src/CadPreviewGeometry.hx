@@ -96,6 +96,17 @@ class CadPreviewGeometry {
       edges,
       edgeIds
     );
+    // Step heights let sub-pixel steps fade instead of drawing full lines (app/plans/EDGE_SIGNIFICANCE.md).
+    var steps = cadkit.MeshFeatureEdges.steps(
+      part.vertices,
+      part.indices,
+      part.vertexCount,
+      part.indexCount,
+      cadkit.MeshFeatureEdges.triangleFaces(part.indexCount, [for (range in part.faceRanges) range.faceIndex],
+        [for (range in part.faceRanges) range.firstIndex], [for (range in part.faceRanges) range.indexCount]),
+      edges,
+      edgeIds
+    );
     if (edges != null) for (index in 0...Std.int(edges.length / 48)) {
       var offset = index * 48;
       for (axis in 0...6) if (!finite(edges.getDouble(offset
@@ -110,7 +121,8 @@ class CadPreviewGeometry {
           (edges.getDouble(offset + 40) - centerZ) * scale
         ],
         edgeIds == null || edgeIds.length == 0 ? -1 : edgeIds.getInt32(index * 4),
-        featureEdges[index]
+        featureEdges[index],
+        steps[index] * Math.abs(scale)
       );
     }
     geometry.setBounds(

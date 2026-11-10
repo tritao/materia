@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "cadkit-edge-steps-smoke"},
+  "entry": "EdgeStepSmoke",
+  "sourceRoots": ["."],
+  "dependencies": {"cadkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/edge-steps"
+}

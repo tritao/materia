@@ -66,10 +66,11 @@ class CadDetailGeometry {
 class CadGeometryData extends GeometryData {
   public final threads:Array<CadThreadGeometry>;
   public final details:Array<CadDetailGeometry>;
-  final cadStrokes:Array<{points:Array<Float>, id:Int, feature:Bool}> = [];
+  final cadStrokes:Array<{points:Array<Float>, id:Int, feature:Bool, step:Float}> = [];
   var edgeMode:CadEdgeMode = Feature;
-  public function addCadStroke(points:Array<Float>, id:Int, feature:Bool):Void {
-    cadStrokes.push({points: points, id: id, feature: feature});
+  /** `step` is the height of the step the edge outlines in scene units, 0 for a corner (see MeshFeatureEdges.steps). */
+  public function addCadStroke(points:Array<Float>, id:Int, feature:Bool, step:Float = 0.0):Void {
+    cadStrokes.push({points: points, id: id, feature: feature, step: step});
     if (showsStroke(feature)) super.addStrokeSegment(
       points[0],
       points[1],
@@ -77,7 +78,8 @@ class CadGeometryData extends GeometryData {
       points[3],
       points[4],
       points[5],
-      id
+      id,
+      step
     );
   }
   inline function showsStroke(feature:Bool):Bool return edgeMode == All || edgeMode == Feature && feature;
@@ -88,7 +90,7 @@ class CadGeometryData extends GeometryData {
     clearStrokeSegments();
     for (stroke in cadStrokes) if (showsStroke(stroke.feature)) {
       var p = stroke.points;
-      super.addStrokeSegment(p[0], p[1], p[2], p[3], p[4], p[5], stroke.id);
+      super.addStrokeSegment(p[0], p[1], p[2], p[3], p[4], p[5], stroke.id, stroke.step);
     }
   }
 

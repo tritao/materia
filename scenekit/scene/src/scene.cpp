@@ -622,6 +622,9 @@ nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
         std::copy(std::begin(segment.start), std::end(segment.start), copied.start.begin());
         std::copy(std::begin(segment.end), std::end(segment.end), copied.end.begin());
         copied.subelement = segment.subelement;
+        copied.step = segment.step;
+        if (!std::isfinite(copied.step) || copied.step < 0.0f)
+            return NKS_ERROR_INVALID_ARGUMENT;
         for (const auto coordinate : copied.start)
             if (!std::isfinite(coordinate))
                 return NKS_ERROR_INVALID_ARGUMENT;
@@ -2427,6 +2430,9 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
         std::copy(std::begin(segment.start), std::end(segment.start), copied.start.begin());
         std::copy(std::begin(segment.end), std::end(segment.end), copied.end.begin());
         copied.subelement = segment.subelement;
+        copied.step = segment.step;
+        if (!std::isfinite(copied.step) || copied.step < 0.0f)
+            return NKS_ERROR_INVALID_ARGUMENT;
         for (const auto coordinate : copied.start)
             if (!std::isfinite(coordinate))
                 return NKS_ERROR_INVALID_ARGUMENT;

@@ -275,13 +275,19 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	/**
 	 * One object-space CAD edge segment attached to its face geometry.
 	 */
-	struct nkscene_stroke_segment @layout(28, 4) {
+	struct nkscene_stroke_segment @layout(32, 4) {
 		start: array<f32, 3> @offset(0);
 		end: array<f32, 3> @offset(12);
 		/**
 		 * Zero for an anonymous stroke; tagged BRep edge ID for CAD strokes.
 		 */
 		subelement: u32 @offset(24);
+		/**
+		 * Height of the step this edge outlines, in object units: the offset between the parallel faces a narrow face
+		 * joins. Zero for a corner or any other stroke, which draws at full weight; a step draws with coverage
+		 * min(1, step / pixel size), so sub-pixel steps fade instead of flickering.
+		 */
+		step: f32 @offset(28);
 	}
 	struct nkscene_subelement_range @layout(12, 4) {
 		first_primitive: u32 @offset(0);

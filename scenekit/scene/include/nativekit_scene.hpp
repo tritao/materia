@@ -190,6 +190,8 @@ struct GeometryPayload {
         std::array<float, 3> start{};
         std::array<float, 3> end{};
         std::uint32_t subelement = 0;
+        /** Step height this edge outlines (object units); 0 draws at full weight. */
+        float step = 0.0f;
     };
     std::vector<StrokeSegment> stroke_segments;
     /** Optional uint32 triangle indices. Empty means sequential triangles. */

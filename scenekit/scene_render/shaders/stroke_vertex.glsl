@@ -9,6 +9,7 @@ layout(location=4) in vec4 transform1;
 layout(location=5) in vec4 transform2;
 layout(location=6) in vec4 transform3;
 layout(location=7) in vec3 support_position;
+layout(location=8) in float stroke_step;
 uniform mat4 view_projection;
 uniform vec4 stroke_view[6];
 out vec3 line_coordinate_homogeneous;
@@ -17,6 +18,18 @@ out float line_half_width;
 out vec3 world_position;
 out vec3 world_depth_bias;
 flat out float support_sidedness;
+out float step_coverage;
+
+// A step edge (app/plans/EDGE_SIGNIFICANCE.md) draws in proportion to its height over one pixel at its depth `w`;
+// corners and other strokes carry no step and draw fully. The pixel's world size is 2 w / (P00 * width), where P00 is
+// the projection's horizontal scale: the length of the view-projection's first row, since the view is a rotation.
+float step_coverage_at(float w, mat4 model) {
+    if (stroke_step <= 0.0) return 1.0;
+    float horizontal = length(vec3(view_projection[0][0], view_projection[1][0], view_projection[2][0]));
+    float pixel = 2.0 * max(w, 1e-6) / max(horizontal * stroke_view[0].x, 1e-12);
+    float scale = (length(model[0].xyz) + length(model[1].xyz) + length(model[2].xyz)) / 3.0;
+    return clamp(stroke_step * scale / pixel, 0.0, 1.0);
+}
 
 void main() {
     support_sidedness = 0.0;
@@ -34,6 +47,7 @@ void main() {
         // projected line coordinates. The ordinary clipped ribbon remains.
         if (a.w <= 1e-5 || b.w <= 1e-5 || c.w <= 1e-5) {
             gl_Position = vec4(2.0,2.0,2.0,1.0);
+            step_coverage = 0.0;
             world_position = world_a;
             world_depth_bias = vec3(0.0);
             line_coordinate_homogeneous = vec3(0.0,0.0,1.0);
@@ -49,6 +63,7 @@ void main() {
         vec2 tangent = delta / length_px;
         vec2 offset = (clip.xy / clip.w - a.xy / a.w) * 0.5 * stroke_view[0].xy;
         gl_Position = clip;
+        step_coverage = step_coverage_at(clip.w, model);
         line_coordinate_homogeneous = vec3(vec2(dot(offset,tangent), dot(offset,vec2(-tangent.y,tangent.x))) * clip.w, clip.w);
         line_length = length_px;
         line_half_width = stroke_view[0].z;
@@ -60,6 +75,7 @@ void main() {
     }
     if (a.w <= 1e-5 && b.w <= 1e-5) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        step_coverage = 0.0;
         line_coordinate_homogeneous = vec3(0.0, 0.0, 1.0);
         line_length = 0.0;
         line_half_width = stroke_view[0].z;
@@ -118,6 +134,7 @@ void main() {
         clip.z += max(cap_depth, 0.0) * clip.w;
     }
     gl_Position = clip;
+    step_coverage = step_coverage_at(clip.w, model);
     // Convert the constant depth-unit tie-break to a world-space displacement.
     // Differentiate homogeneous unprojection rather than subtracting nearly
     // equal world positions. stroke_view[5].x is two depth-buffer steps of clip z.

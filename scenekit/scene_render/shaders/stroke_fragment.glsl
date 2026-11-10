@@ -8,6 +8,7 @@ in float line_half_width;
 in vec3 world_position;
 in vec3 world_depth_bias;
 flat in float support_sidedness;
+in float step_coverage;
 uniform vec4 clip_planes[32];
 uniform vec4 clip_plane_count;
 out vec4 fragment_color;
@@ -32,6 +33,7 @@ void main() {
             if (distance_to_plane < 0.0) discard;
         } else if (distance_to_plane <= footprint) discard;
     }
+    coverage *= step_coverage;
     if (coverage <= 0.0) discard;
     fragment_color = vec4(stroke_color.rgb * coverage, stroke_color.a * coverage);
 }

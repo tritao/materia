@@ -502,6 +502,45 @@ void sidedness_regression(nkgpu_renderer renderer) {
 
 } // namespace
 
+// A step edge draws in proportion to its height over one pixel (app/plans/EDGE_SIGNIFICANCE.md):
+// a corner (step 0) and a step of several pixels draw fully, a step of 1/100 px all but vanishes.
+void step_edge_coverage_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    const auto plane = scene->reserve_geometry_id();
+    auto &mesh = scene->geometry_store().create(plane);
+    const std::array<float,3> a{-0.8f,0,0}, b{0.8f,0,0};
+    mesh.edit_payload().vertices = {{{-0.9f,-0.9f,0}},{{0.9f,-0.9f,0}},{{0.9f,0.9f,0}},{{-0.9f,0.9f,0}}};
+    mesh.edit_payload().indices = {0,1,2,0,2,3};
+    const auto material = scene->reserve_material_id();
+    auto &state = scene->material_store().create(material).edit_state();
+    state.base_color = {1,1,1,1}; state.emissive = {1,1,1};
+    state.flags = static_cast<unsigned>(nkscene::MaterialFlags::Opaque);
+    const auto node = scene->reserve_node_id();
+    Transaction create(scene);create.add_create(node);create.add_geometry(node,plane);create.add_material(node,material);
+    ChangeSet changes;assert(scene->commit(create,changes)==NKS_OK);create.close();
+    nkscene::NativeKitGpuExecutor executor(renderer);
+    nkscene::SceneView view;
+    // Darkness the stroke adds along its centre row: the identity projection makes a pixel 2/64 units.
+    auto darkness = [&](float step) {
+        mesh.edit_payload().stroke_segments.clear();
+        scene->publish();auto plan = nkscene::compile(scene->snapshot(),view);
+        std::vector<std::uint8_t> plain, edged;
+        assert(executor.capture_rgba8(plan,scene->snapshot(),64,64,{1,1,1,1},plain)==NKGPU_OK);
+        nkscene::GeometryPayload::StrokeSegment segment{a,b,1};segment.step=step;
+        mesh.edit_payload().stroke_segments = {segment};
+        scene->publish();plan = nkscene::compile(scene->snapshot(),view);
+        assert(executor.capture_rgba8(plan,scene->snapshot(),64,64,{1,1,1,1},edged)==NKGPU_OK);
+        int total = 0;
+        for (int y=30;y<34;++y)for(int x=16;x<48;++x)total += plain[(y*64+x)*4]-edged[(y*64+x)*4];
+        return total;
+    };
+    const auto corner = darkness(0.0f), wide = darkness(0.2f), tiny = darkness(0.0003f);
+    assert(corner > 0 && "a corner stroke draws");
+    assert(wide == corner && "a step of several pixels draws fully");
+    assert(tiny * 20 < corner && "a 1/100 px step all but vanishes");
+    std::puts("step edge coverage passed");
+}
+
 // A wall meets a bed along a slanted screen-space seam. Both surfaces
 // approach the eye away from that seam, hiding a centerline-depth ribbon.
 void contact_edge_regression(nkgpu_renderer renderer) {
@@ -640,6 +679,7 @@ int main() {
     surface_lod_regression(renderer);
     mixed_surface_pass_regression(renderer);
     round_stroke_caps_regression(renderer);
+    step_edge_coverage_regression(renderer);
     equivalent_material_batch_regression(renderer);
     sidedness_regression(renderer);
     contact_edge_regression(renderer);

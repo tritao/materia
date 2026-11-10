@@ -136,9 +136,11 @@ class GeometryData {
     endX:Float,
     endY:Float,
     endZ:Float,
-    edgeIndex:Int = -1
+    edgeIndex:Int = -1,
+    step:Float = 0.0
   ):GeometryData {
     if (edgeIndex >= 0x3fffffff) throw "CAD edge index exceeds stroke identity range";
+    if (!(step >= 0.0) || !Math.isFinite(step)) throw "Stroke step must be finite and not negative";
     var segment = new nkscene_stroke_segment();
     segment.set_start(0, startX);
     segment.set_start(1, startY);
@@ -147,6 +149,7 @@ class GeometryData {
     segment.set_end(1, endY);
     segment.set_end(2, endZ);
     segment.set_subelement(edgeIndex < 0 ? 0 : EDGE_SUBELEMENT_TAG | (edgeIndex + 1));
+    segment.set_step(step);
     strokeSegments.push(segment);
     return this;
   }

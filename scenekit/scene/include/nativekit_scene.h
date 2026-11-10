@@ -154,6 +154,12 @@ typedef struct nkscene_stroke_segment {
     float end[3];
     /** Zero for an anonymous stroke; tagged BRep edge ID for CAD strokes. */
     uint32_t subelement;
+    /**
+     * Height of the step this edge outlines, in object units: the offset between the parallel faces a narrow face
+     * joins. Zero for a corner or any other stroke, which draws at full weight; a step draws with coverage
+     * min(1, step / pixel size), so sub-pixel steps fade instead of flickering.
+     */
+    float step;
 } nkscene_stroke_segment;
 
 typedef struct nkscene_subelement_range {
