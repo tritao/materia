@@ -56,4 +56,13 @@ restructuring: no design change. Status: plan, 2026-11-10.
 
 Order: RF1, RF2, RF3, RF4, then RF5/RF6, then RF7.
 
+## Recorded baseline
+
+At `a825f2976` on `hobber-refactor`, with haxeon at the main pin
+`2a09270ea4fd4b5e88aa3b349cc53bc2edacc7c1`, the enclosure manifest produced
+`f6e54e3520d9b493ba5063555c0f7e4d2cd72881a0c80520aa2afb45cd864484` (SHA-256).
+A second build after restoring the original source reproduced that digest exactly.
+
 ## Log
+
+- RF1 — STOPPED, not complete: two machine-frame pose-bookkeeping checkpoints failed the byte gate (SHA-256 `0c125e860c9602ad29ac888fa897905d4f29303f18f1204d828fda28e2fdaedd`, then `2acbd316f104d72f0fc26f3b2413c724154c161a8af0a2ab320c18eb0b4aaba2` after removing an extra inverse calculation); 159 serialized connector frames changed through roundoff (for example `railXLeft/XParent.x`: `220.00000000000006` -> `220`), which propagated into derived hole geometry and enclosure fitting. Rejected both checkpoints, restored source and baseline artifact, digest check PASS. Baseline suites: hobbing 1185 assertions PASS; joint fasteners PASS; assembly integrity PASS; enclosure 371 guard checks plus 48 samples / 66 exact near-pair checks PASS; linear module 230 assertions PASS; hobber 3302 assertions PASS. `FlexsplineHobber.hx` remains 764 lines, no split files. RF2–RF7 not started. Diagnostic patches, scenes and logs: `/media/joao/DATA1/claude-hobber-tools/tmp/rf*`.
