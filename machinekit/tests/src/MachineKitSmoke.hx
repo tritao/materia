@@ -786,7 +786,7 @@ class MachineKitSmoke {
     check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
       "document BOM groups recipe instances by values");
     var saved = DocumentCodec.encode(document);
-    check(DocumentCodec.VERSION == 16, "document version 16");
+    check(DocumentCodec.VERSION == 17, "document version 17");
     var loaded = DocumentCodec.decode(saved);
     check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
     loaded.close();

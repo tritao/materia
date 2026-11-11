@@ -9,9 +9,18 @@ package cadkit.parametric;
  */
 class FeatureTypeRegistry {
   static var codecs:Map<String, FeatureCodec> = new Map();
+  static var ownTypes = false;
+
+  /** CadKit's own domain features (sheet metal) go through the registry too; they register on first use. */
+  static function registerOwnTypes():Void {
+    if (ownTypes) return;
+    ownTypes = true;
+    cadkit.sheetmetal.SheetFeatureTypes.register();
+  }
 
   /** Register `codec` for its type. Registering the same codec again is a no-op; another codec for a taken type throws. */
   public static function register(codec:FeatureCodec):Void {
+    registerOwnTypes();
     if (codec == null) throw new ParametricError("feature codec must not be null");
     var type = codec.type();
     if (type == null || StringTools.trim(type) == "" || type != StringTools.trim(type))
@@ -23,12 +32,19 @@ class FeatureTypeRegistry {
     codecs.set(type, codec);
   }
 
-  public static function isRegistered(type:String):Bool return codecs.exists(type);
+  public static function isRegistered(type:String):Bool {
+    registerOwnTypes();
+    return codecs.exists(type);
+  }
 
-  public static function codec(type:String):Null<FeatureCodec> return codecs.get(type);
+  public static function codec(type:String):Null<FeatureCodec> {
+    registerOwnTypes();
+    return codecs.get(type);
+  }
 
   /** Registered type names, sorted. */
   public static function types():Array<String> {
+    registerOwnTypes();
     var result = [for (type in codecs.keys()) type];
     result.sort(Reflect.compare);
     return result;

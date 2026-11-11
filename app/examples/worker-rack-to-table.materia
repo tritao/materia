@@ -1790,7 +1790,7 @@
   },
   "bim": {
     "format": "cadkit.document",
-    "version": 16,
+    "version": 17,
     "lengthUnit": "mm",
     "documentId": "document-0a5956e0327b23c600000002",
     "implicitOutput": false,
