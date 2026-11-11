@@ -1,5 +1,5 @@
-// Included after section_caps.hpp: section contours share cap eligibility and
-// stroke geometry, but have their own depth precedence and clipping predicate.
+// Included after section_caps.hpp: section contours share cap eligibility, stroke
+// geometry and visibility, with their own clipping predicate.
 template<class StateT>
 bool prepare_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &snapshot,
                       unsigned samples,GpuExecutionStats &stats) {
@@ -11,7 +11,7 @@ bool prepare_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &
             it=state.contours.erase(it);
         } else ++it;
     }
-    if(!state.caps.empty()&&!ensure_stroke_pipeline(state,stats,samples,true))return false;
+    if(!state.caps.empty()&&!ensure_stroke_pipeline(state,stats,samples))return false;
     for(const auto &cap:state.caps) {
         const auto &batch=state.batches[cap.batch];
         const auto *geometry=snapshot.find_geometry(batch.key.geometry);
@@ -54,31 +54,24 @@ bool draw_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &sna
     const auto *diagnostic=std::getenv("NK_SCENE_SECTION_CONTOURS");
     if(diagnostic && std::string(diagnostic)=="0")return true;
     if(state.caps.empty())return true;
-    std::array<float,16> inverse{};
-    if(!invert_matrix(plan.view_projection(),inverse))return true;
-    StrokeUniformData viewport{{float(std::max(state.viewport_width,1u)),float(std::max(state.viewport_height,1u)),0.85f,1.0f}};
-    for(unsigned row=0;row<4;++row) {
-        viewport.x_unprojection[row]=inverse[row];
-        viewport.y_unprojection[row]=inverse[4+row];
-        viewport.depth_unprojection[row]=inverse[8+row];
-    }
+    if(!state.surface_buffer_ready)return set_failure(state,stats,NKGPU_ERROR_WRONG_STATE);
+    const StrokeUniformData viewport{{float(std::max(state.viewport_width,1u)),float(std::max(state.viewport_height,1u)),0.85f,0.0f}};
     for(const auto &cap:state.caps) {
         const auto &batch=state.batches[cap.batch];
         const auto &entry=state.contours.at({batch.instances[cap.instance].value,cap.plane});
         if(!entry.count)continue;
-        viewport.contour_plane=plan.clip_planes()[cap.plane];
         ClipUniformData clips{};clips.count[1]=1; // Geometric contours, not surface-edge remnants.
         for(std::size_t p=0;p<plan.clip_planes().size();++p)if(p!=cap.plane)
             clips.planes[static_cast<std::size_t>(clips.count[0]++)]=plan.clip_planes()[p];
         const auto color=stroke_color_for(plan,snapshot.find_material(batch.key.material));
-        auto result=nkgpu_apply_pipeline(state.renderer,state.pipelines[pipeline_slot(samples)].contour);
+        auto result=nkgpu_apply_pipeline(state.renderer,state.pipelines[pipeline_slot(samples)].stroke);
         if(result==NKGPU_OK)result=nkgpu_apply_uniform_data(state.renderer,1,
             reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),sizeof(float)*16);
         if(result==NKGPU_OK)result=nkgpu_apply_uniform_data(state.renderer,3,reinterpret_cast<const std::uint8_t *>(&viewport),sizeof(viewport));
         if(result==NKGPU_OK)result=nkgpu_apply_uniform_data(state.renderer,0,reinterpret_cast<const std::uint8_t *>(color.data()),sizeof(color));
         if(result==NKGPU_OK)result=nkgpu_apply_uniform_data(state.renderer,2,reinterpret_cast<const std::uint8_t *>(&clips),sizeof(clips));
-        // Contours lie on the section caps; only the depth test decides them.
-        if(result==NKGPU_OK)result=apply_stroke_surfaces(state,plan,false);
+        // Contours lie on their own caps, which the visible-surface buffer holds.
+        if(result==NKGPU_OK)result=apply_stroke_surfaces(state,plan);
         if(result==NKGPU_OK)result=nkgpu_apply_vertex_buffer(state.renderer,0,entry.buffer,0);
         if(result==NKGPU_OK)result=nkgpu_apply_vertex_buffer(state.renderer,1,batch.buffer,static_cast<unsigned>(cap.instance*instance_stride));
         if(result==NKGPU_OK)result=nkgpu_draw(state.renderer,0,entry.count,1);

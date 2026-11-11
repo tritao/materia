@@ -3,7 +3,6 @@
 #include "capture_profiler.hpp"
 #include "render_internal.hpp"
 #include "section_contours.hpp"
-#include "stroke_support.hpp"
 #include "material_batches.hpp"
 #include "surface_lod.hpp"
 
@@ -42,7 +41,6 @@ struct StrokeVertex {
     std::array<float, 3> start{};
     std::array<float, 3> end{};
     std::array<float, 2> coordinate{};
-    std::array<float, 3> support{};
     /** Step height the edge outlines (object units); 0 draws at full weight. */
     float step = 0.0f;
 };
@@ -56,29 +54,21 @@ constexpr std::uint32_t default_viewport_height = 768;
 
 static_assert(sizeof(SceneVertex) == sizeof(float) * 12);
 static_assert(sizeof(PickVertex) == sizeof(float) * 4);
-static_assert(sizeof(StrokeVertex) == sizeof(float) * 12);
+static_assert(sizeof(StrokeVertex) == sizeof(float) * 9);
 
 // One depth format for scene, capture and pick passes, matching the published bit count.
 constexpr nkgpu_image_format kSceneDepthFormat = NKGPU_IMAGEFORMAT_DEPTH24_STENCIL8;
 static_assert(NKS_RENDER_DEPTH_BITS == 24, "kSceneDepthFormat must carry NKS_RENDER_DEPTH_BITS");
-// Two depth-buffer steps expressed in clip z (whose range is two window-depth units).
-constexpr float kStrokeDepthTie = 4.0f / static_cast<float>(1u << NKS_RENDER_DEPTH_BITS);
 
 struct StrokeUniformData {
-    // w: ordinary single-sided (0), section contour (1), ordinary double-sided (2).
+    /** Target width and height in pixels, and the line's half width in pixels. */
     std::array<float, 4> viewport_width_height_half_width{};
-    std::array<float, 4> depth_unprojection{};
-    std::array<float, 4> x_unprojection{};
-    std::array<float, 4> y_unprojection{};
-    std::array<float, 4> contour_plane{};
-    // x: coplanar tie budget in clip z, converted to world units for section clipping.
-    std::array<float, 4> depth_tie{kStrokeDepthTie, 0.0f, 0.0f, 0.0f};
 };
 
-/* The stroke shader's view of the studio AO prepass: other parts in front hide a stroke (stroke_fragment.glsl). */
+/* The line shader's view of the visible-surface buffer (stroke_fragment.glsl). */
 struct StrokeSurfaceUniformData {
     std::array<float, 16> view_projection{};
-    // xy: buffer size; z: 1 when the buffer holds this frame's surfaces; w: tolerance in world units.
+    // xy: buffer size; w: tolerance in world units.
     std::array<float, 4> viewport{};
 };
 
@@ -93,15 +83,13 @@ static_assert(sizeof(InstanceData) == instance_stride);
 // The signed-distance shader contributes only within radius half_width + 1
 // of a cap's endpoint. A circumscribed half-diamond covers that disk using
 // one triangle, with the same affine cap-depth ramp as the former quad.
-// Round sqrt(2) upward; y must stay below the shader's support-triangle tag.
+// Round sqrt(2) upward.
 constexpr float stroke_cap_extent = 1.414214f;
-static_assert(stroke_cap_extent < 1.5f);
 constexpr std::array<std::array<float, 2>, 12> stroke_corners{{
         {{0.0f, -1.0f}}, {{0.0f, 1.0f}}, {{1.0f, 1.0f}},
         {{0.0f, -1.0f}}, {{1.0f, 1.0f}}, {{1.0f, -1.0f}},
         {{-stroke_cap_extent, 0.0f}}, {{0.0f, stroke_cap_extent}}, {{0.0f, -stroke_cap_extent}},
         {{1.0f, stroke_cap_extent}}, {{1.0f + stroke_cap_extent, 0.0f}}, {{1.0f, -stroke_cap_extent}}}};
-constexpr std::size_t max_stroke_vertices = stroke_corners.size() + 6; // Two incident support triangles.
 
 struct ClipUniformData {
     std::array<std::array<float, 4>, RenderPlan::max_clip_planes> planes{};
@@ -493,10 +481,8 @@ struct NativeKitGpuExecutor::State {
         nkgpu_pipeline indexed{};
         nkgpu_pipeline blend{};
         nkgpu_pipeline indexed_blend{};
+        /** Strokes and section contours, decided by the visible-surface buffer (no depth test). */
         nkgpu_pipeline stroke{};
-        /** Strokes decided by the visible-surface buffer instead of the depth test. */
-        nkgpu_pipeline stroke_surface{};
-        nkgpu_pipeline contour{};
         nkgpu_pipeline workplane{};
         std::array<nkgpu_pipeline, 3> caps{};
         nkgpu_pipeline indexed_parity{};
@@ -510,7 +496,7 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader stroke_shader{};
     nkgpu_shader pick_shader{};
     nkgpu_pipeline pick_pipeline{};
-    nkgpu_pipeline ao_position_pipeline{};
+    nkgpu_pipeline surface_position_pipeline{};
     std::array<std::array<nkgpu_pipeline,3>,2> pick_caps{};
     struct CapDraw { std::size_t batch, instance, plane; std::array<int,4> scissor; };
     std::vector<CapDraw> caps;
@@ -527,11 +513,14 @@ struct NativeKitGpuExecutor::State {
     nkgpu_buffer postprocess_vertex_buffer{};
     nkgpu_shader workplane_shader{};
     nkgpu_buffer workplane_vertex_buffer{};
-    /* Screen-space CAD edges (app/plans/SCREEN_EDGES.md): drawn from the AO prepass's ids and positions. */
-    /** Nearest-filtered, for reading the visible-surface buffer in the stroke pass. */
+    /** Nearest-filtered, for reading the visible-surface buffer in the line pass. */
     nkgpu_sampler surface_sampler{};
-    /** The AO prepass of this frame is bound for stroke visibility against other parts. */
-    bool stroke_surfaces_active = false;
+    /**
+     * This frame's visible-surface buffer is rendered: the part id (pick_color) and world position
+     * (surface_positions) of the surface each pixel shows. Ambient occlusion samples it; strokes and section contours
+     * take their visibility from it (app/plans/STROKE_VISIBILITY.md).
+     */
+    bool surface_buffer_ready = false;
     nkgpu_image capture_color{};
     nkgpu_image capture_depth{};
     /* The multisampled color target that resolves into capture_color, when capturing with MSAA. */
@@ -549,8 +538,8 @@ struct NativeKitGpuExecutor::State {
     nkgpu_image pick_color{};
     nkgpu_image pick_subelement{};
     nkgpu_image pick_depth_value{};
-    nkgpu_image ao_position{};
-    std::uint32_t ao_width = 0, ao_height = 0;
+    nkgpu_image surface_positions{};
+    std::uint32_t surface_width = 0, surface_height = 0;
     nkgpu_image pick_depth{};
     nkgpu_image default_image{};
     nkgpu_sampler default_sampler{};
@@ -594,7 +583,7 @@ struct NativeKitGpuExecutor::State {
     ~State() { release_gpu(); }
 
     void destroy_pass_pipelines(PassPipelines &set) noexcept {
-        for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke, &set.stroke_surface, &set.contour,
+        for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke,
                                &set.workplane, &set.caps[0], &set.caps[1], &set.caps[2], &set.indexed_parity}) {
             if (renderer.id && pipeline->id)
                 (void)nkgpu_pipeline_destroy(renderer, *pipeline);
@@ -655,8 +644,8 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_image_destroy(renderer, pick_color);
         if (renderer.id && pick_subelement.id)
             (void)nkgpu_image_destroy(renderer, pick_subelement);
-        if (renderer.id && ao_position.id)
-            (void)nkgpu_image_destroy(renderer, ao_position);
+        if (renderer.id && surface_positions.id)
+            (void)nkgpu_image_destroy(renderer, surface_positions);
         if (renderer.id && pick_depth_value.id)
             (void)nkgpu_image_destroy(renderer, pick_depth_value);
         if (renderer.id && pick_depth.id)
@@ -672,8 +661,8 @@ struct NativeKitGpuExecutor::State {
         if (renderer.id && ao_sampler.id) (void)nkgpu_sampler_destroy(renderer, ao_sampler);
         if (renderer.id && shader.id)
             (void)nkgpu_shader_destroy(renderer, shader);
-        if (renderer.id && ao_position_pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, ao_position_pipeline);
+        if (renderer.id && surface_position_pipeline.id)
+            (void)nkgpu_pipeline_destroy(renderer, surface_position_pipeline);
         if (renderer.id && pick_pipeline.id)
             (void)nkgpu_pipeline_destroy(renderer, pick_pipeline);
         if (renderer.id && pick_shader.id)
@@ -702,7 +691,7 @@ struct NativeKitGpuExecutor::State {
         shader = {};
         ao_sampler = {};
         pick_pipeline = {};
-        ao_position_pipeline = {};
+        surface_position_pipeline = {};
         pick_shader = {};
         postprocess_pipeline = {};
         postprocess_shader = {};
@@ -722,8 +711,8 @@ struct NativeKitGpuExecutor::State {
         pick_color = {};
         pick_subelement = {};
         pick_depth_value = {};
-        ao_position = {};
-        ao_width = ao_height = 0;
+        surface_positions = {};
+        surface_width = surface_height = 0;
         pick_depth = {};
         default_image = {};
         default_sampler = {};
@@ -958,34 +947,27 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
     return true;
 }
 
-template <class StateT> bool ensure_default_material_resources(StateT &state, GpuExecutionStats &stats);
-
-/* Binds the AO prepass for stroke visibility against other parts, or placeholders with the test off. */
+/* Binds this frame's visible-surface buffer, from which strokes and contours take their visibility. */
 template <class StateT>
-nkgpu_result apply_stroke_surfaces(StateT &state, const RenderPlan &plan, bool active) {
+nkgpu_result apply_stroke_surfaces(StateT &state, const RenderPlan &plan) {
     StrokeSurfaceUniformData data;
     data.view_projection = plan.view_projection();
-    active = active && state.stroke_surfaces_active && state.pick_color.id && state.ao_position.id;
     data.viewport = {static_cast<float>(std::max(state.viewport_width, 1u)),
-                     static_cast<float>(std::max(state.viewport_height, 1u)), active ? 1.0f : 0.0f, 1.0e-6f};
+                     static_cast<float>(std::max(state.viewport_height, 1u)), 0.0f, 1.0e-6f};
     nkgpu_result result = NKGPU_OK;
-    if ((result = nkgpu_apply_image(state.renderer, 0, active ? state.pick_color : state.default_image)) != NKGPU_OK ||
-        (result = nkgpu_apply_image(state.renderer, 1, active ? state.ao_position : state.default_image)) != NKGPU_OK ||
+    if ((result = nkgpu_apply_image(state.renderer, 0, state.pick_color)) != NKGPU_OK ||
+        (result = nkgpu_apply_image(state.renderer, 1, state.surface_positions)) != NKGPU_OK ||
         (result = nkgpu_apply_sampler(state.renderer, 0, state.surface_sampler)) != NKGPU_OK)
         return result;
     return nkgpu_apply_uniform_data(state.renderer, 4, reinterpret_cast<const std::uint8_t *>(&data), sizeof(data));
 }
 
 template <class StateT>
-bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples, bool contour = false,
-                            bool surface_tested = false) {
-    auto &set = state.pipelines[pipeline_slot(samples)];
-    auto &pipeline = contour ? set.contour : surface_tested ? set.stroke_surface : set.stroke;
+bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples) {
+    auto &pipeline = state.pipelines[pipeline_slot(samples)].stroke;
     if (pipeline.id)
         return true;
     nkgpu_result result = NKGPU_OK;
-    if (!ensure_default_material_resources(state, stats))
-        return false;
     if (!state.surface_sampler.id &&
         (result = nkgpu_sampler_create(state.renderer, NKGPU_FILTER_NEAREST, NKGPU_FILTER_NEAREST,
                                        NKGPU_WRAP_CLAMP_TO_EDGE, NKGPU_WRAP_CLAMP_TO_EDGE, &state.surface_sampler)) != NKGPU_OK)
@@ -1010,9 +992,8 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
             (result = attribute(4, "transform1")) != NKGPU_OK ||
             (result = attribute(5, "transform2")) != NKGPU_OK ||
             (result = attribute(6, "transform3")) != NKGPU_OK ||
-            (result = attribute(7, "support_position")) != NKGPU_OK ||
-            (result = attribute(8, "stroke_step")) != NKGPU_OK ||
-            (result = attribute(9, "pick_color")) != NKGPU_OK ||
+            (result = attribute(7, "stroke_step")) != NKGPU_OK ||
+            (result = attribute(8, "pick_color")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 4, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(StrokeSurfaceUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 4, 0, "surface_params",
@@ -1028,7 +1009,7 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
             (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(StrokeUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view_params",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 6)) != NKGPU_OK ||
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 1)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(float) * 4)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color_params",
@@ -1068,11 +1049,9 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
                                                 NKGPU_PRIMITIVETYPE_TRIANGLES)) != NKGPU_OK)
         return set_failure(state, stats, result);
 
-    if ((result = nkgpu_pipeline_attribute(pipeline_builder, 7, 0, sizeof(float)*8,
-                                           NKGPU_VERTEXFORMAT_FLOAT3)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_attribute(pipeline_builder, 8, 0, sizeof(float)*11,
+    if ((result = nkgpu_pipeline_attribute(pipeline_builder, 7, 0, offsetof(StrokeVertex, step),
                                            NKGPU_VERTEXFORMAT_FLOAT)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_attribute(pipeline_builder, 9, 1, offsetof(InstanceData, pick_color),
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 8, 1, offsetof(InstanceData, pick_color),
                                            NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK)
         return set_failure(state, stats, result);
     if ((result = nkgpu_pipeline_cull_mode(pipeline_builder, NKGPU_CULLMODE_NONE,
@@ -1081,14 +1060,9 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
 
     nkgpu_depth_state depth{};
     depth.enabled = 1;
-    // With the visible-surface buffer the shader decides each stroke point once, for the whole ribbon width.
-    depth.compare = surface_tested ? NKGPU_COMPAREFUNC_ALWAYS : NKGPU_COMPAREFUNC_LESS_EQUAL;
+    // Lines are decided by the visible-surface buffer in the shader, once per point on the edge for the whole ribbon.
+    depth.compare = NKGPU_COMPAREFUNC_ALWAYS;
     depth.write_enabled = 0;
-    // Only resolve coplanar ties. Slope bias can pull hidden ribbons through
-    // thin foreground surfaces; the shader preserves the centerline slope.
-    // Section contours explicitly win ties against both their own and adjacent
-    // caps. Surface-edge bias/clipping keeps its separate, smaller tie budget.
-    depth.bias = contour ? -4.0f : -1.0f;
     nkgpu_blend_state blend{};
     blend.enabled = 1;
     blend.src_rgb = NKGPU_BLENDFACTOR_ONE;
@@ -1139,32 +1113,35 @@ std::array<float,4> stroke_color_for(const RenderPlan &plan,const MaterialResour
     return std::array<float, 4>{light[0], light[1], light[2], 1.0f};
 }
 
+/* Whether any batch draws strokes. */
+template <class StateT> bool frame_has_strokes(const StateT &state) {
+    return std::any_of(state.batches.begin(), state.batches.end(), [&](const auto &batch) {
+        const auto found = state.geometry_resources.find(batch.key.geometry);
+        return found != state.geometry_resources.end() && found->second.stroke_buffer.id &&
+               found->second.stroke_vertex_count != 0;
+    });
+}
+
+/* Whether the frame draws lines, strokes or section contours, which take their visibility from the visible-surface
+   buffer. */
+template <class StateT> bool frame_has_lines(const StateT &state, const RenderPlan &plan) {
+    return frame_has_strokes(state) || !plan.clip_planes().empty();
+}
+
 template <class StateT>
 bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
                          std::uint32_t samples, GpuExecutionStats &stats) {
-    const auto has_strokes = std::any_of(state.batches.begin(), state.batches.end(),
-        [&](const auto &batch) {
-            const auto found = state.geometry_resources.find(batch.key.geometry);
-            return found != state.geometry_resources.end() && found->second.stroke_buffer.id &&
-                   found->second.stroke_vertex_count != 0;
-        });
-    if (!has_strokes)
+    if (!frame_has_strokes(state))
         return true;
-    const bool surface_tested = state.stroke_surfaces_active;
-    if (!ensure_stroke_pipeline(state, stats, samples, false, surface_tested))
+    // Strokes have no depth test; without this frame's visible-surface buffer they would show hidden edges.
+    if (!state.surface_buffer_ready)
+        return set_failure(state, stats, NKGPU_ERROR_WRONG_STATE);
+    if (!ensure_stroke_pipeline(state, stats, samples))
         return false;
-    const auto &stroke_pipeline = surface_tested ? state.pipelines[pipeline_slot(samples)].stroke_surface
-                                                 : state.pipelines[pipeline_slot(samples)].stroke;
+    const auto &stroke_pipeline = state.pipelines[pipeline_slot(samples)].stroke;
     const auto width = std::max(state.viewport_width, 1u);
     const auto height = std::max(state.viewport_height, 1u);
-    StrokeUniformData viewport{{static_cast<float>(width), static_cast<float>(height),
-                                 0.85f, 0.0f}};
-    if (!plan.clip_planes().empty()) {
-        std::array<float, 16> inverse{};
-        if (invert_matrix(plan.view_projection(), inverse))
-            for (unsigned row = 0; row < 4; ++row)
-                viewport.depth_unprojection[row] = inverse[8 + row];
-    }
+    const StrokeUniformData viewport{{static_cast<float>(width), static_cast<float>(height), 0.85f, 0.0f}};
     const auto clip_data = clip_uniform_data(plan);
     bool globals_bound = false;
     for (const auto &batch : state.batches) {
@@ -1176,8 +1153,6 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         const auto *material = snapshot.find_material(batch.key.material);
         if (material && material_is_invisible(*material->state))
             continue;
-        viewport.viewport_width_height_half_width[3] = material &&
-            has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 2.0f : 0.0f;
         const auto color = stroke_color_for(plan,material);
         nkgpu_result result = NKGPU_OK;
         if (!globals_bound) {
@@ -1194,7 +1169,7 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
             result = nkgpu_apply_uniform_data(state.renderer, 3,
                 reinterpret_cast<const std::uint8_t *>(&viewport), sizeof(viewport));
         if (result == NKGPU_OK)
-            result = apply_stroke_surfaces(state, plan, true);
+            result = apply_stroke_surfaces(state, plan);
         if (result == NKGPU_OK)
             result = nkgpu_apply_uniform_data(state.renderer, 0,
                 reinterpret_cast<const std::uint8_t *>(color.data()), sizeof(color));
@@ -1233,8 +1208,7 @@ bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot, std:
             if (!geometry->second.indexed && !geometry->second.lods.empty() &&
                 !ensure_pipeline(state, stats, true, blended, samples)) return false;
         }
-        if (geometry->second.stroke_vertex_count && (!ensure_stroke_pipeline(state, stats, samples) ||
-                                                     !ensure_stroke_pipeline(state, stats, samples, false, true)))
+        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(state, stats, samples))
             return false;
     }
     return true;
@@ -1345,7 +1319,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
             (result = nkgpu_apply_image(state.renderer, 4, material_gpu->second.images[4])) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_image(state.renderer, 5, lighting_data.ao_params[1] > 0.0f
-                ? state.ao_position : material_gpu->second.images[3])) != NKGPU_OK ||
+                ? state.surface_positions : material_gpu->second.images[3])) != NKGPU_OK ||
             (result = nkgpu_apply_sampler(state.renderer, 1, state.ao_sampler)) != NKGPU_OK ||
             (result = nkgpu_apply_sampler(state.renderer, 0, material_gpu->second.sampler)) !=
                 NKGPU_OK ||
@@ -1410,8 +1384,9 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
 }
 
 template <class StateT>
-bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position_output = false, int cap_mode = 0) {
-    auto &pipeline = cap_mode ? state.pick_caps[position_output?1:0][cap_mode-1] : position_output ? state.ao_position_pipeline : state.pick_pipeline;
+bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool visible_surfaces = false, int cap_mode = 0) {
+    auto &pipeline = cap_mode ? state.pick_caps[visible_surfaces?1:0][cap_mode-1] : visible_surfaces ? state.surface_position_pipeline : state.pick_pipeline;
+    const bool stencil_only = cap_mode == 1 || cap_mode == 2;
     if (pipeline.id)
         return true;
 
@@ -1480,15 +1455,18 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool position
             NKGPU_OK ||
         (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
         (result = nkgpu_pipeline_cull_mode(pipeline_builder, NKGPU_CULLMODE_NONE, NKGPU_FACEWINDING_CCW)) != NKGPU_OK ||
+        // Stencil clear and parity steps of a cap write no colour to any target: the part id, subelement and
+        // position must keep the cap or surface already drawn there.
         (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
-                                              NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
+                                              stencil_only ? NKGPU_COLORMASK_NONE : NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 1, NKGPU_IMAGEFORMAT_RGBA8,
-                                              NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
+                                              stencil_only ? NKGPU_COLORMASK_NONE : NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 2,
-                                              position_output ? NKGPU_IMAGEFORMAT_RGBA32F : NKGPU_IMAGEFORMAT_R32F,
-                                              position_output ? NKGPU_COLORMASK_RGBA : NKGPU_COLORMASK_R, nullptr)) != NKGPU_OK ||
+                                              visible_surfaces ? NKGPU_IMAGEFORMAT_RGBA32F : NKGPU_IMAGEFORMAT_R32F,
+                                              stencil_only ? NKGPU_COLORMASK_NONE
+                                                           : visible_surfaces ? NKGPU_COLORMASK_RGBA : NKGPU_COLORMASK_R,
+                                              nullptr)) != NKGPU_OK ||
         (cap_mode && (result=cap_pipeline_state(pipeline_builder,cap_mode))!=NKGPU_OK) ||
-        (cap_mode && cap_mode!=3 && (result=nkgpu_pipeline_color_write_mask(pipeline_builder,NKGPU_COLORMASK_NONE))!=NKGPU_OK) ||
         (result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
@@ -1576,11 +1554,11 @@ bool ensure_pick_targets(StateT &state, std::uint32_t width, std::uint32_t heigh
 // AO owns a sampled position target only when enabled. The picking depth/readback
 // contract remains unchanged, and the same mesh/clip pass supplies both outputs.
 template <class StateT>
-bool ensure_ao_position_target(StateT &state, std::uint32_t width, std::uint32_t height,
+bool ensure_surface_position_target(StateT &state, std::uint32_t width, std::uint32_t height,
                                GpuExecutionStats &stats) {
-    if (state.ao_position.id && state.ao_width == width && state.ao_height == height) return true;
-    if (state.ao_position.id) (void)nkgpu_image_destroy(state.renderer, state.ao_position);
-    state.ao_position = {};
+    if (state.surface_positions.id && state.surface_width == width && state.surface_height == height) return true;
+    if (state.surface_positions.id) (void)nkgpu_image_destroy(state.renderer, state.surface_positions);
+    state.surface_positions = {};
     nkgpu_image_desc position{};
     position.struct_size = sizeof(position);
     position.width = width;
@@ -1588,10 +1566,10 @@ bool ensure_ao_position_target(StateT &state, std::uint32_t width, std::uint32_t
     position.format = NKGPU_IMAGEFORMAT_RGBA32F;
     position.usage = NKGPU_IMAGE_RENDER_TARGET | NKGPU_IMAGE_SAMPLED;
     position.mip_count = position.sample_count = position.layer_count = 1;
-    const auto result = nkgpu_image_create_desc(state.renderer, &position, &state.ao_position);
+    const auto result = nkgpu_image_create_desc(state.renderer, &position, &state.surface_positions);
     if (result != NKGPU_OK) return set_failure(state, stats, result);
-    state.ao_width = width;
-    state.ao_height = height;
+    state.surface_width = width;
+    state.surface_height = height;
     return true;
 }
 
@@ -1958,29 +1936,18 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         pick_vertex_count / 3 > 0x00ffffffu)
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
     if (resource.payload->stroke_segments.size() >
-        std::numeric_limits<std::uint32_t>::max() / (max_stroke_vertices * sizeof(StrokeVertex)))
+        std::numeric_limits<std::uint32_t>::max() / (stroke_corners.size() * sizeof(StrokeVertex)))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
     const bool revision_changed = inserted || cached.revision != resource.revision;
     if (!revision_changed)
         return true;
     for (const auto &lod : cached.lods) (void)nkgpu_buffer_destroy(state.renderer, lod.buffer);
     cached.lods.clear();
-    const auto supports = render_internal::stroke_supports(*resource.payload);
     std::vector<StrokeVertex> stroke_vertices;
-    stroke_vertices.reserve(resource.payload->stroke_segments.size() * max_stroke_vertices);
-    for (std::size_t index=0; index<resource.payload->stroke_segments.size(); ++index) {
-        const auto &segment=resource.payload->stroke_segments[index];
+    stroke_vertices.reserve(resource.payload->stroke_segments.size() * stroke_corners.size());
+    for (const auto &segment : resource.payload->stroke_segments)
         for (const auto &corner : stroke_corners)
-            stroke_vertices.push_back({segment.start, segment.end, corner, {}, segment.step});
-        // Use the incident triangle's original vertices for identical per-sample
-        // rasterized depth. Merely projecting a ribbon onto its analytic plane
-        // still fights rasterizer subpixel snapping on sloping surfaces.
-        for (const auto &support : supports[index]) {
-            for (int corner : {support.reversed ? 1 : 0, support.reversed ? 0 : 1, 2})
-                stroke_vertices.push_back({segment.start, segment.end,
-                    {static_cast<float>(corner), 2.0f}, support.third, segment.step});
-        }
-    }
+            stroke_vertices.push_back({segment.start, segment.end, corner, segment.step});
     const auto stroke_byte_size = stroke_vertices.size() * sizeof(StrokeVertex);
 
     if (cached.buffer.id) {
@@ -2733,21 +2700,23 @@ bool prepare_resources(StateT &state, const RenderPlan &plan, const SceneSnapsho
 /*
  * Renders every batch's pick geometry into the pick targets (ids, subelements
  * and depth) and submits the frame, leaving the targets ready to read back.
- * The opaque AO variant writes surface positions instead of device depth.
+ * The visible-surface variant (opaque surfaces and section caps) writes world
+ * positions instead of device depth: the buffer ambient occlusion and line
+ * visibility read.
  * On failure the frame is closed, state.last_result holds the result, and it
  * is returned.
  */
 template <class StateT>
 nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
                               std::uint32_t width, std::uint32_t height, GpuExecutionStats &stats,
-                              bool for_ao = false) {
+                              bool visible_surfaces = false) {
     if (!ensure_pick_targets(state, width, height, stats))
         return state.last_result;
-    if (for_ao && !ensure_ao_position_target(state, width, height, stats))
+    if (visible_surfaces && !ensure_surface_position_target(state, width, height, stats))
         return state.last_result;
     for (const auto &batch : state.batches) {
         const auto *material = snapshot.find_material(batch.key.material);
-        if (for_ao && material && (material_is_invisible(*material->state) ||
+        if (visible_surfaces && material && (material_is_invisible(*material->state) ||
             material_is_blended(*material->state) || material->state->alpha_mode == AlphaMode::Mask)) continue;
         const auto *resource = snapshot.find_geometry(batch.key.geometry);
         if (resource && state.geometry_resources.contains(resource->id) &&
@@ -2756,11 +2725,11 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         if (geometry == state.geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
         const auto element_count = geometry->second.pick_vertex_count;
-        if (element_count && !ensure_pick_pipeline(state, stats, for_ao))
+        if (element_count && !ensure_pick_pipeline(state, stats, visible_surfaces))
             return state.last_result;
     }
 
-    if(!prepare_caps(state,plan,snapshot,width,height,1,true,for_ao,stats))return state.last_result;
+    if(!prepare_caps(state,plan,snapshot,width,height,1,true,visible_surfaces,stats))return state.last_result;
     auto result = nkgpu_frame_begin(state.renderer);
     if (result != NKGPU_OK) {
         state.last_result = result;
@@ -2787,10 +2756,10 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
     pass.colors[1].action.load_action = NKGPU_LOADACTION_CLEAR;
     pass.colors[1].action.store_action = NKGPU_STOREACTION_STORE;
     pass.colors[1].action.clear_color = {0.0f, 0.0f, 0.0f, 0.0f};
-    pass.colors[2].image = for_ao ? state.ao_position : state.pick_depth_value;
+    pass.colors[2].image = visible_surfaces ? state.surface_positions : state.pick_depth_value;
     pass.colors[2].action.load_action = NKGPU_LOADACTION_CLEAR;
     pass.colors[2].action.store_action = NKGPU_STOREACTION_STORE;
-    pass.colors[2].action.clear_color = {for_ao ? 0.0f : 1.0f, 0.0f, 0.0f, 0.0f};
+    pass.colors[2].action.clear_color = {visible_surfaces ? 0.0f : 1.0f, 0.0f, 0.0f, 0.0f};
     pass.depth_stencil = state.pick_depth;
     pass.depth_stencil_action.load_action = NKGPU_LOADACTION_CLEAR;
     pass.depth_stencil_action.store_action = NKGPU_STOREACTION_STORE;
@@ -2809,9 +2778,9 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
     bool globals_bound = false;
     for (const auto &batch : state.batches) {
         const auto *material = snapshot.find_material(batch.key.material);
-        const std::array<float, 4> pick_output{for_ao ? 1.0f : 0.0f,
+        const std::array<float, 4> pick_output{visible_surfaces ? 1.0f : 0.0f,
             material && has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 1.0f : 0.0f, 0, 0};
-        if (for_ao && material && (material_is_invisible(*material->state) ||
+        if (visible_surfaces && material && (material_is_invisible(*material->state) ||
             material_is_blended(*material->state) || material->state->alpha_mode == AlphaMode::Mask)) continue;
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
         if (geometry == state.geometry_resources.end() || !geometry->second.pick_buffer.id)
@@ -2820,7 +2789,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         if (!element_count)
             continue;
         if (!globals_bound) {
-            if ((result = nkgpu_apply_pipeline(state.renderer, for_ao ? state.ao_position_pipeline : state.pick_pipeline)) != NKGPU_OK ||
+            if ((result = nkgpu_apply_pipeline(state.renderer, visible_surfaces ? state.surface_position_pipeline : state.pick_pipeline)) != NKGPU_OK ||
                 (result = nkgpu_apply_uniform_data(state.renderer, 1,
                     reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()), sizeof(float) * 16)) != NKGPU_OK ||
                 (result = nkgpu_apply_uniform_data(state.renderer, 2,
@@ -2838,7 +2807,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
             return fail_frame(result);
         if (state.capture_profiler) state.capture_profiler->triangles(element_count, batch.instances.size());
     }
-    if((result=draw_caps(state,plan,snapshot,LightingUniformData{},1,true,for_ao,stats))!=NKGPU_OK)return fail_frame(result);
+    if((result=draw_caps(state,plan,snapshot,LightingUniformData{},1,true,visible_surfaces,stats))!=NKGPU_OK)return fail_frame(result);
     if(state.capture_profiler)state.capture_profiler->pass("aoResolve");
     if ((result = nkgpu_end_pass(state.renderer)) != NKGPU_OK) {
         pass_active = false;
@@ -3180,8 +3149,7 @@ bool NativeKitGpuExecutor::synchronize(const RenderPlan &plan, const SceneSnapsh
 GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
                                                 const SceneSnapshot &snapshot) {
     GpuExecutionStats stats;
-    // This path has no AO prepass, so strokes are decided by the depth test alone.
-    state_->stroke_surfaces_active = false;
+    state_->surface_buffer_ready = false;
     if (!synchronize(plan, snapshot, stats))
         return stats;
 
@@ -3191,6 +3159,15 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
     }
     if (!ensure_surface_pipelines(*state_, snapshot, 1, stats))
         return stats;
+    // Strokes and contours take their visibility from the visible-surface prepass.
+    if (frame_has_lines(*state_, plan)) {
+        if (render_pick_pass(*state_, plan, snapshot, std::max(state_->viewport_width, 1u),
+                             std::max(state_->viewport_height, 1u), stats, true) != NKGPU_OK) {
+            stats.result = state_->last_result;
+            return stats;
+        }
+        state_->surface_buffer_ready = true;
+    }
 
     if(!prepare_caps(*state_,plan,snapshot,state_->viewport_width,state_->viewport_height,1,false,false,stats) ||
        !prepare_contours(*state_,plan,snapshot,1,stats))return stats;
@@ -3278,10 +3255,12 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
 
     const auto &detail = plan.studio_lighting().surface_detail;
     const bool use_ao = plan.studio_lighting().enabled && detail[0] > 0.0f && detail[1] > 0.0f;
-    if (use_ao && render_pick_pass(*state_, plan, snapshot, width, height, stats, true) != NKGPU_OK)
+    // The visible-surface prepass holds each pixel's part and position: ambient occlusion samples it, and strokes
+    // take their visibility from it.
+    const bool surfaces = use_ao || frame_has_lines(*state_, plan);
+    if (surfaces && render_pick_pass(*state_, plan, snapshot, width, height, stats, true) != NKGPU_OK)
         return state_->last_result;
-    // The AO prepass holds each pixel's visible part and position, which strokes test against.
-    state_->stroke_surfaces_active = use_ao;
+    state_->surface_buffer_ready = surfaces;
     if(!prepare_caps(*state_,plan,snapshot,width,height,samples,false,false,stats) ||
        !prepare_contours(*state_,plan,snapshot,samples,stats))return state_->last_result;
     if (profiler) profiler->prepared(timing);

@@ -2,7 +2,7 @@
 // Stencil parity is private render state: no mesh or presentation is modified.
 template<class StateT>
 bool prepare_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot &snapshot,
-                  unsigned width,unsigned height,unsigned samples,bool picking,bool for_ao,GpuExecutionStats &stats) {
+                  unsigned width,unsigned height,unsigned samples,bool picking,bool visible_surfaces,GpuExecutionStats &stats) {
     state.caps.clear();
     if(state.cap_instances.id){(void)nkgpu_buffer_destroy(state.renderer,state.cap_instances);state.cap_instances={};}
     if(plan.clip_planes().empty())return true;
@@ -72,7 +72,7 @@ bool prepare_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot &snap
     }
     if(auto r=upload(records,state.cap_instances);r!=NKGPU_OK)return set_failure(state,stats,r);
     for(int mode=1;mode<=3;++mode) {
-        if(picking){if(!ensure_pick_pipeline(state,stats,for_ao,mode))return false;}
+        if(picking){if(!ensure_pick_pipeline(state,stats,visible_surfaces,mode))return false;}
         else if(!ensure_pipeline(state,stats,false,false,samples,mode))return false;
     }
     if(!picking)for(const auto &cap:state.caps) {
@@ -84,7 +84,7 @@ bool prepare_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot &snap
 
 template<class StateT>
 nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot &snapshot,
-                       const LightingUniformData &lighting,unsigned samples,bool picking,bool for_ao,GpuExecutionStats &stats) {
+                       const LightingUniformData &lighting,unsigned samples,bool picking,bool visible_surfaces,GpuExecutionStats &stats) {
     const std::array<float,16> identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
     const auto &set=state.pipelines[pipeline_slot(samples)];
     std::size_t cap_index=0;
@@ -95,11 +95,11 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
         auto result=nkgpu_apply_scissor(state.renderer,1,cap.scissor[0],cap.scissor[1],cap.scissor[2],cap.scissor[3]);if(result!=NKGPU_OK)return result;
         for(int mode=1;mode<=3;++mode) {
             bool parity=mode==2,clear=mode==1;ClipUniformData clips{};
-            if(state.capture_profiler)state.capture_profiler->pass(for_ao ?
+            if(state.capture_profiler)state.capture_profiler->pass(visible_surfaces ?
                 (clear?"aoStencilClear":parity?"aoParity":"aoCapQuads") :
                 (clear?"stencilClear":parity?"parity":"capQuads"));
             for(std::size_t p=0;p<plan.clip_planes().size();++p)if((parity&&p==cap.plane)||(!clear&&!parity&&p!=cap.plane))clips.planes[static_cast<int>(clips.count[0]++)]=plan.clip_planes()[p];
-            auto pipeline=picking?state.pick_caps[for_ao?1:0][mode-1]:parity&&gpu.indexed?set.indexed_parity:set.caps[mode-1];
+            auto pipeline=picking?state.pick_caps[visible_surfaces?1:0][mode-1]:parity&&gpu.indexed?set.indexed_parity:set.caps[mode-1];
             if((result=nkgpu_apply_pipeline(state.renderer,pipeline))!=NKGPU_OK)return result;
             const auto &vp=clear?identity:plan.view_projection();
             if((result=nkgpu_apply_uniform_data(state.renderer,1,reinterpret_cast<const std::uint8_t *>(vp.data()),sizeof(vp)))!=NKGPU_OK)return result;
@@ -111,7 +111,7 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
             if((result=nkgpu_apply_vertex_buffer(state.renderer,1,instances,static_cast<unsigned>(offset*instance_stride)))!=NKGPU_OK)return result;
             if((result=nkgpu_apply_uniform_data(state.renderer,2,reinterpret_cast<const std::uint8_t *>(&clips),sizeof(clips)))!=NKGPU_OK)return result;
             if(picking) {
-                std::array<float,4> output{for_ao?1.f:0.f,1.f,mode==3?2.f:1.f,static_cast<float>(cap.plane)};
+                std::array<float,4> output{visible_surfaces?1.f:0.f,1.f,mode==3?2.f:1.f,static_cast<float>(cap.plane)};
                 if((result=nkgpu_apply_uniform_data(state.renderer,0,reinterpret_cast<const std::uint8_t *>(output.data()),sizeof(output)))!=NKGPU_OK)return result;
             } else {
                 MaterialUniformData data{};data.base_color=material->state->base_color;data.base_color[3]=1;
@@ -119,7 +119,7 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
                 if((result=nkgpu_apply_uniform_data(state.renderer,0,reinterpret_cast<const std::uint8_t *>(&data),sizeof(data)))!=NKGPU_OK)return result;
                 if((result=nkgpu_apply_uniform_data(state.renderer,3,reinterpret_cast<const std::uint8_t *>(&lighting),sizeof(lighting)))!=NKGPU_OK)return result;
                 for(unsigned i=0;i<5;++i)if((result=nkgpu_apply_image(state.renderer,i,textures.images[i]))!=NKGPU_OK)return result;
-                if((result=nkgpu_apply_image(state.renderer,5,lighting.ao_params[1]>0?state.ao_position:textures.images[3]))!=NKGPU_OK)return result;
+                if((result=nkgpu_apply_image(state.renderer,5,lighting.ao_params[1]>0?state.surface_positions:textures.images[3]))!=NKGPU_OK)return result;
                 if((result=nkgpu_apply_sampler(state.renderer,0,textures.sampler))!=NKGPU_OK)return result;
                 if((result=nkgpu_apply_sampler(state.renderer,1,state.ao_sampler))!=NKGPU_OK)return result;
             }
@@ -130,6 +130,6 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
         }
         ++cap_index;
     }
-    if(state.capture_profiler)state.capture_profiler->pass(for_ao?"aoSurfaces":"surfaces");
+    if(state.capture_profiler)state.capture_profiler->pass(visible_surfaces?"aoSurfaces":"surfaces");
     return nkgpu_apply_scissor(state.renderer,0,0,0,0,0);
 }

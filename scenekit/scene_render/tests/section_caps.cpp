@@ -205,6 +205,14 @@ void touching_facets_do_not_stroke_caps(nkgpu_renderer renderer) {
         std::printf("TouchingFacetsCapStrokeTie perspective=%d samples=%u changed channels=%d\n",perspective,samples,changed);std::fflush(stdout);
         for(size_t i=0;i<plain.size();i+=4)if(!std::equal(plain.begin()+i,plain.begin()+i+4,edged.begin()+i))
             std::printf("changed (%zu,%zu) plain=%d,%d,%d,%d edged=%d,%d,%d,%d\n",i/4%192,i/4/192,plain[i],plain[i+1],plain[i+2],plain[i+3],edged[i],edged[i+1],edged[i+2],edged[i+3]);
+        // Picking (and the visible-surface buffer) sees each cut part's cap. The insert's cap steps once overwrote
+        // the box cap's subelement and position: a "write nothing" colour mask wrote every channel of the extra targets.
+        std::vector<std::uint32_t> ids,subelements;
+        assert(gpu.capture_pick_ids(plan,f.scene->snapshot(),192,192,ids,&subelements)==NKGPU_OK);
+        constexpr std::uint32_t cap_tag=0x80000000u;
+        for(int x:{30,40,45,50,60,150})
+            assert(ids[57*192+x]==1&&(subelements[57*192+x]&cap_tag)&&"the box's cap beside the insert");
+        assert(ids[57*192+96]==2&&(subelements[57*192+96]&cap_tag)&&"the insert's cap");
         std::fflush(stdout);assert(plain==edged);
     }
     // Outside caps, an ordinary coplanar surface edge must retain its tie-break.

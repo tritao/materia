@@ -5,21 +5,19 @@ uniform vec4 stroke_color;
 in vec3 line_coordinate_homogeneous;
 in float line_length;
 in float line_half_width;
-in vec3 world_position;
-in vec3 world_depth_bias;
-flat in float support_sidedness;
+centroid in vec3 world_position;
 in float step_coverage;
 flat in float stroke_instance;
 uniform vec4 clip_planes[32];
 uniform vec4 clip_plane_count;
 out vec4 fragment_color;
 
-// Visibility against other parts, from the studio AO prepass's visible-surface buffer (app/plans/STROKE_VISIBILITY.md):
-// the part id and world position of the surface each pixel shows.
+// Visibility from the visible-surface buffer (app/plans/STROKE_VISIBILITY.md): the part id and world position of the
+// surface each pixel shows.
 uniform sampler2D pick_ids_texture;
 uniform sampler2D surface_position_texture;
 uniform mat4 surface_view_projection;
-// xy: buffer size in pixels; z: 1 when the buffer holds this frame's surfaces; w: tolerance in world units.
+// xy: buffer size in pixels; w: tolerance in world units.
 uniform vec4 surface_viewport;
 
 vec4 surface_at(ivec2 p) {
@@ -61,27 +59,16 @@ float depth_slope(ivec2 p, float depth, float part) {
     return slope;
 }
 
-// Whether the visible surface at this stroke point's pixel hides the point. Every fragment of the ribbon asks about
-// the same point on the edge, so a line is drawn whole or not at all.
-// - background: visible;
-// - the stroke's own part: the point lies on that surface up to the pixel centre's offset (under a pixel), so it is
-//   hidden when it lies deeper than the surface's depth change over one pixel: a part's back edges, the inner edges
-//   of its holes, however grazing the view;
-// - another part: comparing depths would need that same tolerance, larger than a thin wall over a hidden edge, so the
-//   part's tangent plane is carried to the exact point; hidden beyond 2 % of a pixel footprint behind it.
-bool hidden_by_surface(vec3 point) {
-    vec4 clip = surface_view_projection * vec4(point, 1.0);
-    if (clip.w <= 0.0) return false;
-    ivec2 p = ivec2(floor((clip.xy / clip.w * 0.5 + 0.5) * surface_viewport.xy));
-    if (p.x < 1 || p.y < 1 || p.x >= int(surface_viewport.x) - 1 || p.y >= int(surface_viewport.y) - 1) return false;
-    vec4 shown = surface_at(p);
+// Whether another part's surface shown at pixel q, carried to the exact point along its tangent plane, lies in front
+// of the point by more than float noise (0.5 % of a pixel footprint; a thin wall over a hidden edge is a quarter of a
+// pixel or more). Comparing depths would need a tolerance of a pixel's worth of slope, larger than such a wall.
+bool hidden_by_other_part(ivec2 q, vec3 point) {
+    if (q.x < 1 || q.y < 1 || q.x >= int(surface_viewport.x) - 1 || q.y >= int(surface_viewport.y) - 1) return false;
+    vec4 shown = surface_at(q);
     if (shown.w < 0.5) return false;
-    float part = part_at(p);
-    if (part == stroke_instance) {
-        float surface_depth = depth_of(shown.xyz);
-        return clip.z / clip.w > surface_depth + depth_slope(p, surface_depth, part) + 1.0e-6;
-    }
-    vec3 n = cross(surface_step(p, ivec2(1, 0), shown.xyz, part), surface_step(p, ivec2(0, 1), shown.xyz, part));
+    float part = part_at(q);
+    if (part == stroke_instance) return false;
+    vec3 n = cross(surface_step(q, ivec2(1, 0), shown.xyz, part), surface_step(q, ivec2(0, 1), shown.xyz, part));
     float area = length(n);
     if (area <= 0.0) return false;
     n /= area;
@@ -90,27 +77,56 @@ bool hidden_by_surface(vec3 point) {
     vec4 c0 = surface_view_projection * vec4(shown.xyz, 1.0);
     vec4 c1 = surface_view_projection * vec4(shown.xyz + n * footprint, 1.0);
     if (c1.z * c0.w > c0.z * c1.w) n = -n;
-    return dot(n, point - shown.xyz) < -(surface_viewport.w + 0.02 * footprint);
+    return dot(n, point - shown.xyz) < -(surface_viewport.w + 0.005 * footprint);
+}
+
+// Whether the visible surfaces hide this stroke point. Every fragment of the ribbon asks about the same point on the
+// edge, so a line is drawn whole or not at all.
+// - the stroke's own part, at the point's pixel: the point lies on that surface up to the pixel centre's offset (under
+//   a pixel), so it is hidden when it lies deeper than the surface's depth change over one pixel: a part's back edges,
+//   the inner edges of its holes, however grazing the view;
+// - other parts, at the four pixel centres around the point: two surfaces can cross inside one pixel (a sheet just in
+//   front of the seam where two parts meet), so any of them in front of the point hides it. A part the edge touches
+//   passes through the point and leaves it visible. Near another part's silhouette a line may end up to a pixel early.
+// - background: visible.
+bool hidden_by_surface(vec3 point) {
+    vec4 clip = surface_view_projection * vec4(point, 1.0);
+    if (clip.w <= 0.0) return false;
+    vec2 position = (clip.xy / clip.w * 0.5 + 0.5) * surface_viewport.xy;
+    ivec2 p = ivec2(floor(position));
+    if (p.x >= 1 && p.y >= 1 && p.x < int(surface_viewport.x) - 1 && p.y < int(surface_viewport.y) - 1) {
+        vec4 shown = surface_at(p);
+        if (shown.w > 0.5 && part_at(p) == stroke_instance) {
+            float surface_depth = depth_of(shown.xyz);
+            if (clip.z / clip.w > surface_depth + depth_slope(p, surface_depth, stroke_instance) + 1.0e-6) return true;
+        }
+    }
+    ivec2 base = ivec2(floor(position - 0.5));
+    for (int y = 0; y < 2; ++y) for (int x = 0; x < 2; ++x)
+        if (hidden_by_other_part(base + ivec2(x, y), point)) return true;
+    return false;
 }
 
 void main() {
-    if (surface_viewport.z > 0.5) {
-        // Support strips only win depth ties for the depth test; the ribbon alone covers the line here.
-        if (support_sidedness != 0.0 || hidden_by_surface(world_position)) discard;
-    } else if (abs(support_sidedness) == 1.0 && gl_FrontFacing != (support_sidedness > 0.0)) discard;
+    if (hidden_by_surface(world_position)) discard;
     vec2 line_coordinate = line_coordinate_homogeneous.xy / line_coordinate_homogeneous.z;
     vec2 nearest = vec2(clamp(line_coordinate.x, 0.0, line_length), 0.0);
     float signed_distance = length(line_coordinate - nearest) - line_half_width;
     float coverage = clamp(0.5 - signed_distance / max(fwidth(signed_distance), 1e-4), 0.0, 1.0);
+    // A pixel's world size at this point: 2 w / (P00 * width), P00 the view-projection's horizontal scale.
+    vec4 point_clip = surface_view_projection * vec4(world_position, 1.0);
+    float horizontal = length(vec3(surface_view_projection[0][0], surface_view_projection[1][0], surface_view_projection[2][0]));
+    float pixel_size = 2.0 * abs(point_clip.w) / max(horizontal * surface_viewport.x, 1e-12);
     for (int index = 0; index < 32; ++index) {
         if (index >= int(clip_plane_count.x)) break;
         float distance_to_plane = dot(clip_planes[index].xyz, world_position) + clip_planes[index].w;
-        // Expanded ribbons carry centerline depth/position. Near a cut their
-        // lateral coverage can lie over a neighbour's cap even before depth bias.
-        // Cut back by the ribbon + AA footprint in screen pixels, in plane units.
-        // This removes clipped surface-edge remnants, not a synthetic cap outline.
-        float footprint = (line_half_width + 1.0) * fwidth(distance_to_plane)
-                        + abs(dot(clip_planes[index].xyz, world_depth_bias));
+        // Expanded ribbons carry centerline position. Near a cut their lateral
+        // coverage can lie over a neighbour's cap. Cut back by the ribbon + AA
+        // footprint in screen pixels, in plane units, plus a hundredth of a
+        // pixel's world size for edges parallel to the cut (whose plane distance
+        // has no screen derivative). This removes clipped surface-edge remnants,
+        // not a synthetic cap outline.
+        float footprint = (line_half_width + 1.0) * fwidth(distance_to_plane) + 0.01 * pixel_size;
         if (clip_plane_count.y > 0.5) {
             // Contours omit their source plane and clip exactly to the others.
             if (distance_to_plane < 0.0) discard;

@@ -3,7 +3,6 @@
 #include "nativekit_window.h"
 
 #include "scene_internal.hpp"
-#include "stroke_support.hpp"
 
 #include <array>
 #include <cassert>
@@ -562,15 +561,6 @@ void contact_edge_regression(nkgpu_renderer renderer) {
     create.add_geometry(wall_node,wall);create.add_geometry(bed_node,bed);
     create.add_material(wall_node,material);create.add_material(bed_node,material);
     ChangeSet changes;assert(scene->commit(create,changes)==NKS_OK);create.close();
-    mesh.edit_payload().stroke_segments = {{a,b,1}};
-    auto incident = nkscene::render_internal::stroke_supports(*mesh.payload);
-    assert(incident.size()==1 && incident[0].count==1 && !incident[0].triangles[0].reversed);
-    mesh.edit_payload().stroke_segments = {{b,a,1}};
-    incident = nkscene::render_internal::stroke_supports(*mesh.payload);
-    assert(incident[0].count==1 && incident[0].triangles[0].reversed);
-    mesh.edit_payload().stroke_segments = {{{-0.5f,0,0},{0.5f,0,0},1}};
-    assert(nkscene::render_internal::stroke_supports(*mesh.payload)[0].count==0);
-    mesh.edit_payload().stroke_segments.clear();
     nkscene::NativeKitGpuExecutor executor(renderer);
     nkscene::SceneView view;
     auto capture = [&] {
@@ -641,10 +631,10 @@ void contact_edge_regression(nkgpu_renderer renderer) {
 
 }
 
-// Stroke visibility against other parts (app/plans/STROKE_VISIBILITY.md) at the editor's projection (0.63 m, 50 degrees,
-// about 1 mm per pixel), with the studio AO prepass as the visible-surface buffer. An edge 0.2 mm under another part's
-// oblique wall stays hidden, which the depth test alone does not manage; a block's contact edges on a plate and its
-// own outline stay drawn, and its own back edges stay hidden.
+// Stroke visibility from the visible-surface buffer (app/plans/STROKE_VISIBILITY.md) at the editor's projection
+// (0.63 m, 50 degrees, about 1 mm per pixel). An edge 0.2 mm under another part's oblique wall stays hidden, which the
+// depth test alone did not manage; a block's contact edges on a plate and its own outline stay drawn, and its own back
+// edges stay hidden.
 void stroke_visibility_regression(nkgpu_renderer renderer) {
     using Point = std::array<float,3>;
     const int width=1167, height=828;
@@ -715,9 +705,10 @@ void stroke_visibility_regression(nkgpu_renderer renderer) {
             // edit_payload() marks the geometry changed; each edit goes through it.
             auto set_segments=[&](std::vector<nkscene::GeometryPayload::StrokeSegment> next){
                 scene->geometry_store().find(collar)->edit_payload().stroke_segments=std::move(next);};
-            int leaked_without_prepass=0;
-            for(const bool prepass:{false,true}){
-                view.studio_lighting.surface_detail=prepass?with_prepass:std::array<float,4>{};
+            // With studio ambient occlusion and without: either way strokes are decided by the visible-surface
+            // buffer (the depth test alone leaked 91 / 132 pixels here at 1x / 4x).
+            for(const bool ambient_occlusion:{false,true}){
+                view.studio_lighting.surface_detail=ambient_occlusion?with_prepass:std::array<float,4>{};
                 nkscene::NativeKitGpuExecutor executor(renderer);
                 set_segments({{{-0.04f,0,-wall},{0.04f,0,-wall},1}});
                 const auto edged=capture(executor,scene);
@@ -728,12 +719,8 @@ void stroke_visibility_regression(nkgpu_renderer renderer) {
                 for(std::size_t i=0;i<edged.size();i+=4){
                     leaked+=int(plain[i])-int(edged[i])>8;
                 }
-                if(!prepass)leaked_without_prepass=leaked;
-                else assert(leaked==0&&"an edge under another part's thin wall stays hidden");
+                assert(leaked==0&&"an edge under another part's thin wall stays hidden");
             }
-            std::printf("stroke visibility (%u samples): the depth test alone leaks %d pixels, with the buffer 0\n",
-                samples,leaked_without_prepass);
-            assert(leaked_without_prepass>0&&"the depth test alone leaks this edge (the case the buffer fixes)");
         }
         {   // A block standing on a plate: its contact edges and outline stay drawn, its own back edge stays hidden.
             view.studio_lighting.surface_detail=with_prepass;
@@ -1859,12 +1846,12 @@ int main() {
                     {{0.25f, -length / 2, 0.3f}, {0.25f, length / 2, 0.0001f}, 1}};
                 assert(capture() == face_only);
             }
-            // Coplanar authored edges still render with the constant tie bias.
+            // Coplanar authored edges still render.
             resource.edit_payload().stroke_segments = {
                 {{-0.25f, -0.4f, 0.0f}, {-0.25f, 0.4f, 0.0f}, 1}};
             assert(capture() != face_only);
-            // Parallel hidden edges under a sloping face: extending the stroke
-            // caps must also extrapolate depth, rather than flatten its ramp.
+            // Parallel edges a few pixels behind a sloping face of their own part stay hidden. (Within a pixel's
+            // depth change of its own surface an edge counts as on it: app/plans/STROKE_VISIBILITY.md.)
             for (auto &vertex : resource.edit_payload().vertices)
                 vertex.position[2] = vertex.position[1] * 0.3f;
             resource.edit_payload().stroke_segments.clear();
@@ -1872,10 +1859,10 @@ int main() {
             for (const auto length : {0.8f, 0.2f}) {
                 const auto y = length / 2;
                 resource.edit_payload().stroke_segments = {
-                    {{-0.25f, -y, -y * 0.3f + 0.0001f},
-                     {-0.25f, y, y * 0.3f + 0.0001f}, 1},
-                    {{0.25f, y, y * 0.3f + 0.0001f},
-                     {0.25f, -y, -y * 0.3f + 0.0001f}, 1}};
+                    {{-0.25f, -y, -y * 0.3f + 0.05f},
+                     {-0.25f, y, y * 0.3f + 0.05f}, 1},
+                    {{0.25f, y, y * 0.3f + 0.05f},
+                     {0.25f, -y, -y * 0.3f + 0.05f}, 1}};
                 assert(capture() == sloped_face);
             }
             resource.edit_payload().stroke_segments = {
