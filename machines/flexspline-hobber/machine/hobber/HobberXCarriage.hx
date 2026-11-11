@@ -85,14 +85,12 @@ class HobberXCarriage extends HobberMadePart {
   override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
     var plate:Null<cadkit.parametric.Feature> = null;
     b.group("Stock", () -> {
-      b.length("plate.length", skeleton.columnRear - skeleton.xDeckFront).derivedBy("X deck front to column rear (skeleton)");
-      var half = b.length("plate.halfWidth", xCarriageHalfWidth())
+      var length = b.length("plate.length", skeleton.columnRear - skeleton.xDeckFront).derivedBy("X deck front to column rear (skeleton)");
+      b.length("plate.halfWidth", xCarriageHalfWidth())
         .derivedBy("rail centre + block bolt spacing / 2 + bolt edge distance, rounded up to 5 mm");
+      var width = b.expression("plate.width", cadkit.parametric.ParameterKind.Length, "mm", "2 * plate.halfWidth");
       var thickness = b.length("plate.thickness", X_CARRIAGE_THICKNESS).fixedBy("20 mm ground steel flat stock");
-      var front = b.expression("plate.front", cadkit.parametric.ParameterKind.Length, "mm", "-plate.length / 2");
-      var rear = b.expression("plate.rear", cadkit.parametric.ParameterKind.Length, "mm", "plate.length / 2");
-      var right = b.expression("plate.right", cadkit.parametric.ParameterKind.Length, "mm", "-plate.halfWidth");
-      plate = b.label(b.boxBetween(front, rear, right, half, 0, thickness), "Ground plate");
+      plate = b.label(b.block(length, width, thickness), "Ground plate");
     });
     // Open at the front (it starts 5 mm ahead of the deck), 80 mm into the deck and 300 mm wide: clears the hob and work.
     var front = -(skeleton.columnRear - skeleton.xDeckFront) / 2;

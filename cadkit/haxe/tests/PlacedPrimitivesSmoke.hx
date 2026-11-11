@@ -64,6 +64,17 @@ class PlacedPrimitivesSmoke {
     check(Math.abs(centre.x - mid) < 1e-6 && Math.abs(centre.y - mid) < 1e-6 && Math.abs(centre.z) < 1e-6, 'bore centre $centre');
     bore.close();
 
+    // A block centred in x and y on its frame, resting on z = 0 (the default), and one aligned to end at the origin in x.
+    var blocks = DocumentBuilder.build(b -> b.output(b.unionAll([b.block(40, 20, 10), b.block(10, 4, 4, ["max", "centre", "min"])])));
+    var bb = output(blocks).bounds();
+    check(Math.abs(bb.get_min().get_x() + 20) < 1e-9 && Math.abs(bb.get_max().get_x() - 20) < 1e-9 && Math.abs(bb.get_min().get_z()) < 1e-9
+      && Math.abs(bb.get_max().get_y() - 10) < 1e-9, "block alignment");
+    var blocksText = DocumentCodec.encode(blocks);
+    blocks.close();
+    var blocksBack = DocumentCodec.decode(blocksText);
+    check(DocumentCodec.encode(blocksBack) == blocksText, "blocks save identically after restore");
+    blocksBack.close();
+
     // Union of overlapping boxes in one step.
     var union = DocumentBuilder.build(function(b) {
       b.output(b.unionAll([b.boxBetween(0, 10, 0, 10, 0, 10), b.boxBetween(5, 15, 0, 10, 0, 10), b.boxBetween(0, 10, 5, 15, 0, 10)]));

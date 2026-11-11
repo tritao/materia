@@ -30,6 +30,7 @@ import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.features.PlaceFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.HolesFeature;
 import cadkit.parametric.HoleSpec;
 import cadkit.parametric.features.ToolCollectionFeature;
@@ -679,6 +680,19 @@ class DocumentBuilder {
   public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
     check();
     return document.add(new TransformFeature(source, x, y, z));
+  }
+
+  /**
+   * A block of sizes x, y, z against the origin: centred in x and y and resting on z = 0 unless `align` says otherwise
+   (`BlockFeature.MIN`, `CENTRE` or `MAX` per axis). Sizes may be named dimensions.
+   */
+  public function block(x:Dimension, y:Dimension, z:Dimension, ?align:Array<String>):BlockFeature {
+    check();
+    var feature = document.add(new BlockFeature(x.number(), y.number(), z.number(), align));
+    bind(x, feature, "block.x");
+    bind(y, feature, "block.y");
+    bind(z, feature, "block.z");
+    return feature;
   }
 
   /** An axis-aligned box between two corners; any extent may be a named dimension. */

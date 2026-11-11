@@ -4,6 +4,7 @@ import haxe.Json;
 import haxeon.wire.JsonWire;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.BoxBetweenFeature;
 import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.HolesFeature;
@@ -17,7 +18,7 @@ import cadkit.parametric.features.UnionAllFeature;
  */
 class CadKitFeatureTypes {
   public static function codecs():Array<FeatureCodec> {
-    var list:Array<FeatureCodec> = [new PlaceCodec(), new BoxBetweenCodec(), new CylinderAlongCodec(), new UnionAllCodec(), new HolesCodec()];
+    var list:Array<FeatureCodec> = [new PlaceCodec(), new BlockCodec(), new BoxBetweenCodec(), new CylinderAlongCodec(), new UnionAllCodec(), new HolesCodec()];
     for (codec in cadkit.sheetmetal.SheetFeatureTypes.codecs()) list.push(codec);
     return list;
   }
@@ -60,6 +61,21 @@ private class PlaceCodec extends CoreCodec {
         context.decodeVector(Reflect.field(data, "xDirection")), context.decodeVector(Reflect.field(data, "normal"))),
       datum == null ? null : context.decodeElementReference(datum));
   }
+}
+
+private class BlockCodec extends CoreCodec {
+  public function new() super();
+
+  override public function type():String return "block";
+
+  override public function encode(feature:Feature, context:FeatureCodecContext):Dynamic {
+    var block:BlockFeature = cast feature;
+    return {x: block.x.value, y: block.y.value, z: block.z.value, align: block.align.copy()};
+  }
+
+  override public function decode(data:Dynamic, context:FeatureCodecContext):Feature
+    return new BlockFeature(context.number(data, "x"), context.number(data, "y"), context.number(data, "z"),
+      [for (a in context.array(data, "align")) Std.string(a)]);
 }
 
 private class BoxBetweenCodec extends CoreCodec {
