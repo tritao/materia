@@ -368,7 +368,8 @@ robotkit::SegmentBatch trajectory_batch(
 
 void unsupported_trajectory_queue_is_rejected(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count, false);
-    robotkit::RobotRuntime runtime(blueprint, endpoint);
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint);
+    auto &runtime = *runtime_owner;
     assert(!runtime.supports_trajectory_queue());
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_ERROR_UNSUPPORTED);
@@ -383,7 +384,9 @@ void unsupported_trajectory_queue_is_rejected(const rk_robot_runtime_blueprint &
 
 void drive_reference_timing_is_per_coupled_group(const rk_robot_runtime_blueprint &blueprint) {
     for (bool coupled : {false, true}) {
-        auto mixed = blueprint;
+        // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+        auto mixed_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+        auto &mixed = *mixed_storage;
         mixed.joint_servo[0] = {200.0, 10.0};
         if (coupled) {
             mixed.coupling_count = 1;
@@ -391,7 +394,8 @@ void drive_reference_timing_is_per_coupled_group(const rk_robot_runtime_blueprin
         }
         assert(rk_robot_runtime_blueprint_validate(&mixed) == RK_OK);
         auto endpoint = std::make_shared<EchoEndpoint>(mixed.joint_count);
-        robotkit::RobotRuntime runtime(mixed, endpoint, std::chrono::milliseconds(50));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(mixed, endpoint, std::chrono::milliseconds(50));
+        auto &runtime = *runtime_owner;
         uint64_t timestamp = 0;
         assert(runtime.submit_segments(trajectory_command(1),
             trajectory_batch({{0, 0.0}, {100'000'000, 0.5}, {200'000'000, 1.0}})) == RK_OK);
@@ -410,8 +414,10 @@ void drive_reference_timing_is_per_coupled_group(const rk_robot_runtime_blueprin
 void process_fault_is_confined_to_its_runtime(const rk_robot_runtime_blueprint &blueprint) {
     auto first_endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
     auto second_endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime first(blueprint, first_endpoint, std::chrono::milliseconds(10));
-    robotkit::RobotRuntime second(blueprint, second_endpoint, std::chrono::milliseconds(10));
+    auto first_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, first_endpoint, std::chrono::milliseconds(10));
+    auto &first = *first_owner;
+    auto second_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, second_endpoint, std::chrono::milliseconds(10));
+    auto &second = *second_owner;
     first.fail_tick(RK_FAULT_PROCESS_CHANNEL_TYPE);
     rk_robot_snapshot failed{};
     failed.struct_size = sizeof(failed);
@@ -428,7 +434,8 @@ void process_fault_is_confined_to_its_runtime(const rk_robot_runtime_blueprint &
 void timestamped_trajectory_interpolates_and_reports_progress(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.5},
@@ -459,7 +466,8 @@ void timestamped_trajectory_interpolates_and_reports_progress(
 
 void normal_stop_decelerates_active_trajectory(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {200'000'000, 1.0}})) == RK_OK);
@@ -484,11 +492,14 @@ void normal_stop_decelerates_active_trajectory(const rk_robot_runtime_blueprint 
 
 void trajectory_stop_follows_path_and_reports_tag(
     const rk_robot_runtime_blueprint &blueprint) {
-    auto slow_blueprint = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto slow_blueprint_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &slow_blueprint = *slow_blueprint_storage;
     for (auto &joint : slow_blueprint.joints)
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
-    robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(slow_blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 42)) == RK_OK);
@@ -579,11 +590,14 @@ double peak_acceleration(const std::vector<double> &positions, double period_sec
 
 void trajectory_chunk_extends_running_stop(
     const rk_robot_runtime_blueprint &blueprint) {
-    auto slow_blueprint = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto slow_blueprint_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &slow_blueprint = *slow_blueprint_storage;
     for (auto &joint : slow_blueprint.joints)
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
-    robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(slow_blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 7)) == RK_OK);
@@ -623,11 +637,14 @@ void trajectory_stop_counts_trajectory_braking(
     // The trajectory cruises at 0.5 for 0.2 s, then brakes at the joint limit.
     // A stop that lands in that braking must not add its own deceleration.
     constexpr double limit = 1.0;
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints)
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, limit);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     const auto profile = [](double t) {
         if (t <= 0.2)
@@ -654,11 +671,14 @@ void stop_beyond_queued_path_ramps_within_limits(
     // Only 0.1 s of path is queued at 1 m/s, but stopping at 1 m/s^2 needs
     // 1 s. The stop must finish on a limited ramp instead of stopping dead.
     constexpr double limit = 1.0;
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints)
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, limit);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
@@ -690,11 +710,14 @@ void stop_ramp_stays_within_travel(const rk_robot_runtime_blueprint &blueprint) 
     // 0.15 m short of the upper travel limit at 1.0. The ramp must stop at
     // the limit rather than run into it, then report braking past its limit.
     constexpr double limit = 1.0;
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints)
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, limit);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     auto initial = velocity_batch(1, {{0, 0.0}, {1, 0.0}});
     initial.targets[0].mode = RK_TARGET_POSITION;
@@ -745,7 +768,8 @@ void stop_ramp_stays_within_travel(const rk_robot_runtime_blueprint &blueprint) 
 void faulted_batch_skips_commands_before_reset(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
 
     auto invalid = velocity_batch(1, {{0, 0.2}});
@@ -766,7 +790,8 @@ void faulted_batch_skips_commands_before_reset(
 void invalid_trajectory_chunk_is_atomic(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
@@ -782,14 +807,17 @@ void invalid_trajectory_chunk_is_atomic(
 }
 
 void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &blueprint) {
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints)
         joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
 
     {
         // 0.1 m in 100 ms is 1 m/s: exactly at the limit.
         auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-        robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(50));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(50));
+        auto &runtime = *runtime_owner;
         uint64_t timestamp = 0;
         assert(runtime.submit_segments(trajectory_command(1),
             trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_OK);
@@ -812,7 +840,8 @@ void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &bluepri
     {
         // 0.2 m in 100 ms is 2 m/s: twice the limit.
         auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-        robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(50));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(50));
+        auto &runtime = *runtime_owner;
         assert(runtime.submit_segments(trajectory_command(1),
             trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
         assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
@@ -825,7 +854,8 @@ void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &bluepri
 
 void trajectory_queue_is_bounded(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto &runtime = *runtime_owner;
     constexpr uint32_t batch_size = 128;
     robotkit::SegmentBatch full{};
     for (uint32_t index = 0; index < batch_size; ++index) {
@@ -852,7 +882,8 @@ void trajectory_queue_is_bounded(const rk_robot_runtime_blueprint &blueprint) {
 
 void mixed_queue_depth_counts_knots(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_OK);
@@ -870,7 +901,8 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     blueprint.calibration_revision = 7;
     blueprint.commit_lead_ns = 250'000'000;
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     auto first = cubic_plan_chunk(11);
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
@@ -947,7 +979,8 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
 void device_queue_endpoint_does_not_receive_sampled_targets(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<QueueExecutingEndpoint>();
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 99;
@@ -975,7 +1008,8 @@ void plan_events_follow_path_clock(const rk_robot_runtime_blueprint &source) {
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.digital = 0;
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 100;
@@ -1025,7 +1059,8 @@ void plan_event_records_report_overflow(const rk_robot_runtime_blueprint &source
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 101;
@@ -1060,10 +1095,12 @@ void accepted_plan_keeps_committed_region_identical(
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     auto reference_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     auto replacement_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime reference(blueprint, reference_endpoint,
+    auto reference_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, reference_endpoint,
         std::chrono::milliseconds(1));
-    robotkit::RobotRuntime replacement(blueprint, replacement_endpoint,
+    auto &reference = *reference_owner;
+    auto replacement_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, replacement_endpoint,
         std::chrono::milliseconds(1));
+    auto &replacement = *replacement_owner;
     robotkit::PlanRequest first{};
     first.sequence = 1;
     first.plan_id = 71;
@@ -1122,7 +1159,8 @@ void accepted_plan_keeps_committed_region_identical(
 
 void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 81;
@@ -1277,7 +1315,8 @@ void initial_device_origin_is_held_once_and_reset(const rk_robot_runtime_bluepri
 void submitted_start_tolerances_control_acceptance(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 92;
@@ -1302,7 +1341,8 @@ void submitted_start_tolerances_control_acceptance(
 
 void degree_one_append_checks_chord_velocity(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 0.5}}, 93)) == RK_OK);
@@ -1328,7 +1368,9 @@ void degree_one_append_checks_chord_velocity(const rk_robot_runtime_blueprint &b
 
 void ruckig_segments_match_motionkit_evaluation(
     const rk_robot_runtime_blueprint &blueprint) {
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints) {
         joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 2.0);
@@ -1337,7 +1379,8 @@ void ruckig_segments_match_motionkit_evaluation(
     assert(runtime_fixtures::rest_two(&trajectory) == MK_OK);
     auto chunk = segments_from_native(trajectory);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(segment_command(1), chunk) == RK_OK);
     int64_t duration = 0;
@@ -1354,10 +1397,13 @@ void ruckig_segments_match_motionkit_evaluation(
 }
 
 void overacceleration_segment_is_rejected(const rk_robot_runtime_blueprint &blueprint) {
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints) joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     auto chunk = linear_segment_chunk(0.0, 0.0, 100'000'000);
     chunk.segments[0].degree = 2;
     chunk.segments[0].coefficients[0].value[2] = 1.0;
@@ -1372,7 +1418,8 @@ void overacceleration_segment_is_rejected(const rk_robot_runtime_blueprint &blue
 
 void segment_junction_jump_is_rejected(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     assert(runtime.submit_segments(segment_command(1),
         linear_segment_chunk(0.0, 1.0, 100'000'000)) == RK_OK);
     assert(runtime.apply_pending_commands() == RK_OK);
@@ -1382,7 +1429,9 @@ void segment_junction_jump_is_rejected(const rk_robot_runtime_blueprint &bluepri
 }
 
 void stop_braking_uses_segment_degree(const rk_robot_runtime_blueprint &blueprint) {
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints) joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
     const auto profile = [](double t) {
         if (t <= 0.2) return 0.5 * t;
@@ -1392,7 +1441,8 @@ void stop_braking_uses_segment_degree(const rk_robot_runtime_blueprint &blueprin
     auto samples = sampled_batch(profile, 700'000'000, 10'000'000, 1);
     auto degree_one = segments_from_samples(samples);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(segment_command(1), degree_one) == RK_OK);
     std::vector<double> positions;
@@ -1408,8 +1458,9 @@ void stop_braking_uses_segment_degree(const rk_robot_runtime_blueprint &blueprin
     analytic.segments[0].coefficients[0].value[2] = -0.5;
     analytic.segments[0].coefficients[1].value[2] = 0.5;
     auto analytic_endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime analytic_runtime(limited, analytic_endpoint,
+    auto analytic_runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, analytic_endpoint,
         std::chrono::milliseconds(10));
+    auto &analytic_runtime = *analytic_runtime_owner;
     timestamp = 0;
     assert(analytic_runtime.submit_segments(segment_command(1), analytic) == RK_OK);
     positions.clear();
@@ -1423,7 +1474,9 @@ void stop_braking_uses_segment_degree(const rk_robot_runtime_blueprint &blueprin
 
 void ruckig_segment_stop_uses_analytic_braking(
     const rk_robot_runtime_blueprint &blueprint) {
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     for (auto &joint : limited.joints) {
         joint.max_velocity = (joint.limit_flags |= RK_LIMIT_VELOCITY, 1.0);
         joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 1.0);
@@ -1454,7 +1507,8 @@ void ruckig_segment_stop_uses_analytic_braking(
     assert(std::abs(estimate.acceleration[0] - analytic.acceleration[0]) < 1e-12);
     auto chunk = segments_from_native(trajectory);
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     assert(runtime.submit_segments(segment_command(1), chunk) == RK_OK);
     std::vector<double> positions;
@@ -1469,7 +1523,8 @@ void ruckig_segment_stop_uses_analytic_braking(
 
 void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
 
     // Separate batches for different joints in one cycle both apply, like a
@@ -1512,7 +1567,8 @@ void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint 
 void partial_targets_and_ordered_trajectory_commands(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(50));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
 
     // Partial target batches retain joints that the newer batch does not
@@ -1527,8 +1583,9 @@ void partial_targets_and_ordered_trajectory_commands(
     // Updating another joint must not reset an in-progress position
     // reference or silently drop its rate-limited motion.
     auto position_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime position_runtime(blueprint, position_endpoint,
+    auto position_runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, position_endpoint,
                                             std::chrono::milliseconds(50));
+    auto &position_runtime = *position_runtime_owner;
     auto position = velocity_batch(1, {{1, 0.2}});
     position.targets[0] = {0, RK_TARGET_POSITION, 0.8, 1.0, 0.0};
     assert(position_runtime.submit(position) == RK_OK);
@@ -1568,8 +1625,9 @@ void partial_targets_and_ordered_trajectory_commands(
     // Reset and a chunk in one owner cycle are also sequential. The reset is
     // delivered to the endpoint before the generated trajectory setpoint.
     auto reset_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime reset_runtime(blueprint, reset_endpoint,
+    auto reset_runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, reset_endpoint,
                                          std::chrono::milliseconds(50));
+    auto &reset_runtime = *reset_runtime_owner;
     assert(reset_runtime.submit(lifecycle_command(1, RK_COMMAND_EMERGENCY_STOP)) == RK_OK);
     state = apply_cycle(reset_runtime, timestamp);
     assert(state.safety == RK_SAFETY_EMERGENCY_STOP);
@@ -1611,7 +1669,8 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
     };
     {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto plan = make_plan(201, true, false);
         assert(runtime.submit_plan(plan) == RK_OK);
         uint64_t timestamp = 0;
@@ -1623,7 +1682,8 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
     }
     {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto plan = make_plan(202, true, true);
         assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
     }
@@ -1631,7 +1691,8 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         // Reach zero velocity with bounded but nonzero endpoint acceleration,
         // as a TOPP-RA path can do at its final knot.
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto plan = make_plan(205, true, false);
         plan.flags = RK_PLAN_JERK_UNCHECKED;
         for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
@@ -1653,7 +1714,8 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
     {
         // A checked-jerk plan must finish with zero acceleration.
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto plan = make_plan(206, true, false);
         for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
             const double sign = joint == 0 ? 1.0 : -1.0;
@@ -1670,7 +1732,8 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
     }
     for (bool unchecked : {false, true}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto first = make_plan(207, false, false);
         first.segments.segments[0].degree = 2;
         for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
@@ -1700,7 +1763,8 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
     }
     for (bool smooth : {false, true}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto plan = make_plan(smooth ? 204 : 203, false, smooth);
         assert(runtime.submit_plan(plan) == RK_OK);
         uint64_t timestamp = 0;
@@ -1718,7 +1782,8 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
     }
     {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto first = make_plan(205, false, false);
         assert(runtime.submit_plan(first) == RK_OK);
         uint64_t timestamp = 0;
@@ -1744,7 +1809,8 @@ void plan_start_ignores_chunking(const rk_robot_runtime_blueprint &blueprint) {
     // queued before that cycle ran.
     auto run = [&](bool split) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         auto chunk = [&](uint64_t sequence, double start, uint64_t duration_ns, bool ends_at_rest) {
             robotkit::PlanRequest plan{};
             plan.sequence = sequence;
@@ -1823,7 +1889,8 @@ void hold_with_compiled_follower(const rk_robot_runtime_blueprint &source) {
     blueprint.coupling_count = 1;
     blueprint.couplings[0] = {0, 1, -1.0, 0.0};
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     assert(runtime.blueprint().joints[1].max_acceleration == 1.0);
     assert(runtime.blueprint().joints[1].max_velocity == 1.0);
     robotkit::PlanRequest plan{};
@@ -1864,7 +1931,8 @@ void follower_with_two_leaders_takes_their_summed_limits(const rk_robot_runtime_
     blueprint.couplings[0] = {0, 2, 2.0, 0.0};
     blueprint.couplings[1] = {1, 2, -3.0, 0.0};
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     assert(std::abs(runtime.blueprint().joints[2].max_velocity - (2.0 * 1.0 + 3.0 * 2.0)) < 1e-12);
     assert(std::abs(runtime.blueprint().joints[2].max_acceleration - (2.0 * 1.0 + 3.0 * 2.0)) < 1e-12);
 }
@@ -1876,7 +1944,8 @@ void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
         blueprint.joints[joint].max_velocity = (blueprint.joints[joint].limit_flags |= RK_LIMIT_VELOCITY, 1.0);
     }
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto &runtime = *runtime_owner;
     robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 210;
@@ -1908,7 +1977,8 @@ void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
     assert(std::abs(snapshot.position[0] - 0.4) < 1e-9);
 
     auto abort_endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime abort_runtime(blueprint, abort_endpoint, std::chrono::milliseconds(100));
+    auto abort_runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, abort_endpoint, std::chrono::milliseconds(100));
+    auto &abort_runtime = *abort_runtime_owner;
     plan.sequence = 1;
     plan.plan_id = 211;
     assert(abort_runtime.submit_plan(plan) == RK_OK);
@@ -1933,7 +2003,8 @@ void smooth_path_hold_respects_acceleration(const rk_robot_runtime_blueprint &so
     }
     for (int hold_after : {3, 14}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto &runtime = *runtime_owner;
         robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = 220 + hold_after;
@@ -1983,7 +2054,8 @@ void smooth_path_hold_respects_acceleration(const rk_robot_runtime_blueprint &so
 
 void presampled_publication_does_not_sample_again(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<FaultEndpoint>();
-    robotkit::RobotRuntime runtime(blueprint, endpoint);
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint);
+    auto &runtime = *runtime_owner;
     rk_robot_state sampled{};
     assert(endpoint->sample(100, sampled) == RK_OK);
     assert(runtime.publish_presampled(100, sampled) == RK_OK);
@@ -2010,8 +2082,9 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
             for (uint64_t remaining_ns : {300'000'000ULL, 200'000'000ULL,
                                           100'000'000ULL}) {
                 auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-                robotkit::RobotRuntime runtime(blueprint, endpoint,
+                auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint,
                     std::chrono::milliseconds(100));
+                auto &runtime = *runtime_owner;
                 robotkit::PlanRequest plan{};
                 plan.sequence = 1;
                 plan.plan_id = 300;
@@ -2042,8 +2115,9 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
     }
     for (auto command : {RK_COMMAND_HOLD, RK_COMMAND_STOP, RK_COMMAND_ABORT}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint,
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint,
             std::chrono::milliseconds(10));
+        auto &runtime = *runtime_owner;
         robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = 301;
@@ -2065,8 +2139,9 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
     }
     {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint,
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint,
             std::chrono::milliseconds(10));
+        auto &runtime = *runtime_owner;
         robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = 302;
@@ -2092,7 +2167,8 @@ void plan_end_does_not_restore_earlier_targets(const rk_robot_runtime_blueprint 
     // plan ends the robot must stay at the plan's end, not return to the
     // targets it held before.
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 0;
     auto placed = velocity_batch(1, {{0, 0.0}, {1, 0.0}});
     placed.targets[0].mode = RK_TARGET_POSITION;
@@ -2151,11 +2227,14 @@ private:
 
 void single_precision_reading_at_a_limit_is_not_a_fault(const rk_robot_runtime_blueprint &blueprint) {
     // 1.2 as a float is 1.2000000477: past the limit unless the endpoint's precision is allowed for.
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     limited.joints[0].upper_limit = 1.2;
     for (bool declares : {true, false}) {
         auto endpoint = std::make_shared<SinglePrecisionEndpoint>(1.2, declares);
-        robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+        auto &runtime = *runtime_owner;
         const auto result = runtime.publish_sample(10'000'000);
         assert(declares ? result == RK_OK : result == RK_ERROR_LIMIT);
     }
@@ -2194,7 +2273,8 @@ void stated_zero_speed_stops_position_commands(const rk_robot_runtime_blueprint 
     blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY;
     blueprint.joints[0].max_velocity = 0.0;
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     assert(runtime.publish_sample(10'000'000) == RK_OK);
     rk_robot_command command{};
     command.struct_size = sizeof(command);
@@ -2215,7 +2295,8 @@ void quantized_motor_seams_keep_the_c2_bound(const rk_robot_runtime_blueprint &s
     }
     for (double gap : {4e-6, 1e-4}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+        auto &runtime = *runtime_owner;
         robotkit::PlanRequest first{};
         first.sequence = 1; first.plan_id = 401;
         first.model_revision = blueprint.revision;
@@ -2251,7 +2332,8 @@ void quantized_terminal_acceleration_is_bounded(const rk_robot_runtime_blueprint
     }
     for (double gap : {4e-6, 1e-4}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint, std::chrono::milliseconds(10));
+        auto &runtime = *runtime_owner;
         robotkit::PlanRequest plan{};
         plan.sequence = 1; plan.plan_id = 403;
         plan.model_revision = blueprint.revision;
@@ -2280,11 +2362,14 @@ void quantized_terminal_acceleration_is_bounded(const rk_robot_runtime_blueprint
 
 void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_blueprint &blueprint) {
     // Joint 0 brakes at 2 rad/s^2; joint 1 has no acceleration limit.
-    auto limited = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto limited_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &limited = *limited_storage;
     limited.joints[0].max_acceleration = (limited.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 2.0);
     limited.joints[1].max_acceleration = (limited.joints[1].limit_flags &= ~RK_LIMIT_ACCELERATION, 0.0);
     auto endpoint = std::make_shared<EchoEndpoint>(limited.joint_count);
-    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(limited, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     uint64_t timestamp = 10'000'000;
     assert(runtime.publish_sample(timestamp) == RK_OK);
     auto emitted = [&](uint32_t joint) {
@@ -2365,11 +2450,14 @@ void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_bluepri
 
 void trajectory_drive_endpoints_join_through_hold_resume_and_stop(
         const rk_robot_runtime_blueprint &blueprint) {
-    auto bounded = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+    auto bounded_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+    auto &bounded = *bounded_storage;
     for (uint32_t joint = 0; joint < bounded.joint_count; ++joint)
         bounded.joints[joint].max_acceleration = 0.2;
     auto endpoint = std::make_shared<EchoEndpoint>(bounded.joint_count);
-    robotkit::RobotRuntime runtime(bounded, endpoint, std::chrono::milliseconds(10));
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(bounded, endpoint, std::chrono::milliseconds(10));
+    auto &runtime = *runtime_owner;
     robotkit::SegmentBatch batch{};
     auto &segment = batch.segments.emplace_back();
     segment.duration_ns = 2'000'000'000;
@@ -2426,11 +2514,14 @@ void trajectory_drive_endpoints_join_through_hold_resume_and_stop(
 void trajectory_drive_endpoints_join_at_queue_exhaustion(
         const rk_robot_runtime_blueprint &blueprint) {
     for (bool stop : {false, true}) {
-        auto bounded = blueprint;
+        // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+        auto bounded_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+        auto &bounded = *bounded_storage;
         for (uint32_t joint = 0; joint < bounded.joint_count; ++joint)
             bounded.joints[joint].max_acceleration = 1.0;
         auto endpoint = std::make_shared<EchoEndpoint>(bounded.joint_count);
-        robotkit::RobotRuntime runtime(bounded, endpoint, std::chrono::milliseconds(10));
+        auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(bounded, endpoint, std::chrono::milliseconds(10));
+        auto &runtime = *runtime_owner;
         robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = 90;
@@ -2463,7 +2554,8 @@ void trajectory_drive_endpoints_join_at_queue_exhaustion(
 
 void queued_coordinate_calibration_translates_device_plan(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<QueueExecutingEndpoint>();
-    robotkit::RobotRuntime runtime(blueprint, endpoint);
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint);
+    auto &runtime = *runtime_owner;
     const double offsets[] = {-0.1, 0.0};
     assert(runtime.calibrate_coordinates(offsets, 2, nullptr, 0) == RK_OK);
     rk_robot_snapshot snapshot{};
@@ -2562,7 +2654,8 @@ int main() {
 
     // Zero is a valid source epoch, not a missing-timestamp sentinel.
     auto clock_endpoint = std::make_shared<FaultEndpoint>();
-    robotkit::RobotRuntime clock_runtime(blueprint, clock_endpoint);
+    auto clock_runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, clock_endpoint);
+    auto &clock_runtime = *clock_runtime_owner;
     const auto before_receive = std::chrono::steady_clock::now().time_since_epoch();
     assert(clock_runtime.publish_sample(0) == RK_OK);
     rk_robot_state clock_state{};
@@ -2579,8 +2672,8 @@ int main() {
         std::chrono::duration_cast<std::chrono::nanoseconds>(after_receive).count()));
 
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, std::move(endpoint));
-
+    auto runtime_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, std::move(endpoint));
+    auto &runtime = *runtime_owner;
     rk_robot_command command{};
     command.struct_size = sizeof(command);
     command.sequence = 1;
@@ -2604,10 +2697,12 @@ int main() {
     // of whether its endpoint is the loopback adapter or a hardware-like peer.
     auto simulated_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     auto physical_endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
-    robotkit::RobotRuntime simulated_control(blueprint, simulated_endpoint,
+    auto simulated_control_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, simulated_endpoint,
                                              std::chrono::milliseconds(100));
-    robotkit::RobotRuntime physical_control(blueprint, physical_endpoint,
+    auto &simulated_control = *simulated_control_owner;
+    auto physical_control_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, physical_endpoint,
                                             std::chrono::milliseconds(100));
+    auto &physical_control = *physical_control_owner;
     rk_robot_command rate_limited{};
     rate_limited.struct_size = sizeof(rate_limited);
     rate_limited.sequence = 1;
@@ -2635,7 +2730,11 @@ int main() {
     }
     assert(physical_endpoint->apply_count == 3);
 
-    auto mixed_blueprint = blueprint;
+    // The blueprint is ~300 kB: copies live on the heap, not in the (8 MB) stack frame.
+
+    auto mixed_blueprint_storage = std::make_unique<rk_robot_runtime_blueprint>(blueprint);
+
+    auto &mixed_blueprint = *mixed_blueprint_storage;
     mixed_blueprint.joint_count = 3;
     mixed_blueprint.link_count = 4;
     mixed_blueprint.joints[2] = {2, RK_RUNTIME_JOINT_REVOLUTE, 2, 3, -1.0, 1.0, 3.0};
@@ -2648,8 +2747,9 @@ int main() {
     mixed_blueprint.links[3].inertia_tensor[4] = 1.0;
     mixed_blueprint.links[3].inertia_tensor[8] = 1.0;
     auto mixed_endpoint = std::make_shared<robotkit::InMemoryRobot>(3);
-    robotkit::RobotRuntime mixed_control(mixed_blueprint, mixed_endpoint,
+    auto mixed_control_owner = std::make_unique<robotkit::RobotRuntime>(mixed_blueprint, mixed_endpoint,
                                          std::chrono::milliseconds(100));
+    auto &mixed_control = *mixed_control_owner;
     rk_robot_command mixed_targets{};
     mixed_targets.struct_size = sizeof(mixed_targets);
     mixed_targets.sequence = 1;
@@ -2688,7 +2788,8 @@ int main() {
     assert(physical_stopped_state.safety == RK_SAFETY_STOPPING);
 
     auto stale_sample_endpoint = std::make_shared<StaleSampleEndpoint>();
-    robotkit::RobotRuntime stale_sample(blueprint, stale_sample_endpoint);
+    auto stale_sample_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, stale_sample_endpoint);
+    auto &stale_sample = *stale_sample_owner;
     assert(stale_sample.publish_sample(100) == RK_OK);
     assert(stale_sample.publish_sample(200) == RK_ERROR_STALE_STATE);
     assert(stale_sample.snapshot(state) == RK_OK);
@@ -2696,14 +2797,16 @@ int main() {
     assert(stale_sample_endpoint->emergency_stop_received);
 
     auto out_of_limit_endpoint = std::make_shared<OutOfLimitEndpoint>();
-    robotkit::RobotRuntime out_of_limit(blueprint, out_of_limit_endpoint);
+    auto out_of_limit_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, out_of_limit_endpoint);
+    auto &out_of_limit = *out_of_limit_owner;
     assert(out_of_limit.publish_sample(100) == RK_ERROR_LIMIT);
     assert(out_of_limit.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
     assert(out_of_limit_endpoint->emergency_stop_received);
 
     auto wrong_sensor_endpoint = std::make_shared<WrongSensorLayoutEndpoint>();
-    robotkit::RobotRuntime wrong_sensor_layout(blueprint, wrong_sensor_endpoint);
+    auto wrong_sensor_layout_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, wrong_sensor_endpoint);
+    auto &wrong_sensor_layout = *wrong_sensor_layout_owner;
     assert(wrong_sensor_layout.publish_sample(100) == RK_ERROR_BACKEND);
     assert(wrong_sensor_layout.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
@@ -2751,8 +2854,9 @@ int main() {
     assert(state.safety == RK_SAFETY_FAULT);
 
     auto threaded_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime threaded(blueprint, std::move(threaded_endpoint),
+    auto threaded_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, std::move(threaded_endpoint),
                                std::chrono::milliseconds(1));
+    auto &threaded = *threaded_owner;
     assert(threaded.start() == RK_OK);
     assert(threaded.running());
     assert(threaded.stop() == RK_OK);
@@ -2760,7 +2864,8 @@ int main() {
 
     auto apply_failure_endpoint = std::make_shared<FaultEndpoint>();
     apply_failure_endpoint->fail_apply = true;
-    robotkit::RobotRuntime apply_failure(blueprint, apply_failure_endpoint);
+    auto apply_failure_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, apply_failure_endpoint);
+    auto &apply_failure = *apply_failure_owner;
     command.sequence = 1;
     command.kind = RK_COMMAND_JOINT_TARGETS;
     command.target_count = 1;
@@ -2776,14 +2881,16 @@ int main() {
 
     auto sample_failure_endpoint = std::make_shared<FaultEndpoint>();
     sample_failure_endpoint->fail_sample = true;
-    robotkit::RobotRuntime sample_failure(blueprint, sample_failure_endpoint);
+    auto sample_failure_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, sample_failure_endpoint);
+    auto &sample_failure = *sample_failure_owner;
     assert(sample_failure.publish_sample(100) == RK_ERROR_STALE_STATE);
     assert(sample_failure_endpoint->emergency_stop_count == 1);
     assert(sample_failure.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
     {
         auto stop_endpoint = std::make_shared<HomingStopEndpoint>();
-        robotkit::RobotRuntime stopped(blueprint, stop_endpoint);
+        auto stopped_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, stop_endpoint);
+        auto &stopped = *stopped_owner;
         assert(stopped.publish_sample(100'000'000) == RK_OK);
         rk_device_homing_control stop{};
         stop.struct_size = sizeof(stop); stop.action = 4;

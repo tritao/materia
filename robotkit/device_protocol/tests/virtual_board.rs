@@ -34,7 +34,7 @@ fn ten_seconds_of_output_uses_bounded_storage_and_active_actuators() {
         1_000_000, 0, 0, [1_000.0; 64], 1);
     for cycle in 0..400_000 {
         board.advance_host_ns(cycle * 25_000);
-        board.position_target(0, cycle as f32 / 1_000.0);
+        board.position_target(0, cycle as f64 / 1_000.0);
         board.velocity_target(0, 1.0);
         board.step_pulse(0, true);
         board.position_target(63, 1.0); // inactive physical channel

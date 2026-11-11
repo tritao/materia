@@ -2,13 +2,13 @@
 use robotkit_device_protocol::{Board, Output, SkewGroup, StepFault, StepGenerator, VirtualBoard};
 
 #[test]
-fn captured_integer_counter_does_not_retract_after_f32_conversion() {
+// Holding at the position read back from the step counter, whatever its rounding, never retracts a step.
+fn captured_integer_counter_is_held_without_retracting() {
     let mut board = VirtualBoard::<1, 1>::new(1_000_000, 0, 0, [1000.0]);
     let mut generator = StepGenerator::new([1000.0], [0], [1]).unwrap();
     for _ in 0..166 { board.step_pulse(0, true); }
     board.advance_host_ns(1_000_000);
-    let held = generator.counter_position(&board, 0).unwrap() as f32;
-    assert!((held as f64 * 1000.0) < 166.0);
+    let held = generator.counter_position(&board, 0).unwrap() as f64;
     generator.tick(&mut board, [held]).unwrap();
     assert_eq!(board.step_count(0), 166);
     board.advance_host_ns(2_000_000);
@@ -55,9 +55,9 @@ fn lead_screw_crosses_400_steps_per_mm() {
     for tick in 1..=4_000 {
         let host_ns = tick * 25_000;
         board.advance_host_ns(host_ns);
-        let position = host_ns as f32 * 0.01 / 1e9;
+        let position = host_ns as f64 * 0.01 / 1e9;
         generator.tick(&mut board, [position]).unwrap();
-        let expected = (position as f64 * 400_000.0) as i64;
+        let expected = (position * 400_000.0) as i64;
         assert!((board.step_count(0) - expected).abs() <= 1);
     }
 }
