@@ -31,6 +31,7 @@ import cadkit.parametric.ElementReference;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.PolygonFeature;
 import cadkit.parametric.features.HolesFeature;
 import cadkit.parametric.HoleSpec;
 import cadkit.parametric.features.ToolCollectionFeature;
@@ -680,6 +681,12 @@ class DocumentBuilder {
   public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
     check();
     return document.add(new TransformFeature(source, x, y, z));
+  }
+
+  /** A closed polygon face through `points` (the plane's own x/y), on `plane` (XY by default): a profile to revolve or extrude. */
+  public function polygon(points:Array<Vector>, ?plane:Plane):PolygonFeature {
+    check();
+    return document.add(new PolygonFeature(points, plane == null ? Plane.XY() : plane));
   }
 
   /**

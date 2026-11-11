@@ -63,7 +63,11 @@ class HobberMadePart extends MachineComponent {
     case "GE-X-fixed-drive-bar": new HobberDriveBar("X", "fixed", values);
     case "GE-X-scale-seat": new HobberScaleSeat("X", values);
     case "GE-Z-scale-arm": new HobberZScaleArm(values);
-    case "GE-chip-tray": new HobberChipTray(values);
+    case "GE-chip-tray":
+      var table = new ComponentValues();
+      if (values != null) for (name in ["tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"])
+        if (values.get(name) != null) table.setNumber(name, values.number(name));
+      new HobberChipTray(table);
     case "GE-enclosure": new HobberEnclosurePanel(values);
     case "GE-coolant": new HobberCoolantPort();
     case "GE-spindle-seat": new HobberSpindleSeat(values);

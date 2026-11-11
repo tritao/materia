@@ -5,6 +5,7 @@ import haxeon.wire.JsonWire;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.PolygonFeature;
 import cadkit.parametric.features.BoxBetweenFeature;
 import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.HolesFeature;
@@ -18,7 +19,7 @@ import cadkit.parametric.features.UnionAllFeature;
  */
 class CadKitFeatureTypes {
   public static function codecs():Array<FeatureCodec> {
-    var list:Array<FeatureCodec> = [new PlaceCodec(), new BlockCodec(), new BoxBetweenCodec(), new CylinderAlongCodec(), new UnionAllCodec(), new HolesCodec()];
+    var list:Array<FeatureCodec> = [new PlaceCodec(), new BlockCodec(), new PolygonCodec(), new BoxBetweenCodec(), new CylinderAlongCodec(), new UnionAllCodec(), new HolesCodec()];
     for (codec in cadkit.sheetmetal.SheetFeatureTypes.codecs()) list.push(codec);
     return list;
   }
@@ -61,6 +62,23 @@ private class PlaceCodec extends CoreCodec {
         context.decodeVector(Reflect.field(data, "xDirection")), context.decodeVector(Reflect.field(data, "normal"))),
       datum == null ? null : context.decodeElementReference(datum));
   }
+}
+
+private class PolygonCodec extends CoreCodec {
+  public function new() super();
+
+  override public function type():String return "polygon";
+
+  override public function encode(feature:Feature, context:FeatureCodecContext):Dynamic {
+    var polygon:PolygonFeature = cast feature;
+    return {points: [for (p in polygon.points) {x: p.x, y: p.y}], origin: context.encodeVector(polygon.plane.origin),
+      xDirection: context.encodeVector(polygon.plane.xDirection), normal: context.encodeVector(polygon.plane.normal)};
+  }
+
+  override public function decode(data:Dynamic, context:FeatureCodecContext):Feature
+    return new PolygonFeature([for (p in context.array(data, "points")) new Vector(context.number(p, "x"), context.number(p, "y"), 0)],
+      new Plane(context.decodeVector(Reflect.field(data, "origin")), context.decodeVector(Reflect.field(data, "xDirection")),
+        context.decodeVector(Reflect.field(data, "normal"))));
 }
 
 private class BlockCodec extends CoreCodec {

@@ -75,6 +75,16 @@ class PlacedPrimitivesSmoke {
     check(DocumentCodec.encode(blocksBack) == blocksText, "blocks save identically after restore");
     blocksBack.close();
 
+    // A polygon profile in XZ revolved about Z: a 10 x 20 ring section from r 30 to 40 is a tube.
+    var ring = DocumentBuilder.build(b -> b.output(b.revolve(b.polygon([new Vector(30, 0, 0), new Vector(40, 0, 0), new Vector(40, 20, 0),
+      new Vector(30, 20, 0)], cadkit.modeling.Plane.XZ()), new Vector(), Vector.Z(), Math.PI * 2)));
+    near(output(ring).volume(), Math.PI * (40 * 40 - 30 * 30) * 20, "revolved polygon");
+    var ringText = DocumentCodec.encode(ring);
+    ring.close();
+    var ringBack = DocumentCodec.decode(ringText);
+    check(DocumentCodec.encode(ringBack) == ringText, "polygon saves identically after restore");
+    ringBack.close();
+
     // Union of overlapping boxes in one step.
     var union = DocumentBuilder.build(function(b) {
       b.output(b.unionAll([b.boxBetween(0, 10, 0, 10, 0, 10), b.boxBetween(5, 15, 0, 10, 0, 10), b.boxBetween(0, 10, 5, 15, 0, 10)]));

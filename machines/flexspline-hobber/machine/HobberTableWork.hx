@@ -141,7 +141,7 @@ class HobberTableWork extends HobberUnit {
             tableBase
           )
         ),
-        HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z),
+        HobberFrame.sourcePose(HobberChipTray.frameFor(tableBase)),
         "foundation", "bed-tablePlate"
       );
     exposeConnector("work", "mandrel", "work");
