@@ -233,6 +233,10 @@ class CadPlateWorkflowTests {
         object(scene, id).depth >= 0.000001,
         "planar sketch dimensions stay serializable: " + object(scene, id).depth
       );
+      check(
+        scene.cadSession(id).collisionBounds == null && !scene.hasCollisionBody(id),
+        "a part showing only a sketch profile has no collision body"
+      );
 
       var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
       try {

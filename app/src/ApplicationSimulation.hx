@@ -457,7 +457,7 @@ class ApplicationSimulation implements Observable {
       createdSpace.session.beginTopologyUpdate();
       environmentTopologyOpen = true;
       for (object in environmentRecords) if ((object.collisionEnabled
-        || object.dynamicBody) && !assemblyOwned.exists(object.id)) {
+        || object.dynamicBody) && !assemblyOwned.exists(object.id) && scene.hasCollisionBody(object.id)) {
         if (control != null) control.throwIfCancelled();
         var centerX = object.x, centerY = object.y, centerZ = object.z;
         var halfX = object.width / 2.0, halfY = object.height / 2.0, halfZ = object.depth / 2.0;

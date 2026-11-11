@@ -1529,6 +1529,11 @@ class EditorScene implements Observable {
     return item != null && isCadKind(item.kind);
   }
 
+  /** Whether the object has a body to collide or simulate: a CAD part only once it has a solid. */
+  public function hasCollisionBody(id:String):Bool {
+    return !isCadPart(id) || cadSession(id).collisionBounds != null;
+  }
+
   public function hasCadOutput(id:String):Bool {
     var item = object(id);
     if (item == null || !isCadKind(item.kind)) return false;

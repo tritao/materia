@@ -21,6 +21,7 @@ class CadDocumentSession {
   public var diagnostics(default, null):Array<String> = [];
   public var selectedTopology:Null<TopologyFingerprint> = null;
   public var previewResult(default, null):Null<Shape> = null;
+  /** Box proxy of the published body; null while the part has no solid (empty, or only a sketch profile). */
   public var collisionBounds(default, null):Null<CadCollisionBounds> = null;
   public var lastPublicationSeconds(default, null):Float = 0;
 
@@ -271,7 +272,9 @@ class CadDocumentSession {
       } else candidate = source.cloneShape();
       nextShape = candidate;
       nextGeometry = model.geometryFor(candidate, true);
-      nextCollisionBounds = model.collisionBoundsFor(candidate);
+      // Only a body with volume collides: a part showing just a sketch profile (a flat face) has no proxy.
+      var solid = candidate.subshapeCount(CadKit.ShapeKind.Solid) > 0;
+      if (solid) nextCollisionBounds = model.collisionBoundsFor(candidate);
       ensureEvaluationCurrent(ticket);
     } catch (error:Dynamic) {
       lastPublicationSeconds = Sys.time() - publicationStarted;

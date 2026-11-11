@@ -8,6 +8,22 @@ import nativekit.scene.GeometryData;
 /** Converts CadKit's millimetre mesh convention into SceneKit metres. */
 class CadSceneGeometry {
   public static inline var METRES_PER_MILLIMETRE:Float = 0.001;
+  /** Smallest scene size along an axis, in metres: a flat shape (a sketch profile) still has a serializable depth. */
+  public static inline var MIN_SCENE_SIZE:Float = 0.000001;
+
+  /** A shape's scene size in metres from its exact bounds; flat axes get MIN_SCENE_SIZE. */
+  public static function dimensionsOf(shape:Shape):CadModelDimensions {
+    var bounds = shape.bounds(), minimum = bounds.get_min(), maximum = bounds.get_max();
+    inline function size(low:Float, high:Float):Float return Math.max(
+      (high - low) * METRES_PER_MILLIMETRE,
+      MIN_SCENE_SIZE
+    );
+    return {
+      width: size(minimum.get_x(), maximum.get_x()),
+      height: size(minimum.get_y(), maximum.get_y()),
+      depth: size(minimum.get_z(), maximum.get_z())
+    };
+  }
 
   public static function mountingPlate(
     widthMetres:Float,

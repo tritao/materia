@@ -166,7 +166,8 @@ class SceneCollision {
     bodyObjects = [];
     bodyCentres = [];
     var assemblyObjects = describeAssembly(description, scene, project);
-    for (item in scene.items()) if (item.collisionEnabled && !assemblyObjects.exists(item.id)) {
+    for (item in scene.items()) if (item.collisionEnabled
+      && !assemblyObjects.exists(item.id) && scene.hasCollisionBody(item.id)) {
       var box = boxOf(scene, item);
       var body = description.addBody(item.id, 0, false, posed(item, null));
       description.addObject(

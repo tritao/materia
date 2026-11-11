@@ -68,8 +68,7 @@ class CadImportedModel implements CadSessionModel {
   public function geometryConversionSeconds():Float return lastGeometryConversionSeconds;
 
   public function sceneDimensions():CadModelDimensions {
-    var bounds = collisionBoundsFor(document.result());
-    return {width: bounds.halfExtents.x * 2, height: bounds.halfExtents.y * 2, depth: bounds.halfExtents.z * 2};
+    return CadSceneGeometry.dimensionsOf(document.result());
   }
 
   public function setSceneDimensions(width:Float,
