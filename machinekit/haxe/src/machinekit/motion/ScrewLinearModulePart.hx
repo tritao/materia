@@ -21,28 +21,30 @@ class ScrewLinearModulePart extends MachineComponent {
     P.text("profile","HGH15CA"),P.length("stroke",20),P.length("railSpacing",150),P.length("blockSpacing",80),P.length("overtravel",5),P.scalar("hostLength",0),P.scalar("hostWidth",0)];
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.motion.screw-linear-module-part",parameters(),v->new ScrewLinearModulePart(v),false,false,null,false)
     .versioned(5).numbered(numberFor).procured(_->Make("ground plate/flat bar, cut and joint-drilled"))
-    .requiring(v->{
-      // The stock (and so the route) is worked out from the module spec when the part is made.
-      var route=ManufacturingRoute.of(new ScrewLinearModulePart(v));
-      if(route==null)throw "Screw module part has no manufacturing route";
-      route.requirements();
-    }));
+    .requiring(v->{var r=P.resolve(parameters(),v);routeFor(specOf(r),r.token("role")).requirements();}));
   static function numberFor(v:ComponentValues):String {
     var keys=[v.token("profile")];for(k in ["stroke","railSpacing","blockSpacing","overtravel","hostLength","hostWidth"])keys.push(ComponentNumberKey.encode(v.number(k)));
     return PartNumbers.geometry("SCREW-MODULE",v.token("role"),keys.join("|"));
   }
   public function new(?overrides:ComponentValues) {
-    var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"),v.number("hostLength"),v.number("hostWidth"));role=v.token("role");
+    var v=P.resolve(parameters(),overrides);spec=specOf(v);role=v.token("role");
     super(numberFor(v),"Precision screw module "+role,"steel",false,v);
-    var stock=isScaleSpacer()?GroundStock.bar(40,8):isPad()?GroundStock.bar(GroundStock.barWidths().filter(w->w>=padBounds(spec,role=="fixedPad"?"fixed":"floating").maxY*2)[0],3):role=="scaleHeadCarrier"?GroundStock.bar(headCarrierStockWidth(spec),GroundStock.atLeast("flat bar",spec.carriageBottom()-headCarrierBottom(spec)))
+    addFacet(routeFor(spec,role));
+    addFacet(EngineeringMetadata.assumed("Stock tolerances and process acceptance unqualified"));
+    addConnector("mount",Mount,F.identity());
+    addConnector("interface",Mount,isScaleSpacer()?F.translation(0,0,ScrewLinearModuleSpec.SCALE_PACKING):F.translation(spec.carriageCentre,0,spec.carriageBottom()+spec.carriageThickness));
+  }
+  static function specOf(v:ComponentValues):ScrewLinearModuleSpec return new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),
+    v.number("blockSpacing"),v.number("overtravel"),v.number("hostLength"),v.number("hostWidth"));
+  /** The ground stock a role is made from and how it is finished: a function of the module spec, so the recipe's requirements need no part. */
+  static function routeFor(spec:ScrewLinearModuleSpec,role:String):ManufacturingRoute {
+    var spacer=role=="scaleSpacer",pad=role=="fixedPad"||role=="floatingPad";
+    var stock=spacer?GroundStock.bar(40,8):pad?GroundStock.bar(GroundStock.barWidths().filter(w->w>=padBounds(spec,role=="fixedPad"?"fixed":"floating").maxY*2)[0],3):role=="scaleHeadCarrier"?GroundStock.bar(headCarrierStockWidth(spec),GroundStock.atLeast("flat bar",spec.carriageBottom()-headCarrierBottom(spec)))
       :StringTools.startsWith(role,"wall")?GroundStock.bar(Math.max(spec.wallWidth,spec.wallHeight),Math.min(spec.wallWidth,spec.wallHeight))
       :StringTools.startsWith(role,"stop")?GroundStock.bar(60,20)
       :role=="nutCarrier"?GroundStock.bar(spec.carrierWidth,spec.carrierThickness)
       :GroundStock.plate(GroundStock.STEEL,role=="carriage"?spec.carriageThickness:spec.baseThickness);
-    addFacet(ManufacturingRoute.groundStock(stock,[{name:isScaleSpacer()?"finish scale-housing packing to 7 mm from 8 mm ground stock; ASSUMED supplier capability":isPad()?"finish matched support packing to 2 mm from 3 mm ground stock; ASSUMED supplier capability":"joint interfaces; inspect stock before assembly, supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]));
-    addFacet(EngineeringMetadata.assumed("Stock tolerances and process acceptance unqualified"));
-    addConnector("mount",Mount,F.identity());
-    addConnector("interface",Mount,isScaleSpacer()?F.translation(0,0,ScrewLinearModuleSpec.SCALE_PACKING):F.translation(spec.carriageCentre,0,spec.carriageBottom()+spec.carriageThickness));
+    return ManufacturingRoute.groundStock(stock,[{name:spacer?"finish scale-housing packing to 7 mm from 8 mm ground stock; ASSUMED supplier capability":pad?"finish matched support packing to 2 mm from 3 mm ground stock; ASSUMED supplier capability":"joint interfaces; inspect stock before assembly, supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]);
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function machinable():Bool return true;

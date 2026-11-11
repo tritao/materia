@@ -212,7 +212,8 @@ own included, is one class and one registered codec. Done.
 - BOM: one helper for the "Assumed made part" engineering metadata the
   hobber parts repeat (done: `EngineeringMetadata.assumed(source)`, 88 uses
   across MachineKit, its examples and the hobber); `ScrewLinearModulePart`'s stock and route as a
-  function of its recipe values, so its requirements do not build a part.
+  function of its recipe values, so its requirements do not build a part
+  (done: `routeFor(spec, role)`).
 
 **FP1e — Placed primitives and n-ary booleans.** From the hobber count:
 
