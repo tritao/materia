@@ -14,7 +14,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
-/** GE-motor-cradle; owns its stock, interfaces and manufacturing route. */
+/** GE-motor-cradle: the B servo's milled cradle on the spindle seat; recorded in the seat's frame (see `record`). */
 class HobberMotorCradle extends HobberMadePart {
   // ---- B motor cradle (FRAME_PLAN head redesign) -------------------------------------------------------------------------------
 
@@ -151,11 +151,6 @@ class HobberMotorCradle extends HobberMadePart {
     return {wall: CRADLE_WALL, floor: CRADLE_FLOOR, floorThin: CRADLE_FLOOR_THIN, foot: CRADLE_FOOT, lug: CRADLE_LUG, travel: HobSpindle.TENSION_TRAVEL, slot: CRADLE_SLOT, jackY: cradleFaceY() - 4.0};
   }
   public static function cradleMotor():machinekit.motion.ServoMotor return machinekit.motion.LeadshineServo.driven(HobSpindle.MOTOR);
-  /** A slot as `holeTool` ends and the box between them: vertical (work z) with the round ends at `zc` +- `travel`, cut into +y from the mouth at `y0`. */
-  public static function slotCuts(x:Float, zc:Float, width:Float, travel:Float, y0:Float, depth:Float):Array<Part> {
-    return [HobberPartGeometry.holeTool([x, y0, zc - travel], [0.0, 1, 0], width, depth), HobberPartGeometry.holeTool([x, y0, zc + travel], [0.0, 1, 0], width, depth),
-      HobberPartGeometry.box(x - width / 2, x + width / 2, y0 - 1, y0 + depth, zc - travel, zc + travel)];
-  }
   /**
    * The cradle's holes in the work frame lowered by the seat height (`inSeat` false), or the seat block's matching tapped holes (true): the
    * floor's four M8 and two dowels into the seat's top, and in the cradle the motor's pilot register, four flange bolts and the
@@ -185,41 +180,78 @@ class HobberMotorCradle extends HobberMadePart {
       position: [CRADLE_MOTOR_X, cradleFaceY() - 4.0, cradleFloorTop(cradleFaceY()) + CRADLE_LUG], direction: [0.0, 0, -1]});
     return list;
   }
-  /** The motor cradle: a milled steel part, a floor on the seat block's top, a wall with the servo's slotted flange register, a jack lug, one windowed rib and the rest block under the servo's body. */
-  public static function motorCradle():Part {
-    var c = HobSpindle.motorHeight(), top = c + 47, rear = cradleRearY(), low = HobberSpindleSeat.SEAT_HALF, floor = low + CRADLE_FLOOR, thin = low + CRADLE_FLOOR_THIN, foot = low + CRADLE_FOOT;
-    var body = Solids.union([HobberPartGeometry.box(CRADLE_FLOOR_THIN_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_Y0, CRADLE_FLOOR_STEP, low, thin),
-      HobberPartGeometry.box(CRADLE_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_STEP, HobberSpindleSeat.SEAT_Y1, low, floor),
-      HobberPartGeometry.box(CRADLE_X0, CRADLE_FLOOR_X1, HobberSpindleSeat.SEAT_Y1, rear, low, foot),
-      HobberPartGeometry.box(CRADLE_REST_X0, CRADLE_REST_X1, CRADLE_REST_Y0, CRADLE_REST_Y1, low, cradleRestTop()),
-      HobberPartGeometry.box(CRADLE_X0, CRADLE_X1, cradleFaceY(), rear, foot, top),
-      HobberPartGeometry.box(CRADLE_X0 - 5, CRADLE_X0 + 1, CRADLE_RIB_Y0, rear, low, top),
-      HobberPartGeometry.box(CRADLE_MOTOR_X - CRADLE_LUG_HALF, CRADLE_MOTOR_X + CRADLE_LUG_HALF, CRADLE_LUG_Y0, cradleFaceY() + 0.5, foot, foot + CRADLE_LUG)]);
-    var slit = HobberPartGeometry.box(-CRADLE_SLIT / 2, CRADLE_SLIT / 2, CRADLE_FLOOR_Y0 - 1, cradleFaceY() - CRADLE_SLIT_END, low - 1, Math.max(foot, cradleRestTop()) + 1);
-    var window = HobberPartGeometry.box(CRADLE_X0 - 6, CRADLE_X0 + 2, CRADLE_RIB_WINDOW_Y0, CRADLE_RIB_WINDOW_Y1, CRADLE_RIB_WINDOW_Z0, CRADLE_RIB_WINDOW_Z1);
+  static final cradleRecipe = new machinekit.cache.Once<ComponentType>();
+
+  public static function cradleType():ComponentType return cradleRecipe.get(() -> new ComponentType("machinekit.hobbing.motor-cradle", [],
+    _ -> new HobberMotorCradle(), false, false, null, false).versioned(1).numbered(_ -> "HOBBER-GE-MOTOR-CRADLE")
+    .procured(_ -> Make("steel fabrication and machining")).requiring(_ -> route().requirements()));
+
+  static function floorFrame(row:Float):AssemblyFrame return BoltedFace.frameOf({x: 0.0, y: row, z: HobberSpindleSeat.SEAT_HALF}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0});
+  static function motorFrame():AssemblyFrame return BoltedFace.frameOf({x: CRADLE_MOTOR_X, y: cradleFaceY(), z: HobSpindle.motorHeight()}, {x: 0, y: 1, z: 0},
+    {x: 1, y: 0, z: 0});
+  static function servoFlange():machinekit.motion.MotorFlange {
     var flange = cradleMotor().mounting();
-    if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(cradleMotor().rating.designation);
-    var t = HobSpindle.TENSION_TRAVEL, cuts = [slit, window];
-    // Pilot recess, shaft bore and the four flange-bolt slots, then the plain holes.
-    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, flange.pilotDiameter + 0.2, t, cradleFaceY(), flange.pilotHeight));
-    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, cradleMotor().rating.shaftDiameter + 8, t, cradleFaceY(), CRADLE_WALL));
-    for (h in flange.holes) cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X + h.x, c + h.y, CRADLE_SLOT, t, cradleFaceY(), CRADLE_WALL));
-    var plain = [for (h in cradleHoles(false)) if (h.slotLength == null) h];
-    return HobberPartGeometry.withHoles(Solids.cut(body, cuts), plain);
+    return flange == null ? machinekit.motion.ServoMotor.assumedMounting(cradleMotor().rating.designation) : flange;
   }
-  public function new(?values:ComponentValues) { super("GE-motor-cradle",values); finish(true); }
+
+  public function new(?values:ComponentValues) {
+    super("GE-motor-cradle", values, new ComponentValues());
+    finish(true);
+  }
+  override public function componentType():Null<ComponentType> return cradleType();
+
+  /**
+   * The cradle: a milled steel part on the spindle seat's top (in the seat's frame, the spindle axis): a floor on the seat's top,
+   * a wall carrying the servo's slotted flange register, a jack lug, one windowed rib and the rest block under the servo body.
+   */
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var c = HobSpindle.motorHeight(), top = c + 47, rear = cradleRearY(), low = HobberSpindleSeat.SEAT_HALF, floor = low + CRADLE_FLOOR;
+    var thin = low + CRADLE_FLOOR_THIN, foot = low + CRADLE_FOOT;
+    var body = b.label(b.unionAll([
+      b.label(b.boxBetween(CRADLE_FLOOR_THIN_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_Y0, CRADLE_FLOOR_STEP, low, thin), "Thin floor"),
+      b.label(b.boxBetween(CRADLE_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_STEP, HobberSpindleSeat.SEAT_Y1, low, floor), "Floor"),
+      b.label(b.boxBetween(CRADLE_X0, CRADLE_FLOOR_X1, HobberSpindleSeat.SEAT_Y1, rear, low, foot), "Foot"),
+      b.label(b.boxBetween(CRADLE_REST_X0, CRADLE_REST_X1, CRADLE_REST_Y0, CRADLE_REST_Y1, low, cradleRestTop()), "Rest block"),
+      b.label(b.boxBetween(CRADLE_X0, CRADLE_X1, cradleFaceY(), rear, foot, top), "Wall"),
+      b.label(b.boxBetween(CRADLE_X0 - 5, CRADLE_X0 + 1, CRADLE_RIB_Y0, rear, low, top), "Rib"),
+      b.label(b.boxBetween(CRADLE_MOTOR_X - CRADLE_LUG_HALF, CRADLE_MOTOR_X + CRADLE_LUG_HALF, CRADLE_LUG_Y0, cradleFaceY() + 0.5, foot, foot + CRADLE_LUG), "Jack lug")
+    ]), "Cradle body");
+    var slit = b.boxBetween(-CRADLE_SLIT / 2, CRADLE_SLIT / 2, CRADLE_FLOOR_Y0 - 1, cradleFaceY() - CRADLE_SLIT_END, low - 1, Math.max(foot, cradleRestTop()) + 1);
+    var window = b.boxBetween(CRADLE_X0 - 6, CRADLE_X0 + 2, CRADLE_RIB_WINDOW_Y0, CRADLE_RIB_WINDOW_Y1, CRADLE_RIB_WINDOW_Z0, CRADLE_RIB_WINDOW_Z1);
+    var opened = b.label(b.cutAll(body, [slit, window], ["clamp slit", "rib window"]), "Slit and rib window");
+    // The servo slides on its flange bolts by the tension travel: its pilot register, shaft bore and bolt holes are slots.
+    var flange = servoFlange(), t = HobSpindle.TENSION_TRAVEL, slots:Array<cadkit.parametric.Feature> = [], labels:Array<String> = [];
+    function slot(x:Float, zc:Float, width:Float, depth:Float, label:String):Void {
+      for (z in [zc - t, zc + t]) {
+        slots.push(b.cylinderAlong(new Vector(x, cradleFaceY(), z), Vector.Y(), width / 2, -1, depth));
+        labels.push(label + " end");
+      }
+      slots.push(b.boxBetween(x - width / 2, x + width / 2, cradleFaceY() - 1, cradleFaceY() + depth, zc - t, zc + t));
+      labels.push(label);
+    }
+    slot(CRADLE_MOTOR_X, c, flange.pilotDiameter + 0.2, flange.pilotHeight, "pilot register");
+    slot(CRADLE_MOTOR_X, c, cradleMotor().rating.shaftDiameter + 8, CRADLE_WALL, "shaft slot");
+    for (h in flange.holes) slot(CRADLE_MOTOR_X + h.x, c + h.y, CRADLE_SLOT, CRADLE_WALL, "flange bolt slot");
+    var slotted = b.label(b.cutAll(opened, slots, labels), "Servo register and slots");
+    var plain = [for (h in cradleHoles(false)) if (h.slotLength == null) RouteHoles.spec(h, F.identity())];
+    var drilled = b.label(b.holes(slotted, plain), "Jack screw");
+    for (row in [CRADLE_FRONT_BOLT_Y, CRADLE_REAR_BOLT_Y]) HobberRecording.datum(b, row >= HobberSpindleSeat.SEAT_Y1 ? "floor-rear" : "floor-front", floorFrame(row));
+    HobberRecording.datum(b, "motor", motorFrame());
+    HobberRecording.datum(b, "floor-pins", floorFrame(CRADLE_PIN_Y));
+    return drilled;
+  }
   override public function machinable():Bool return true;
   override public function pinnedFaces():Array<PinnedFace> return {
-    [PinnedFace.atPoints("floor-pins", BoltedFace.frameOf({x: 0.0, y: CRADLE_PIN_Y, z: HobberSpindleSeat.SEAT_HALF}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
-      [for (x in CRADLE_PIN_X) {x: x, y: CRADLE_PIN_Y, z: HobberSpindleSeat.SEAT_HALF}], 8.0, cradleFloorTop(CRADLE_PIN_Y) - HobberSpindleSeat.SEAT_HALF, true)];
+    [PinnedFace.atPoints("floor-pins", floorFrame(CRADLE_PIN_Y),
+      [for (x in CRADLE_PIN_X) {x: x, y: CRADLE_PIN_Y, z: HobberSpindleSeat.SEAT_HALF}], 8.0, cradleFloorTop(CRADLE_PIN_Y) - HobberSpindleSeat.SEAT_HALF, true)
+      .at(recordedDatum("floor-pins"))];
   };
   override public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return {
     derivedRouteHoles().concat(cradleHoles(false));
   };
-  override public function pieces():Array<Part> return {
-    [motorCradle()];
-  };
-  override public function manufacturingRoute():Null<ManufacturingRoute> return {
+  override public function manufacturingRoute():Null<ManufacturingRoute> return route();
+
+  static function route():ManufacturingRoute return {
     ManufacturingRoute.milled(2, "fine", [
       {name: "motor flange face, front (square to the shaft bore; pilot register)", tolerance: 0.02, roughnessRa: 1.6},
       {name: "floor underside, on the seat block's top", tolerance: 0.02, roughnessRa: 1.6},
@@ -231,7 +263,7 @@ class HobberMotorCradle extends HobberMadePart {
     // The floor's four M8 into the seat: heads on the floor top, clearance holes through it; the rear row's heads are sunk (Ø14 x 9) under the servo's flange.
         for (row in [CRADLE_FRONT_BOLT_Y, CRADLE_REAR_BOLT_Y]) {
           var rear = row >= HobberSpindleSeat.SEAT_Y1, floor = cradleFloorTop(row) - HobberSpindleSeat.SEAT_HALF;
-          faces.push(BoltedFace.clamped(rear ? "floorRear" : "floorFront", BoltedFace.frameOf({x: 0.0, y: row, z: HobberSpindleSeat.SEAT_HALF}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+          faces.push(BoltedFace.clamped(rear ? "floorRear" : "floorFront", recordedDatum(rear ? "floor-rear" : "floor-front"),
             [for (b in cradleFloorBolts()) if (b.y == row) {x: b.x, y: 0.0}], machinekit.standard.SocketHeadCapScrew.catalog().get("M8").clearanceMedium,
             rear ? floor - CRADLE_BORE_DEPTH : floor, "M8", rear ? {diameter: CRADLE_BORE, depth: CRADLE_BORE_DEPTH} : null, false));
         }
@@ -239,8 +271,7 @@ class HobberMotorCradle extends HobberMadePart {
         // and nut on its rear face: a through plate, so the screws, washers and nuts derive while the slots stay the part's own.
         var motor = cradleMotor(), flange = motor.mounting();
         if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
-        faces.push(BoltedFace.through("motor", BoltedFace.frameOf({x: CRADLE_MOTOR_X, y: cradleFaceY(), z: HobSpindle.motorHeight()},
-          {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), [for (h in flange.holes) {x: h.x, y: -h.y}], flange.holeDiameter, CRADLE_WALL,
+        faces.push(BoltedFace.through("motor", recordedDatum("motor"), [for (h in flange.holes) {x: h.x, y: -h.y}], flange.holeDiameter, CRADLE_WALL,
           "M" + Std.int(flange.holeDiameter - 0.5)).withSlots(CRADLE_SLOT, HobSpindle.TENSION_TRAVEL, "y"));
     return faces;
   }

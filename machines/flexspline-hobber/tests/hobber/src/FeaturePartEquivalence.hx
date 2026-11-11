@@ -184,7 +184,8 @@ class FeaturePartEquivalence {
       "outboardCarrier" => ["Carrier"],
       "spindleSeat" => ["Block", "Bore and slit", "Swivel clearance", "Clamp screw holes"],
       "Ymodule/base" => ["Swept deck relief"],
-      "Ymodule/carriage" => ["Spindle flange relief"]
+      "Ymodule/carriage" => ["Spindle flange relief"],
+      "motorCradle" => ["Cradle body", "Slit and rib window", "Servo register and slots", "Jack screw"]
     ];
     for (id => steps in expected) {
       var found = [for (member in machine.components()) if (member.id == id) member.component];
