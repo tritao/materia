@@ -23,14 +23,20 @@ class HobberChipCover extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [machinekit.component.ComponentRecipeSupport.choice("role",MADE,"XleftFront")];
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType("machinekit.hobbing.chip-cover",parameters(),v->new HobberChipCover(v),false,false,null,false)
-      .versioned(2).numbered(v->"HOBBER-GUARD-"+v.token("role").toUpperCase()).procured(v->Make(v.token("role")=="Xrear"?"cut plate":"cut and formed sheet")));
+      .versioned(2).numbered(v->"HOBBER-GUARD-"+v.token("role").toUpperCase()).procured(v->Make(v.token("role")=="Xrear"?"cut plate":"cut and formed sheet"))
+      .requiring(v->routeFor(v.token("role")).requirements()));
   }
   public function new(?overrides:ComponentValues) {
     var v=machinekit.component.ComponentRecipeSupport.resolve(parameters(),overrides),r=v.token("role");
     super("HOBBER-GUARD-"+r.toUpperCase(),"Chip shield: "+r,"steel",false,v);role=r;
-    var bends=StringTools.startsWith(r,"Xleft")||StringTools.startsWith(r,"Xright")?3:r=="Xfront"?1:r=="Xskirt"?16:3;
-    addFacet(r=="Xrear"?ManufacturingRoute.cutPlate():ManufacturingRoute.foldedSheet(2,bends,2));
+    addFacet(routeFor(r));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed")
+      .setToken("source","Sheet guard sized to clear the X drive; no load or deflection check")));
     addConnector("mount",Mount,Solids.axial(0,0,0));
+  }
+  static function routeFor(role:String):ManufacturingRoute {
+    var bends=StringTools.startsWith(role,"Xleft")||StringTools.startsWith(role,"Xright")?3:role=="Xfront"?1:role=="Xskirt"?16:3;
+    return role=="Xrear"?ManufacturingRoute.cutPlate():ManufacturingRoute.foldedSheet(2,bends,2);
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function machinable():Bool return true;

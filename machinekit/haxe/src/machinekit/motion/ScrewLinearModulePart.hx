@@ -20,7 +20,13 @@ class ScrewLinearModulePart extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [P.choice("role",ROLES,"base"),
     P.text("profile","HGH15CA"),P.length("stroke",20),P.length("railSpacing",150),P.length("blockSpacing",80),P.length("overtravel",5),P.scalar("hostLength",0),P.scalar("hostWidth",0)];
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.motion.screw-linear-module-part",parameters(),v->new ScrewLinearModulePart(v),false,false,null,false)
-    .versioned(5).numbered(numberFor).procured(_->Make("ground plate/flat bar, cut and joint-drilled")));
+    .versioned(5).numbered(numberFor).procured(_->Make("ground plate/flat bar, cut and joint-drilled"))
+    .requiring(v->{
+      // The stock (and so the route) is worked out from the module spec when the part is made.
+      var route=ManufacturingRoute.of(new ScrewLinearModulePart(v));
+      if(route==null)throw "Screw module part has no manufacturing route";
+      route.requirements();
+    }));
   static function numberFor(v:ComponentValues):String {
     var keys=[v.token("profile")];for(k in ["stroke","railSpacing","blockSpacing","overtravel","hostLength","hostWidth"])keys.push(ComponentNumberKey.encode(v.number(k)));
     return PartNumbers.geometry("SCREW-MODULE",v.token("role"),keys.join("|"));

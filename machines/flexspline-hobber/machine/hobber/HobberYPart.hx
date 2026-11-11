@@ -19,11 +19,17 @@ class HobberYPart extends MachineComponent {
   public final role:String;
   public final spec:ScrewLinearModuleSpec;
   public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage"],"base")];
-  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(22).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->Make("ground plate, joint drilling")));
+  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(22).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(v->Make("ground plate, joint drilling")).requiring(v->routeFor(v.token("role")).requirements()));
+  /** Ground stock for the role, inspected on receipt; small faces the supplier misses are finished. */
+  static function routeFor(role:String):ManufacturingRoute {
+    var spec=HobberLayout.get().moduleSpec();
+    return ManufacturingRoute.groundStock(GroundStock.plate(role=="base"?GroundStock.STEEL:GroundStock.ALUMINIUM,role=="base"?spec.baseThickness:spec.carriageThickness),
+      [{name:"inspect ground stock; supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]);
+  }
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberLayout.get().moduleSpec();
     super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,role=="base"?"steel":"aluminium 6061",false,v);
-    addFacet(ManufacturingRoute.groundStock(GroundStock.plate(role=="base"?GroundStock.STEEL:GroundStock.ALUMINIUM,role=="base"?spec.baseThickness:spec.carriageThickness),[{name:"inspect ground stock; supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]));
+    addFacet(routeFor(role));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed").setToken("source","Bought ground stock acceptance and small-face finishing remain unqualified")));
     addConnector("mount",Mount,F.identity());addConnector("interface",Mount,F.translation(spec.carriageCentre,0,spec.carriageBottom()+spec.carriageThickness));
   }
