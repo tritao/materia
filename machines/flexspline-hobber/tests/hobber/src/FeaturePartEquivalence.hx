@@ -170,7 +170,9 @@ class FeaturePartEquivalence {
       "XdriveFixedBar" => ["Stock · Ground bar", "Fasteners · Derived holes"],
       "XdriveFloatingBar" => ["Stock · Ground bar", "Fasteners · Derived holes"],
       "ZdriveFixedBar" => ["Stock · Ground bar", "Fasteners · Derived holes"],
-      "ZdriveFloatingBar" => ["Stock · Ground bar", "Z running clearance", "Fasteners · Derived holes"]
+      "ZdriveFloatingBar" => ["Stock · Ground bar", "Z running clearance", "Fasteners · Derived holes"],
+      "XscaleSeat" => ["Stock · Ground bar", "Housing holes"],
+      "ZscaleSeat" => ["Stock · Ground bar", "Housing holes"]
     ];
     for (id => steps in expected) {
       var found = [for (member in machine.components()) if (member.id == id) member.component];

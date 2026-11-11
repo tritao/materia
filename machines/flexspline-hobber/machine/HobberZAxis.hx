@@ -44,7 +44,7 @@ class HobberZAxis extends HobberUnit implements machinekit.cover.WayCover.CoverM
     drive(axis,HobberDrives.barMember("Z","fixed"),HobberDrives.barMember("Z","floating"),"Zplate",0);
     var scaleZ=HobberScales.z();
     group("Scale");
-    externalPart("ZscaleSeat", new HobberScaleSeat("Z"), HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z), "foundation", "column-casting", scaleBarContact(scaleZ));
+    externalPart("ZscaleSeat", new HobberScaleSeat("Z"), HobberFrame.sourcePose(HobberScaleSeat.frameFor(scaleZ)), "foundation", "column-casting", scaleBarContact(scaleZ));
     var armFace = HobberScales.headFace(scaleZ);
     fixedPart("ZscaleArm", new HobberZScaleArm(), HobberFrame.partAt(0, 0, heights.hobCentreZ), "Zplate",
       F.alongY(-(armFace[1] - HobberScales.Z_ARM_THICKNESS / 2), 148, HobberFrame.PART_DATUM_Z + armFace[2], 0, 1, 0));

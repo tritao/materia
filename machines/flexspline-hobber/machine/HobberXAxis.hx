@@ -50,7 +50,7 @@ class HobberXAxis extends HobberUnit {
     drive(axis,HobberDrives.barMember("X","fixed"),HobberDrives.barMember("X","floating"),"Xbridge",cutDistance);
     var scaleX=HobberScales.x();
     group("Scale");
-    externalPart("XscaleSeat", new HobberScaleSeat("X"), HobberFrame.partAt(0,0,HobberFrame.PART_DATUM_Z), "foundation", "bed-casting", scaleBarContact(scaleX));
+    externalPart("XscaleSeat", new HobberScaleSeat("X"), HobberFrame.sourcePose(HobberScaleSeat.frameFor(scaleX)), "foundation", "bed-casting", scaleBarContact(scaleX));
     scale(scaleX,"XscaleSeat","Xrib-scale");
     group("Protection");
     for (r in HobberChipCover.installations()) {
