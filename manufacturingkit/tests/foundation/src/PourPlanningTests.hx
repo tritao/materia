@@ -125,7 +125,7 @@ class PourPlanningTests {
       "unknown pour rate stays pending"
     );
     var unknown = cube(100000);
-    unknown.model = "future exact non-box model";
+    unknown.model = materia.tooling.process.FillAnalysis.FillModel.Brep;
     var unsupported = PourPlanning.analyze("cast", unknown, recipe, mixer());
     check(
       unsupported.schedule == null

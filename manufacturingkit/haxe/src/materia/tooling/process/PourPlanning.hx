@@ -6,6 +6,7 @@ import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.ToolingDiagnostic.ToolingSeverity;
 import materia.tooling.process.FillAnalysis.FillReport;
+import materia.tooling.process.FillAnalysis.FillModel;
 
 enum abstract MixIngredientKind(String) to String {
   var Resin = "resin";
@@ -120,7 +121,7 @@ class PourPlanning {
       return result;
     }
     var declaredMixer:PourMixerSpec = equipment;
-    if (fill.model != "exact-orthogonal-flat-free-surface") {
+    if (fill.model != FillModel.Orthogonal) {
       result.validation.push(check(
         sourceId,
         "batch-schedule",

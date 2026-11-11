@@ -17,7 +17,7 @@ class MarkerDetector {
     params.set_min_marker_perimeter_rate(minPerimeterRate);
     params.set_corner_refinement(refineCorners ? 1 : 0);
     var created = VisionKitNative.vk_marker_detector_create(dictionary, params);
-    if (created.status != 0) throw 'Marker detector creation failed with VisionKit error ${created.status}';
+    if (created.status != VkResult.Ok) throw 'Marker detector creation failed with VisionKit error ${created.status}';
     owner = created.out_detector;
   }
 
@@ -32,14 +32,14 @@ class MarkerDetector {
       markerSizeMetres,
       capacity
     );
-    if (result.status == -6) result = VisionKitNative.vk_marker_detect(
+    if (result.status == VkResult.ErrorLimit) result = VisionKitNative.vk_marker_detect(
       owner.borrow(),
       image.native(),
       model.native(),
       markerSizeMetres,
       result.out_count
     );
-    if (result.status != 0) throw 'Marker detection failed with VisionKit error ${result.status}';
+    if (result.status != VkResult.Ok) throw 'Marker detection failed with VisionKit error ${result.status}';
     var output:Array<MarkerObservation> = [];
     for (i in 0...result.out_count) {
       var marker = result.out_markers[i];

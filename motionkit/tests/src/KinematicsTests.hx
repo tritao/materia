@@ -2740,7 +2740,7 @@ class KinematicsTests extends MotionKitTestSupport {
           1e-7
         );
       }
-      if (freedom == motionkit.path.OrientationPolicy.Free) {
+      if ((switch freedom { case Free: true; default: false; })) {
         var axis = rotation.rotate(new Vec3(0, 0, 1)), oppositeFound = false;
         for (cell in cells) {
           var q = new Quat(cell.pose.qx, cell.pose.qy, cell.pose.qz, cell.pose.qw);

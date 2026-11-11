@@ -3,7 +3,7 @@ package trajectorykit.validation;
 import haxe.Int64;
 
 /** What one validation check establishes for a particular plan. */
-enum ValidationGuarantee {
+enum ValidationGuarantee implements Equatable {
   Proven;
   Sampled(resolutionNs:Int64);
   Unchecked;

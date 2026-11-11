@@ -96,7 +96,7 @@ class CameraModel {
       input.push(n);
     }
     var result = VisionKitNative.vk_project_points(native(), input);
-    if (result.status != 0) throw 'Projection failed with VisionKit error ${result.status}';
+    if (result.status != VkResult.Ok) throw 'Projection failed with VisionKit error ${result.status}';
     return [for (p in result.out_pixels) {
       x:p.get_x(), y:p.get_y()
     }
@@ -114,7 +114,7 @@ class CameraModel {
       input.push(n);
     }
     var result = VisionKitNative.vk_unproject_points(native(), input);
-    if (result.status != 0) throw 'Unprojection failed with VisionKit error ${result.status}';
+    if (result.status != VkResult.Ok) throw 'Unprojection failed with VisionKit error ${result.status}';
     return [for (p in result.out_rays) {
       x:p.get_x(), y:p.get_y(), z:p.get_z()
     }
@@ -147,7 +147,7 @@ class CameraModel {
     var pose = new vk_pose3();
     pose.set_struct_size(vk_pose3.size());
     var result = VisionKitNative.vk_solve_pnp(native(), objects, images, ippeSquare ? 1 : 0, pose);
-    if (result.status != 0) throw 'PnP failed with VisionKit error ${result.status}';
+    if (result.status != VkResult.Ok) throw 'PnP failed with VisionKit error ${result.status}';
     return new PoseEstimate(Pose3.fromNative(pose), result.out_reprojection_errors);
   }
 }

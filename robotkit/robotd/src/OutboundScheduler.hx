@@ -36,7 +36,6 @@ private class BulkSlot {
 
 /** Per-session latest-wins queue. The transport writer remains the only I/O thread. */
 class OutboundScheduler {
-  public static inline final QUEUE_FULL:Int = -9;
   public static inline final MIN_ESSENTIAL_RESERVE:Int = 65536;
   final transport:TransportHandle;
   final budgetBytes:Int;
@@ -210,7 +209,7 @@ class OutboundScheduler {
         continue;
       }
       var result = TransportInterop.sendStatus(transport, slot.frame.encode());
-      if (result == QUEUE_FULL) {
+      if (result == Result.ErrorQueueFull) {
         nextKey++;
         continue;
       }
