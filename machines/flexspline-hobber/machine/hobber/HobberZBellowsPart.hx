@@ -2,8 +2,6 @@ package hobber;
 
 import machinekit.hobbing.*;
 
-import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.cover.*;
 import machinekit.motion.ScrewLinearModuleSpec;
@@ -63,11 +61,11 @@ class HobberZBellowsPart extends WayCoverSection {
       BoltedFace.frameOf({x:0.0,y:0.0,z:0.0},{x:0.0,y:0.0,z:1.0},{x:1.0,y:0.0,z:0.0}),
       holes(),plan.row.clearance,plan.row.flangeThickness,plan.row.screw,null,false,false)];
   }
-  override public function geometry(detail:ComponentDetail=Preview):Part {
-    var body=super.geometry(detail);if(role==Sleeve)return body;
+  /** The shared flange, trimmed to the host face: never the skins (checked when made). */
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder,detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var body=super.record(b,detail);if(role==Sleeve||body==null)return body;
     var half=plan.fullPlateHalf()-ScrewLinearModuleSpec.GAP,high=plan.shape.hostMax,low=plan.row.flangeThickness+0.2;
-    var raw=Part.box(2*half,high-low,plan.flangeSkin()+plan.row.flangeThickness+plan.row.wiper+2);
-    var keep=raw.translated(new Vector(0,(high+low)/2,-1));raw.close();
-    var trimmed=body.intersect(keep);keep.close();body.close();return trimmed;
+    var keep=b.boxBetween(-half,half,low,high,-1,plan.flangeSkin()+plan.row.flangeThickness+plan.row.wiper+1);
+    return b.label(b.intersect(body,keep),"Trimmed to host face");
   }
 }

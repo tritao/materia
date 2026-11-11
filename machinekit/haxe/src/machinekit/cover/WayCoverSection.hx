@@ -1,6 +1,8 @@
 package machinekit.cover;
 
-import cadkit.modeling.Part;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
+import machinekit.component.PartRecordings;
 import machinekit.component.BoltedFace;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentRecipeSupport;
@@ -10,7 +12,6 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Procurement.ProcurementCodec;
 import machinekit.component.Procurement.ProcurementRequirement;
-import machinekit.component.Solids;
 import machinekit.cover.WayCoverCatalog.WayCoverRow;
 import machinekit.cover.WayCoverPlan.CoverShape;
 
@@ -148,58 +149,43 @@ class WayCoverSection extends MachineComponent {
 
   override public function machinable():Bool return role != Sleeve;
 
-  override public function hasGeometry():Bool return true;
-
   /** A box centred across the frame (x), `y0` to `y1` up and `z0` to `z1` along. */
-  static function slab(halfWidth:Float, y0:Float, y1:Float, z0:Float, z1:Float):Part {
-    var box = Part.box(2 * halfWidth, y1 - y0, z1 - z0), moved = box.translated(new cadkit.modeling.Vector(0, (y0 + y1) / 2, z0));
-    box.close();
-    return moved;
-  }
+  static function slab(b:DocumentBuilder, halfWidth:Float, y0:Float, y1:Float, z0:Float, z1:Float):Feature
+    return b.boxBetween(-halfWidth, halfWidth, y0, y1, z0, z1);
 
   /** The solid between an outer and an inner section: both rectangles are given by their half width and height range. */
-  static function ring(outerHalf:Float, oy0:Float, oy1:Float, innerHalf:Float, iy0:Float, iy1:Float, z0:Float, z1:Float, tag:String):Part
-    return Solids.cut(Solids.named(slab(outerHalf, oy0, oy1, z0, z1), tag), [Solids.named(slab(innerHalf, iy0, iy1, z0 - 1, z1 + 1), tag + "-opening")]);
+  static function ring(b:DocumentBuilder, outerHalf:Float, oy0:Float, oy1:Float, innerHalf:Float, iy0:Float, iy1:Float, z0:Float, z1:Float,
+      name:String):Feature
+    return b.label(b.cutAll(slab(b, outerHalf, oy0, oy1, z0, z1), [slab(b, innerHalf, iy0, iy1, z0 - 1, z1 + 1)], [name + " opening"]), name);
 
-  function skin(z0:Float, z1:Float):Part {
+  function skin(b:DocumentBuilder, z0:Float, z1:Float):Feature {
     var row = plan.row, w = plan.innerHalfWidth(level);
-    return ring(w + row.wall, plan.outerLow(level), plan.outerHigh(level), w, plan.innerLow(level), plan.innerHigh(level), z0, z1, "skin");
+    return ring(b, w + row.wall, plan.outerLow(level), plan.outerHigh(level), w, plan.innerLow(level), plan.innerHigh(level), z0, z1, "Skin");
   }
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
     var row = plan.row;
-    if (role == Sleeve) return Solids.building([], owned -> {
+    if (role == Sleeve) {
       // The slide lip at the start end rides on the next smaller skin, which is how a loose skin is held and touches its parent.
-      var w = plan.innerHalfWidth(level), g = row.gap;
-      var shell = skin(0, plan.looseSkin());
-      owned.push(shell);
-      var open = plan.shape.open;
+      var w = plan.innerHalfWidth(level), g = row.gap, open = plan.shape.open;
+      var shell = skin(b, 0, plan.looseSkin());
       var lip = plan.shape.reversed
         // Nesting that grows toward the fixed end: the parent is the larger skin, so the lip is on the outside of this one.
-        ? ring(w + row.wall + g, open ? WayCoverPlan.FLOOR_GAP : plan.outerLow(level) - g, plan.outerHigh(level) + g, w + row.wall,
-          open ? WayCoverPlan.FLOOR_GAP - 1 : plan.outerLow(level), plan.outerHigh(level), 0, WayCoverPlan.LIP, "lip")
-        : ring(w, open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(level), plan.innerHigh(level), w - g, open ? WayCoverPlan.FLOOR_GAP - 1 : plan.innerLow(level) + g,
-          plan.innerHigh(level) - g, 0, WayCoverPlan.LIP, "lip");
-      owned.push(lip);
-      return Solids.union([shell, lip]);
-    });
-    return Solids.building([], owned -> {
-      var plate = ring(plateHalf(), plan.plateLow(), plan.plateHigh(), plan.width / 2, plan.openingLow(), plan.openingHigh(), 0, row.flangeThickness, "plate");
-      owned.push(plate);
-      var shell = skin(row.flangeThickness, row.flangeThickness + plan.flangeSkin());
-      owned.push(shell);
-      var parts = [plate, shell];
-      if (role == Moving) {
-        // The wiper pad: a lip hugging the protected profile, from the opening out to the first skin, standing on the plate's inner face.
-        var pad = ring(plan.innerHalfWidth(0), plan.shape.open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(0), plan.innerHigh(0), plan.width / 2, plan.openingLow(), plan.openingHigh(),
-          row.flangeThickness, row.flangeThickness + row.wiper, "pad");
-        owned.push(pad);
-        parts.push(pad);
-      }
-      var body = Solids.union(parts);
-      owned.splice(0, owned.length);
-      return machined(body);
-    });
+        ? ring(b, w + row.wall + g, open ? WayCoverPlan.FLOOR_GAP : plan.outerLow(level) - g, plan.outerHigh(level) + g, w + row.wall,
+          open ? WayCoverPlan.FLOOR_GAP - 1 : plan.outerLow(level), plan.outerHigh(level), 0, WayCoverPlan.LIP, "Slide lip")
+        : ring(b, w, open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(level), plan.innerHigh(level), w - g,
+          open ? WayCoverPlan.FLOOR_GAP - 1 : plan.innerLow(level) + g, plan.innerHigh(level) - g, 0, WayCoverPlan.LIP, "Slide lip");
+      return b.label(b.unionAll([shell, lip]), "Loose skin");
+    }
+    var parts = [
+      ring(b, plateHalf(), plan.plateLow(), plan.plateHigh(), plan.width / 2, plan.openingLow(), plan.openingHigh(), 0, row.flangeThickness, "Plate"),
+      skin(b, row.flangeThickness, row.flangeThickness + plan.flangeSkin())
+    ];
+    // The wiper pad: a lip hugging the protected profile, from the opening out to the first skin, standing on the plate's inner face.
+    if (role == Moving) parts.push(ring(b, plan.innerHalfWidth(0), plan.shape.open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(0), plan.innerHigh(0),
+      plan.width / 2, plan.openingLow(), plan.openingHigh(), row.flangeThickness, row.flangeThickness + row.wiper, "Wiper pad"));
+    return b.label(b.unionAll(parts), role == Moving ? "Moving flange" : "Fixed flange");
   }
 
   static final recipe = new machinekit.cache.Once<ComponentType>();

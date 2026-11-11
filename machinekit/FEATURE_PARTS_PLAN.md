@@ -335,9 +335,14 @@ Step 5 done: mineral castings record one step per casting feature
 (MachineKit registers casting-body, casting-cavity, casting-anchors,
 casting-receivers with CadKit), shared by every casting in MachineKit.
 
-Left in FP5: the Z bellows sections
-(bought, on MachineKit's `WayCoverSection`: they record when that base does,
-FP8),. Faces some parts still take from
+Z bellows done: MachineKit's `WayCoverSection` records (plate, skins, wiper
+pad and slide lips as rings; flanges get the shared derived-holes step), so
+every way cover in every machine records; the hobber's custom flanges add a
+"Trimmed to host face" step. `PartRecordings.recipeInputs` declares a part's
+numeric recipe inputs as its editable parameters for parts whose shape comes
+from a plan. Exact equivalence (60 sections).
+
+Left in FP5: faces some parts still take from
 other parts' helpers in the part datum frame (the carriage's nut-block, rib,
 cover and bellows receivers) move to datums as those helpers are reworked.
 

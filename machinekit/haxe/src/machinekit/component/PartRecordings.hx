@@ -70,6 +70,20 @@ class PartRecordings {
    * parameter is a recipe input: values computed from others are recorded as derived, values from stock or a catalogue as
    * fixed. So an editor override of a recipe input and the dimension it changes are the same thing.
    */
+  /**
+   * Every numeric input of the component's recipe as an editable named parameter of `builder`, by name: for a part whose shape
+   * comes from a plan computed from its inputs rather than from the dimensions one by one.
+   */
+  public static function recipeInputs(component:MachineComponent, builder:DocumentBuilder):Map<String, cadkit.parametric.NamedParameter> {
+    var out = new Map<String, cadkit.parametric.NamedParameter>(), recipe = component.componentType();
+    if (recipe != null) for (parameter in recipe.parameters()) switch parameter.type {
+      case Scalar | Length | Angle: out.set(parameter.name, builder.length(parameter.name, component.values().number(parameter.name)));
+      case Count: out.set(parameter.name, builder.count(parameter.name, component.values().integer(parameter.name)));
+      case _:
+    }
+    return out;
+  }
+
   static function checkParameters(component:MachineComponent, document:Document):Void {
     var recipe = component.componentType(), designation = component.designation;
     var inputs = new Map<String, Float>();

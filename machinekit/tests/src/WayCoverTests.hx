@@ -92,7 +92,9 @@ class WayCoverTests {
       } : null;
       var mount = new machinekit.cover.WayCoverMount("TEST-COVER-MOUNT" + (foot ? "-FOOT" : ""), 50, 50, 14,
         [{x:-20.0, y:25.0, d:8.0}], [{x0:10.0, x1:25.0, y0:0.0, y1:18.0}], 5, attachment);
-      mount.machine([{frame:frame, x:0.0, y:30.0, diameter:5.0, from:-14.0, to:0.0, kind:"clearance"}]);
+      // Drilled down from the top face (z = 0) through the 14 mm stock: the face frame's +Z points into the material.
+      var top = materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0, [1.0, 0, 0, 0, -1, 0, 0, 0, -1]);
+      mount.machine([{frame:top, x:0.0, y:-30.0, diameter:5.0, depth:14.0, through:true, kind:"clearance"}]);
       var assembly = new machinekit.assembly.MachineAssembly();
       assembly.addComponent("mount", mount);
       var restored = machinekit.assembly.MachineAssembly.decode(assembly.encode()).components()[0].component;

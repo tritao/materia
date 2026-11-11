@@ -128,7 +128,7 @@ class JointFastenerTests {
     function mount(name:String,x:Float,dx:Float=0,thread:String="M3"):machinekit.cover.WayCoverMount {
       var part=new machinekit.cover.WayCoverMount("REPEATED-MOUNT-TEST",50,50,14);
       part.machine([{name:name,frame:AssemblyFrames.fromRotationMatrix(dx,25,0,[1.0,0,0,0,-1,0,0,0,-1]),
-        x:x,y:7.0+dx*1e-15,diameter:2.5,from:-1.0,to:8.0,kind:"tapped",thread:thread}]);
+        x:x,y:7.0+dx*1e-15,diameter:2.5,depth:8.0,kind:"tapped",thread:thread}]);
       return part;
     }
     var a=mount("first-instance",12),b=mount("second-instance",2,10),bom=new machinekit.component.Bom();
