@@ -5,6 +5,7 @@ import haxeon.wire.JsonWire;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.CutAllFeature;
 import cadkit.parametric.features.PolygonFeature;
 import cadkit.parametric.features.BoxBetweenFeature;
 import cadkit.parametric.features.CylinderAlongFeature;
@@ -19,7 +20,7 @@ import cadkit.parametric.features.UnionAllFeature;
  */
 class CadKitFeatureTypes {
   public static function codecs():Array<FeatureCodec> {
-    var list:Array<FeatureCodec> = [new PlaceCodec(), new BlockCodec(), new PolygonCodec(), new BoxBetweenCodec(), new CylinderAlongCodec(), new UnionAllCodec(), new HolesCodec()];
+    var list:Array<FeatureCodec> = [new PlaceCodec(), new BlockCodec(), new PolygonCodec(), new BoxBetweenCodec(), new CylinderAlongCodec(), new UnionAllCodec(), new CutAllCodec(), new HolesCodec()];
     for (codec in cadkit.sheetmetal.SheetFeatureTypes.codecs()) list.push(codec);
     return list;
   }
@@ -139,6 +140,20 @@ private class UnionAllCodec extends CoreCodec {
 
   override public function decode(data:Dynamic, context:FeatureCodecContext):Feature
     return new UnionAllFeature([for (id in context.array(data, "parts")) context.feature(Std.int(id))]);
+}
+
+private class CutAllCodec extends CoreCodec {
+  public function new() super();
+
+  override public function type():String return "cut-all";
+
+  override public function encode(feature:Feature, context:FeatureCodecContext):Dynamic {
+    var cut:CutAllFeature = cast feature;
+    return {target: context.featureId(cut.target), tools: [for (tool in cut.tools) context.featureId(tool)]};
+  }
+
+  override public function decode(data:Dynamic, context:FeatureCodecContext):Feature
+    return new CutAllFeature(context.feature(Std.int(context.number(data, "target"))), [for (id in context.array(data, "tools")) context.feature(Std.int(id))]);
 }
 
 private class HolesCodec extends CoreCodec {

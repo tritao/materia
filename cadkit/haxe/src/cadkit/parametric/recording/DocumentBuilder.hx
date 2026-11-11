@@ -31,6 +31,7 @@ import cadkit.parametric.ElementReference;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.CutAllFeature;
 import cadkit.parametric.features.PolygonFeature;
 import cadkit.parametric.features.HolesFeature;
 import cadkit.parametric.HoleSpec;
@@ -728,11 +729,15 @@ class DocumentBuilder {
     return feature;
   }
 
-  /** `target` less every tool, as one labelled step and one boolean (labels name each tool in the history). */
-  public function cutAll(target:Feature, tools:Array<Feature>, labels:Array<String>):BooleanFeature {
+  /**
+   * `target` less every tool in one step (one native multi-tool cut, so tools may overlap each other). `labels` name the tools
+   * that have no label of their own; they are this step's sub-steps in the history.
+   */
+  public function cutAll(target:Feature, tools:Array<Feature>, labels:Array<String>):CutAllFeature {
     check();
-    var collection = document.add(new ToolCollectionFeature(tools, labels));
-    return document.add(new BooleanFeature(target, collection, BooleanOperation.Cut));
+    if (labels.length != tools.length) throw new ParametricError("cutAll needs one label per tool");
+    for (i in 0...tools.length) if (tools[i].label == "") tools[i].label = labels[i];
+    return document.add(new CutAllFeature(target, tools));
   }
 
   /** `target` with the holes `specs` describe cut in one step, each named by its spec. */

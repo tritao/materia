@@ -87,6 +87,16 @@ class TimelineModel {
     for (index in 0...document.featureCount()) {
       var feature = document.featureAt(index);
       if (!feature.active) continue;
+      // A multi-tool cut's tools are its sub-steps, as a boolean's are.
+      var cutAll = Std.downcast(feature, cadkit.parametric.features.CutAllFeature);
+      if (cutAll != null) {
+        var base = new Map<Int, Bool>();
+        collect(cutAll.target, base);
+        var tools = new Map<Int, Bool>();
+        for (tool in cutAll.tools) if (tool.active) collectTool(tool, tools);
+        for (id in tools.keys()) if (!base.exists(id) && !owners.exists(id)) owners.set(id, cutAll.id.toInt());
+        continue;
+      }
       // A union is made of its parts: they are its sub-steps, so the union's row carries their faces.
       var union = Std.downcast(feature, cadkit.parametric.features.UnionAllFeature);
       if (union != null) {

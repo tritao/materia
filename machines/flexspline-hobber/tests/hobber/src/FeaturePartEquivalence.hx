@@ -181,7 +181,8 @@ class FeaturePartEquivalence {
       "Xrib-scale" => ["Stock · Bright bar"],
       "chipTray" => ["Chip tray"],
       "electricalPanel" => ["Welded panel"],
-      "outboardCarrier" => ["Carrier"]
+      "outboardCarrier" => ["Carrier"],
+      "spindleSeat" => ["Block", "Bore and slit", "Swivel clearance", "Clamp screw holes"]
     ];
     for (id => steps in expected) {
       var found = [for (member in machine.components()) if (member.id == id) member.component];

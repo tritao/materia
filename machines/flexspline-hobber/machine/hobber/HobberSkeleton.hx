@@ -869,7 +869,8 @@ class HobberSkeleton {
 
   public function headInModule():materia.assembly.AssemblyRecord.AssemblyFrame return materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(modulePose()),materia.assembly.AssemblyFrames.translation(0,0,nativeHobCentreZ));
 
-  function railClearance():Float {
+  /** The Y module's clearance above the X rails at the swivel range, mm (the inclined plane the head must stay above). */
+  public function railClearance():Float {
     var rail=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA");if(rail==null)throw "Missing X guide";
     var stroke=HobberScales.stroke("Y"),half=(stroke.upper-stroke.lower)/2+HobberScales.overtravel();
     return bedRailSeatTop()+rail.railHeight+machinekit.motion.ScrewLinearModuleSpec.GAP
