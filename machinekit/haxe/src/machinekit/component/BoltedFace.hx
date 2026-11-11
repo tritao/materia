@@ -19,8 +19,6 @@ typedef BoltRecess = {diameter:Float, depth:Float}
 /** Uniform drawn adjustment slots, centred on each listed hole; axis is in the face frame. */
 typedef BoltSlot = {width:Float, halfTravel:Float, axis:String}
 
-/** One round hole or recess `JointFasteners` derives for a part, cut by `MachineComponent.machined` (see `HoleSpec`). */
-typedef MachinedCut = cadkit.parametric.HoleSpec;
 
 enum BoltedRole {
   /**

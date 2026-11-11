@@ -21,17 +21,17 @@ class HolesFeatureSmoke {
     // Its +Y is world -Y, so holes at frame y 10..30 lie in the plate (world y -60..0).
     var top = F.fromRotationMatrix(0, 0, 20, [1.0, 0, 0, 0, -1, 0, 0, 0, -1]);
     return [
-      {frame: top, x: 20, y: 10, diameter: 6.8, from: -1, to: 12, kind: "tapped", thread: "M8", name: "J1.h1.tap", nominal: 8},
-      {frame: top, x: 50, y: 10, diameter: 9, from: -1, to: 21, kind: "clearance", thread: "M8", through: true, name: "J2.h1.clearance"},
-      {frame: top, x: 50, y: 10, diameter: 15, from: -1, to: 8.5, kind: "counterbore", thread: "M8", name: "J2.h1.counterbore"},
-      {frame: top, x: 80, y: 30, diameter: 6, from: -1, to: 21, kind: "dowel", fit: "H7", through: true}
+      {frame: top, x: 20, y: 10, diameter: 6.8, depth: 13, kind: "tapped", thread: "M8", name: "J1.h1.tap", nominal: 8},
+      {frame: top, x: 50, y: 10, diameter: 9, depth: 20, through: true, kind: "clearance", thread: "M8", name: "J2.h1.clearance",
+        recess: {diameter: 15, depth: 11.5, name: "J2.h1.counterbore"}},
+      {frame: top, x: 80, y: 30, diameter: 6, depth: 20, kind: "dowel", fit: "H7", through: true}
     ];
   }
 
-  /** 100 x 60 x 20 plate less: a 13 deep tap drill, a through clearance hole with an 8.5 deep counterbore, a through dowel. */
+  /** 100 x 60 x 20 plate less: a 13 deep tap drill, a through clearance hole counterbored 11.5 from the far face, a through dowel. */
   static function expectedVolume():Float {
     var area = (d:Float) -> Math.PI * d * d / 4;
-    return 100 * 60 * 20 - area(6.8) * 12 - (area(9) * (20 - 8.5) + area(15) * 8.5) - area(6) * 20;
+    return 100 * 60 * 20 - area(6.8) * 13 - (area(9) * (20 - 11.5) + area(15) * 11.5) - area(6) * 20;
   }
 
   public static function run():Void {
@@ -45,11 +45,10 @@ class HolesFeatureSmoke {
     for (name in ["J1.h1.tap", "J2.h1.clearance", "J2.h1.counterbore", "cut1"])
       check(names.indexOf(name) >= 0, 'faces named under $name: $names');
 
-    // The same tools as MachineComponent.machined cuts (it calls HolesFeature.tool): identical solid.
+    // The same tools as MachineComponent.machined cuts (it calls HolesFeature.tools): identical solid.
     var raw = Part.box(100, 60, 20), body = raw.translated(new cadkit.modeling.Vector(50, -30, 0));
     raw.close();
-    var index = 0;
-    var tools = [for (hole in specs()) HolesFeature.tool(hole, hole.name != null ? hole.name : 'cut${++index}')];
+    var tools = HolesFeature.tools(specs());
     var direct = body.subtractAll(tools);
     near(direct.volume(), shape.volume(), "same volume as the direct cut");
     var directNames = direct.shape.elementNames(CadKit.ShapeKind.Face).join(" ");

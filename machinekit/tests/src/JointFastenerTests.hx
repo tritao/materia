@@ -559,7 +559,7 @@ class JointFastenerTests {
     for (entry in machine.components()) {
       var cuts = entry.component.machinedCuts();
       if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting) || StringTools.startsWith(entry.id, "screwXNearBridge") || StringTools.startsWith(entry.id, "screwXFarBridge") || StringTools.startsWith(entry.id, "screwYStand") || StringTools.startsWith(entry.id, "screwZStand") || Std.isOfType(entry.component, machinekit.cover.WayCoverMount) || Std.isOfType(entry.component, machinekit.cover.WayCoverSection), entry.id + " is machined but is not a casting, support stand or cover part");
-      cut += cuts.length;
+      for (hole in cuts) cut += hole.recess == null ? 1 : 2;
     }
     // Each block screw cuts its clearance hole and its counterbored pocket into the casting it is bolted through.
     check(cut == railHoles + 2 * 4 * blocks + footScrews + 2 * flangeScrews + 2 * mountScrews + 2 * derivation.dowelCount(),

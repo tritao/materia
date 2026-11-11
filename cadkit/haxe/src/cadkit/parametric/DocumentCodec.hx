@@ -38,11 +38,6 @@ import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
-import cadkit.parametric.features.PlaceFeature;
-import cadkit.parametric.features.BoxBetweenFeature;
-import cadkit.parametric.features.CylinderAlongFeature;
-import cadkit.parametric.features.UnionAllFeature;
-import cadkit.parametric.features.HolesFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -70,7 +65,7 @@ class DocumentCodec {
   public static inline var FORMAT:String = "cadkit.document";
   public static inline var VERSION:Int = 17;
   static final BUILT_IN_TYPES:Array<String> = [
-    "boolean", "box", "box-between", "chamfer", "constrained-sketch", "cylinder", "cylinder-along", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "holes", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "place", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "union-all", "wire"
+    "boolean", "box", "chamfer", "constrained-sketch", "cylinder", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "wire"
   ];
 
   /** Feature types this codec saves itself; `FeatureTypeRegistry` refuses them. */
@@ -328,19 +323,6 @@ class DocumentCodec {
           ));
         } else if (featureType == "cylinder") {
           feature = document.add(new CylinderFeature(numberField(record, "radius"), numberField(record, "height")));
-        } else if (featureType == "box-between") {
-          feature = document.add(new BoxBetweenFeature(numberField(record, "x0"), numberField(record, "x1"), numberField(record, "y0"),
-            numberField(record, "y1"), numberField(record, "z0"), numberField(record, "z1")));
-        } else if (featureType == "cylinder-along") {
-          feature = document.add(new CylinderAlongFeature(decodeVector(requiredField(record, "origin")),
-            decodeVector(requiredField(record, "axis")), numberField(record, "radius"), numberField(record, "from"),
-            numberField(record, "to")));
-        } else if (featureType == "holes") {
-          var specs:Array<HoleSpec> = JsonWire.decode(Json.stringify(requiredField(record, "holes")));
-          feature = document.add(new HolesFeature(requiredFeature(document, intField(record, "source")), specs));
-        } else if (featureType == "union-all") {
-          var partIds:Array<Dynamic> = cast requiredField(record, "parts");
-          feature = document.add(new UnionAllFeature([for (partId in partIds) requiredFeature(document, integerValue(partId, "part"))]));
         } else if (featureType == "imported-step") {
           feature = document.add(new ImportedShapeFeature(stringField(record, "stepText")));
         } else if (featureType == "face") {
@@ -407,17 +389,6 @@ class DocumentCodec {
             numberField(record, "y"),
             numberField(record, "z")
           ));
-        } else if (featureType == "place") {
-          var datumRecord:Dynamic = Reflect.field(record, "datum");
-          feature = document.add(new PlaceFeature(
-            requiredFeature(document, intField(record, "source")),
-            new Plane(
-              new Vector(numberField(record, "x"), numberField(record, "y"), numberField(record, "z")),
-              decodeVector(requiredField(record, "xDirection")),
-              decodeVector(requiredField(record, "normal"))
-            ),
-            datumRecord == null ? null : decodeElementReferenceInDocument(datumRecord)
-          ));
         } else if (featureType == "rotation") {
           feature = document.add(new RotationFeature(
             requiredFeature(document, intField(record, "source")),
@@ -458,7 +429,7 @@ class DocumentCodec {
         } else {
           var codec = FeatureTypeRegistry.codec(featureType);
           if (codec == null) throw new ParametricError("unsupported feature type: " + featureType);
-          feature = document.add(codec.decode(requiredField(record, "data"), new FeatureCodecContext(document)));
+          feature = document.add(codec.decode(requiredField(record, "data"), new FeatureCodecContext(document, remapDocumentId)));
           if (feature.serializationType() != featureType)
             throw new ParametricError('registered feature decoded as ${feature.serializationType()}, not $featureType');
         }
@@ -751,29 +722,6 @@ class DocumentCodec {
         height: box.height.value,
         references: references
       };
-    } else if (featureType == "box-between") {
-      var between:BoxBetweenFeature = cast feature;
-      return {
-        id: feature.id.toInt(), type: featureType,
-        x0: between.x0.value, x1: between.x1.value, y0: between.y0.value, y1: between.y1.value, z0: between.z0.value, z1: between.z1.value,
-        references: references
-      };
-    } else if (featureType == "cylinder-along") {
-      var along:CylinderAlongFeature = cast feature;
-      return {
-        id: feature.id.toInt(), type: featureType,
-        origin: encodeVector(along.origin), axis: encodeVector(along.axis),
-        radius: along.radius.value, from: along.from.value, to: along.to.value,
-        references: references
-      };
-    } else if (featureType == "holes") {
-      var drilled:HolesFeature = cast feature;
-      var specs:Array<HoleSpec> = drilled.holes;
-      return {id: feature.id.toInt(), type: featureType, source: drilled.source.id.toInt(), holes: Json.parse(JsonWire.encode(specs)),
-        references: references};
-    } else if (featureType == "union-all") {
-      var union:UnionAllFeature = cast feature;
-      return {id: feature.id.toInt(), type: featureType, parts: [for (part in union.parts) part.id.toInt()], references: references};
     } else if (featureType == "cylinder") {
       var cylinder:CylinderFeature = cast feature;
       return {
@@ -873,21 +821,6 @@ class DocumentCodec {
         z: transform.z.value,
         references: references
       };
-    } else if (featureType == "place") {
-      var place:PlaceFeature = cast feature;
-      var encoded:Dynamic = {
-        id: feature.id.toInt(),
-        type: featureType,
-        source: place.source.id.toInt(),
-        x: place.x.value,
-        y: place.y.value,
-        z: place.z.value,
-        xDirection: encodeVector(place.xDirection),
-        normal: encodeVector(place.normal),
-        references: references
-      };
-      if (place.datum != null) Reflect.setField(encoded, "datum", encodeElementReference(place.datum));
-      return encoded;
     } else if (featureType == "rotation") {
       var rotation:RotationFeature = cast feature;
       return {

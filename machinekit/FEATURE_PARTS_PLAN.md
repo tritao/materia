@@ -174,16 +174,28 @@ two systems bridged by `MachineKitRecipes`. A recorded part's recipe inputs
 its `ValueBasis`. FP7 reads only these tags.
 
 **FP1d — One hole description.** Done (first half): `cadkit.parametric.HoleSpec`
-is the hole record: a cylinder in a face frame at x/y spanning from..to,
-with kind, thread, fit, through, nominal and a stable name (`J3.h2.tap`).
-MachineKit's `MachinedCut` is now an alias of it (same wire ids, so saved
-assemblies are unchanged), and `MachineComponent.machined` cuts with
-`HolesFeature.tool`, the same tool a recorded `holes` feature cuts, so a
-part built either way has identical holes and face names (hobber
-equivalence unchanged). Builder: `holes(target, specs)`. Left for FP2: the
+describes the hole, not the tool: mouth at x/y on a face frame, depth,
+through, kind, thread, fit, nominal, a stable name (`J3.h2.clearance`) and an
+optional head-side recess (counterbore) with its own name. `HolesFeature`
+owns the cutter rule (1 mm lead-in, 1 mm run-out past a through exit).
+`MachinedCut` is gone; joints derive `HoleSpec`s, and
+`MachineComponent.machined` cuts with `HolesFeature.tools`, the tools a
+recorded `holes` feature cuts. Geometry unchanged; the hole table no longer
+counts the run-out on 28 tapped through holes of the hobber (16 -> 15). Builder: `holes(target, specs)`. Left for FP2: the
 route table (`RouteHole`, `derivedRouteHoles`), drawings and
 `MachinedPackageExport` read the specs back from the part's document;
 slots join `HoleSpec` when a recorded part first needs one.
+
+**FP1h — Clean-ups found in review (2026-11-11).**
+- One feature vocabulary: retire `box`, `cylinder`, `transform` and
+  `rotation` in favour of `box-between`, `cylinder-along` and `place`
+  (editor and example uses included; old documents are not kept), and move
+  the remaining built-ins out of `DocumentCodec`'s branch chain onto
+  `FeatureCodec`s in `CadKitFeatureTypes`, so every type is one class and
+  one codec.
+- BOM: one helper for the "Assumed made part" engineering metadata the
+  hobber parts repeat; `ScrewLinearModulePart`'s stock and route as a
+  function of its recipe values, so its requirements do not build a part.
 
 **FP1e — Placed primitives and n-ary booleans.** From the hobber count:
 

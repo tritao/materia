@@ -5,9 +5,28 @@ import cadkit.modeling.Vector;
 /** What a `FeatureCodec` may use from the document being saved or restored. */
 class FeatureCodecContext {
   final document:Document;
+  final remapDocument:Null<String -> String>;
 
-  public function new(document:Document) {
+  /** `remapDocument` maps a saved document id to the one being decoded into (a clone gets a new id). */
+  public function new(document:Document, ?remapDocument:String -> String) {
     this.document = document;
+    this.remapDocument = remapDocument;
+  }
+
+  public function encodeElementReference(value:ElementReference):Dynamic
+    return {document: value.documentId.value, element: value.elementId.value};
+
+  public function decodeElementReference(value:Dynamic):ElementReference {
+    if (value == null) throw new ParametricError("document element reference is missing");
+    var documentId = string(value, "document");
+    return new ElementReference(new DocumentId(remapDocument == null ? documentId : remapDocument(documentId)), new ElementId(string(value, "element")));
+  }
+
+  /** A required array field of a payload object. */
+  public function array(record:Dynamic, name:String):Array<Dynamic> {
+    var value:Dynamic = Reflect.field(record, name);
+    if (value == null) throw new ParametricError('document field is missing: $name');
+    return cast value;
   }
 
   /** An earlier feature of the document being decoded, by saved id. */

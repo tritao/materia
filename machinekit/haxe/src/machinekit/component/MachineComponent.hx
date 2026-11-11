@@ -44,7 +44,7 @@ class MachineComponent {
   /** The shoulders or keys that locate this part against a thrust in both directions (see `LocatingKey`); `JointSlip` counts them for the joint of the face they name. */
   public function locatingKeys():Array<machinekit.component.BoltedFace.LocatingKey> return [];
 
-  var machining:Array<MachinedCut> = [];
+  var machining:Array<cadkit.parametric.HoleSpec> = [];
 
   /**
 	 * Whether this part cuts the holes `JointFasteners` derives for it into its geometry: its `geometry()` ends with
@@ -54,7 +54,7 @@ class MachineComponent {
   public function machinable():Bool return false;
 
   /** Records the holes derived for this part, once; they are cut by `machined`. */
-  public function machine(cuts:Array<MachinedCut>):Void {
+  public function machine(cuts:Array<cadkit.parametric.HoleSpec>):Void {
     if (!machinable()) throw 'Part "$designation" does not cut derived holes into its geometry';
     if (machining.length > 0) throw 'Part "$designation" is already machined';
     machining = cuts.copy();
@@ -63,19 +63,22 @@ class MachineComponent {
     cachedMassMaterialId = null;
   }
 
-  public function machinedCuts():Array<MachinedCut> return machining.copy();
+  public function machinedCuts():Array<cadkit.parametric.HoleSpec> return machining.copy();
 
   /**
 	 * The derived holes as a hole table (this part's frame): tapped, clearance, counterbore and dowel, from the mating plane. A tool starts 1 mm
 	 * outside the plane (and a clearance hole ends 1 mm past the far face), so the table's mouth and depth are the hole's.
 	 */
   public function derivedRouteHoles():Array<ManufacturingRoute.RouteHole> {
-    var n = 0;
-    return [for (cut in machining) {
-      var mouth = Math.max(cut.from, 0.0), p = materia.assembly.AssemblyFrames.transformPoint(cut.frame, cut.x, cut.y, mouth), q = materia.assembly.AssemblyFrames.transformVector(cut.frame, 0, 0, 1);
-      ({id: "J" + (++n), kind: cut.kind == "counterbore" ? "bore" : cut.kind ?? "clearance", thread: cut.kind == "counterbore" ? null : cut.thread, diameter: cut.diameter,
-        nominal: cut.diameter, fit: cut.fit, depth: cut.to - mouth - (cut.kind == "tapped" || (cut.kind == "dowel" && cut.through != true) ? 0.0 : 1.0), position: [p.x, p.y, p.z], direction: [q.x, q.y, q.z]} : ManufacturingRoute.RouteHole);
-    }];
+    var n = 0, rows:Array<ManufacturingRoute.RouteHole> = [];
+    for (hole in machining) for (cut in cadkit.parametric.features.HolesFeature.cuts(hole)) {
+      // The hole from its mouth; a recess from where it opens into the hole, out to the far face.
+      var mouth = cut.recess ? cut.from : 0.0, depth = cut.recess ? hole.depth - cut.from : hole.depth;
+      var p = materia.assembly.AssemblyFrames.transformPoint(hole.frame, hole.x, hole.y, mouth), q = materia.assembly.AssemblyFrames.transformVector(hole.frame, 0, 0, 1);
+      rows.push({id: "J" + (++n), kind: cut.recess ? "bore" : hole.kind ?? "clearance", thread: cut.recess ? null : hole.thread, diameter: cut.diameter,
+        nominal: cut.diameter, fit: cut.recess ? null : hole.fit, depth: depth, position: [p.x, p.y, p.z], direction: [q.x, q.y, q.z]});
+    }
+    return rows;
   }
 
   /** Geometry caches retain instance face labels and exact coordinates. A BOM
@@ -84,13 +87,14 @@ class MachineComponent {
    * input identity remains exact. The1e-12 resolution is below CAD tolerance. */
   function machiningKey(forGeometry:Bool):String {
     var out:Array<String>=[];
-    for(cut in machining) {
-      if(forGeometry)out.push([cut.frame.x,cut.frame.y,cut.frame.z,cut.frame.qx,cut.frame.qy,cut.frame.qz,cut.frame.qw,cut.x,cut.y,
+    for(hole in machining) for(cut in cadkit.parametric.features.HolesFeature.cuts(hole)) {
+      var kind=cut.recess?"counterbore":hole.kind, fit=cut.recess?null:hole.fit, through=cut.recess?null:hole.through;
+      if(forGeometry)out.push([hole.frame.x,hole.frame.y,hole.frame.z,hole.frame.qx,hole.frame.qy,hole.frame.qz,hole.frame.qw,hole.x,hole.y,
         cut.diameter,cut.from,cut.to].map(v->ComponentNumberKey.encode(v)).join(",")+","+cut.name);
       else {
-        var p=materia.assembly.AssemblyFrames.transformPoint(cut.frame,cut.x,cut.y,0),axis=materia.assembly.AssemblyFrames.transformVector(cut.frame,0,0,1);
+        var p=materia.assembly.AssemblyFrames.transformPoint(hole.frame,hole.x,hole.y,0),axis=materia.assembly.AssemblyFrames.transformVector(hole.frame,0,0,1);
         var values=[p.x,p.y,p.z,axis.x,axis.y,axis.z,cut.diameter,cut.from,cut.to];
-        out.push(values.map(v->ComponentNumberKey.encode(Math.fround(v*1e12)/1e12)).join(",")+"|"+Std.string(cut.kind)+"|"+Std.string(cut.thread)+"|"+Std.string(cut.fit)+"|"+Std.string(cut.through));
+        out.push(values.map(v->ComponentNumberKey.encode(Math.fround(v*1e12)/1e12)).join(",")+"|"+Std.string(kind)+"|"+Std.string(hole.thread)+"|"+Std.string(fit)+"|"+Std.string(through));
       }
     }
     if(!forGeometry)out.sort(Reflect.compare);
@@ -100,12 +104,8 @@ class MachineComponent {
   /** `part` with the derived holes cut in (consumes it); the end of a machinable part's `geometry()`. */
   function machined(part:Part):Part {
     if (machining.length == 0) return part;
-    var tools:Array<Part> = [];
-    var index = 0;
-    // Named like the part's own bodies, so the faces a derived hole leaves are found by what they are, not by shape. The tool is
-    // the one a recorded `holes` feature cuts, so a part built either way has the same holes.
-    for (cut in machining) tools.push(cadkit.parametric.features.HolesFeature.tool(cut, cut.name != null ? cut.name : 'cut${++index}'));
-    return Solids.cut(part, tools);
+    // The tools a recorded `holes` feature cuts, named by hole, so a part built either way has the same holes and face names.
+    return Solids.cut(part, cadkit.parametric.features.HolesFeature.tools(machining));
   }
   /**
 	 * Whether a shaft turns in this part: its bearings (a screw support, a motor mount, a motor housing, a bearing block) carry

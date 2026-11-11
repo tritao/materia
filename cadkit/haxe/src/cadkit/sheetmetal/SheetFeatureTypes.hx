@@ -6,7 +6,6 @@ import haxeon.wire.JsonWire;
 import cadkit.parametric.Feature;
 import cadkit.parametric.FeatureCodec;
 import cadkit.parametric.FeatureCodecContext;
-import cadkit.parametric.FeatureTypeRegistry;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
@@ -23,25 +22,19 @@ import cadkit.sheetmetal.SheetFeatureRecord.SheetStockRecord;
 import cadkit.sheetmetal.process.ProcessBendRule;
 
 /**
- * Sheet-metal document features, saved through `FeatureTypeRegistry` like any feature type from outside the document core.
+ * Sheet-metal document features, saved through `FeatureTypeRegistry` like CadKit's other added types (`CadKitFeatureTypes`).
  * Each payload is the typed `SheetFeatureRecord`, validated by `JsonWire` before a feature is constructed.
  */
 class SheetFeatureTypes {
-  static var registered = false;
-
-  /** Register the six sheet feature types; repeated calls are no-ops. */
-  public static function register():Void {
-    if (registered) return;
-    registered = true;
-    for (codec in ([
-      new SheetBaseCodec(),
-      new SheetEdgeFlangeCodec(),
-      new SheetHemCodec(),
-      new SheetRipCodec(),
-      new SheetCornerCodec(),
-      new SheetCutCodec()
-    ] : Array<FeatureCodec>)) FeatureTypeRegistry.register(codec);
-  }
+  /** The six sheet feature types; `CadKitFeatureTypes` registers them with CadKit's other types. */
+  public static function codecs():Array<FeatureCodec> return [
+    new SheetBaseCodec(),
+    new SheetEdgeFlangeCodec(),
+    new SheetHemCodec(),
+    new SheetRipCodec(),
+    new SheetCornerCodec(),
+    new SheetCutCodec()
+  ];
 
   /** A sheet feature dependency of the expected class, or a named error. */
   public static function sheetSource(context:FeatureCodecContext, id:Int, what:String):SheetFeature {

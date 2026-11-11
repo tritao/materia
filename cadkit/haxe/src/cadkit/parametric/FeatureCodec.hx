@@ -1,7 +1,7 @@
 package cadkit.parametric;
 
 /**
- * How a feature type defined outside CadKit is saved and restored (`FeatureTypeRegistry`).
+ * How a feature type added through `FeatureTypeRegistry` is saved and restored (CadKit's own in `CadKitFeatureTypes`, others by their package).
  *
  * The feature class itself evaluates (`Feature.evaluate`) and declares its scalar parameters, dependencies and topology
  * references as any built-in feature does. The codec only turns the feature's own data into a JSON payload and back.

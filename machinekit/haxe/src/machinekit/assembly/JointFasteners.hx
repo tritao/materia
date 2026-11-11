@@ -6,7 +6,7 @@ import machinekit.component.Solids;
 import machinekit.component.BoltedFace;
 import machinekit.component.BoltedFace.BoltHole;
 import machinekit.component.BoltedFace.BoltRecess;
-import machinekit.component.BoltedFace.MachinedCut;
+import cadkit.parametric.HoleSpec;
 import machinekit.component.BoltedFace.ThreadMaterial;
 import machinekit.component.BoltedFace.PinnedFace;
 import machinekit.standard.DowelPin;
@@ -124,7 +124,7 @@ class FastenerDerivation {
 	 * drilled to suit and the clearance holes of a clamped face whose holes the part does not draw. They are derived once,
 	 * here, from the solved joint; `MachineAssembly.deriveFasteners` hands them to the parts (`MachineComponent.machine`).
 	 */
-  public final machining = new Map<String, Array<MachinedCut>>();
+  public final machining = new Map<String, Array<HoleSpec>>();
 
   public function new() {
   }
@@ -583,8 +583,7 @@ class JointFasteners {
           x: hole.x,
           y: hole.y,
           diameter: spec.diameter,
-          from: -1.0,
-          to: side.p.face.through ? side.p.face.depth + 1 : side.p.face.depth,
+          depth: side.p.face.depth,
           kind: "dowel",
           thread: null,
           fit: side.p.face.fit,
@@ -917,8 +916,8 @@ class JointFasteners {
         x: point.x,
         y: point.y,
         diameter: spec.tapDrill,
-        from: -1.0,
-        to: through ? thickness + 1 : drillDepth,
+        depth: through ? thickness : drillDepth,
+        through: through,
         kind: "tapped",
         thread: size
       });
@@ -935,8 +934,8 @@ class JointFasteners {
         x: point.x,
         y: point.y,
         diameter: plateClearance,
-        from: -1.0,
-        to: thickness + 1,
+        depth: thickness,
+        through: true,
         kind: "clearance",
         thread: size
       });
@@ -950,18 +949,10 @@ class JointFasteners {
       );
       else for (k => hole in aHoles) {
         var back = grip + (recess == null ? 0.0 : recess.depth);
-        cutsOf(result, a.member).push({name: cutName(id, k + 1, "clearance"), frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance, from: -1.0, to: back + 1, kind: "clearance", thread: size});
-        if (recess != null) cutsOf(result, a.member).push({
-          name: cutName(id, k + 1, "counterbore"),
-          frame: a.face.frame,
-          x: hole.x,
-          y: hole.y,
-          diameter: recess.diameter,
-          from: grip,
-          to: back + 1,
-          kind: "counterbore",
-          thread: size
-        });
+        // The screw head's counterbore opens from the far face, back to the grip.
+        cutsOf(result, a.member).push({name: cutName(id, k + 1, "clearance"), frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance,
+          depth: back, through: true, kind: "clearance", thread: size,
+          recess: recess == null ? null : {diameter: recess.diameter, depth: recess.depth, name: cutName(id, k + 1, "counterbore")}});
       }
     }
     if (hasErrorSince(diagnostics, before)) return null;
@@ -1065,7 +1056,7 @@ class JointFasteners {
   /**
    * The stable name of hole `hole` (from 1) of joint `joint`, cut as `role` (tap, clearance, counterbore, dowel): `host.top..cover.bottom.h2.tap`.
    * The joint id's member and face separators become dots and everything else outside a name's alphabet an underscore, so the
-   * cylinder's faces are named strongly under it (`MachinedCut.name`).
+   * cylinder's faces are named strongly under it (`HoleSpec.name`).
    */
   public static function cutName(joint:String, hole:Int, role:String):String {
     var id = StringTools.replace(StringTools.replace(StringTools.replace(joint, " -> ", ".."), " ~ ", ".."), "#", ".");
@@ -1078,7 +1069,7 @@ class JointFasteners {
     return out.toString() + ".h" + hole + "." + role;
   }
 
-  static function cutsOf(result:FastenerDerivation, member:String):Array<MachinedCut> {
+  static function cutsOf(result:FastenerDerivation, member:String):Array<HoleSpec> {
     var cuts = result.machining.get(member);
     if (cuts == null) {
       cuts = [];

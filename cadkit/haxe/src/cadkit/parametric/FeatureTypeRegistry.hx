@@ -11,16 +11,20 @@ class FeatureTypeRegistry {
   static var codecs:Map<String, FeatureCodec> = new Map();
   static var ownTypes = false;
 
-  /** CadKit's own domain features (sheet metal) go through the registry too; they register on first use. */
+  /** CadKit's own added types (`CadKitFeatureTypes`: placement, primitives, holes, sheet metal) are registered before any lookup. */
   static function registerOwnTypes():Void {
     if (ownTypes) return;
     ownTypes = true;
-    cadkit.sheetmetal.SheetFeatureTypes.register();
+    for (codec in CadKitFeatureTypes.codecs()) add(codec);
   }
 
   /** Register `codec` for its type. Registering the same codec again is a no-op; another codec for a taken type throws. */
   public static function register(codec:FeatureCodec):Void {
     registerOwnTypes();
+    add(codec);
+  }
+
+  static function add(codec:FeatureCodec):Void {
     if (codec == null) throw new ParametricError("feature codec must not be null");
     var type = codec.type();
     if (type == null || StringTools.trim(type) == "" || type != StringTools.trim(type))
