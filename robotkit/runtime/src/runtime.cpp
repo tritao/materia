@@ -1576,6 +1576,10 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         duration_seconds = std::max(duration_seconds, limited_duration);
         const double unconstrained_duration = duration_seconds;
         bool ramp_hits_limit = false;
+        // A joint resting against its limit carries solver noise in its velocity: its stopping distance is far
+        // below any position anyone can resolve. Only a ramp that would overshoot the travel left by more than
+        // this tolerance is shortened, or reported as hitting the limit.
+        constexpr double kRampPositionTolerance = 1e-9;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
             const double speed = std::abs(velocities[joint]);
             if (speed <= 1e-12)
@@ -1584,8 +1588,10 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             const double room = std::max(0.0, velocities[joint] > 0.0
                 ? limits.upper_limit + ramp_overtravel(joint) - positions[joint]
                 : positions[joint] - (limits.lower_limit - ramp_overtravel(joint)));
-            if (0.5 * speed * unconstrained_duration >= room - 1e-12)
-                ramp_hits_limit = true;
+            const double stopping = 0.5 * speed * unconstrained_duration;
+            if (stopping <= room + kRampPositionTolerance)
+                continue;
+            ramp_hits_limit = true;
             duration_seconds = std::min(duration_seconds, 2.0 * room / speed);
         }
         return std::pair<uint64_t, bool>{
