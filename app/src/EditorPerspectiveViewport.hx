@@ -78,6 +78,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   var renderedCollisionRevision:Int = -1;
   var lightingRevision:Int = 0;
   var lightingPreset:Int = 0;
+  var screenEdges:Bool = false;
   var renderCount:Int = 0;
   var lastRenderSeconds:Float = 0.0;
   @:unobservable var lastViewSetupSeconds:Float = 0.0;
@@ -725,6 +726,15 @@ class EditorPerspectiveViewport implements View implements Observable {
     lightingRevision++;
   }
 
+  /** Draw opaque parts' CAD edges from the visible surfaces instead of as strokes (app/plans/SCREEN_EDGES.md). */
+  public function setScreenEdges(enabled:Bool):Void {
+    if (enabled == screenEdges) return;
+    screenEdges = enabled;
+    lightingRevision++;
+  }
+
+  public function screenEdgesEnabled():Bool return screenEdges;
+
   @:unobservable var paintContext:Null<BuildContext>;
   @:unobservable var paintNodeId:Null<haxeon.ui.core.WidgetId>;
   @:unobservable var paintNode:Null<RenderNode>;
@@ -827,6 +837,8 @@ class EditorPerspectiveViewport implements View implements Observable {
       view.setStudioEnvironment([for (light in look.lights) light.radius], look.reflection, look.exposure);
       view.setStudioEdges(ViewportLook.edgeOnLight(), ViewportLook.edgeOnDark(), ViewportLook.EdgeContrastLuminance);
       view.setStudioDetail(look.occlusionRadius, look.occlusionStrength, look.occlusionBias, look.roughnessFloor);
+      // Screen edges stand in for feature-edge strokes only: All shows every mesh edge, Shaded none.
+      view.setScreenEdges(screenEdges && scene.cadEdgeMode == CadEdgeMode.Feature);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
       if (sampleCountApplied != sampleCountRequested) {

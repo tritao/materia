@@ -443,6 +443,7 @@ std::uint64_t view_signature(const SceneView &view) noexcept {
     };
     add(view.camera.enabled ? 1 : 0);
     add(view.full_detail ? 1 : 0);
+    add(view.screen_edges ? 1 : 0);
     add(pose_signature(view));
     add(view.camera_node.value);
     for (const auto value : view.camera.view_projection)

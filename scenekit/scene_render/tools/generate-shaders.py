@@ -38,7 +38,7 @@ BLOCKS = {
     ("pick", "vertex"): ((1, "view_params", "mat4 view_projection"),),
     ("pick", "fragment"): ((0, "pick_output_params", "vec4 pick_output"),
                                (2, "clip_params", "vec4 clip_planes[32]; vec4 clip_plane_count")),
-    ("edge", "fragment"): ((0, "edge_params", "vec4 edge_color; vec4 edge_view; vec4 edge_style"),),
+    ("edge", "fragment"): ((0, "edge_params", "vec4 edge_color; vec4 edge_color_on_dark; vec4 edge_view; vec4 edge_style; vec4 edge_depth_z; vec4 edge_depth_w"),),
     ("postprocess", "fragment"): ((0, "postprocess_params", "vec4 color_params; "
                                                      "vec4 distortion_params"),
                                       (1, "postprocess_random", "ivec4 random_params")),

@@ -44,6 +44,7 @@ class AppPreferencesTests {
     check(first.showStartPage, "the Start page shows by default");
     check(first.recent.length == 0, "no recent files at first");
     check(first.store.getBool(AppSettings.COSMETIC_THREADS), "cosmetic threads are shown by default");
+    check(!first.store.getBool(AppSettings.SCREEN_EDGES), "screen-space edges are off by default");
     first.store.set(AppSettings.COSMETIC_THREADS, PropertyValue.Bool(false));
     check(!new AppPreferences(file).store.getBool(AppSettings.COSMETIC_THREADS),
       "thread visibility survives a restart");

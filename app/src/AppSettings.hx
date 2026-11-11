@@ -17,6 +17,8 @@ class AppSettings {
   /** One of LIGHTING_PRESETS; its index is the viewport's preset number. */
   public static inline var LIGHTING:String = "editors/3d/lighting";
   public static inline var COSMETIC_THREADS:String = "editors/3d/show_cosmetic_threads";
+  /** Draw CAD edges of opaque parts from the visible surfaces instead of as strokes (app/plans/SCREEN_EDGES.md). */
+  public static inline var SCREEN_EDGES:String = "editors/3d/screen_space_edges";
   public static inline var GRID_VISIBLE:String = "editors/3d/grid/show_grid";
   public static inline var GRID_SNAP:String = "editors/3d/grid/snap_to_grid";
   /** Metres between grid lines, and the snapping step. */
@@ -94,6 +96,10 @@ class AppSettings {
     threads.label = "Show Cosmetic Threads";
     threads.tooltip = "Draw the nominal threads on named bore and shank faces.";
     registry.define(COSMETIC_THREADS, PropertyType.Bool, PropertyValue.Bool(true), threads);
+    var edges = new SettingOptions();
+    edges.label = "Screen-Space Edges";
+    edges.tooltip = "Draw the edges of opaque parts from what is visible, so hidden edges never show through thin walls.";
+    registry.define(SCREEN_EDGES, PropertyType.Bool, PropertyValue.Bool(false), edges);
     var overlays = new SettingOptions();
     overlays.label = "Show Viewport Overlays";
     overlays.tooltip =

@@ -641,6 +641,134 @@ void contact_edge_regression(nkgpu_renderer renderer) {
 
 }
 
+// Screen-space CAD edges (app/plans/SCREEN_EDGES.md) at the editor's projection (0.63 m, 50 degrees, about 1 mm per
+// pixel), drawn from the studio AO prepass: a hidden edge under a 0.2 mm oblique wall and a 0.05 mm raised band draw
+// nothing, a 10 mm chamfer draws both its creases, and a part's outline takes the nearer part's edge colour.
+void screen_edges_regression(nkgpu_renderer renderer) {
+    using Point = std::array<float,3>;
+    const int width=800, height=600;
+    const float fov=50.0f*3.14159265f/180.0f, aspect=float(width)/height, n=0.0017f, f=2.18f;
+    const Point eye{0.25f,0.30f,0.50f};
+    auto normalize=[](Point v){float l=std::sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);return Point{v[0]/l,v[1]/l,v[2]/l};};
+    auto cross=[](Point x,Point y){return Point{x[1]*y[2]-x[2]*y[1],x[2]*y[0]-x[0]*y[2],x[0]*y[1]-x[1]*y[0]};};
+    auto dot=[](Point x,Point y){return x[0]*y[0]+x[1]*y[1]+x[2]*y[2];};
+    const auto forward=normalize({-eye[0],-eye[1],-eye[2]}), side=normalize(cross(forward,{0,1,0})), up=cross(side,forward);
+    const std::array<float,16> view_matrix{side[0],up[0],-forward[0],0, side[1],up[1],-forward[1],0,
+        side[2],up[2],-forward[2],0, -dot(side,eye),-dot(up,eye),dot(forward,eye),1};
+    const float t=1.0f/std::tan(fov/2);
+    const std::array<float,16> projection{t/aspect,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0};
+    nkscene::SceneView view;view.camera.enabled=true;
+    for(int c=0;c<4;++c)for(int r=0;r<4;++r){float v=0;for(int k=0;k<4;++k)v+=projection[k*4+r]*view_matrix[c*4+k];view.camera.view_projection[c*4+r]=v;}
+    view.studio_lighting.enabled=true;
+    view.studio_lighting.surface_detail={0.005f,0.05f,0.0f,0.0f};
+    view.studio_lighting.edges_on_light={0,0,0};
+    view.studio_lighting.edges_on_dark={1,0,0};
+    view.studio_lighting.edge_contrast_luminance=0.2f;
+    const auto &vp=view.camera.view_projection;
+    auto pixel=[&](Point p){
+        float clip[4];
+        for(int r=0;r<4;++r)clip[r]=vp[r]*p[0]+vp[4+r]*p[1]+vp[8+r]*p[2]+vp[12+r];
+        return std::array<int,2>{int((clip[0]/clip[3]+1)*0.5f*width),int((1-clip[1]/clip[3])*0.5f*height)};
+    };
+
+    auto material_in=[](const std::shared_ptr<Scene> &scene,float base){
+        const auto material=scene->reserve_material_id();
+        auto &state=scene->material_store().create(material).edit_state();
+        state.base_color={base,base,base,1};state.emissive={0.6f,0.6f,0.6f};
+        state.flags=static_cast<unsigned>(nkscene::MaterialFlags::Opaque)|static_cast<unsigned>(nkscene::MaterialFlags::DoubleSided);
+        return material;
+    };
+    auto add_mesh=[](const std::shared_ptr<Scene> &scene,auto material,std::vector<Point> points,std::vector<std::uint32_t> indices){
+        const auto id=scene->reserve_geometry_id();
+        auto &payload=scene->geometry_store().create(id).edit_payload();
+        for(const auto &p:points)payload.vertices.push_back({p});
+        payload.indices=std::move(indices);
+        const auto node=scene->reserve_node_id();
+        Transaction create(scene);
+        create.add_create(node);create.add_geometry(node,id);create.add_material(node,material);
+        ChangeSet changes;assert(scene->commit(create,changes)==NKS_OK);create.close();
+        return id;
+    };
+    auto box=[](Point lo,Point hi,std::vector<Point> &points,std::vector<std::uint32_t> &indices){
+        for(int i=0;i<8;++i)points.push_back({i&1?hi[0]:lo[0],i&2?hi[1]:lo[1],i&4?hi[2]:lo[2]});
+        indices={0,2,1, 1,2,3, 4,5,6, 5,7,6, 0,1,4, 1,5,4, 2,6,3, 3,6,7, 0,4,2, 2,4,6, 1,3,5, 3,7,5};
+    };
+    // A profile in (x, z), millimetres, extruded across y = -50..50 mm: one mesh, so its steps are one part's shape.
+    auto extrusion=[](std::vector<std::array<float,2>> profile,std::vector<Point> &points,std::vector<std::uint32_t> &indices){
+        for(const auto &q:profile){points.push_back({q[0]*1e-3f,-0.05f,q[1]*1e-3f});points.push_back({q[0]*1e-3f,0.05f,q[1]*1e-3f});}
+        for(std::uint32_t i=0;i+1<profile.size();++i){const auto a=2*i;indices.insert(indices.end(),{a,a+2,a+3,a,a+3,a+1});}
+    };
+
+    // Pixels with screen edges on and off, so only what the edge pass adds differs. Each scene has its own executor:
+    // fresh scenes reuse geometry ids, by which an executor caches GPU meshes.
+    unsigned samples=1;
+    auto capture=[&](nkscene::NativeKitGpuExecutor &executor,const std::shared_ptr<Scene> &scene,bool edges){
+        executor.set_sample_count(samples);
+        scene->publish();view.screen_edges=edges;auto plan=nkscene::compile(scene->snapshot(),view);
+        assert(plan.screen_edges()==edges);
+        std::vector<std::uint8_t> pixels;
+        assert(executor.capture_rgba8(plan,scene->snapshot(),width,height,{1,1,1,1},pixels)==NKGPU_OK);
+        return pixels;
+    };
+    // The strongest change the edge pass makes within `radius` pixels of p: summed RGB difference, and that pixel.
+    struct Mark { int strength=0; std::array<int,3> rgb{}; };
+    auto mark=[&](const std::vector<std::uint8_t> &on,const std::vector<std::uint8_t> &off,Point p,int radius){
+        const auto c=pixel(p);Mark best;
+        for(int y=c[1]-radius;y<=c[1]+radius;++y)for(int x=c[0]-radius;x<=c[0]+radius;++x){
+            assert(x>=0&&y>=0&&x<width&&y<height);
+            const auto i=std::size_t(y*width+x)*4;int d=0;
+            for(int k=0;k<3;++k)d+=std::abs(int(on[i+k])-int(off[i+k]));
+            if(d>best.strength)best={d,{on[i],on[i+1],on[i+2]}};
+        }
+        return best;
+    };
+
+    for(unsigned count:{1u,4u}) {
+        samples=count;
+        {   // A collar's corner edge 0.2 mm under an oblique wall, carried as a CAD stroke: neither it nor a line shows.
+            auto scene=std::make_shared<Scene>();const auto white=material_in(scene,1.0f);const float wall=0.0002f;
+            std::vector<Point> points;std::vector<std::uint32_t> indices;
+            box({-0.05f,-0.05f,-wall},{0.05f,0.05f,0},points,indices);add_mesh(scene,white,points,indices);
+            points.clear();box({-0.04f,-0.05f,-wall-0.002f},{0.04f,0.0f,-wall},points,indices);
+            const auto collar=add_mesh(scene,white,points,indices);
+            scene->geometry_store().find(collar)->edit_payload().stroke_segments={{{-0.04f,0,-wall},{0.04f,0,-wall},1}};
+            nkscene::NativeKitGpuExecutor executor(renderer);
+            const auto on=capture(executor,scene,true);
+            scene->geometry_store().find(collar)->edit_payload().stroke_segments.clear();
+            const auto plain=capture(executor,scene,false);
+            for(float x:{-0.02f,0.0f,0.02f})assert(mark(on,plain,{x,0,0},3).strength<30&&"a hidden edge draws no line");
+        }
+        {   // A 0.05 mm raised band (1/20 px) draws nothing; a 45 degree, 10 mm chamfer step draws both creases.
+            auto scene=std::make_shared<Scene>();const auto white=material_in(scene,1.0f);
+            std::vector<Point> points;std::vector<std::uint32_t> indices;
+            extrusion({{-50,0},{-5,0},{-5,0.05f},{5,0.05f},{5,0},{50,0}},points,indices);add_mesh(scene,white,points,indices);
+            nkscene::NativeKitGpuExecutor executor(renderer);
+            const auto off=capture(executor,scene,false),on=capture(executor,scene,true);
+            for(float x:{-0.005f,0.005f})assert(mark(on,off,{x,0,0},3).strength<30&&"a sub-pixel band draws no line");
+            auto stepped=std::make_shared<Scene>();const auto white2=material_in(stepped,1.0f);points.clear();indices.clear();
+            extrusion({{-50,0},{-5,0},{5,10},{50,10}},points,indices);add_mesh(stepped,white2,points,indices);
+            nkscene::NativeKitGpuExecutor step_executor(renderer);
+            const auto step_off=capture(step_executor,stepped,false),step_on=capture(step_executor,stepped,true);
+            assert(mark(step_on,step_off,{-0.005f,0,0},2).strength>150&&"a chamfer's lower crease draws");
+            assert(mark(step_on,step_off,{0.005f,0,0.01f},2).strength>150&&"a chamfer's upper crease draws");
+        }
+        {   // A dark block on a light plate: the block owns its outline (the dark-material colour, red here), and the
+            // plate's outline against the background is the light-material colour (black).
+            auto scene=std::make_shared<Scene>();const auto white=material_in(scene,1.0f),dark=material_in(scene,0.02f);
+            std::vector<Point> points;std::vector<std::uint32_t> indices;
+            box({-0.05f,-0.05f,-0.01f},{0.05f,0.05f,0},points,indices);add_mesh(scene,white,points,indices);
+            points.clear();box({-0.01f,-0.01f,0},{0.01f,0.01f,0.02f},points,indices);add_mesh(scene,dark,points,indices);
+            nkscene::NativeKitGpuExecutor executor(renderer);
+            const auto off=capture(executor,scene,false),on=capture(executor,scene,true);
+            const auto block=mark(on,off,{0,-0.01f,0.02f},2);
+            assert(block.strength>100&&block.rgb[0]>block.rgb[1]+60&&"a dark part's outline is the dark-material colour");
+            const auto plate=mark(on,off,{0,-0.05f,0},2);
+            assert(plate.strength>150&&plate.rgb[0]<120&&std::abs(plate.rgb[0]-plate.rgb[1])<30&&"a light part's outline is dark");
+        }
+    }
+    std::puts("screen edges passed");
+}
+
 int main() {
     nk_init_options init{};
     init.struct_size = sizeof(init);
@@ -683,6 +811,7 @@ int main() {
     equivalent_material_batch_regression(renderer);
     sidedness_regression(renderer);
     contact_edge_regression(renderer);
+    screen_edges_regression(renderer);
 
     {
         auto scene = std::make_shared<Scene>();

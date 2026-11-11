@@ -28,7 +28,7 @@ void main() {
                                float((id >> 8u) & 0xffu) / 255.0,
                                float((id >> 16u) & 0xffu) / 255.0,
                                cap_surface ? (pick_output.w + 1.0) / 255.0 : 1.0);
-    // Picking retains device depth; AO consumes positions with an explicit validity bit.
-    fragment_depth = pick_output.x > 0.0 ? vec4(world_position, 1.0)
+    // Picking retains device depth; AO consumes positions with w marking coverage (and the edge tone: 1 or 2).
+    fragment_depth = pick_output.x > 0.0 ? vec4(world_position, pick_output.x)
                                        : vec4(gl_FragCoord.z, 0.0, 0.0, 0.0);
 }

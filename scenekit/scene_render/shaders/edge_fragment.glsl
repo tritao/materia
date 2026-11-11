@@ -4,7 +4,10 @@
 // Screen-space CAD edges (app/plans/SCREEN_EDGES.md): a line where neighbouring pixels show different parts, or
 // where one part's surface creases or occludes itself. Only visible surfaces are in these
 // buffers, so a hidden edge can never be drawn and nothing ties with a face.
+// Line colours on light and on dark materials; the AO prepass marks each surface pixel's tone in its position's w
+// (1 light, 2 dark), from the same rule as stroke colours.
 uniform vec4 edge_color;
+uniform vec4 edge_color_on_dark;
 // x, y: one over the target size; z: cosine of the crease angle; w: occlusion gap, in pixel footprints.
 uniform vec4 edge_view;
 uniform sampler2D pick_ids_texture;
@@ -14,6 +17,9 @@ out vec4 fragment_color;
 
 // x: the line's half width in pixels (strokes use 0.85).
 uniform vec4 edge_style;
+// Rows z and w of the view-projection, for which of two surfaces is nearer.
+uniform vec4 edge_depth_z;
+uniform vec4 edge_depth_w;
 
 vec2 texel_uv(ivec2 p) {
     return (vec2(p) + 0.5) * edge_view.xy;
@@ -70,6 +76,16 @@ bool edge_between(ivec2 a, ivec2 b) {
     return abs(dot(na.xyz, pb.xyz - pa.xyz)) > edge_view.w * na.w;
 }
 
+// The tone of the line between a and b: the nearer surface owns it, as a part owns its outline.
+float boundary_tone(ivec2 a, ivec2 b) {
+    vec4 pa = window_position[slot(a)], pb = window_position[slot(b)];
+    if (pa.w <= 0.5) return pb.w;
+    if (pb.w <= 0.5) return pa.w;
+    float za = dot(edge_depth_z.xyz, pa.xyz) + edge_depth_z.w, wa = dot(edge_depth_w.xyz, pa.xyz) + edge_depth_w.w;
+    float zb = dot(edge_depth_z.xyz, pb.xyz) + edge_depth_z.w, wb = dot(edge_depth_w.xyz, pb.xyz) + edge_depth_w.w;
+    return za * wb <= zb * wa ? pa.w : pb.w;
+}
+
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
     for (int y = -2; y <= 2; ++y) for (int x = -2; x <= 2; ++x) {
@@ -81,14 +97,23 @@ void main() {
         frame[(x + 1) + 3 * (y + 1)] = window_position[slot(ivec2(x, y))].w > 0.5 ? surface_frame(ivec2(x, y)) : vec4(0.0);
     // A boundary lies midway between two pixels that differ. Coverage falls off with the distance from this pixel's
     // centre to the nearest one: a line of the strokes' width with a one-pixel soft edge.
-    float nearest = 4.0;
+    float nearest = 4.0, tone = 1.0;
     for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 0; ++x) {
-        if (edge_between(ivec2(x, y), ivec2(x + 1, y))) nearest = min(nearest, length(vec2(float(x) + 0.5, float(y))));
+        float d = length(vec2(float(x) + 0.5, float(y)));
+        if (d < nearest && edge_between(ivec2(x, y), ivec2(x + 1, y))) {
+            nearest = d;
+            tone = boundary_tone(ivec2(x, y), ivec2(x + 1, y));
+        }
     }
     for (int y = -1; y <= 0; ++y) for (int x = -1; x <= 1; ++x) {
-        if (edge_between(ivec2(x, y), ivec2(x, y + 1))) nearest = min(nearest, length(vec2(float(x), float(y) + 0.5)));
+        float d = length(vec2(float(x), float(y) + 0.5));
+        if (d < nearest && edge_between(ivec2(x, y), ivec2(x, y + 1))) {
+            nearest = d;
+            tone = boundary_tone(ivec2(x, y), ivec2(x, y + 1));
+        }
     }
     float coverage = clamp(edge_style.x + 0.5 - nearest, 0.0, 1.0);
     if (coverage <= 0.0) discard;
-    fragment_color = vec4(edge_color.rgb * edge_color.a * coverage, edge_color.a * coverage);
+    vec4 color = tone > 1.5 ? edge_color_on_dark : edge_color;
+    fragment_color = vec4(color.rgb * color.a * coverage, color.a * coverage);
 }

@@ -18,7 +18,9 @@ import nativekit.scene.DepthPrecision;
  *                dark line where neighbours differ. Subelements are B-rep faces when the mesh
  *                carries face ids, otherwise triangles, so plain meshes show their tessellation.
  *   frame.png    the rendered frame as the viewport draws it (lighting, edges, samples)
- *   frame-shaded.png  the same frame without edge strokes
+ *   frame-shaded.png  the same frame without edges (strokes or screen-space). Switching the edge mode republishes
+ *                the scene, and a republished hobber currently shades darker than the first frame (open; see
+ *                app/plans/SCREEN_EDGES.md), so compare its edges with frame.png, not its shading.
  *
  * --presentation-camera keeps the presentation view's own framing instead of the
  * recorded camera, and state.json then records that framing: a way to start a
@@ -29,6 +31,8 @@ import nativekit.scene.DepthPrecision;
  * with the view-depth gap in mm (negative: the segment lies in front of the surface). The gap compares the surface at
  * the probe pixel with the segment at its nearest point, up to 2.5 px away: on an oblique surface that offset alone
  * moves the gap by about a pixel's worth of slope, so read it as identification, not as a visibility verdict.
+ *
+ * --screen-edges draws opaque parts' edges from the visible surfaces (the editor's Screen-Space Edges setting).
  *
  * --bounds=text (repeatable) prints the world bounding box of every part whose id contains `text`, as displayed.
  *
@@ -44,7 +48,7 @@ import nativekit.scene.DepthPrecision;
   public static function main():Int {
     var statePath:Null<String> = null, out:Null<String> = null, launch:Array<String> = [];
     var focusLimit = DepthPrecision.FOCUS_STEP_PIXELS * 1.01, maxLimit = Math.POSITIVE_INFINITY;
-    var presentationCamera = false;
+    var presentationCamera = false, screenEdges = false;
     var probes:Array<Array<Int>> = [];
     var boundsFilters:Array<String> = [];
     for (arg in Sys.args()) {
@@ -53,6 +57,7 @@ import nativekit.scene.DepthPrecision;
       else if (StringTools.startsWith(arg, "--max-focus-step-px=")) focusLimit = Std.parseFloat(arg.substr(20));
       else if (StringTools.startsWith(arg, "--max-step-px=")) maxLimit = Std.parseFloat(arg.substr(14));
       else if (arg == "--presentation-camera") presentationCamera = true;
+      else if (arg == "--screen-edges") screenEdges = true;
       else if (StringTools.startsWith(arg, "--bounds=")) boundsFilters.push(arg.substr(9));
       else if (StringTools.startsWith(arg, "--probe=")) {
         var xy = arg.substr(8).split(",");
@@ -92,6 +97,7 @@ import nativekit.scene.DepthPrecision;
           if (state.presentation != null && viewport.presentation == null) continue;
           if (presentationCamera && state.presentation == null) throw "--presentation-camera needs a presentation in the state";
           viewport.applyViewState(state);
+          viewport.setScreenEdges(screenEdges);
           if (presentationCamera) viewport.pendingViewState = null;
           phase = 2;
         case 2:

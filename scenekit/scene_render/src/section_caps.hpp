@@ -111,7 +111,7 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
             if((result=nkgpu_apply_vertex_buffer(state.renderer,1,instances,static_cast<unsigned>(offset*instance_stride)))!=NKGPU_OK)return result;
             if((result=nkgpu_apply_uniform_data(state.renderer,2,reinterpret_cast<const std::uint8_t *>(&clips),sizeof(clips)))!=NKGPU_OK)return result;
             if(picking) {
-                std::array<float,4> output{for_ao?1.f:0.f,1.f,mode==3?2.f:1.f,static_cast<float>(cap.plane)};
+                std::array<float,4> output{for_ao?(material_takes_light_edges(plan,material)?2.f:1.f):0.f,1.f,mode==3?2.f:1.f,static_cast<float>(cap.plane)};
                 if((result=nkgpu_apply_uniform_data(state.renderer,0,reinterpret_cast<const std::uint8_t *>(output.data()),sizeof(output)))!=NKGPU_OK)return result;
             } else {
                 MaterialUniformData data{};data.base_color=material->state->base_color;data.base_color[3]=1;
