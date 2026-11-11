@@ -3,7 +3,7 @@ import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ParameterRole;
 import cadkit.parametric.recording.DocumentBuilder;
 
-/** FEATURE_PARTS_PLAN FP1c: named parameters say who sets them (editable, derived, fixed), from what, and keep it saved. */
+/** Named parameters say who sets them (editable, derived, fixed), from what, and keep it saved. */
 class ParameterRoleSmoke {
   static function check(value:Bool, message:String):Void {
     if (!value) throw "ParameterRoleSmoke: " + message;

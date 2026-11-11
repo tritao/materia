@@ -82,7 +82,7 @@ class BoxCodec extends CornerDrillCodec {
   override public function type():String return "box";
 }
 
-/** FEATURE_PARTS_PLAN FP1a: a feature type registered from outside CadKit saves, restores, recomputes and names its row. */
+/** A feature type registered from outside CadKit saves, restores, recomputes and names its row. */
 class FeatureRegistrySmoke {
   static function check(value:Bool, message:String):Void {
     if (!value) throw "FeatureRegistrySmoke: " + message;

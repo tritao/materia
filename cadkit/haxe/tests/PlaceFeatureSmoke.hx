@@ -9,7 +9,7 @@ import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.recording.DocumentBuilder;
 
-/** FEATURE_PARTS_PLAN FP1b: a solid placed in a frame, driven by named dimensions and by a datum frame. */
+/** A solid placed in a frame, driven by named dimensions and by a datum frame. */
 class PlaceFeatureSmoke {
   static function check(value:Bool, message:String):Void {
     if (!value) throw "PlaceFeatureSmoke: " + message;

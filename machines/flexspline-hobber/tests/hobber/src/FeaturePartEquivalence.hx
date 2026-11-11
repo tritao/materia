@@ -7,11 +7,11 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import sys.io.File;
 
 /**
- * FEATURE_PARTS_PLAN FP0: the machine-frame snapshot the feature-parts refactor must preserve.
+ * The machine-frame snapshot of the parts this machine designs, which restructuring them must preserve.
  *
  * Every member's world pose, and for each part the hobber designs itself (the classes in `machine/hobber`): its BOM identity,
  * mass, solid properties, route holes, fastening faces and pinned faces, all expressed in the machine frame so that moving
- * a part into its own frame (FP4–FP5) changes nothing here. One record per line, `kind <TAB> key <TAB> name=value ...`,
+ * a part into its own frame changes nothing here. One record per line, `kind <TAB> key <TAB> name=value ...`,
  * sorted, so a failure diffs readably.
  *
  * Usage: `hl main.hl` compares with the checked-in fixture; `hl main.hl --write [path]` rewrites it.
@@ -31,7 +31,7 @@ class FeaturePartEquivalence {
     case _: {abs: 1e-4, rel: 0};
   };
 
-  /** The parts this machine designs: what FP3–FP6 restructure. */
+  /** The parts this machine designs itself. */
   static function designed(component:MachineComponent):Null<String> {
     if (Std.isOfType(component, HobberMadePart)) return "made";
     if (Std.isOfType(component, machinekit.structural.MineralCasting)) return "casting";
