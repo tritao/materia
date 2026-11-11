@@ -37,7 +37,7 @@ class HobberXAxis extends HobberUnit {
     for (role in HobberCarriageRib.ROLES) {
       var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
       var b = rib.band();
-      fixedPart("Xrib-" + role, rib, HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z), "Xbridge",
+      fixedPart("Xrib-" + role, rib, HobberFrame.sourcePose(rib.interfaceFrame(-1)), "Xbridge",
         F.alongY(-((b.low + b.high) / 2), 263, heights.xCarriageBottomZ, 0, 0, 1));
     }
     host("carriage", "Xbridge");

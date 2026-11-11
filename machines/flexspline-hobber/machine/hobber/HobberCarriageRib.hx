@@ -36,7 +36,25 @@ class HobberCarriageRib extends MachineComponent {
       .setToken("errorsBasis", "Assumed").setToken("source", "Bright drawn bar and dry bolted joint remain unqualified")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
-  override public function hasGeometry():Bool return true;
+
+  /** The rib's own frame in the part datum frame: its top, where it bolts to the carriage's underside, +Z down into the rib. */
+  public static function frameFor(role:String):materia.assembly.AssemblyRecord.AssemblyFrame
+    return new HobberCarriageRib(new ComponentValues().setToken("role", role)).interfaceFrame(-1);
+
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var band = band(), body:Null<cadkit.parametric.Feature> = null;
+    b.group("Stock", () -> {
+      var length = b.length("rib.length", HobberSkeleton.reference().columnRear - 140).derivedBy("front window's rear edge (x 140) to the column rear");
+      var thickness = b.length("rib.thickness", band.high - band.low).derivedBy("the rib's band across the carriage (layout)");
+      var height = b.length("rib.height", HobberXCarriage.xCarriageBottom() - band.bottom).derivedBy("rib bottom to the carriage underside");
+      body = b.label(b.block(length, thickness, height), "Bright bar");
+    });
+    HobberRecording.datum(b, "plate", F.identity());
+    if (role == "scale") HobberRecording.datum(b, "scale-head", F.compose(F.inverse(interfaceFrame(-1)), scaleHeadFace().frame));
+    return body;
+  }
+
+  function scaleHeadFace():BoltedFace return HobberScales.carrierFace(HobberScales.x(), [0.0, 0, 0], 8, HobberXCarriage.xCarriageBottom() - band().bottom);
   override public function machinable():Bool return true;
   public function band():{low:Float, high:Float, bottom:Float} return bandFor(role);
   static function bandFor(role:String):{low:Float, high:Float, bottom:Float} return switch role {
@@ -85,19 +103,12 @@ class HobberCarriageRib extends MachineComponent {
     var b = band();
     var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(boltSize());
     var recess = screw.headHeight + 0.5;
-    var faces = [BoltedFace.clamped("plate", interfaceFrame(-1),
+    var faces = [BoltedFace.clamped("plate", recordedDatum("plate"),
       [for (x in boltXs()) {x: x - 263, y: 0.0}], screw.clearanceMedium,
       HobberXCarriage.xCarriageBottom() - b.bottom - recess, boltSize(), {diameter: screw.headDiameter + 2, depth: recess}, false)];
-    if (role == "scale") faces.push(HobberScales.carrierFace(HobberScales.x(), [0.0, 0, 0], 8, HobberXCarriage.xCarriageBottom() - b.bottom));
+    if (role == "scale") faces.push(scaleHeadFace().at(recordedDatum("scale-head")));
     return faces;
   }
   override public function pinnedFaces():Array<PinnedFace> return [new PinnedFace("plate-pins",
-    interfaceFrame(-1), [for (x in pinXs()) {x: x - 263, y: 0.0}], 4, 8)];
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var b = band();
-    var raw = Part.box(246, b.high - b.low, HobberXCarriage.xCarriageBottom() - b.bottom);
-    var placed = raw.translated(new Vector(263, (b.low + b.high) / 2, b.bottom));
-    raw.close();
-    return machined(placed);
-  }
+    recordedDatum("plate"), [for (x in pinXs()) {x: x - 263, y: 0.0}], 4, 8)];
 }
