@@ -70,7 +70,7 @@ class HobberXCarriage extends HobberMadePart {
     return Math.ceil((HobberSkeleton.reference().bedRailCentre + block.spec.blockHoleSpacingAcross / 2 + edge) / 5) * 5;
   }
   public function new(?values:ComponentValues, ?skeleton:HobberSkeleton) {
-    super("GE-X-carriage", values, true);
+    super("GE-X-carriage", values, new ComponentValues());
     this.skeleton = skeleton == null ? HobberSkeleton.reference() : skeleton;
     finish(true);
   }
@@ -118,11 +118,6 @@ class HobberXCarriage extends HobberMadePart {
   };
   override public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return {
     derivedRouteHoles();
-  };
-  /** The recorded body without the derived holes, for the collision pieces; separate bolted ribs carry their own joints. */
-  override public function pieces():Array<Part> return {
-    var document = cadkit.parametric.recording.DocumentBuilder.build(b -> b.output(record(b, Preview)));
-    [PartRecordings.solid(document)];
   };
   override public function manufacturingRoute():Null<ManufacturingRoute> return route();
 

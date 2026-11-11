@@ -135,6 +135,10 @@ class BoltedFace {
   public function paired(holes:Array<BoltHole>):BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn,
       washer, alternative, rated, lowHead, slot);
 
+  /** This face placed at `frame` (a datum of the part's recording): same holes, role and size, new position. */
+  public function at(frame:AssemblyFrame):BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn, washer,
+    alternative, rated, lowHead, slot);
+
   /** This face expressed in another frame: `transform` takes the frame it is given in to the new one (a part's own frame). */
   public function movedBy(transform:AssemblyFrame):BoltedFace return new BoltedFace(id, AssemblyFrames.compose(transform, frame), role, holes,
     width, height, thicknessAt, drawn, washer, alternative, rated, lowHead, slot);
@@ -248,6 +252,9 @@ class PinnedFace {
     this.drawn = drawn;
     this.fit = fit;
   }
+
+  /** These pins placed at `frame` (a datum of the part's recording): same holes and fit, new position. */
+  public function at(frame:AssemblyFrame):PinnedFace return new PinnedFace(id, frame, holes, diameter, depth, through, drawn, fit);
 
   /** This face expressed in another frame: `transform` takes the frame it is given in to the new one (a part's own frame). */
   public function movedBy(transform:AssemblyFrame):PinnedFace

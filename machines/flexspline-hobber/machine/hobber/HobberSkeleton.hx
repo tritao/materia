@@ -1007,7 +1007,8 @@ class HobberSkeleton {
   }
 
 
-  function envelopeSegments(grow:Float):Array<{x0:Float, x1:Float, r:Float}
+  /** The swivel head's moving envelope as segments along work x: a radius over an x span, swept from z lo to hi. */
+  public function envelopeSegments(grow:Float):Array<{x0:Float, x1:Float, r:Float}
 > {
     var front = swivelNativeX + E.PILOT_HEIGHT;
     // Segments along work x: the Ø110 body from the front face, the Ø85 rear boss, the connectors (the boss's envelope to the overall length).

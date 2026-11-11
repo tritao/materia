@@ -77,13 +77,13 @@ class HobberMadePart extends MachineComponent {
     default: throw "Unknown hobber made part: "+design;
   };
   /**
-   * `ownRecipe`: the part has a recipe of its own (its `componentType`) with no inputs, so it carries no values of the shared
-   * made-part recipe.
+   * `ownValues`: the part has a recipe of its own (its `componentType`) and these are that recipe's values, so it carries none
+   * of the shared made-part recipe's.
    */
-  public function new(design:String, ?values:ComponentValues, ownRecipe:Bool = false) {
+  public function new(design:String, ?values:ComponentValues, ?ownValues:ComponentValues) {
     var supplied = values == null ? new ComponentValues() : values.copy();
     supplied.setToken("design", design);
-    var v = ownRecipe ? new ComponentValues() : P.resolve(parameters(), supplied);
+    var v = ownValues != null ? ownValues.copy() : P.resolve(parameters(), supplied);
     super(
       "HOBBER-" + design,
       "Designed steel " + design + "; machined seats, assumed structural adequacy",
@@ -115,7 +115,13 @@ class HobberMadePart extends MachineComponent {
   override public function fasteningFaces():Array<BoltedFace> return [];
   public function manufacturingRoute():Null<ManufacturingRoute> return null;
   public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return [];
-  public function pieces():Array<Part> throw "Concrete made part must declare its stock pieces";
+  /** The stock pieces (no derived holes), for the collision pieces: a recorded part's recorded body. */
+  public function pieces():Array<Part> {
+    if (!isRecorded()) throw "Concrete made part must declare its stock pieces";
+    var self = this;
+    var document = cadkit.parametric.recording.DocumentBuilder.build(b -> b.output(self.record(b, Preview)));
+    return [PartRecordings.solid(document)];
+  }
   /** A part that records its geometry (`record`) takes it from the recording; the others still build from `pieces()`. */
   override public function geometry(detail:ComponentDetail = Preview):Part
     return isRecorded() ? super.geometry(detail) : machined(Solids.union(pieces()));

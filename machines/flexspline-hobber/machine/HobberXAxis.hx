@@ -45,7 +45,7 @@ class HobberXAxis extends HobberUnit {
     var axis=HobberDrives.x();
       for(support in ["fixed","floating"]) {
         var id=HobberDrives.barMember(axis.id,support),face=HobberPadBolts.face(axis,support);
-        externalPart(id,new HobberDriveBar(axis.id,support),HobberFrame.partAt(0, 0, HobberFrame.PART_DATUM_Z),"foundation",axis.id=="X"?"bed-driveSeat":"column-driveSeat",HobberFrame.sourcePose(face.frame),true);
+        externalPart(id,new HobberDriveBar(axis.id,support),HobberFrame.sourcePose(HobberDriveBar.frameFor(axis,support)),"foundation",axis.id=="X"?"bed-driveSeat":"column-driveSeat",HobberFrame.sourcePose(face.frame),true);
       }
     drive(axis,HobberDrives.barMember("X","fixed"),HobberDrives.barMember("X","floating"),"Xbridge",cutDistance);
     var scaleX=HobberScales.x();

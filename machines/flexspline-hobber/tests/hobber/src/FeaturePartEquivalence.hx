@@ -165,7 +165,13 @@ class FeaturePartEquivalence {
 
   /** The parts recorded so far really take their geometry and history from their recordings. */
   static function checkRecorded(machine:FlexsplineHobber):Void {
-    var expected = ["Xbridge" => ["Stock · Ground plate", "Front window", "Fasteners · Derived holes"]];
+    var expected = [
+      "Xbridge" => ["Stock · Ground plate", "Front window", "Fasteners · Derived holes"],
+      "XdriveFixedBar" => ["Stock · Ground bar", "Fasteners · Derived holes"],
+      "XdriveFloatingBar" => ["Stock · Ground bar", "Fasteners · Derived holes"],
+      "ZdriveFixedBar" => ["Stock · Ground bar", "Fasteners · Derived holes"],
+      "ZdriveFloatingBar" => ["Stock · Ground bar", "Z running clearance", "Fasteners · Derived holes"]
+    ];
     for (id => steps in expected) {
       var found = [for (member in machine.components()) if (member.id == id) member.component];
       if (found.length != 1) throw 'No member $id';

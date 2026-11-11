@@ -5,6 +5,7 @@ import machinekit.hobbing.*;
 import cadkit.modeling.Part;
 import machinekit.motion.ErobActuatorPart;
 import cadkit.modeling.Vector;
+import cadkit.modeling.Plane;
 import machinekit.assembly.PosedParts;
 import machinekit.component.*;
 import machinekit.component.BoltedFace.PinnedFace;
@@ -15,7 +16,24 @@ import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** GE-X-fixed-drive-bar; owns its stock, interfaces and manufacturing route. */
+/**
+ * A ground pad bar under a ball-screw support (X or Z, fixed or floating end): bolted to its cast-in seat, carrying the support
+ * on its far face. Recorded in its own frame, the pad face against the casting (`frameFor`): +X along the screw, +Z into the
+ * bar towards the support.
+ */
 class HobberDriveBar extends HobberMadePart {
+  static final barRecipe = new machinekit.cache.Once<ComponentType>();
+
+  /** Its own recipe: which axis and which end; every dimension follows from the drive and its support. */
+  public static function barType():ComponentType return barRecipe.get(() -> new ComponentType("machinekit.hobbing.drive-bar",
+    [P.choice("axis", ["X", "Z"], "X"), P.choice("support", ["fixed", "floating"], "fixed")],
+    v -> new HobberDriveBar(v.token("axis"), v.token("support")), false, false, null, false).versioned(1)
+    .numbered(v -> 'HOBBER-GE-${v.token("axis")}-${v.token("support").toUpperCase()}-DRIVE-BAR')
+    .procured(_ -> Make("steel fabrication and machining")).requiring(v -> route(v.token("axis") == "X" ? HobberDrives.x() : HobberDrives.z()).requirements()));
+
+  /** The bar's own frame in the part datum frame: its pad face against the casting. */
+  public static function frameFor(axis:HobberDriveAxis, support:String):materia.assembly.AssemblyRecord.AssemblyFrame
+    return HobberPadBolts.face(axis, support).frame;
   /** Width of the ground flat bar a drive pad is sawn from. */
   public static inline final PAD_WIDTH = HobberDrives.PAD_WIDTH;
   // ---- Fastening faces (BOM_PLAN F1): the joints whose screws, holes and clearances `deriveFasteners` derives ------------------
@@ -71,27 +89,73 @@ class HobberDriveBar extends HobberMadePart {
   public static function barAxis(design:String):HobberDriveAxis return design.indexOf("GE-X-")==0?HobberDrives.x():HobberDrives.z();
   public static function barSupport(design:String):String return design.indexOf("-fixed-")>=0?"fixed":"floating";
   public function new(axis:String="X", support:String="fixed", ?values:ComponentValues) {
-    super("GE-"+axis+"-"+support+"-drive-bar", values);
     if((axis!="X"&&axis!="Z")||(support!="fixed"&&support!="floating"))throw "Unknown drive bar";
+    super("GE-"+axis+"-"+support+"-drive-bar", values, new ComponentValues().setToken("axis", axis).setToken("support", support));
     finish(true);
   }
+  override public function componentType():Null<ComponentType> return barType();
+
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var axis = barAxis(designId), support = barSupport(designId), bounds = HobberDrives.barBounds(axis, support);
+    var ni = 0, ai = 0;
+    for (i in 0...3) {
+      if (Math.abs(axis.axis.normal[i]) > 0.5) ni = i;
+      if (Math.abs(axis.axis.direction[i]) > 0.5) ai = i;
+    }
+    var ci = 3 - ni - ai;
+    var blank:Null<cadkit.parametric.Feature> = null;
+    b.group("Stock", () -> {
+      var length = b.length("bar.length", bounds[ai + 3] - bounds[ai])
+        .derivedBy("tapped seat holes along the screw + 3 diameters, up to 5 mm" + (support == "floating" ? "; at least the support's foot" : ""));
+      var width = b.length("bar.width", bounds[ci + 3] - bounds[ci]).derivedBy("tapped seat holes across + 3 diameters, up to 5 mm");
+      var thickness = b.length("bar.thickness", bounds[ni + 3] - bounds[ni]).fixedBy("ground flat bar, matched pair for the axis");
+      blank = b.label(b.block(length, width, thickness), "Ground bar");
+    });
+    var body = blank;
+    if (axis.id == "Z" && support == "floating") {
+      var tools = runningClearance(axis, support, b);
+      body = b.label(b.cutAll(blank, tools, [for (i in 0...tools.length) 'swivel head sweep ${i + 1}']), "Z running clearance");
+    }
+    // Its two interfaces: the pad face on the casting (the frame itself) and the seat the support stands on (the far face).
+    b.datum("pad", new Plane(new Vector(0, 0, 0), Vector.X(), Vector.Z()));
+    // The seat's in-plane axis follows the drive's convention (the support's dowels are laid out in it), so it is the drive's
+    // seat frame expressed in this bar's frame, not one written here.
+    var seat = F.compose(F.inverse(frameFor(axis, support)), seatFace(axis, support, bounds[ni + 3] - bounds[ni], bounds).frame);
+    var o = F.transformPoint(seat, 0, 0, 0), x = F.transformVector(seat, 1, 0, 0), z = F.transformVector(seat, 0, 0, 1);
+    b.datum("seat", new Plane(new Vector(o.x, o.y, o.z), new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z)));
+    return body;
+  }
+
+  /** The swivel head's swept envelope over Z's stroke and overtravel, with its running gap, as tools in this bar's frame. */
+  function runningClearance(axis:HobberDriveAxis, support:String, b:cadkit.parametric.recording.DocumentBuilder):Array<cadkit.parametric.Feature> {
+    var skeleton = HobberSkeleton.reference(), range = HobberScales.stroke("Z"), over = HobberScales.overtravel();
+    var toOwn = F.inverse(frameFor(axis, support));
+    var zLow = skeleton.nativeHobCentreZ + range.lower - over, zHigh = skeleton.nativeHobCentreZ + range.upper + over;
+    var tools:Array<cadkit.parametric.Feature> = [];
+    function own(x:Float, y:Float, z:Float):Vector {
+      var p = F.transformPoint(toOwn, x, y, z);
+      return new Vector(p.x, p.y, p.z);
+    }
+    var along = F.transformVector(toOwn, 1, 0, 0);
+    for (s in skeleton.envelopeSegments(skeleton.zRunningGap)) {
+      for (z in [zLow, zHigh]) tools.push(b.cylinderAlong(own(0, 0, z), new Vector(along.x, along.y, along.z), s.r, s.x0, s.x1));
+      var a = own(s.x0, -s.r, zLow), c = own(s.x1, s.r, zHigh);
+      tools.push(b.boxBetween(Math.min(a.x, c.x), Math.max(a.x, c.x), Math.min(a.y, c.y), Math.max(a.y, c.y), Math.min(a.z, c.z), Math.max(a.z, c.z)));
+    }
+    return tools;
+  }
   override public function machinable():Bool return true;
+  /** The supports' dowels, at the seat datum. */
   override public function pinnedFaces():Array<PinnedFace> return {
     var axis=barAxis(designId),support=barSupport(designId);
-    padPins(axis,[support],HobberDrives.barThickness(axis),HobberDrives.barBounds(axis,support));
+    [for (pins in padPins(axis,[support],HobberDrives.barThickness(axis),HobberDrives.barBounds(axis,support))) pins.at(recordedDatum("seat"))];
   };
   override public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return {
     derivedRouteHoles();
   };
-  override public function pieces():Array<Part> return {
-    var axis=barAxis(designId),support=barSupport(designId),blank=HobberPartGeometry.padBox(HobberDrives.barBounds(axis,support));
-    if(axis.id=="Z"&&support=="floating") {
-      var range=HobberScales.stroke("Z"),over=HobberScales.overtravel();
-      [Solids.cut(blank,[HobberSkeleton.reference().envelope(range.lower-over,range.upper+over,HobberSkeleton.reference().zRunningGap)])];
-    } else [blank];
-  };
-  override public function manufacturingRoute():Null<ManufacturingRoute> return {
-    var axis=barAxis(designId);
+  override public function manufacturingRoute():Null<ManufacturingRoute> return route(barAxis(designId));
+
+  static function route(axis:HobberDriveAxis):ManufacturingRoute return {
     ManufacturingRoute.groundStock(GroundStock.bar(80,HobberDrives.barThickness(axis)),[
       {name:"saw finished width from80 mm ground stock; preserve both broad faces; buy both supports from one matched-thickness parent bar, inspect pair within0.01 mm; no epoxy",tolerance:0.01,roughnessRa:0.8},
       {name:"joint-derived bores, flush bar-clamp counterbores and support match-pins after indication",tolerance:0.1,roughnessRa:null}
@@ -100,8 +164,9 @@ class HobberDriveBar extends HobberMadePart {
   override public function fasteningFaces():Array<BoltedFace> {
     var faces:Array<BoltedFace>=[];
     var axis=barAxis(designId),support=barSupport(designId);
-        faces.push(seatFace(axis,support,HobberDrives.barThickness(axis),HobberDrives.barBounds(axis,support)));
-        faces.push(HobberPadBolts.face(axis,support));
+    // The faces' holes and roles come from the drive; the recording's datums place them.
+    faces.push(seatFace(axis,support,HobberDrives.barThickness(axis),HobberDrives.barBounds(axis,support)).at(recordedDatum("seat")));
+    faces.push(HobberPadBolts.face(axis,support).at(recordedDatum("pad")));
     return faces;
   }
 }
