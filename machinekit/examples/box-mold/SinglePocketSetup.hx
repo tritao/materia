@@ -27,6 +27,7 @@ class SinglePocketSetup {
     ),
     [{
       id : "seat",
+      purpose : materia.casting.InsertSpec.InsertRole.GuideSeat,
       openings : [CastingPatterns.face("body.z-max")],
       part : new CastInsert(CastInsert.precastHoles(
         CastInsert.boxValues(40, 35, 15),

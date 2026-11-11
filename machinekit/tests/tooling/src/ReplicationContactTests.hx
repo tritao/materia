@@ -28,6 +28,7 @@ class ReplicationContactTests {
       new machinekit.component.ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 40),
       [{
         id: "seat",
+        purpose: materia.casting.InsertSpec.InsertRole.GuideSeat,
         part: insert,
         pose: F.translation(0, 0, 20),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]

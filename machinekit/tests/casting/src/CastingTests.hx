@@ -144,7 +144,7 @@ class CastingTests {
     var breakout = "";
     try new MineralFoundation(
       v,
-      [{id: "seat", part: insert, openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 90)}]
+      [{id: "seat", purpose: materia.casting.InsertSpec.InsertRole.GenericMount, part: insert, openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 90)}]
     ) catch (error:Dynamic) breakout = Std.string(error);
     check(
       breakout.indexOf("Undeclared casting breakout: insert-seat body.x-max") >= 0,

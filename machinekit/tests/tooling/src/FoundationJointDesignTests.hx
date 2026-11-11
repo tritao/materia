@@ -81,6 +81,7 @@ class FoundationJointDesignTests {
       new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 40),
       [{
         id: "seat",
+        purpose: materia.casting.InsertSpec.InsertRole.ColumnMount,
         part: seat(40, InsertHoles.tappedBlind(thread, 20)),
         pose: F.translation(0, 0, 20),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
@@ -90,6 +91,7 @@ class FoundationJointDesignTests {
       new ComponentValues().setNumber("width", 180).setNumber("depth", 80).setNumber("height", 40),
       [{
         id: "seat",
+        purpose: materia.casting.InsertSpec.InsertRole.ColumnMount,
         part: seat(180, InsertHoles.through(thread.clearanceDiameter, 20)),
         pose: F.compose(F.translation(0, 0, 20), F.turnY(Math.PI)),
         openings: [

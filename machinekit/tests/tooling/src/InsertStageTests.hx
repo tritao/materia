@@ -71,7 +71,7 @@ class InsertStageTests {
       values(),
       [],
       null,
-      [{id: "hatch", part: insert, pose: F.translation(0, 0, 40)}]
+      [{id: "hatch", purpose: materia.casting.InsertSpec.InsertRole.HatchMount, part: insert, pose: F.translation(0, 0, 40)}]
     );
     check(foundation.castingMemberIds().length == 1, "bonded steel is not a pour member");
     var raw = foundation.body.asCastGeometry(), service = foundation.body.geometry();
@@ -122,7 +122,7 @@ class InsertStageTests {
         values(),
         [],
         null,
-        [{id: "hatch", part: insert, pose: F.translation(15, 0, 40)}]
+        [{id: "hatch", purpose: materia.casting.InsertSpec.InsertRole.HatchMount, part: insert, pose: F.translation(15, 0, 40)}]
       ),
       "breaks into a cavity or outside the casting"
     );
@@ -132,7 +132,7 @@ class InsertStageTests {
         values(),
         [],
         null,
-        [{id: "hatch", part: insert, pose: F.translation(13, 0, 40)}]
+        [{id: "hatch", purpose: materia.casting.InsertSpec.InsertRole.HatchMount, part: insert, pose: F.translation(13, 0, 40)}]
       ),
       "declared radial wall"
     );
@@ -346,6 +346,7 @@ class InsertStageTests {
       new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 100),
       [{
         id: "seat",
+        purpose: materia.casting.InsertSpec.InsertRole.GenericMount,
         part: raw,
         pose: F.translation(0, 0, 80),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
