@@ -885,29 +885,6 @@ class HobberSkeleton {
     var out=machinekit.assembly.PosedParts.moved(raw,materia.assembly.AssemblyFrames.fromRotationMatrix(0,0,0,[0.0,0,1,1,0,0,0,1,0]));raw.close();return out;
   }
 
-  final yReliefCache=new machinekit.cache.Once<cadkit.modeling.Part>();
-
-  public function sweptDeckRelief():cadkit.modeling.Part {
-    var raw=yReliefCache.get(()->{
-      var drop=zTravelMax-zTravelMin+2*HobberScales.overtravel();
-      var gap=machinekit.motion.ScrewLinearModuleSpec.GAP,skirt=new HobberChipCover(new machinekit.component.ComponentValues().setToken("role","Xskirt")).geometry();
-      var b=machinekit.assembly.PosedParts.boxOf(skirt);skirt.close();
-      // Sweep the stationary deck/skirt through the complete relative Z
-      // passage. A single low-Z slab misses material near its lower face.
-      var skirtBox=cadkit.modeling.Part.box(b.maxX-b.minX+2*gap,b.maxY-b.minY+2*gap,b.maxZ-b.minZ+2*gap+drop);
-      var skirtKeep=skirtBox.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ-gap-drop));skirtBox.close();
-      var deck=machinekit.component.Solids.union([HobberXCarriage.xDeckKeepout(gap,drop),skirtKeep]);
-      var low=nativeHobCentreZ+zTravelMin-HobberScales.overtravel();
-      var local=machinekit.assembly.PosedParts.moved(deck,materia.assembly.AssemblyFrames.translation(0,0,-low));deck.close();
-      var copies:Array<cadkit.modeling.Part>=[];
-      for(i in 0...13) {
-        var angle=-swivelRange+2*swivelRange*i/12,c=Math.cos(angle),s=Math.sin(angle);
-        copies.push(machinekit.assembly.PosedParts.moved(local,materia.assembly.AssemblyFrames.fromRotationMatrix(0,0,0,[1.0,0,0,0,c,-s,0,s,c])));
-      }
-      local.close();return machinekit.component.Solids.union(copies);
-    });
-    return machinekit.assembly.PosedParts.moved(raw,headInModule());
-  }
 
   /** Output flange face, x. */
   public final swivelNativeX:Float;

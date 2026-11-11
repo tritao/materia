@@ -58,29 +58,57 @@ class HobberYPart extends MachineComponent {
     if(role=="carriage")for(face in HobberYPart.yHeadPins())out.push(new PinnedFace(face.id,F.compose(HobberSkeleton.reference().headInModule(),face.frame),face.holes,face.diameter,face.through?spec.carriageThickness:face.depth,face.through,false,face.fit));
     return out;
   }
-  static function box(a:Float,b:Float,c:Float,d:Float,e:Float,f:Float):Part {
-    var raw=Part.box(b-a,d-c,f-e),shape=raw.translated(new Vector((a+b)/2,(c+d)/2,e));raw.close();return shape;
-  }
-  override public function geometry(detail:ComponentDetail=Preview):Part {
-    var shape:Part;
-    if(role=="base") {
-      var at=actuatorPoint(),half=spec.wallY(1)+spec.wallWidth/2+16;
-      // The lobe overlaps the continuous rail/floor strip; no adapter.
-      // The rail and drive floor is the broad face of ONE ground blank.
-      shape=Solids.union([box(spec.baseMin,spec.baseMax,-half,half,0,spec.baseThickness),Part.cylinderSpan(ErobActuatorData.BODY_DIAMETER/2,0,spec.baseThickness,at.x,at.y)]);
-      shape=Solids.cut(shape,[Part.cylinderSpan(ErobActuatorData.BODY_DIAMETER/2,-1,at.z,at.x,at.y),Part.cylinderSpan((ErobActuatorData.BORE_DIAMETER+0.4)/2,-1,spec.baseThickness+1,at.x,at.y)]);
-    } else {
-      // The plain rectangle extends toward the head, rather than retaining
-      // unused stock above the upper guide or adding a separate adapter.
-      var high=spec.carriageMaxY();
-      shape=box(spec.carriageCentre-spec.carriageLength/2,spec.carriageCentre+spec.carriageLength/2,high-spec.carriageWidth,high,spec.carriageBottom(),spec.carriageBottom()+spec.carriageThickness);
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var skeleton = HobberSkeleton.reference();
+    if (role == "base") {
+      // The rail and drive floor is the broad face of ONE ground blank; the actuator lobe overlaps it, no adapter.
+      var at = actuatorPoint(), half = spec.wallY(1) + spec.wallWidth / 2 + 16;
+      var plate = b.label(b.boxBetween(spec.baseMin, spec.baseMax, -half, half, 0, spec.baseThickness), "Ground plate");
+      var lobe = b.label(b.cylinderAlong(new Vector(at.x, at.y, 0), Vector.Z(), ErobActuatorData.BODY_DIAMETER / 2, 0, spec.baseThickness), "Actuator lobe");
+      var blank = b.label(b.unionAll([plate, lobe]), "Base plate");
+      var recess = b.cylinderAlong(new Vector(at.x, at.y, 0), Vector.Z(), ErobActuatorData.BODY_DIAMETER / 2, -1, at.z);
+      var bore = b.cylinderAlong(new Vector(at.x, at.y, 0), Vector.Z(), (ErobActuatorData.BORE_DIAMETER + 0.4) / 2, -1, spec.baseThickness + 1);
+      var seated = b.label(b.cutAll(blank, [recess, bore], ["actuator recess", "actuator bore"]), "Actuator seat");
+      return b.label(b.cutAll(seated, [sweptDeckRelief(b, skeleton)], ["swept deck"]), "Swept deck relief");
     }
-    if(role=="carriage") {
-      var bore=Part.cylinderAlong(Bt30SpindleData.FLANGE_DIAMETER/2+3,new Vector(0,-132,0),Vector.Y(),HobberSkeleton.reference().spindleNativeY-Bt30SpindleData.FLANGE_FROM+134);
-      var tool=PosedParts.moved(bore,HobberSkeleton.reference().headInModule());bore.close();shape=Solids.cut(shape,[tool]);
-    } else shape=Solids.cut(shape,[HobberSkeleton.reference().sweptDeckRelief()]);
-    var made=machined(shape);
-    if(made.solidCount()!=1) {
+    // The plain rectangle extends toward the head, rather than retaining unused stock above the upper guide or adding an adapter.
+    var high = spec.carriageMaxY();
+    var plate = b.label(b.boxBetween(spec.carriageCentre - spec.carriageLength / 2, spec.carriageCentre + spec.carriageLength / 2, high - spec.carriageWidth, high,
+      spec.carriageBottom(), spec.carriageBottom() + spec.carriageThickness), "Ground plate");
+    var head = skeleton.headInModule(), o = F.transformPoint(head, 0, -132, 0), y = F.transformVector(head, 0, 1, 0);
+    var flange = b.cylinderAlong(new Vector(o.x, o.y, o.z), new Vector(y.x, y.y, y.z), Bt30SpindleData.FLANGE_DIAMETER / 2 + 3, 0,
+      skeleton.spindleNativeY - Bt30SpindleData.FLANGE_FROM + 134);
+    return b.label(b.cutAll(plate, [flange], ["spindle flange"]), "Spindle flange relief");
+  }
+
+  /**
+   * The X deck and its chip skirt swept through the Y module's whole relative Z passage and the swivel's +-range (13 positions),
+   * in the module frame: what the base must clear. One keep-out body, placed at each swivel angle, fused.
+   */
+  function sweptDeckRelief(b:cadkit.parametric.recording.DocumentBuilder, skeleton:HobberSkeleton):cadkit.parametric.Feature {
+    var drop = skeleton.zTravelMax - skeleton.zTravelMin + 2 * HobberScales.overtravel(), gap = ScrewLinearModuleSpec.GAP;
+    var skirt = new HobberChipCover(new ComponentValues().setToken("role", "Xskirt")).geometry(), sb = PosedParts.boxOf(skirt);
+    skirt.close();
+    var low = skeleton.nativeHobCentreZ + skeleton.zTravelMin - HobberScales.overtravel();
+    var hw = HobberXCarriage.xCarriageHalfWidth(), bottom = HobberXCarriage.xCarriageBottom() - low, top = HobberXCarriage.xCarriageTop() - low;
+    var deck = b.boxBetween(60 - gap, 386 + gap, -hw - gap, hw + gap, bottom - gap - drop, top + gap);
+    var window = b.boxBetween(55 + gap, 140 - gap, -150 + gap, 150 - gap, bottom - gap - drop - 1, top + gap + 1);
+    var skirtKeep = b.boxBetween(sb.minX - gap, sb.maxX + gap, sb.minY - gap, sb.maxY + gap, sb.minZ - gap - drop - low, sb.maxZ + gap - low);
+    var keep = b.label(b.unionAll([b.cutAll(deck, [window], ["deck window"]), skirtKeep]), "Deck and skirt keep-out");
+    var head = skeleton.headInModule(), copies:Array<cadkit.parametric.Feature> = [];
+    for (i in 0...13) {
+      var angle = -skeleton.swivelRange + 2 * skeleton.swivelRange * i / 12, c = Math.cos(angle), s = Math.sin(angle);
+      var pose = F.compose(head, F.fromRotationMatrix(0, 0, 0, [1.0, 0, 0, 0, c, -s, 0, s, c]));
+      var o = F.transformPoint(pose, 0, 0, 0), x = F.transformVector(pose, 1, 0, 0), z = F.transformVector(pose, 0, 0, 1);
+      copies.push(b.placeIn(keep, new cadkit.modeling.Plane(new Vector(o.x, o.y, o.z), new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z))));
+    }
+    return b.label(b.unionAll(copies), "Swept deck");
+  }
+
+  /** A Y member must be one solid: a relief that splits it is a design error, not a shape to accept. */
+  override public function geometry(detail:ComponentDetail=Preview):Part {
+    var made = super.geometry(detail);
+    if (made.solidCount() != 1) {
       var fragments=[];
       for(i in 0...made.solidCount()) {
         var piece=new Part(made.shape.subshape(CadKit.ShapeKind.Solid,i));

@@ -34,7 +34,13 @@ class TimelineModel {
       for (index in 0...names.length) {
         var creator = creatorOf(names[index]);
         if (creator < 0) continue;
-        var step = parents.exists(creator) ? parents.get(creator) : creator;
+        // A face belongs to the top-level step that contains the feature that made it (sub-steps can nest).
+        var step:Int = creator, hops = 0;
+        while (parents.exists(step) && hops++ < 10000) {
+          var owner:Null<Int> = parents.get(step);
+          if (owner == null) break;
+          step = owner;
+        }
         var owned = faces.get(step);
         if (owned == null) {
           owned = [];
