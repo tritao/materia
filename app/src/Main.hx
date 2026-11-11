@@ -39,6 +39,7 @@ import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
 import materia.sheet.SheetInventory;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.core.Command;
 import haxeon.ui.core.CommandContext;
 import haxeon.ui.core.CommandRegistry;
@@ -99,6 +100,7 @@ import haxeon.ui.widgets.layout.SplitView;
 import haxeon.ui.widgets.layout.SplitViewOptions;
 import haxeon.ui.widgets.controls.TabItem;
 import haxeon.ui.widgets.controls.Tabs;
+import haxeon.ui.widgets.text.MiddleEllipsisText;
 import haxeon.ui.widgets.text.Text;
 import haxeon.ui.widgets.text.TextArea;
 import haxeon.editor.TextDocument;
@@ -2270,11 +2272,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
         var editor = bimEditor;
         return editor.atWidth(width);
       }
-    ), DockPanelContent.observing("perspective", function(context) {
-      return perspectivePanel();
-    }, function(context, width) {
-      return perspectivePanel(width);
-    }), DockPanelContent.observing(
+    ), DockPanelContent.observingWithWidth("perspective", perspectivePanel), DockPanelContent.observing(
         "inspection-camera",
         function(context) {
           return inspectionCamera.build(this);
@@ -2505,13 +2503,61 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     return style;
   }
 
-  function viewportWithControls(content:View, availableWidth:Float):View {
-    var compact = availableWidth > 0.0 && availableWidth < 400.0;
-    var tiny = availableWidth > 0.0 && availableWidth < 235.0;
-    var options = new Button(gridSpacingLabel() + (tiny ? "" : " m"), null, null, "viewport-options");
+  function viewportWithControls(context:BuildContext, content:View, availableWidth:Float):View {
+    var simulate = mode == EditorMode.Simulate;
+    var edgeLabel = app.CadEdgeModes.label(scene.cadEdgeMode);
+    var spacing = gridSpacingLabel();
+    var navigation = [
+      {key: "frame", command: "scene.frame-selected", label: "Frame", icon: IconName.Inspect},
+      {key: "fit-all", command: "scene.fit-all", label: "Fit", icon: IconName.Inspect},
+      {key: "reset", command: "scene.reset-perspective", label: "Reset", icon: IconName.Cube}
+    ];
+    var gridActions = [
+      {key: "grid", command: "scene.toggle-grid", label: "Grid", icon: IconName.Grid},
+      {key: "snap", command: "scene.toggle-grid-snap", label: "Snap", icon: IconName.Magnet}
+    ];
+
+    var padding = 7.0, buttonGap = 4.0, controlGap = 4.0, barInset = 8.0;
+    var textStyle = context.resolveTextRole(haxeon.ui.theme.TextRole.Button,
+      TextStyleOverride.paragraph(haxeon.ui.TextWrap.None));
+    var labelLayout:Null<haxeon.ui.TextLayout> = null;
+    function toolWidth(label:String, iconSize:Float, iconCount:Int = 1):Float {
+      var labelWidth = 0.0;
+      if (label.length > 0) {
+        if (context.fonts == null) labelWidth = label.length * textStyle.textStyle.fontSize;
+        else {
+          if (labelLayout == null) labelLayout = haxeon.ui.TextLayout.createStyled(context.fonts, label, 100000.0,
+            textStyle.textStyle, textStyle.paragraphStyle);
+          else labelLayout.setText(label);
+          labelWidth = labelLayout.measure().width;
+        }
+      }
+      var children = iconCount + (label.length == 0 ? 0 : 1);
+      return Math.ceil(labelWidth) + iconSize * iconCount + 2.0 * padding + (children - 1) * buttonGap;
+    }
+    var visibilityWidth = toolWidth("Visibility", 12.0, 2);
+    function toolbarWidth(compact:Bool):Float {
+      // Count the divider and three display controls, with room for the gap before the status.
+      var controlCount = navigation.length + gridActions.length + 4 + (simulate ? 1 : 0);
+      var width = 2.0 * barInset + 1.0 + controlCount * controlGap;
+      for (tool in navigation.concat(gridActions)) width += toolWidth(compact ? "" : tool.label, 16.0);
+      if (simulate) width += toolWidth(compact ? "" : "Camera", 16.0);
+      width += toolWidth(spacing + " m", 12.0);
+      width += compact ? toolWidth("", 12.0, 2) : visibilityWidth;
+      return width + toolWidth(compact ? "" : edgeLabel, 12.0);
+    }
+    var compact = availableWidth > 0.0 && availableWidth < toolbarWidth(false);
+    var tiny = compact && availableWidth < toolbarWidth(true);
+    var triggerWidth = compact ? toolWidth("", 12.0, 2) : visibilityWidth;
+    if (labelLayout != null) labelLayout.dispose();
+    var toolStyle = new LayoutStyle();
+    toolStyle.padding = new Insets(padding, 5.0, padding, 5.0);
+    toolStyle.childGap = buttonGap;
+
+    var options = new Button(spacing + (tiny ? "" : " m"), toolStyle, null, "viewport-options");
     options.variant = ButtonVariant.Navigation;
     options.classes = ["viewport-tool"];
-    options.accessibilityLabel = "Grid spacing: " + gridSpacingLabel() + " m";
+    options.accessibilityLabel = "Grid spacing: " + spacing + " m";
     options.trailingIcon = IconName.ChevronDown;
     options.iconSize = 12.0;
     options.selected = viewportOptionsVisible;
@@ -2527,39 +2573,36 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       viewportOptionsVisible = true;
       invalidateView();
     };
-    var controls:Array<KeyedView> = [new KeyedView(
-      "frame",
-      viewportToolbarAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact)
-    )];
-    controls.push(new KeyedView(
-      "fit-all",
-      viewportToolbarAction("viewport-fit-all", "scene.fit-all", "Fit", IconName.Inspect, compact)
-    ));
-    if (!tiny) controls.push(new KeyedView(
-      "reset",
-      viewportToolbarAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube, compact)
-    ));
-    if (mode == EditorMode.Simulate) {
-      var cameraButton = new Button("Camera", null, openInspectionCamera, "viewport-inspection-camera");
+    var controls:Array<KeyedView> = [];
+    for (tool in navigation) {
+      if (tiny && tool.key == "reset") continue;
+      controls.push(new KeyedView(tool.key,
+        viewportToolbarAction("viewport-" + tool.key, tool.command, tool.label, tool.icon, compact, toolStyle)));
+    }
+    if (simulate) {
+      var cameraButton = new Button(compact ? "" : "Camera", toolStyle, openInspectionCamera, "viewport-inspection-camera");
+      cameraButton.leadingIcon = IconName.Inspect;
+      cameraButton.variant = ButtonVariant.Navigation;
+      cameraButton.classes = ["viewport-tool"];
       cameraButton.accessibilityLabel = "Open inspection camera";
-      controls.push(new KeyedView("inspection-camera", cameraButton));
+      controls.push(new KeyedView("inspection-camera", compact
+        ? new Tooltip("viewport-inspection-camera-tooltip", cameraButton, new Text("Inspection camera"), 0.0, 34.0)
+        : cameraButton));
     }
     var groupDivider = new Spacer("viewport-toolbar-group-divider", LayoutAxis.fixed(1.0), LayoutAxis.fixed(20.0));
     groupDivider.style.background = appearance.theme.tokens.border;
     controls.push(new KeyedView("group-divider", groupDivider));
-    controls.push(new KeyedView(
-      "grid",
-      viewportToolbarAction("viewport-grid", "scene.toggle-grid", "Grid", IconName.Grid, compact)
-    ));
-    controls.push(new KeyedView(
-      "snap",
-      viewportToolbarAction("viewport-snap", "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)
-    ));
+    for (tool in gridActions) controls.push(new KeyedView(tool.key,
+      viewportToolbarAction("viewport-" + tool.key, tool.command, tool.label, tool.icon, compact, toolStyle)));
     controls.push(new KeyedView("options", options));
-    var visibility = new Button(compact ? "" : "Visibility", null, null, "viewport-visibility");
+    var visibilityLabel = compact ? "" : "Visibility";
+    var visibilityStyle = toolStyle.copy();
+    visibilityStyle.width = LayoutAxis.fixed(triggerWidth);
+    var visibility = new Button(visibilityLabel, visibilityStyle, null, "viewport-visibility");
     visibility.variant = ButtonVariant.Navigation;
     visibility.leadingIcon = IconName.Inspect;
     visibility.trailingIcon = IconName.ChevronDown;
+    visibility.iconSize = 12.0;
     visibility.classes = ["viewport-tool"];
     visibility.accessibilityLabel = "Component visibility";
     visibility.selected = visibilityPopupVisible;
@@ -2571,9 +2614,12 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     visibilityPopupVisible = !visibilityPopupVisible;
     invalidateView();
     };
-    controls.push(new KeyedView("visibility", visibility));
-    var edgeMode = new Button(compact ? "" : app.CadEdgeModes.label(scene.cadEdgeMode),
-      null, () -> {scene.setCadEdgeMode(app.CadEdgeModes.next(scene.cadEdgeMode));
+    var visibilityTip = new Tooltip("viewport-visibility-tooltip", visibility, new Text("Component visibility"));
+    visibilityTip.placement = haxeon.ui.widgets.overlays.TooltipPlacement.Below;
+    visibilityTip.showWhen = () -> compact;
+    controls.push(new KeyedView("visibility", visibilityTip));
+    var edgeMode = new Button(compact ? "" : edgeLabel, toolStyle,
+      () -> {scene.setCadEdgeMode(app.CadEdgeModes.next(scene.cadEdgeMode));
     invalidateView();
     }, "viewport-cad-edge-mode");
     edgeMode.leadingIcon = IconName.Cube;
@@ -2581,27 +2627,30 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     edgeMode.classes = ["viewport-tool"];
     edgeMode.iconSize = 12.0;
     edgeMode.accessibilityLabel = "CAD display: "
-      + app.CadEdgeModes.label(scene.cadEdgeMode) + ". Cycle Feature edges, All edges, Shaded.";
+      + edgeLabel + ". Cycle Feature edges, All edges, Shaded.";
     controls.push(new KeyedView("cad-edge-mode", edgeMode));
-    // While a jointed part is dragged, say whether it follows the cursor and why not.
+
+    // While a jointed part is dragged, say whether it follows the cursor and why.
     var dragMessage = perspectiveViewport == null ? null : perspectiveViewport.assemblyDragMessage();
     var mateMessage = perspectiveViewport == null ? null : perspectiveViewport.matePickMessage();
-    if (mateMessage != null) dragMessage = mateMessage;
-    if (dragMessage != null) controls.push(new KeyedView(
-      "assembly-drag-status",
-      new Text(dragMessage, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
-    ));
-    else if (collisionSummary != null) controls.push(new KeyedView(
-      "collision-status",
-      new Text(collisionSummary, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
-    ));
+    var message = mateMessage != null ? mateMessage : dragMessage != null ? dragMessage : collisionSummary;
+    if (message != null) {
+      var status = new MiddleEllipsisText("viewport-status-text", message, false,
+        TextStyleOverride.combine(TextStyleOverride.text(12.0),
+          TextStyleOverride.foreground(appearance.theme.tokens.textSecondary)));
+      var tip = new Tooltip("viewport-status-tooltip", status, new Text(message));
+      tip.fillAnchor = true;
+      tip.placement = haxeon.ui.widgets.overlays.TooltipPlacement.Below;
+      tip.showWhen = () -> status.truncated;
+      controls.push(new KeyedView("viewport-status", tip));
+    }
     var barStyle = new LayoutStyle();
     barStyle.width = LayoutAxis.grow();
     barStyle.height = LayoutAxis.fixed(38.0);
-    barStyle.direction = LayoutDirection.LeftToRight;
     barStyle.childAlignY = LayoutAlignmentY.Center;
-    barStyle.childGap = tiny ? 2.0 : 4.0;
-    barStyle.padding = new Insets(tiny ? 4.0 : 8.0, 4.0, tiny ? 4.0 : 8.0, 4.0);
+    barStyle.childGap = tiny ? 2.0 : controlGap;
+    var inset = tiny ? 4.0 : barInset;
+    barStyle.padding = new Insets(inset, 4.0, inset, 4.0);
     barStyle.background = appearance.theme.tokens.surfaceRaised;
     var toolbar = new Row("viewport-toolbar", controls, barStyle);
     var divider = new Spacer("viewport-toolbar-bottom-divider", LayoutAxis.grow(), LayoutAxis.fixed(1.0));
@@ -2700,8 +2749,8 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     return new Column("perspective-with-toolbar", viewportRows, panelStyle);
   }
 
-  function viewportToolbarAction(key:String, commandId:String, label:String, icon:IconName, compact:Bool):View {
-    var action = new CommandButton(key, commandId, commands);
+  function viewportToolbarAction(key:String, commandId:String, label:String, icon:IconName, compact:Bool, style:LayoutStyle):View {
+    var action = new CommandButton(key, commandId, commands, null, style);
     action.displayLabel = compact ? "" : label;
     action.leadingIcon = icon;
     action.variant = ButtonVariant.Navigation;
@@ -2878,9 +2927,10 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     invalidateView();
   }
 
-  function perspectivePanel(availableWidth:Float = 0.0):View {
+  function perspectivePanel(context:BuildContext, availableWidth:Float):View {
     return perspectiveViewport
       == null ? new Text("Perspective rendering requires the desktop GPU host.") : viewportWithControls(
+        context,
         perspectiveViewport,
         availableWidth
       );
