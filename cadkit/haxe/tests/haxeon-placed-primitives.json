@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "cadkit-placed-primitives"},
+  "entry": "PlacedPrimitivesSmoke",
+  "sourceRoots": [".", "../../examples/modeling"],
+  "dependencies": {"cadkit": {"path": "../.."}, "projectkit": {"path": "../../../projectkit"}},
+  "target": "host",
+  "outputDir": "build/placed-primitives"
+}

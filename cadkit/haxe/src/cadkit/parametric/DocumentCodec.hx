@@ -39,6 +39,9 @@ import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.PlaceFeature;
+import cadkit.parametric.features.BoxBetweenFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
+import cadkit.parametric.features.UnionAllFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -66,7 +69,7 @@ class DocumentCodec {
   public static inline var FORMAT:String = "cadkit.document";
   public static inline var VERSION:Int = 17;
   static final BUILT_IN_TYPES:Array<String> = [
-    "boolean", "box", "chamfer", "constrained-sketch", "cylinder", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "place", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "wire"
+    "boolean", "box", "box-between", "chamfer", "constrained-sketch", "cylinder", "cylinder-along", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "place", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "union-all", "wire"
   ];
 
   /** Feature types this codec saves itself; `FeatureTypeRegistry` refuses them. */
@@ -324,6 +327,16 @@ class DocumentCodec {
           ));
         } else if (featureType == "cylinder") {
           feature = document.add(new CylinderFeature(numberField(record, "radius"), numberField(record, "height")));
+        } else if (featureType == "box-between") {
+          feature = document.add(new BoxBetweenFeature(numberField(record, "x0"), numberField(record, "x1"), numberField(record, "y0"),
+            numberField(record, "y1"), numberField(record, "z0"), numberField(record, "z1")));
+        } else if (featureType == "cylinder-along") {
+          feature = document.add(new CylinderAlongFeature(decodeVector(requiredField(record, "origin")),
+            decodeVector(requiredField(record, "axis")), numberField(record, "radius"), numberField(record, "from"),
+            numberField(record, "to")));
+        } else if (featureType == "union-all") {
+          var partIds:Array<Dynamic> = cast requiredField(record, "parts");
+          feature = document.add(new UnionAllFeature([for (partId in partIds) requiredFeature(document, integerValue(partId, "part"))]));
         } else if (featureType == "imported-step") {
           feature = document.add(new ImportedShapeFeature(stringField(record, "stepText")));
         } else if (featureType == "face") {
@@ -734,6 +747,24 @@ class DocumentCodec {
         height: box.height.value,
         references: references
       };
+    } else if (featureType == "box-between") {
+      var between:BoxBetweenFeature = cast feature;
+      return {
+        id: feature.id.toInt(), type: featureType,
+        x0: between.x0.value, x1: between.x1.value, y0: between.y0.value, y1: between.y1.value, z0: between.z0.value, z1: between.z1.value,
+        references: references
+      };
+    } else if (featureType == "cylinder-along") {
+      var along:CylinderAlongFeature = cast feature;
+      return {
+        id: feature.id.toInt(), type: featureType,
+        origin: encodeVector(along.origin), axis: encodeVector(along.axis),
+        radius: along.radius.value, from: along.from.value, to: along.to.value,
+        references: references
+      };
+    } else if (featureType == "union-all") {
+      var union:UnionAllFeature = cast feature;
+      return {id: feature.id.toInt(), type: featureType, parts: [for (part in union.parts) part.id.toInt()], references: references};
     } else if (featureType == "cylinder") {
       var cylinder:CylinderFeature = cast feature;
       return {

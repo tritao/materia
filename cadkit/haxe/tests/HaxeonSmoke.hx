@@ -95,6 +95,7 @@ class HaxeonSmoke {
     FeatureRegistrySmoke.run();
     PlaceFeatureSmoke.run();
     ParameterRoleSmoke.run();
+    PlacedPrimitivesSmoke.run();
     var box = Shape.box(10.0, 20.0, 30.0);
     var bounds = box.bounds();
     if (bounds.get_max().get_z() != 30.0) return 1;

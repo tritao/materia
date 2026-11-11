@@ -30,6 +30,10 @@ import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.features.PlaceFeature;
+import cadkit.parametric.features.ToolCollectionFeature;
+import cadkit.parametric.features.UnionAllFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
+import cadkit.parametric.features.BoxBetweenFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.WireFeature;
@@ -672,6 +676,42 @@ class DocumentBuilder {
   public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
     check();
     return document.add(new TransformFeature(source, x, y, z));
+  }
+
+  /** An axis-aligned box between two corners; any extent may be a named dimension. */
+  public function boxBetween(x0:Dimension, x1:Dimension, y0:Dimension, y1:Dimension, z0:Dimension, z1:Dimension):BoxBetweenFeature {
+    check();
+    var feature = document.add(new BoxBetweenFeature(x0.number(), x1.number(), y0.number(), y1.number(), z0.number(), z1.number()));
+    bind(x0, feature, "box.x0");
+    bind(x1, feature, "box.x1");
+    bind(y0, feature, "box.y0");
+    bind(y1, feature, "box.y1");
+    bind(z0, feature, "box.z0");
+    bind(z1, feature, "box.z1");
+    return feature;
+  }
+
+  /** A cylinder on the line through `origin` along `axis`, between stations `from` and `to` along it. */
+  public function cylinderAlong(origin:Vector, axis:Vector, radius:Dimension, from:Dimension, to:Dimension):CylinderAlongFeature {
+    check();
+    var feature = document.add(new CylinderAlongFeature(origin, axis, radius.number(), from.number(), to.number()));
+    bind(radius, feature, "cylinder.radius");
+    bind(from, feature, "cylinder.from");
+    bind(to, feature, "cylinder.to");
+    return feature;
+  }
+
+  /** `target` less every tool, as one labelled step and one boolean (labels name each tool in the history). */
+  public function cutAll(target:Feature, tools:Array<Feature>, labels:Array<String>):BooleanFeature {
+    check();
+    var collection = document.add(new ToolCollectionFeature(tools, labels));
+    return document.add(new BooleanFeature(target, collection, BooleanOperation.Cut));
+  }
+
+  /** Several solids fused into one, in one step. */
+  public function unionAll(parts:Array<Feature>):UnionAllFeature {
+    check();
+    return document.add(new UnionAllFeature(parts));
   }
 
   /** A named datum frame (a reference-plane element) that placed features can be relative to. */
