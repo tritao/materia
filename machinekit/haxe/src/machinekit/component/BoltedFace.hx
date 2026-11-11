@@ -139,10 +139,6 @@ class BoltedFace {
   public function at(frame:AssemblyFrame):BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn, washer,
     alternative, rated, lowHead, slot);
 
-  /** This face expressed in another frame: `transform` takes the frame it is given in to the new one (a part's own frame). */
-  public function movedBy(transform:AssemblyFrame):BoltedFace return new BoltedFace(id, AssemblyFrames.compose(transform, frame), role, holes,
-    width, height, thicknessAt, drawn, washer, alternative, rated, lowHead, slot);
-
   /** This face with its screw the low-head cap screw (see `lowHead`). */
   public function lowHeaded():BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn, washer, alternative, rated, true, slot);
 
@@ -255,10 +251,6 @@ class PinnedFace {
 
   /** These pins placed at `frame` (a datum of the part's recording): same holes and fit, new position. */
   public function at(frame:AssemblyFrame):PinnedFace return new PinnedFace(id, frame, holes, diameter, depth, through, drawn, fit);
-
-  /** This face expressed in another frame: `transform` takes the frame it is given in to the new one (a part's own frame). */
-  public function movedBy(transform:AssemblyFrame):PinnedFace
-    return new PinnedFace(id, AssemblyFrames.compose(transform, frame), holes, diameter, depth, through, drawn, fit);
 
   /** The holes given as points of the part's frame, which `frame` carries onto the face. */
   public static function atPoints(id:String, frame:AssemblyFrame, points:Array<{x:Float, y:Float, z:Float}>, diameter:Float, depth:Float,
