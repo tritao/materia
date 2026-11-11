@@ -35,8 +35,8 @@ class UnifiedHobberTests {
 
     var data = args.length > 0 ? SceneArtifact.decode(sys.io.File.getBytes(args[0])) : {
       var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)), 4);
-      var fit = HobberEnclosurePreview.assembled(machine);
-      HobberEnclosurePreview.runtimeScene(fit.assembly, machine, fit.shell.layout.stroke, true);
+      var fit = HobberCell.build(machine);
+      HobberScenePresentation.build(fit.assembly, machine, fit.shell.layout.stroke, true);
     };
     var definition = data.assemblyDefinition, motion = data.machineMotion;
     if (definition == null || motion == null || motion.enclosureGuard == null) throw "Guarded hobber scene required";

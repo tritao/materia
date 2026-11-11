@@ -32,8 +32,8 @@ class EnclosureRuntimeTests {
     Sys.println("Building fitted guarded hobber");
     Sys.stdout().flush();
     var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)), 4);
-    var fitted = HobberEnclosurePreview.assembled(machine);
-    var data = HobberEnclosurePreview.runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke);
+    var fitted = HobberCell.build(machine);
+    var data = HobberScenePresentation.build(fitted.assembly, machine, fitted.shell.layout.stroke);
     var artifact = SceneArtifact.decode(SceneArtifact.encode(data));
     var loaded = new ProjectArtifactLoader().load(SceneArtifact.encode(artifact));
     var physical = loaded.physical;
@@ -53,8 +53,9 @@ class EnclosureRuntimeTests {
     var badMountArtifact = SceneArtifact.decode(SceneArtifact.encode(data));
     var badMountDefinition = badMountArtifact.assemblyDefinition;
     if (badMountDefinition == null) throw "Missing mounting test assembly";
-    var badMount = badMountDefinition.joints.filter(j -> j.role
-      == materia.assembly.AssemblyDefinition.AssemblyJointRole.Closure)[0];
+    // An enclosure post mounted at a second base connector of the same post: the closure disagrees with the rigid body.
+    var badMount = badMountDefinition.joints.filter(j -> j.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Closure
+      && StringTools.startsWith(j.child, "enclosure/") && j.childConnector != "baseMount0" && StringTools.startsWith(j.childConnector, "baseMount"))[0];
     badMount.childConnector = "baseMount0";
     var badMountRejected = false;
     try {
