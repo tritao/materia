@@ -15,9 +15,11 @@ class WallRole {
   public function new(elementId:ElementId, uncutOutput:Feature) {
     this.elementId = elementId;
     this.uncutOutput = uncutOutput;
-    this.body = uncutOutput.serializationType() == "box" ? cast uncutOutput : null;
+    // A straight wall's body is a block from its own origin (length, thickness, height).
+    var block = Std.downcast(uncutOutput, BlockFeature);
+    this.body = block != null && block.align.join(",") == [BlockFeature.MIN, BlockFeature.MIN, BlockFeature.MIN].join(",") ? block : null;
     this.levelBody = uncutOutput.serializationType() == "level-box" ? cast uncutOutput : null;
-    if (body == null && levelBody == null) throw new BimError("straight wall requires a box or level-box feature");
+    if (body == null && levelBody == null) throw new BimError("straight wall requires a corner block or level-box feature");
   }
 
   public var length(get, never):Float;

@@ -57,9 +57,9 @@ class TypedParameterSmoke {
     near(doubledCount.value, 8);
 
     var wall = document.add(BlockFeature.corner(width.value, depth.value, height.value));
-    width.bind(wall.width);
-    depth.bind(wall.depth);
-    height.bind(wall.height);
+    width.bind(wall.x);
+    depth.bind(wall.y);
+    height.bind(wall.z);
     document.setOutput(wall);
     document.recompute();
     near(document.result().volume(), 2000 * 300 * 2500);
@@ -112,7 +112,7 @@ class TypedParameterSmoke {
     var historyBox = historyDocument.add(BlockFeature.corner(10, 8, 6));
     var historyWidth = historyDocument.defineTypedParameter("history.width", 10, ParameterKind.Length, "mm");
     historyDocument.defineTypedParameter("history.other", 20, ParameterKind.Length, "mm");
-    historyWidth.bind(historyBox.width);
+    historyWidth.bind(historyBox.x);
     historyDocument.setExpression("history.width", "history.other");
     near(historyBox.x.value, 20);
     check(historyDocument.undo(), "bound expression undo");
@@ -152,7 +152,7 @@ class TypedParameterSmoke {
     var typedAngle = validationDocument.defineTypedParameter("validation.angle", 10, ParameterKind.Angle, "rad");
     var typedBox = validationDocument.add(BlockFeature.corner(10, 10, 10));
     failed = false;
-    try typedAngle.bind(typedBox.depth) catch (error:Dynamic) failed = true;
+    try typedAngle.bind(typedBox.y) catch (error:Dynamic) failed = true;
     check(failed, "typed feature bindings require compatible quantities");
     validationDocument.close();
 

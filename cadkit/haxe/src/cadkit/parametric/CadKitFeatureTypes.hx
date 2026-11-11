@@ -21,6 +21,7 @@ import cadkit.parametric.features.UnionAllFeature;
 class CadKitFeatureTypes {
   public static function codecs():Array<FeatureCodec> {
     var list:Array<FeatureCodec> = [new PlaceCodec(), new BlockCodec(), new PolygonCodec(), new BoxBetweenCodec(), new CylinderAlongCodec(), new UnionAllCodec(), new CutAllCodec(), new HolesCodec()];
+    for (codec in ModelingFeatureTypes.codecs()) list.push(codec);
     for (codec in cadkit.sheetmetal.SheetFeatureTypes.codecs()) list.push(codec);
     return list;
   }

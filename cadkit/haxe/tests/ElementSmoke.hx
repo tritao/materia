@@ -36,13 +36,13 @@ private class CountingBoxFeature extends BlockFeature {
   public var evaluations:Int;
 
   public function new() {
-    super(2, 3, 4);
+    super(2, 3, 4, [BlockFeature.MIN, BlockFeature.MIN, BlockFeature.MIN]);
     evaluations = 0;
   }
 
   override public function evaluate(context:EvaluationContext):EvaluationResult {
     evaluations++;
-    return EvaluationResult.fromShape(Shape.box(width.value, depth.value, height.value));
+    return EvaluationResult.fromShape(Shape.box(x.value, y.value, z.value));
   }
 }
 
@@ -460,11 +460,11 @@ class ElementSmoke {
     var graph = new Document();
     var graphBody = graph.add(BlockFeature.corner(10, 20, 30));
     var graphOpening = graph.add(CylinderAlongFeature.upZ(2, 10));
-    graph.defineTypedParameter("body.width", 10, ParameterKind.Length, "mm").bind(graphBody.width);
-    graph.defineTypedParameter("body.depth", 20, ParameterKind.Length, "mm").bind(graphBody.depth);
-    graph.defineTypedParameter("body.height", 30, ParameterKind.Length, "mm").bind(graphBody.height);
+    graph.defineTypedParameter("body.width", 10, ParameterKind.Length, "mm").bind(graphBody.x);
+    graph.defineTypedParameter("body.depth", 20, ParameterKind.Length, "mm").bind(graphBody.y);
+    graph.defineTypedParameter("body.height", 30, ParameterKind.Length, "mm").bind(graphBody.z);
     graph.defineTypedParameter("opening.radius", 2, ParameterKind.Length, "mm").bind(graphOpening.radius);
-    graph.defineTypedParameter("opening.height", 10, ParameterKind.Length, "mm").bind(graphOpening.height);
+    graph.defineTypedParameter("opening.height", 10, ParameterKind.Length, "mm").bind(graphOpening.to);
     var reusable = new Document();
     var inputBindings = new Map<String, String>();
     inputBindings.set("width", "body.width");

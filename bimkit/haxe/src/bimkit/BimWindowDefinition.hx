@@ -42,9 +42,9 @@ class BimWindowDefinition {
       graph.parameter("height").bind(openingBox.z);
 
       graph.defineTypedParameter("cut.overlap", 1, QuantityKind.Length, "mm");
-      bindExpression(graph, "cavity.x", QuantityKind.Length, "width - 2 * frameThickness", cavity.x);
-      bindExpression(graph, "cavity.z", QuantityKind.Length, "height - 2 * frameThickness", cavity.z);
-      bindExpression(graph, "cavity.y", QuantityKind.Length, "depth + 2 * cut.overlap", cavity.y);
+      bindExpression(graph, "cavity.width", QuantityKind.Length, "width - 2 * frameThickness", cavity.x);
+      bindExpression(graph, "cavity.height", QuantityKind.Length, "height - 2 * frameThickness", cavity.z);
+      bindExpression(graph, "cavity.depth", QuantityKind.Length, "depth + 2 * cut.overlap", cavity.y);
       bindExpression(graph, "cavity.y", QuantityKind.Length, "-cut.overlap", positionedCavity.y);
       bindExpression(graph, "opening.depth", QuantityKind.Length, "depth + 2 * cut.overlap", openingBox.y);
       bindExpression(graph, "opening.y", QuantityKind.Length, "-cut.overlap", opening.y);

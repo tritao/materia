@@ -200,7 +200,12 @@ slots join `HoleSpec` when a recorded part first needs one.
   (`BlockFeature.corner`, `CylinderAlongFeature.upZ`, `PlaceFeature.offset`).
   `rotation` stays: its editable angle is not something `place` (exact
   vectors) does. Documents are schema v18. Face names are unchanged (same
-  primitives), so the naming goldens hold. Left: the built-ins onto codecs.
+  primitives), so the naming goldens hold. Built-ins onto codecs, first
+part: wire, polyline, loft, sweep, offset, shell, project, grid, linear and
+polar patterns and hole are registry codecs (`ModelingFeatureTypes`); their
+payload is under `data` like every registered type. Left on the branch
+chain: sketches, extrude/revolve/pocket, booleans, fillet/chamfer, face,
+mirror, rotation, datum/level features, definition output, tool collection.
 - BOM: one helper for the "Assumed made part" engineering metadata the
   hobber parts repeat; `ScrewLinearModulePart`'s stock and route as a
   function of its recipe values, so its requirements do not build a part.

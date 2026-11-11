@@ -65,4 +65,46 @@ class FeatureCodecContext {
     if (value == null || !Std.isOfType(value, String)) throw new ParametricError('document field is not a string: $name');
     return cast value;
   }
+
+  /** A required whole-number field of a payload object. */
+  public function integer(record:Dynamic, name:String):Int {
+    var value = number(record, name);
+    if (Math.ffloor(value) != value || Math.abs(value) > 2147483647) throw new ParametricError('document field is not an integer: $name');
+    return Std.int(value);
+  }
+
+  /** A required boolean field of a payload object. */
+  public function boolean(record:Dynamic, name:String):Bool {
+    var value:Dynamic = Reflect.field(record, name);
+    if (value == null || !Std.isOfType(value, Bool)) throw new ParametricError('document field is not a boolean: $name');
+    return cast value;
+  }
+
+  /** A required field of a payload object, whatever its type. */
+  public function field(record:Dynamic, name:String):Dynamic {
+    var value:Dynamic = Reflect.field(record, name);
+    if (value == null) throw new ParametricError('document field is missing: $name');
+    return value;
+  }
+
+  /** A face or edge selection rule as saved. */
+  public function encodeSelection(selection:Null<SelectionRecipe>):Dynamic {
+    if (selection == null) return null;
+    return {
+      kind: selection.kind,
+      geometry: selection.geometry,
+      parallel: selection.parallel == null ? null : encodeVector(selection.parallel),
+      position: selection.position,
+      axis: encodeVector(selection.axis),
+      expectedCount: selection.expectedCount,
+      tolerance: selection.tolerance
+    };
+  }
+
+  public function decodeSelection(record:Dynamic):SelectionRecipe {
+    if (record == null) throw new ParametricError("document selection is missing");
+    var parallel:Dynamic = Reflect.field(record, "parallel");
+    return new SelectionRecipe(string(record, "kind"), string(record, "geometry"), parallel == null ? null : decodeVector(parallel),
+      string(record, "position"), decodeVector(field(record, "axis")), integer(record, "expectedCount"), number(record, "tolerance"));
+  }
 }

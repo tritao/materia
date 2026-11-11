@@ -62,7 +62,7 @@ class DocumentCodec {
   public static inline var FORMAT:String = "cadkit.document";
   public static inline var VERSION:Int = 18;
   static final BUILT_IN_TYPES:Array<String> = [
-    "boolean", "chamfer", "constrained-sketch", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "wire"
+    "boolean", "chamfer", "constrained-sketch", "datum-sketch", "definition-output", "extrude", "face", "fillet", "imported-step", "level-box", "level-extrude", "mirror", "pocket", "revolve", "rotation", "sketch", "tool-collection"
   ];
 
   /** Feature types this codec saves itself; `FeatureTypeRegistry` refuses them. */
@@ -269,10 +269,7 @@ class DocumentCodec {
         var featureId = intField(record, "id");
         var featureType = stringField(record, "type");
         var feature:Feature;
-        var modeling = decodeModelingFeature(featureType, record, document);
-        if (modeling != null) {
-          feature = document.add(modeling);
-        } else if (featureType == "constrained-sketch") {
+        if (featureType == "constrained-sketch") {
           feature = document.add(decodeConstrainedSketch(record, document));
         } else if (featureType == "datum-sketch") {
           feature = document.add(new DatumSketchFeature(
@@ -635,8 +632,6 @@ class DocumentCodec {
         reference)) references.push(encodeReference(reference));
     }
 
-    var modeling = encodeModelingFeature(feature, references);
-    if (modeling != null) return modeling;
     if (featureType == "datum-sketch") {
       var sketch:DatumSketchFeature = cast feature;
       return {
@@ -1101,235 +1096,6 @@ class DocumentCodec {
     if (value == null) return null;
     if (!Std.isOfType(value, String)) throw new ParametricError("document field is not a string: " + name);
     return cast value;
-  }
-
-  private static function decodeModelingFeature(type:String, record:Dynamic, document:Document):Null<Feature> {
-    if (type == "wire") return new WireFeature(requiredFeature(document, intField(record, "source")));
-    if (type == "polyline") {
-      var raw:Array<Dynamic> = cast requiredField(record, "points");
-      var points:Array<Vector> = [];
-      for (point in raw) points.push(decodeVector(point));
-      return new PolylineFeature(points, boolField(record, "closed"));
-    }
-    if (type == "loft") {
-      var raw:Array<Dynamic> = cast requiredField(record, "sections");
-      var sections:Array<Feature> = [];
-      for (item in raw) sections.push(requiredFeature(document, intField(item, "id")));
-      return new LoftFeature(sections, boolField(record, "ruled"));
-    }
-    if (type == "sweep") return new SweepFeature(
-      requiredFeature(document, intField(record, "profile")),
-      requiredFeature(document, intField(record, "path"))
-    );
-    if (type == "offset") return new OffsetFeature(
-      requiredFeature(document, intField(record, "source")),
-      numberField(record, "distance")
-    );
-    if (type == "shell") return new ShellFeature(
-      requiredFeature(document, intField(record, "source")),
-      numberField(record, "thickness"),
-      decodeSelection(requiredField(record, "selection"))
-    );
-    if (type == "project") return new ProjectFeature(
-      requiredFeature(document, intField(record, "source")),
-      requiredFeature(document, intField(record, "target")),
-      decodeVector(requiredField(record, "direction"))
-    );
-    if (type == "grid") return new GridFeature(
-      requiredFeature(document, intField(record, "source")),
-      intField(record, "columns"),
-      intField(record, "rows"),
-      numberField(record, "spacingX"),
-      numberField(record, "spacingY")
-    );
-    if (type == "linear-pattern") {
-      var rawSecondDirection:Dynamic = Reflect.field(record, "secondDirection");
-      return new LinearPatternFeature(
-        requiredFeature(document, intField(record, "source")),
-        numberField(record, "count"),
-        numberField(record, "spacing"),
-        decodeVector(requiredField(record, "direction")),
-        numberField(record, "secondCount"),
-        numberField(record, "secondSpacing"),
-        rawSecondDirection == null ? null : decodeVector(rawSecondDirection)
-      );
-    }
-    if (type == "polar-pattern") return new PolarPatternFeature(
-      requiredFeature(document, intField(record, "source")),
-      numberField(record, "count"),
-      numberField(record, "radius"),
-      numberField(record, "angularSpan"),
-      decodeVector(requiredField(record, "axisOrigin")),
-      decodeVector(requiredField(record, "axisDirection")),
-      decodeVector(requiredField(record, "radialDirection")),
-      boolField(record, "orientInstances"),
-      numberField(record, "startAngle")
-    );
-    if (type == "hole") {
-      if (!Reflect.hasField(record, "thread")) throw new ParametricError("document field is missing: thread");
-      var rawThread:Dynamic = Reflect.field(record, "thread");
-      var threadData:Null<ThreadSpecData> = rawThread == null ? null : JsonWire.decode(Json.stringify(rawThread));
-      return new HoleFeature(
-        requiredFeature(document, intField(record, "target")),
-        decodeSelection(requiredField(record, "selection")),
-        decodeVector(requiredField(record, "xDirection")),
-        stringField(record, "style"),
-        stringField(record, "mode"),
-        numberField(record, "x"),
-        numberField(record, "y"),
-        numberField(record, "diameter"),
-        numberField(record, "depth"),
-        numberField(record, "recessDiameter"),
-        numberField(record, "recessDepth"),
-        numberField(record, "offset"),
-        boolField(record, "flipped"),
-        numberField(record, "includedAngle"),
-        threadData == null ? null : ThreadSpec.fromData(cast threadData),
-        numberField(record, "threadDepth")
-      );
-    }
-    return null;
-  }
-
-  private static function encodeModelingFeature(feature:Feature, references:Array<Dynamic>):Dynamic {
-    var type = feature.serializationType();
-    if (type == "wire") {
-      var value:WireFeature = cast feature;
-
-      return {id: feature.id.toInt(), type: type, references: references, source: value.source.id.toInt()};
-    }
-    if (type == "polyline") {
-      var value:PolylineFeature = cast feature;
-      var points:Array<Dynamic> = [];
-      for (point in value.points()) points.push(encodeVector(point));
-      return {id: feature.id.toInt(), type: type, references: references, points: points, closed: value.closed};
-    }
-    if (type == "loft") {
-      var value:LoftFeature = cast feature;
-      var sections:Array<Dynamic> = [];
-      for (section in value.dependencyFeatures()) sections.push({id: section.id.toInt()});
-      return {id: feature.id.toInt(), type: type, references: references, sections: sections, ruled: value.ruled};
-    }
-    if (type == "sweep") {
-      var value:SweepFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        profile: value.profile.id.toInt(),
-        path: value.path.id.toInt()
-      };
-    }
-    if (type == "offset") {
-      var value:OffsetFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        source: value.source.id.toInt(),
-        distance: value.distance.value
-      };
-    }
-    if (type == "shell") {
-      var value:ShellFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        source: value.source.id.toInt(),
-        thickness: value.thickness.value,
-        selection: encodeSelection(value.selection)
-      };
-    }
-    if (type == "project") {
-      var value:ProjectFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        source: value.source.id.toInt(),
-        target: value.target.id.toInt(),
-        direction: encodeVector(new Vector(value.x.value, value.y.value, value.z.value))
-      };
-    }
-    if (type == "grid") {
-      var value:GridFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        source: value.source.id.toInt(),
-        columns: value.columns,
-        rows: value.rows,
-        spacingX: value.spacingX.value,
-        spacingY: value.spacingY.value
-      };
-    }
-    if (type == "linear-pattern") {
-      var value:LinearPatternFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        source: value.source.id.toInt(),
-        count: value.count.value,
-        spacing: value.spacing.value,
-        direction: encodeVector(value.direction),
-        secondCount: value.secondCount.value,
-        secondSpacing: value.secondSpacing.value,
-        secondDirection: value.secondDirection == null ? null : encodeVector(value.secondDirection)
-      };
-    }
-    if (type == "polar-pattern") {
-      var value:PolarPatternFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        source: value.source.id.toInt(),
-        count: value.count.value,
-        radius: value.radius.value,
-        startAngle: value.startAngle.value,
-        angularSpan: value.angularSpan.value,
-        axisOrigin: encodeVector(value.axisOrigin),
-        axisDirection: encodeVector(value.axisDirection),
-        radialDirection: encodeVector(value.radialDirection),
-        orientInstances: value.orientInstances
-      };
-    }
-    if (type == "hole") {
-      var value:HoleFeature = cast feature;
-
-      return {
-        id: feature.id.toInt(),
-        type: type,
-        references: references,
-        target: value.target.id.toInt(),
-        selection: encodeSelection(value.selection),
-        xDirection: encodeVector(value.xDirection),
-        offset: value.offset,
-        flipped: value.flipped,
-        style: value.style,
-        mode: value.mode,
-        x: value.x.value,
-        y: value.y.value,
-        diameter: value.diameter.value,
-        depth: value.depth.value,
-        recessDiameter: value.recessDiameter.value,
-        recessDepth: value.recessDepth.value,
-        includedAngle: value.includedAngle.value,
-        thread: value.thread == null ? null : Json.parse(JsonWire.encode((cast value.thread : ThreadSpec).data())),
-        threadDepth : value.threadDepth.value
-      };
-    }
-    return null;
   }
 
   private static function encodeSelection(selection:Null<SelectionRecipe>):Dynamic {

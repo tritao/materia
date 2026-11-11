@@ -273,8 +273,8 @@ class DocumentModelingSmoke {
     try {
       var bad = DocumentCodec.decode(StringTools.replace(
         serialized,
-        '"sections":[{"id":2},{"id":3}]',
-        '"sections":[{"id":2},{"id":999}]'
+        '"sections":[2,3]',
+        '"sections":[2,999]'
       ));
       bad.close();
     } catch (error:Dynamic) {

@@ -77,9 +77,9 @@ class SheetNameCodec extends CornerDrillCodec {
 }
 
 /** Tries to take a built-in name. */
-class BoxCodec extends CornerDrillCodec {
+class ExtrudeCodec extends CornerDrillCodec {
   public function new() super();
-  override public function type():String return "box";
+  override public function type():String return "extrude";
 }
 
 /** A feature type registered from outside CadKit saves, restores, recomputes and names its row. */
@@ -111,7 +111,7 @@ class FeatureRegistrySmoke {
     FeatureTypeRegistry.register(codec);
     check(FeatureTypeRegistry.isRegistered("test-corner-drill"), "type is registered");
     throws(() -> FeatureTypeRegistry.register(new RivalCodec()), "already registered: test-corner-drill", "a second codec");
-    throws(() -> FeatureTypeRegistry.register(new BoxCodec()), "feature type is built in: box", "a built-in name");
+    throws(() -> FeatureTypeRegistry.register(new ExtrudeCodec()), "feature type is built in: extrude", "a built-in name");
 
     // Sheet metal is not built into the document core: its six types arrive through the registry.
     for (type in ["sheet-base", "sheet-edge-flange", "sheet-hem", "sheet-rip", "sheet-corner", "sheet-cut"]) {
