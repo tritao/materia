@@ -46,7 +46,7 @@ class HobberZAxis extends HobberUnit implements machinekit.cover.WayCover.CoverM
     group("Scale");
     externalPart("ZscaleSeat", new HobberScaleSeat("Z"), HobberFrame.sourcePose(HobberScaleSeat.frameFor(scaleZ)), "foundation", "column-casting", scaleBarContact(scaleZ));
     var armFace = HobberScales.headFace(scaleZ);
-    fixedPart("ZscaleArm", new HobberZScaleArm(), HobberFrame.partAt(0, 0, heights.hobCentreZ), "Zplate",
+    fixedPart("ZscaleArm", new HobberZScaleArm(), F.compose(HobberFrame.partAt(0, 0, heights.hobCentreZ), HobberZScaleArm.frameFor()), "Zplate",
       F.alongY(-(armFace[1] - HobberScales.Z_ARM_THICKNESS / 2), 148, HobberFrame.PART_DATUM_Z + armFace[2], 0, 1, 0));
     scale(scaleZ,"ZscaleSeat","ZscaleArm");
     installZBellows();
