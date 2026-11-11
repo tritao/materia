@@ -235,9 +235,11 @@ source row per top-level step with its faces. Any existing class
 (`HobberMadePart`, castings, catalogue parts) adopts it by overriding one
 method. `PartRecordingTests` covers it.
 
-Left: the pendant moves onto it (its plate, shell and board record; the
-hand-made `PendantDocuments.histories()/sources()` go); one history per
-shared definition rather than per first occurrence; caching (FP1f).
+Done since: caching (FP1f: solid, history and datums per recording key);
+the pendant records its plate, shell and board (PanelSolid recorder,
+PanelPartSource), and its parallel immediate-API case builders and
+PendantDocuments are gone. Left: one history per shared definition rather
+than per first occurrence.
 Until FP9 a component either records or overrides `geometry()`; at FP9 the
 `geometry()` override point goes and `record` is the only way to make
 geometry (enforcement needs that rename, not reflection).
@@ -322,9 +324,13 @@ its mounting cutout as named cylinders and can record them in a host
 (`recordMountingCutout`); the skeleton's sweptDeckRelief and the parts'
 static geometry builders are removed as their parts record them.
 
+Step 5 done: mineral castings record one step per casting feature
+(MachineKit registers casting-body, casting-cavity, casting-anchors,
+casting-receivers with CadKit), shared by every casting in MachineKit.
+
 Left in FP5: the X chip covers (sheet metal, above), the Z bellows sections
 (bought, on MachineKit's `WayCoverSection`: they record when that base does,
-FP8), and the mineral castings (step 5). Faces some parts still take from
+FP8),. Faces some parts still take from
 other parts' helpers in the part datum frame (the carriage's nut-block, rib,
 cover and bellows receivers) move to datums as those helpers are reworked.
 
