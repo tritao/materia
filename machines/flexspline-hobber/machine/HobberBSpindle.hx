@@ -61,7 +61,7 @@ class HobberBSpindle extends HobberUnit {
       externalPart(
         "coolantPort",
         new HobberCoolantPort(),
-        HobberFrame.partAt(0, centre, heights.hobCentreZ),
+        F.compose(HobberFrame.partAt(0, centre, heights.hobCentreZ), HobberCoolantPort.frameFor()),
         "yStage", "carriage",
         F.alongY(-64.35, centre + 45, HobberFrame.PART_DATUM_Z + 435, 0, 1, 0)
       );

@@ -173,7 +173,8 @@ class FeaturePartEquivalence {
       "ZdriveFloatingBar" => ["Stock · Ground bar", "Z running clearance", "Fasteners · Derived holes"],
       "XscaleSeat" => ["Stock · Ground bar", "Housing holes"],
       "ZscaleSeat" => ["Stock · Ground bar", "Housing holes"],
-      "ZscaleArm" => ["Arm"]
+      "ZscaleArm" => ["Arm"],
+      "coolantPort" => ["Block", "Coolant bore"]
     ];
     for (id => steps in expected) {
       var found = [for (member in machine.components()) if (member.id == id) member.component];

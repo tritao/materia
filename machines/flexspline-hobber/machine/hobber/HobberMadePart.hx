@@ -65,7 +65,7 @@ class HobberMadePart extends MachineComponent {
     case "GE-Z-scale-arm": new HobberZScaleArm(values);
     case "GE-chip-tray": new HobberChipTray(values);
     case "GE-enclosure": new HobberEnclosurePanel(values);
-    case "GE-coolant": new HobberCoolantPort(values);
+    case "GE-coolant": new HobberCoolantPort();
     case "GE-spindle-seat": new HobberSpindleSeat(values);
     case "GE-motor-cradle": new HobberMotorCradle(values);
     case "GE-outboard-carrier": new HobberOutboardCarrier(values);
