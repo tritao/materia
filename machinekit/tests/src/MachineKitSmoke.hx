@@ -384,7 +384,8 @@ class MachineKitSmoke {
     tool.connectPorts("air", "manifold", "out", "generator", "air");
     tool.connectPorts("vacuum", "generator", "vacuum", "cup", "vacuum");
     tool.exposePort("robotAir", "changer", "robotAir");
-    check(tool.validate().length == 0, "compatible service path validates");
+    var toolProblems = tool.validate();
+    check(toolProblems.length == 0, "compatible service path validates: " + Std.string(toolProblems.slice(0, 3)));
     check(tool.billOfMaterials().quantity("TUBE-6") == 1, "connection line reaches BOM");
     var source = tool.upstream("cup", "vacuum");
     check(

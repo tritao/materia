@@ -92,7 +92,8 @@ class EndEffectorExampleChecks {
     cell.connectPorts("feed", "airSource", "air", "tool/robot/master", "airIn1");
     cell.exposePort("robotSignal", "tool/robot/master", "signalIn");
     cell.exposePort("lock", "tool/robot/master", "lock");
-    check(cell.validate().length == 0, "Cell with an air source validates");
+    var problems = cell.validate();
+    check(problems.length == 0, "Cell with an air source validates: " + Std.string(problems.slice(0, 3)));
     var supplied = cell.upstream("tool/tool/cup", "vacuum");
     check(
       !supplied.external && supplied.port.instanceId == "airSource" && supplied.port.portName == "air",
