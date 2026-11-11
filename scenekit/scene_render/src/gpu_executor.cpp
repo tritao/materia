@@ -496,7 +496,6 @@ struct NativeKitGpuExecutor::State {
         nkgpu_pipeline stroke{};
         nkgpu_pipeline contour{};
         nkgpu_pipeline workplane{};
-        nkgpu_pipeline edge{};
         std::array<nkgpu_pipeline, 3> caps{};
         nkgpu_pipeline indexed_parity{};
     };
@@ -527,10 +526,8 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader workplane_shader{};
     nkgpu_buffer workplane_vertex_buffer{};
     /* Screen-space CAD edges (app/plans/SCREEN_EDGES.md): drawn from the AO prepass's ids and positions. */
-    nkgpu_shader edge_shader{};
-    nkgpu_buffer edge_vertex_buffer{};
-    nkgpu_sampler edge_sampler{};
-    bool screen_edges_active = false;
+    /** Nearest-filtered, for reading the visible-surface buffer in the stroke pass. */
+    nkgpu_sampler surface_sampler{};
     /** The AO prepass of this frame is bound for stroke visibility against other parts. */
     bool stroke_surfaces_active = false;
     nkgpu_image capture_color{};
@@ -596,7 +593,7 @@ struct NativeKitGpuExecutor::State {
 
     void destroy_pass_pipelines(PassPipelines &set) noexcept {
         for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke, &set.contour,
-                               &set.workplane, &set.edge, &set.caps[0], &set.caps[1], &set.caps[2], &set.indexed_parity}) {
+                               &set.workplane, &set.caps[0], &set.caps[1], &set.caps[2], &set.indexed_parity}) {
             if (renderer.id && pipeline->id)
                 (void)nkgpu_pipeline_destroy(renderer, *pipeline);
             *pipeline = {};
@@ -650,12 +647,8 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_buffer_destroy(renderer, postprocess_vertex_buffer);
         if (renderer.id && workplane_vertex_buffer.id)
             (void)nkgpu_buffer_destroy(renderer, workplane_vertex_buffer);
-        if (renderer.id && edge_vertex_buffer.id)
-            (void)nkgpu_buffer_destroy(renderer, edge_vertex_buffer);
-        if (renderer.id && edge_shader.id)
-            (void)nkgpu_shader_destroy(renderer, edge_shader);
-        if (renderer.id && edge_sampler.id)
-            (void)nkgpu_sampler_destroy(renderer, edge_sampler);
+        if (renderer.id && surface_sampler.id)
+            (void)nkgpu_sampler_destroy(renderer, surface_sampler);
         if (renderer.id && pick_color.id)
             (void)nkgpu_image_destroy(renderer, pick_color);
         if (renderer.id && pick_subelement.id)
@@ -713,9 +706,7 @@ struct NativeKitGpuExecutor::State {
         postprocess_shader = {};
         postprocess_vertex_buffer = {};
         workplane_vertex_buffer = {};
-        edge_vertex_buffer = {};
-        edge_shader = {};
-        edge_sampler = {};
+        surface_sampler = {};
         workplane_shader = {};
         capture_color = {};
         capture_depth = {};
@@ -978,7 +969,7 @@ nkgpu_result apply_stroke_surfaces(StateT &state, const RenderPlan &plan, bool a
     nkgpu_result result = NKGPU_OK;
     if ((result = nkgpu_apply_image(state.renderer, 0, active ? state.pick_color : state.default_image)) != NKGPU_OK ||
         (result = nkgpu_apply_image(state.renderer, 1, active ? state.ao_position : state.default_image)) != NKGPU_OK ||
-        (result = nkgpu_apply_sampler(state.renderer, 0, state.edge_sampler)) != NKGPU_OK)
+        (result = nkgpu_apply_sampler(state.renderer, 0, state.surface_sampler)) != NKGPU_OK)
         return result;
     return nkgpu_apply_uniform_data(state.renderer, 4, reinterpret_cast<const std::uint8_t *>(&data), sizeof(data));
 }
@@ -992,9 +983,9 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
     nkgpu_result result = NKGPU_OK;
     if (!ensure_default_material_resources(state, stats))
         return false;
-    if (!state.edge_sampler.id &&
+    if (!state.surface_sampler.id &&
         (result = nkgpu_sampler_create(state.renderer, NKGPU_FILTER_NEAREST, NKGPU_FILTER_NEAREST,
-                                       NKGPU_WRAP_CLAMP_TO_EDGE, NKGPU_WRAP_CLAMP_TO_EDGE, &state.edge_sampler)) != NKGPU_OK)
+                                       NKGPU_WRAP_CLAMP_TO_EDGE, NKGPU_WRAP_CLAMP_TO_EDGE, &state.surface_sampler)) != NKGPU_OK)
         return set_failure(state, stats, result);
     if (!state.stroke_shader.id) {
         const auto sources = render_internal::stroke_shader_sources(
@@ -1129,23 +1120,19 @@ bool material_is_invisible(const MaterialState &state) {
     return material_is_blended(state) && state.base_color[3] * state.opacity <= 0.0f;
 }
 
-/* A material dark enough for light edge lines (the studio's edges-on-dark colour). Strokes and screen-space edges
- * both decide here, so a line's colour does not show which of them drew it. */
-bool material_takes_light_edges(const RenderPlan &plan, const MaterialResource *material) {
-    const auto &studio = plan.studio_lighting();
-    if (studio.edge_contrast_luminance <= 0.0f || !material) return false;
-    const auto linear = [](float value) {
-        return value <= 0.04045f ? value / 12.92f : std::pow((value + 0.055f) / 1.055f, 2.4f);
-    };
-    const auto &base = material->state->base_color;
-    const auto luminance = 0.2126f * linear(base[0]) + 0.7152f * linear(base[1]) + 0.0722f * linear(base[2]);
-    return luminance < studio.edge_contrast_luminance;
-}
-
 std::array<float,4> stroke_color_for(const RenderPlan &plan,const MaterialResource *material) {
     const auto &studio=plan.studio_lighting();
-    const auto &color = material_takes_light_edges(plan, material) ? studio.edges_on_dark : studio.edges_on_light;
-    return std::array<float, 4>{color[0], color[1], color[2], 1.0f};
+    const auto &light = studio.edges_on_light, &dark = studio.edges_on_dark;
+    if (studio.edge_contrast_luminance > 0.0f && material) {
+        const auto linear = [](float value) {
+            return value <= 0.04045f ? value / 12.92f : std::pow((value + 0.055f) / 1.055f, 2.4f);
+        };
+        const auto &base = material->state->base_color;
+        const auto luminance = 0.2126f * linear(base[0]) + 0.7152f * linear(base[1]) + 0.0722f * linear(base[2]);
+        if (luminance < studio.edge_contrast_luminance)
+            return std::array<float, 4>{dark[0], dark[1], dark[2], 1.0f};
+    }
+    return std::array<float, 4>{light[0], light[1], light[2], 1.0f};
 }
 
 template <class StateT>
@@ -1182,9 +1169,6 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         // An object with no alpha shows nothing, edges included.
         const auto *material = snapshot.find_material(batch.key.material);
         if (material && material_is_invisible(*material->state))
-            continue;
-        // Screen-space edges draw opaque surfaces' edges; transparent ones keep their strokes.
-        if (state.screen_edges_active && !(material && material_is_blended(*material->state)))
             continue;
         viewport.viewport_width_height_half_width[3] = material &&
             has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 2.0f : 0.0f;
@@ -1903,86 +1887,6 @@ bool ensure_workplane_pipeline(StateT &state, GpuExecutionStats &stats, std::uin
         (result = nkgpu_pipeline_depth(pipeline_builder, &grid_depth)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK)
-        return set_failure(state, stats, result);
-    if (samples > 1 && (result = nkgpu_pipeline_multisample(pipeline_builder, samples, 0)) != NKGPU_OK)
-        return set_failure(state, stats, result);
-    if ((result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
-        return set_failure(state, stats, result);
-    return true;
-}
-
-struct EdgeUniformData {
-    /** Line colours on light and on dark materials (`material_takes_light_edges`). */
-    std::array<float, 4> color{};
-    std::array<float, 4> color_on_dark{};
-    std::array<float, 4> view{};
-    /** x: half width in pixels, matching surface-edge strokes. */
-    std::array<float, 4> style{0.85f, 0.0f, 0.0f, 0.0f};
-    /** Rows z and w of the view-projection: which of two surfaces is nearer, so it owns the line between them. */
-    std::array<float, 4> depth_z{};
-    std::array<float, 4> depth_w{};
-};
-
-template <class StateT>
-bool ensure_edge_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples) {
-    auto &pipeline = state.pipelines[pipeline_slot(samples)].edge;
-    if (pipeline.id)
-        return true;
-    nkgpu_result result = NKGPU_OK;
-    if (!state.edge_vertex_buffer.id) {
-        constexpr float triangle[] = {-1.0f, -1.0f, 3.0f, -1.0f, -1.0f, 3.0f};
-        if ((result = nkgpu_buffer_create(state.renderer, reinterpret_cast<const std::uint8_t *>(triangle),
-                                          sizeof(triangle), &state.edge_vertex_buffer)) != NKGPU_OK)
-            return set_failure(state, stats, result);
-    }
-    if (!state.edge_sampler.id &&
-        (result = nkgpu_sampler_create(state.renderer, NKGPU_FILTER_NEAREST, NKGPU_FILTER_NEAREST,
-                                       NKGPU_WRAP_CLAMP_TO_EDGE, NKGPU_WRAP_CLAMP_TO_EDGE, &state.edge_sampler)) != NKGPU_OK)
-        return set_failure(state, stats, result);
-    if (!state.edge_shader.id) {
-        const auto sources = render_internal::edge_shader_sources(nkgpu_query_backend(state.renderer));
-        if (!sources.vertex || !sources.fragment)
-            return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
-        nkgpu_shader_builder shader_builder{};
-        if ((result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex, sources.fragment,
-                                         &shader_builder)) != NKGPU_OK ||
-            (result = nkgpu_shader_attribute(shader_builder, 0, "position", "TEXCOORD", 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                                 sizeof(EdgeUniformData))) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "edge_params", NKGPU_UNIFORMTYPE_FLOAT4, 6)) !=
-                NKGPU_OK ||
-            (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "pick_ids_texture_image_edge_sampler")) != NKGPU_OK ||
-            (result = nkgpu_shader_texture(shader_builder, 1, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "surface_position_texture_image_edge_sampler")) != NKGPU_OK ||
-            (result = nkgpu_shader_end(shader_builder, &state.edge_shader)) != NKGPU_OK)
-            return set_failure(state, stats, result);
-    }
-    nkgpu_pipeline_builder pipeline_builder{};
-    if ((result = nkgpu_pipeline_begin(state.renderer, state.edge_shader, sizeof(float) * 2, &pipeline_builder)) !=
-        NKGPU_OK)
-        return set_failure(state, stats, result);
-    nkgpu_blend_state blend{};
-    blend.enabled = 1;
-    blend.src_rgb = NKGPU_BLENDFACTOR_ONE;
-    blend.dst_rgb = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    blend.op_rgb = NKGPU_BLENDOP_ADD;
-    blend.src_alpha = NKGPU_BLENDFACTOR_ONE;
-    blend.dst_alpha = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    blend.op_alpha = NKGPU_BLENDOP_ADD;
-    nkgpu_depth_state depth{};
-    depth.enabled = 1;
-    depth.compare = NKGPU_COMPAREFUNC_ALWAYS;
-    depth.write_enabled = 0;
-    if ((result = nkgpu_pipeline_attribute(pipeline_builder, 0, 0, 0, NKGPU_VERTEXFORMAT_FLOAT2)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, sizeof(float) * 2, NKGPU_VERTEXSTEP_PER_VERTEX,
-                                               1)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_primitive_type(pipeline_builder, NKGPU_PRIMITIVETYPE_TRIANGLES)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_depth(pipeline_builder, &depth)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8, NKGPU_COLORMASK_RGBA,
-                                              nullptr)) != NKGPU_OK ||
         (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK)
         return set_failure(state, stats, result);
     if (samples > 1 && (result = nkgpu_pipeline_multisample(pipeline_builder, samples, 0)) != NKGPU_OK)
@@ -2898,8 +2802,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
     bool globals_bound = false;
     for (const auto &batch : state.batches) {
         const auto *material = snapshot.find_material(batch.key.material);
-        // For AO, the position target's w marks coverage and the edge tone: 1 light material, 2 dark.
-        const std::array<float, 4> pick_output{for_ao ? (material_takes_light_edges(plan, material) ? 2.0f : 1.0f) : 0.0f,
+        const std::array<float, 4> pick_output{for_ao ? 1.0f : 0.0f,
             material && has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 1.0f : 0.0f, 0, 0};
         if (for_ao && material && (material_is_invisible(*material->state) ||
             material_is_blended(*material->state) || material->state->alpha_mode == AlphaMode::Mask)) continue;
@@ -3370,11 +3273,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     const bool use_ao = plan.studio_lighting().enabled && detail[0] > 0.0f && detail[1] > 0.0f;
     if (use_ao && render_pick_pass(*state_, plan, snapshot, width, height, stats, true) != NKGPU_OK)
         return state_->last_result;
-    // The AO prepass already holds each pixel's visible instance, face and position.
-    state_->screen_edges_active = use_ao && plan.screen_edges();
+    // The AO prepass holds each pixel's visible part and position, which strokes test against.
     state_->stroke_surfaces_active = use_ao;
-    if (state_->screen_edges_active && !ensure_edge_pipeline(*state_, stats, samples))
-        return state_->last_result;
     if(!prepare_caps(*state_,plan,snapshot,width,height,samples,false,false,stats) ||
        !prepare_contours(*state_,plan,snapshot,samples,stats))return state_->last_result;
     if (profiler) profiler->prepared(timing);
@@ -3443,26 +3343,6 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, samples, stats, true)) !=
         NKGPU_OK)
         return fail_frame(result);
-    if (state_->screen_edges_active) {
-        const auto &studio = plan.studio_lighting();
-        const auto &vp = plan.view_projection();
-        EdgeUniformData edge{{studio.edges_on_light[0], studio.edges_on_light[1], studio.edges_on_light[2], 1.0f},
-                             {studio.edges_on_dark[0], studio.edges_on_dark[1], studio.edges_on_dark[2], 1.0f},
-                             {1.0f / width, 1.0f / height, std::cos(20.0f * 3.14159265f / 180.0f), 2.0f},
-                             {0.85f, 0.0f, 0.0f, 0.0f},
-                             {vp[2], vp[6], vp[10], vp[14]},
-                             {vp[3], vp[7], vp[11], vp[15]}};
-        if ((result = nkgpu_apply_pipeline(state_->renderer, state_->pipelines[pipeline_slot(samples)].edge)) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, state_->edge_vertex_buffer, 0)) != NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 0, state_->pick_color)) != NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 1, state_->ao_position)) != NKGPU_OK ||
-            (result = nkgpu_apply_sampler(state_->renderer, 0, state_->edge_sampler)) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(state_->renderer, 0, reinterpret_cast<const std::uint8_t *>(&edge),
-                                               sizeof(edge))) != NKGPU_OK ||
-            (result = nkgpu_draw(state_->renderer, 0, 3, 1)) != NKGPU_OK)
-            return fail_frame(result);
-    }
     if(profiler)profiler->pass("surfaceEdges");
     if (!draw_stroke_batches(*state_, plan, snapshot, samples, stats))
         return fail_frame(stats.result);

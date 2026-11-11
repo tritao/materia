@@ -1,7 +1,11 @@
 # Screen-space CAD edges
 
-Status: SE1, SE3 and SE4 done 2026-11-11: the editor setting Screen-Space Edges (`editors/3d/screen_space_edges`, command
-"Screen-Space Edges", default off); SE2 live comparison by the user, then the SE5 decision.
+Status: dropped 2026-11-11 and removed. Lines found from a one-sample-per-pixel buffer only know an edge to the pixel:
+a least-squares fit through the staircase recovers shallow and diagonal lines, but a near-vertical or near-horizontal
+line steps once per many pixels, wider than any local window, and showed hooks at each step (0.39 px deviation at
+slope 15). They also drew every visible crease at full weight, so sub-pixel detail (a rail's grooves) cluttered where
+strokes fade it. Strokes now take their visibility from the same buffer (`STROKE_VISIBILITY.md`), which fixes the
+bellows line with exact, antialiased geometry. Kept for the findings below.
 
 ## Why
 

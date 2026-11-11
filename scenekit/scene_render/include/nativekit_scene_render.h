@@ -155,10 +155,6 @@ typedef struct nkscene_render_view {
     /** Optional: retain original surface triangles for inspection/face overlays.
         Zero permits automatic display LOD; picking always uses original geometry. */
     uint32_t full_detail NK_BOOL32;
-    /** Optional: draw opaque surfaces' CAD edges from the visible-surface buffer (ids and world positions of the
-        studio ambient-occlusion prepass) instead of depth-tested strokes, so hidden edges never show through.
-        Needs studio surface detail with ambient occlusion; blended materials keep strokes. */
-    uint32_t screen_edges NK_BOOL32;
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

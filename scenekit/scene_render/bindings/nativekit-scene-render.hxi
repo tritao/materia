@@ -264,12 +264,6 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		 * Zero permits automatic display LOD; picking always uses original geometry.
 		 */
 		full_detail: u32 @offset(584);
-		/**
-		 * Optional: draw opaque surfaces' CAD edges from the visible-surface buffer (ids and world positions of the
-		 * studio ambient-occlusion prepass) instead of depth-tested strokes, so hidden edges never show through.
-		 * Needs studio surface detail with ambient occlusion; blended materials keep strokes.
-		 */
-		screen_edges: u32 @offset(588);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

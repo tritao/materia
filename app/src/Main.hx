@@ -726,8 +726,6 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
   var gridSpacing:Float;
   /** The viewport's lighting preset number, from the saved setting. */
   var lightingPreset:Int = 0;
-  /** Whether the viewport draws opaque parts' edges from the visible surfaces, from the saved setting. */
-  var screenEdges:Bool = false;
   var paletteVisible:Bool;
   var toolbarMenuVisible:Bool;
   var viewportWidth:Float = Main.DEFAULT_WINDOW_WIDTH;
@@ -955,7 +953,6 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       perspectiveViewport.selectionTree = treeModel;
       perspectiveViewport.setSampleCount(antialiasing);
       perspectiveViewport.setLightingPreset(lightingPreset);
-      perspectiveViewport.setScreenEdges(screenEdges);
       configurePresentationViewport();
     }
     telemetry = new TelemetryPanel(demo);
@@ -2374,10 +2371,8 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     gridSnapEnabled = store.getBool(AppSettings.GRID_SNAP);
     gridSpacing = store.getFloat(AppSettings.GRID_SPACING);
     lightingPreset = Std.int(Math.max(0, AppSettings.LIGHTING_PRESETS.indexOf(store.getString(AppSettings.LIGHTING))));
-    screenEdges = store.getBool(AppSettings.SCREEN_EDGES);
     if (perspectiveViewport != null) {
       perspectiveViewport.setLightingPreset(lightingPreset);
-      perspectiveViewport.setScreenEdges(screenEdges);
       perspectiveViewport.setCosmeticThreads(cosmeticThreadsVisible);
     }
     invalidateView();
@@ -3114,7 +3109,6 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
         perspectiveViewport.selectionTree = treeModel;
         perspectiveViewport.setSampleCount(antialiasing);
         perspectiveViewport.setLightingPreset(lightingPreset);
-        perspectiveViewport.setScreenEdges(screenEdges);
         configurePresentationViewport();
       }
       sceneInspector = null;

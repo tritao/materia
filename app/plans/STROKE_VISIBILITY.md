@@ -1,6 +1,8 @@
 # Stroke visibility: hidden edges through thin walls
 
-Status: superseded 2026-11-11 by `SCREEN_EDGES.md` (edges drawn from the visible-surface buffer cannot leak). Kept for the mechanism and its measurements.
+Status: SV0, SV1 (reused), SV3 and SV4 done 2026-11-11 as the part rule below; SV5 (web) open. Screen-space edges
+(`SCREEN_EDGES.md`) were tried in between and dropped: they cannot antialias near-axis lines and draw sub-pixel detail
+at full weight.
 
 ## Problem
 
@@ -33,28 +35,35 @@ the 0.2 mm wall, so the leak returns; classic slope-scaled polygon offset fails
 the same way. What separates a visible edge from a hidden one is which surface
 covers it, not how far away that surface is.
 
-## Rule
+## Rule (as built)
 
-A stroke fragment asks what covers the stroke's centre line at the nearest
-centre-line point:
+The studio AO prepass already renders, every editor frame, each pixel's part
+(pick id) and world position: the visible-surface buffer. The stroke fragment
+shader reads it at the pixel of its point (the centre-line point for a ribbon,
+the face point for a support strip):
 
-- one of the edge's own faces (same drawn instance, one of its incident face
-  ids): visible;
-- background: visible;
-- any other surface: extend that surface's tangent plane (position and normal
-  from the G-buffer pixel) to the exact centre-line point along its view ray;
-  the edge is hidden when that plane is nearer by more than a few depth steps.
+- background, or the stroke's own part: no change; the depth test decides, as
+  before (it hides a part's own back edges);
+- another part: rebuild that surface's tangent plane from the neighbouring
+  positions of the same part, orient it toward the camera, and carry it to the
+  exact point; the stroke is hidden when the point lies behind the plane by
+  more than 2 % of a pixel footprint.
 
-A touching part (a bolt head on a plate) ties at the contact line and stays
-visible; a wall in front of the edge, however thin, hides it.
+Instance ids replace the per-face ids of the original design: hiding by another
+part is what the depth test cannot do, and a part's own geometry stays with
+the depth test. A touching part (a bolt head on a plate) lies on the plane and
+stays visible; a wall of another part in front of the edge, however thin,
+hides it. Left: a part's own edge under its own sub-pixel wall, as before.
+Section contours keep the depth test alone. Without studio AO (no prepass)
+strokes fall back to the depth test.
 
 ## Steps
 
 | Step | What | Check |
 |---|---|---|
-| SV0 | The thin-wall reproduction becomes a SceneKit GPU test: oblique and straight views, walls 0.05-20 mm, 1x and 4x samples, plus a visible edge on a grazing face and a contact edge (block on plate) that must stay drawn. | Fails today on the thin oblique walls only. |
-| SV1 | A single-sample G-buffer prepass before the main pass, from the pick pass: instance id, face id, world position, world normal. Only when the frame has strokes. | Pick and AO tests unchanged; G-buffer readback test. |
-| SV2 | Stroke vertices carry their instance id and the edge's incident face ids (from the stroke supports); the ribbon passes the centre-line point and its window depth unperspective-interpolated. | Payload and compiler tests. |
-| SV3 | The stroke fragment shader applies the rule; the hardware depth test for surface-edge strokes is replaced by it. Section contours keep their own path. | SV0 passes; existing stroke, section and contour tests pass. |
-| SV4 | The hobber bellows replay shows no line across the skins; record the view in `app/tests/depth-precision/`. Measure the prepass cost on the hobber. | `frame.png` crops; frame time before and after. |
+| SV0 | (done) `stroke_visibility_regression`: an edge 0.2 mm under another part's oblique wall at the editor's projection, 1x and 4x samples; a block's contact edges and outline stay drawn, its own back edge hidden. `stroke_outline_regression`: a part's own outline stays whole at slopes 1/7 to 15. | The depth test alone leaks 91 / 132 pixels; with the buffer 0. |
+| SV1 | (done) No new pass: the studio AO prepass is the buffer (part id, world position). | Pick and AO tests unchanged. |
+| SV2 | (done, smaller) Stroke vertices read the instance's pick colour; no face ids. | Stroke tests. |
+| SV3 | (done) The stroke fragment shader applies the part rule on top of the depth test. | All SceneKit tests pass. |
+| SV4 | (done) The hobber bellows replay shows no line across the skins; corners and band lines unchanged. Prepass cost: none added (it already ran for AO). | `frame.png` crops. |
 | SV5 | Web build: R32F/RGBA16F targets and texture sampling in the stroke pass on WebGL2. | Web smoke. |

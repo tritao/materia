@@ -35,13 +35,6 @@ class SceneView {
     return this;
   }
 
-  /** Draw opaque surfaces' CAD edges from the visible-surface buffer instead of strokes; needs studio detail
-   *  with ambient occlusion (app/plans/SCREEN_EDGES.md). */
-  public function setScreenEdges(enabled:Bool):SceneView {
-    value.set_screen_edges(enabled ? 1 : 0);
-    return this;
-  }
-
   public function clearRoot():SceneView {
     value.set_root(new nkscene_node_id());
     return this;

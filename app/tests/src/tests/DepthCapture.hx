@@ -30,8 +30,6 @@ import nativekit.scene.DepthPrecision;
  * the probe pixel with the segment at its nearest point, up to 2.5 px away: on an oblique surface that offset alone
  * moves the gap by about a pixel's worth of slope, so read it as identification, not as a visibility verdict.
  *
- * --screen-edges draws opaque parts' edges from the visible surfaces (the editor's Screen-Space Edges setting).
- *
  * --bounds=text (repeatable) prints the world bounding box of every part whose id contains `text`, as displayed.
  *
  * Exits non-zero when the focus step exceeds --max-focus-step-px (default the
@@ -46,7 +44,7 @@ import nativekit.scene.DepthPrecision;
   public static function main():Int {
     var statePath:Null<String> = null, out:Null<String> = null, launch:Array<String> = [];
     var focusLimit = DepthPrecision.FOCUS_STEP_PIXELS * 1.01, maxLimit = Math.POSITIVE_INFINITY;
-    var presentationCamera = false, screenEdges = false;
+    var presentationCamera = false;
     var probes:Array<Array<Int>> = [];
     var boundsFilters:Array<String> = [];
     for (arg in Sys.args()) {
@@ -55,7 +53,6 @@ import nativekit.scene.DepthPrecision;
       else if (StringTools.startsWith(arg, "--max-focus-step-px=")) focusLimit = Std.parseFloat(arg.substr(20));
       else if (StringTools.startsWith(arg, "--max-step-px=")) maxLimit = Std.parseFloat(arg.substr(14));
       else if (arg == "--presentation-camera") presentationCamera = true;
-      else if (arg == "--screen-edges") screenEdges = true;
       else if (StringTools.startsWith(arg, "--bounds=")) boundsFilters.push(arg.substr(9));
       else if (StringTools.startsWith(arg, "--probe=")) {
         var xy = arg.substr(8).split(",");
@@ -95,7 +92,6 @@ import nativekit.scene.DepthPrecision;
           if (state.presentation != null && viewport.presentation == null) continue;
           if (presentationCamera && state.presentation == null) throw "--presentation-camera needs a presentation in the state";
           viewport.applyViewState(state);
-          viewport.setScreenEdges(screenEdges);
           if (presentationCamera) viewport.pendingViewState = null;
           phase = 2;
         case 2:

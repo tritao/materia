@@ -41,9 +41,6 @@ import haxeon.ui.core.UiModifier;
     app.commands.register(new Command("scene.toggle-cosmetic-threads", "Cosmetic Threads", function() {
       app.preferences.store.set(AppSettings.COSMETIC_THREADS, PropertyValue.Bool(!app.cosmeticThreadsVisible));
     }, null, null, function() return app.cosmeticThreadsVisible));
-    app.commands.register(new Command("scene.toggle-screen-edges", "Screen-Space Edges", function() {
-      app.preferences.store.set(AppSettings.SCREEN_EDGES, PropertyValue.Bool(!app.screenEdges));
-    }, null, null, function() return app.screenEdges));
     registerLightingPreset(app, "scene.lighting-studio", "Lighting: Studio", 0);
     registerLightingPreset(app, "scene.lighting-soft", "Lighting: Soft", 1);
     registerLightingPreset(app, "scene.lighting-contrast", "Lighting: Contrast", 2);
