@@ -391,6 +391,7 @@ import sys.FileSystem;
       .decodeProject(Json.parse('{"dynamicParts":[],"motions":[],"inspectionCameras":[]}'))),
       "Old camera arrays are rejected"
     );
+    offsetSelectionDismissal(session, host);
     bind(viewport);
     var offsetHistory = session.document.history.undoCount, offsetState = AssemblyDefinitionCodec.encodeState(
       definition,
@@ -456,6 +457,68 @@ import sys.FileSystem;
     tests.ViewportCoordinatesTests.main();
     noPresentationPicking(host);
   }
+  static function offsetSelectionDismissal(session:ProjectDocumentSession,
+    host:haxeon.ui.host.UiHostContext):Void {
+    var definition = session.projectAssemblyDefinition;
+    if (definition == null) throw "Missing offset selection fixture";
+    var oldSelection = session.scene.selectedId, oldListener = session.scene.onSelectionChanged;
+    var fonts = haxeon.ui.FontCollection.create();
+    fonts.addSystemFallbacks();
+    var ui = new haxeon.ui.core.UiContext(null, fonts);
+    var viewport = new EditorPerspectiveViewport("offset-selection", session.scene, host);
+    var tree = new app.EditorSceneTree(session.scene, definition);
+    viewport.selectionTree = tree;
+    viewport.setPresentation(session.presentation, definition, session.presentationCenters(), session.assemblyUnitMetres());
+    viewport.solvePresentationJoints = session.presentationJointPoses;
+    viewport.preparePresentationFrame();
+    viewport.camera.frame(0.02, 0, 0, 0.2, 0.2, 0.2, 800 / 600);
+    var frame = new haxeon.ui.LayoutFrame(800, 600), saves = 0;
+    var history = session.document.history.undoCount;
+    var engineering = AssemblyDefinitionCodec.encodeState(definition, session.projectAssemblyState);
+    session.scene.onSelectionChanged = function() {
+      var pointer = viewport.cancelOffsetOnSelectionChange();
+      if (pointer != null) ui.pointerCancel(pointer.id, pointer.x, pointer.y);
+    };
+    function begin():Void {
+      tree.selectKey("project:cover");
+      check(viewport.beginPresentationOffsetEdit("project:cover", _ -> saves++), "offset dismissal fixture starts editing");
+      viewport.preparePresentationFrame();
+      ui.submit(viewport, frame);
+    }
+    begin();
+    tree.selectKey("project:base");
+    check(!viewport.presentationOffsetEditing() && tree.selectionKey() == "project:base",
+      "selecting another tree object cancels the offset preview and preserves the new selection");
+    begin();
+    var handle = viewport.offsetHandle(800, 600);
+    if (handle == null) throw "Missing offset handle";
+    ui.pointerDown(handle[2], handle[3], 0);
+    check(viewport.navigationMode == 9 && ui.events.hasCapturedPointer(), "the offset handle captures its drag");
+    tree.selectKey("project:base");
+    check(!viewport.presentationOffsetEditing() && viewport.navigationPointer == null && !ui.events.hasCapturedPointer(),
+      "changing selection during a handle drag cancels it and releases pointer capture");
+    begin();
+    check(viewport.pick(2, 2) == "scene", "offset dismissal click lands on blank canvas");
+    ui.pointerDown(2, 2, 0);
+    ui.pointerUp(2, 2, 0);
+    viewport.preparePresentationFrame();
+    check(!viewport.presentationOffsetEditing() && session.scene.selectedId == "scene"
+      && tree.selectionKey() == "scene" && tree.selectedObjects().length == 0,
+      "blank canvas dismisses offset editing and clears both object and tree selection");
+    check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).selectionOverrideCount() == 0,
+      "blank-canvas dismissal removes the object's render highlight");
+    begin();
+    ui.key(haxeon.ui.core.UiEventKind.KeyDown, haxeon.ui.core.UiKey.Escape);
+    check(!viewport.presentationOffsetEditing() && tree.selectionKey() == "project:cover",
+      "Escape still cancels the preview while keeping selection");
+    check(saves == 0 && session.document.history.undoCount == history
+      && AssemblyDefinitionCodec.encodeState(definition, session.projectAssemblyState) == engineering,
+      "dismissing previews never saves offsets or changes engineering state or undo history");
+    session.scene.onSelectionChanged = oldListener;
+    session.scene.select(oldSelection);
+    ui.dispose(); viewport.dispose(); fonts.dispose();
+  }
+
   static function noPresentationPicking(host:haxeon.ui.host.UiHostContext):Void {
     var scene = new app.EditorScene([{
       id: "plain",

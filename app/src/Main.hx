@@ -3212,6 +3212,10 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
   }
 
   function updateCommandContext():Void {
+    if (perspectiveViewport != null) {
+      var pointer = perspectiveViewport.cancelOffsetOnSelectionChange();
+      if (pointer != null) ui.pointerCancel(pointer.id, pointer.x, pointer.y);
+    }
     if (projectUiExtension != null) try {
       projectUiExtension.select(scene.selectedId);
       var requested = projectUiExtension.requestedSelection();

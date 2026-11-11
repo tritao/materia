@@ -132,6 +132,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   public var onSectionEdit:Null<Array<SectionPlane> -> Void> = null;
 
   var offsetOriginal:Null<PresentationController>;
+  var offsetSelectionRevision:Int = -1;
   var offsetDraft:Null<ExplodeOffset>;
   var offsetSaved:Null<ExplodeOffset -> Void>;
   var offsetAxis:Array<Float> = [];
@@ -158,6 +159,7 @@ class EditorPerspectiveViewport implements View implements Observable {
       && !offset.select.subtree) draft = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(offset));
     draft.source = Authored;
     offsetOriginal = controller;
+    offsetSelectionRevision = scene.selectionRevision;
     offsetDraft = draft;
     offsetSaved = save;
     previewPresentationOffset(draft.distance);
@@ -210,6 +212,12 @@ class EditorPerspectiveViewport implements View implements Observable {
     host.requestFrame();
   }
   public function presentationOffsetEditing():Bool return offsetOriginal != null;
+
+  /** Selection changes dismiss this preview; the host releases any captured handle pointer. */
+  public function cancelOffsetOnSelectionChange():Null<PerspectivePointer> {
+    if (offsetOriginal == null || offsetSelectionRevision == scene.selectionRevision) return null;
+    return cancelDrag();
+  }
   public function cancelPresentationOffsetEdit():Void {
     if (offsetOriginal != null) presentation = offsetOriginal;
     offsetOriginal = null;
@@ -2331,7 +2339,14 @@ class EditorPerspectiveViewport implements View implements Observable {
           event.stopPropagation();
           return;
         }
-        // Offset editing never falls through into engineering dragging.
+        // Blank canvas dismisses this modal preview without starting an engineering drag.
+        if (pick(event.localX, event.localY) == "scene") {
+          cancelPresentationOffsetEdit();
+          var tree = selectionTree;
+          if (tree != null) tree.selectKey("scene");
+          else scene.select("scene");
+          host.requestFrame();
+        }
         event.preventDefault();
         event.stopPropagation();
         return;
