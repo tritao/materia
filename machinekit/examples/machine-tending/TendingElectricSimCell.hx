@@ -65,7 +65,8 @@ class TendingElectricSimCell {
     initialDoorOpen:Bool = false
   ) {
     this.scene = scene;
-    scene.gravity.mount(placement);
+    scene.gravity.mount(new kinematicskit.Transform(placement.x * 0.001, placement.y * 0.001, placement.z * 0.001, placement.qx, placement.qy, placement.qz,
+      placement.qw));
     solverOptions = {
       integrator: 2,
       frictionCone: 2,

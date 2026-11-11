@@ -103,6 +103,8 @@ class ApplicationSimulation implements Observable {
   var machineProgram:Null<MachineProgramPlayer> = null;
   var digitalProgram:Null<MachineDigitalProgramPlayer> = null;
   var pressBrake:Null<PressBrakeControllerPlayer> = null;
+  /** Gravity compensation of every simulated robot's servo drives. */
+  var gravityFeedforward:Array<ServoGravityFeedforward> = [];
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
   /** One program per robot controller, run side by side and coordinated only through the cell's wired signals. */
@@ -185,6 +187,7 @@ class ApplicationSimulation implements Observable {
   /** Rebuilds the list every tick walks, so the tick itself allocates nothing. */
   function refreshMembers():Void {
     members = [];
+    for (feedforward in gravityFeedforward) members.push(feedforward);
     if (cellSignals != null) members.push(cellSignals);
     if (motions != null) members.push(motions);
     if (tools != null) members.push(tools);
@@ -236,6 +239,7 @@ class ApplicationSimulation implements Observable {
     var candidateProgram:Null<MachineProgramPlayer> = null;
     var candidateDigital:Null<MachineDigitalProgramPlayer> = null;
     var candidatePress:Null<PressBrakeControllerPlayer> = null;
+    var candidateGravity:Array<ServoGravityFeedforward> = [];
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidatePower:Null<SimulatedMobilePower> = null;
     var candidateMissions:Array<MissionPlayer> = [];
@@ -344,6 +348,8 @@ class ApplicationSimulation implements Observable {
             virtualNutrunner
           );
           candidateRobots.push(built.robot);
+          var holding = ServoGravityFeedforward.of(candidate, robotIndex, built.robot, built.model, built.blueprint);
+          if (holding != null) candidateGravity.push(holding);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);
           if (ownsPress) {
@@ -869,6 +875,7 @@ class ApplicationSimulation implements Observable {
       digitalProgram = candidateDigital;
       if (pressBrake != null) pressBrake.beforeReset();
       pressBrake = candidatePress;
+      gravityFeedforward = candidateGravity;
       cnc = candidateCnc;
       enclosureGuard = candidateGuard;
       hobbing = candidateHobbing;
@@ -972,6 +979,7 @@ class ApplicationSimulation implements Observable {
     machineProgram = prepared.machineProgram;
     digitalProgram = prepared.digitalProgram;
     pressBrake = prepared.pressBrake;
+    gravityFeedforward = prepared.gravityFeedforward;
     mobile = prepared.mobile;
     missions = prepared.missions;
     cellSignals = prepared.cellSignals;
@@ -1599,6 +1607,7 @@ class ApplicationSimulation implements Observable {
     digitalProgram = null;
     if (pressBrake != null) pressBrake.beforeReset();
     pressBrake = null;
+    gravityFeedforward = [];
     cnc = null;
     print = null;
     mobile = null;

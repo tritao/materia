@@ -12,7 +12,7 @@ class TendingElectricSimScene {
   public final arm:AssemblySimulationBridge.AssemblySimulationModel;
   public final tool:AssemblySimulationBridge.AssemblySimulationModel;
   public final blueprint:RobotRuntimeBlueprint;
-  public final gravity:TendingElectricGravity;
+  public final gravity:robotkit.kinematics.GravityTorques;
   public final armJoints:Array<Int>;
   public final jawJoints:Map<String, Int> = [];
   public final jawOriginMm:Map<String, Float> = [];
@@ -234,7 +234,7 @@ class TendingElectricSimScene {
     model.collisionApproximation = CollisionApproximation.None;
     blueprint = RobotRuntimeCompiler.compile(model, arm.profile);
     var identity:RobotRuntimeIdentity = cast blueprint.identity;
-    gravity = new TendingElectricGravity(model, identity);
+    gravity = new robotkit.kinematics.GravityTorques(model, identity);
     armJoints = [for (j in 1...7) identity.jointIndex("j" + j)];
     for (side in ["a", "b"]) {
       var joint = identity.jointIndex("electric/" + side + "-jaw-opening");

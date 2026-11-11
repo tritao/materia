@@ -234,7 +234,6 @@
   "../examples/machine-tending/TendingElectricCycleReview.hx",
   "../examples/machine-tending/TendingElectricCycleSimulation.hx",
   "../examples/machine-tending/TendingElectricEdgeExecutor.hx",
-  "../examples/machine-tending/TendingElectricGravity.hx",
   "../examples/machine-tending/TendingElectricGripperPhysicsChecks.hx",
   "../examples/machine-tending/TendingElectricPhysicsPlayback.hx",
   "../examples/machine-tending/TendingElectricPlanner.hx",

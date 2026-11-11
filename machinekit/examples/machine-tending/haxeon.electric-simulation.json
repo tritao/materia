@@ -33,7 +33,6 @@
     "../bench-mill/BenchMill.hx",
     "../cnc-router/CncRouter.hx",
     "TendingEndEffectorPreview.hx",
-    "TendingElectricGravity.hx",
     "TendingElectricZone.hx",
     "TendingContactSearchAction.hx",
     "TendingSeatPolicy.hx",

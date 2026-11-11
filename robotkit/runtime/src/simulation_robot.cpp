@@ -217,7 +217,9 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
             target.velocity = servo.velocity;
             target.stiffness = servo.stiffness;
             target.damping = servo.damping;
-            target.feedforward = servo.feedforward;
+            // The drive's own feedforward (gravity compensation) adds to what the controller commands.
+            target.feedforward = servo.feedforward +
+                (source.joint < servo_feedforward_.size() ? servo_feedforward_[source.joint] : 0.0);
         }
         if (target.mode == NKSIM_JOINT_TARGET_SERVO && index < RK_MAX_SERVO_JOINTS) {
             target.end_position = command.reference_end_position[index] + slip_[source.joint] +
