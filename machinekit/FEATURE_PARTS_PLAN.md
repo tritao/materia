@@ -307,6 +307,12 @@ own pose changes in the equivalence, and its history steps are asserted.
 
 Done 2026-11-11: group 1 (drive bars, scale seats, Z scale arm, coolant
 port, carriage ribs). Timeline: a union owns its parts as sub-steps.
+Group 2: chip tray (inputs = the table it fits; CadKit `polygon` profile),
+electrical panel (cut-plate route added); the unused GE-enclosure panel
+removed (shared recipe v7). The X chip covers are folded 2 mm sheet built
+today from boxes and quarter-ring "bends": they move to CadKit sheet-metal
+documents (sheet base, edge flanges, R2 bends, so they get flat patterns)
+as their own step, not recorded box for box.
 
 In order, simplest first, one commit per part, each gated by FP0 equivalence:
 
