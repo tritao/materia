@@ -49,10 +49,6 @@ class HobberXCarriage extends HobberMadePart {
   /** Material under the heads of the guide-block screws (the pocket is cut from the far face), mm: M6 into a 20 mm deck, M4 into the 13 and 12 mm plates. */
   public static inline final X_BLOCK_SOLE = 10.0;
   public static inline final X_CARRIAGE_THICKNESS = 20.0;
-  /** Expanded deck keepout, retaining the open front window. */
-  public static function xDeckKeepout(gap:Float,drop:Float):Part return Solids.cut(
-    HobberPartGeometry.box(60-gap,386+gap,-xCarriageHalfWidth()-gap,xCarriageHalfWidth()+gap,xCarriageBottom()-gap-drop,xCarriageTop()+gap),
-    [HobberPartGeometry.box(55+gap,140-gap,-150+gap,150-gap,xCarriageBottom()-gap-drop-1,xCarriageTop()+gap+1)]);
   public static function xGuideOriginZ():Float return HobberSkeleton.reference().heights().xGuideOriginZ - HobberFrame.PART_DATUM_Z;
   public static function xGuideSpec():machinekit.motion.LinearRailProfile.LinearRailProfileSpec {
     var spec=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA");
