@@ -24,6 +24,14 @@ import nativekit.scene.DepthPrecision;
  * recorded camera, and state.json then records that framing: a way to start a
  * state from a named view without the editor open.
  *
+ * --probe=x,y (repeatable) lists every CAD stroke segment passing within 2.5 px of that pixel: the part, its
+ * B-rep edge, feature and step flags, world end points, and its window depth there against the captured surface's,
+ * with the view-depth gap in mm (negative: the segment lies in front of the surface). The gap compares the surface at
+ * the probe pixel with the segment at its nearest point, up to 2.5 px away: on an oblique surface that offset alone
+ * moves the gap by about a pixel's worth of slope, so read it as identification, not as a visibility verdict.
+ *
+ * --bounds=text (repeatable) prints the world bounding box of every part whose id contains `text`, as displayed.
+ *
  * Exits non-zero when the focus step exceeds --max-focus-step-px (default the
  * camera's own target) or, if given, the largest step exceeds --max-step-px.
  *
@@ -37,12 +45,19 @@ import nativekit.scene.DepthPrecision;
     var statePath:Null<String> = null, out:Null<String> = null, launch:Array<String> = [];
     var focusLimit = DepthPrecision.FOCUS_STEP_PIXELS * 1.01, maxLimit = Math.POSITIVE_INFINITY;
     var presentationCamera = false;
+    var probes:Array<Array<Int>> = [];
+    var boundsFilters:Array<String> = [];
     for (arg in Sys.args()) {
       if (StringTools.startsWith(arg, "--state=")) statePath = arg.substr(8);
       else if (StringTools.startsWith(arg, "--out=")) out = arg.substr(6);
       else if (StringTools.startsWith(arg, "--max-focus-step-px=")) focusLimit = Std.parseFloat(arg.substr(20));
       else if (StringTools.startsWith(arg, "--max-step-px=")) maxLimit = Std.parseFloat(arg.substr(14));
       else if (arg == "--presentation-camera") presentationCamera = true;
+      else if (StringTools.startsWith(arg, "--bounds=")) boundsFilters.push(arg.substr(9));
+      else if (StringTools.startsWith(arg, "--probe=")) {
+        var xy = arg.substr(8).split(",");
+        probes.push([Std.parseInt(xy[0]), Std.parseInt(xy[1])]);
+      }
       else launch.push(arg);
     }
     if (statePath == null || out == null) throw "DepthCapture requires --state=FILE and --out=DIR";
@@ -87,6 +102,14 @@ import nativekit.scene.DepthPrecision;
           var height = Std.int(Math.min(2048, Math.ceil(state.height)));
           var depth = viewport.captureDepth(width, height);
           var limit = DepthPrecision.FOCUS_STEP_PIXELS;
+          for (probe in probes) probeStrokes(editor, viewport, depth, probe[0], probe[1]);
+          for (filter in boundsFilters) for (item in editor.scene.items()) if (item.id.indexOf(filter) >= 0) {
+            var t = viewport.displayTransform(item);
+            var hx = Math.abs(item.width) / 2, hy = Math.abs(item.height) / 2, hz = Math.abs(item.depth) / 2;
+            var c = [t.element(12), t.element(13), t.element(14)];
+            var e = [for (r in 0...3) Math.abs(t.element(r)) * hx + Math.abs(t.element(4 + r)) * hy + Math.abs(t.element(8 + r)) * hz];
+            Sys.println('bounds ${item.id}: x ${c[0] - e[0]}..${c[0] + e[0]} y ${c[1] - e[1]}..${c[1] + e[1]} z ${c[2] - e[2]}..${c[2] + e[2]}');
+          }
           sys.io.File.saveBytes(outDir + "/depth.png", depthImage(depth));
           sys.io.File.saveBytes(outDir + "/steps.png", stepImage(depth, limit));
           sys.io.File.saveBytes(outDir + "/window-depth.f32", depth.windowBytes());
@@ -124,6 +147,62 @@ import nativekit.scene.DepthPrecision;
       failed = true;
     }
     return failed ? 1 : 0;
+  }
+
+  /** Projects every CAD stroke with the capture's camera and reports those near pixel (px, py). */
+  static function probeStrokes(editor:app.Main.ReferenceEditorApp, viewport:app.EditorPerspectiveViewport,
+      depth:ViewportDepth, px:Int, py:Int):Void {
+    var width = depth.width, height = depth.height;
+    var shownWidth = viewport.viewportWidth, shownHeight = viewport.viewportHeight;
+    viewport.updateViewportSize(width, height);
+    viewport.fitCameraClipRange();
+    var vp = viewport.camera.viewProjection(width / height);
+    viewport.updateViewportSize(shownWidth, shownHeight);
+    viewport.fitCameraClipRange();
+    var m = [for (i in 0...16) vp.element(i)];
+    function clip(p:Array<Float>):Array<Float> return [for (r in 0...4) m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]];
+    var surface = depth.covered(px, py) ? depth.viewDepth(px, py) : Math.POSITIVE_INFINITY;
+    Sys.println('probe ($px,$py): surface window ${depth.windowDepth(px, py)} view ${surface} m, object ${depth.objectAt(px, py)} face ${depth.faceAt(px, py)}');
+    var scene = editor.scene;
+    var scanned = 0, withRuntime = 0, withCad = 0, strokes = 0, nearest = Math.POSITIVE_INFINITY, nearestId = "";
+    for (item in scene.items()) {
+      scanned++;
+      var runtime = try scene.runtimeFor(item.id) catch (_:Dynamic) null;
+      if (runtime == null) continue;
+      withRuntime++;
+      var entry = scene.cadDisplayGeometry.get(haxe.Int64.toStr(runtime.geometry.id().get_value()));
+      if (entry == null) continue;
+      withCad++;
+      var t = viewport.displayTransform(item);
+      var tm = [for (i in 0...16) t.element(i)];
+      function world(x:Float, y:Float, z:Float):Array<Float>
+        return [tm[0] * x + tm[4] * y + tm[8] * z + tm[12], tm[1] * x + tm[5] * y + tm[9] * z + tm[13], tm[2] * x + tm[6] * y + tm[10] * z + tm[14]];
+      for (stroke in @:privateAccess entry.data.cadStrokes) {
+        var q = stroke.points, a = world(q[0], q[1], q[2]), b = world(q[3], q[4], q[5]);
+        var ca = clip(a), cb = clip(b);
+        if (ca[3] <= 1e-6 || cb[3] <= 1e-6) continue;
+        var ax = (ca[0] / ca[3] + 1) * 0.5 * width, ay = (1 - ca[1] / ca[3]) * 0.5 * height;
+        var bx = (cb[0] / cb[3] + 1) * 0.5 * width, by = (1 - cb[1] / cb[3]) * 0.5 * height;
+        var dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+        var u = len2 > 0 ? Math.max(0, Math.min(1, ((px + 0.5 - ax) * dx + (py + 0.5 - ay) * dy) / len2)) : 0.0;
+        var ex = ax + u * dx - (px + 0.5), ey = ay + u * dy - (py + 0.5);
+        strokes++;
+        if (Math.sqrt(ex * ex + ey * ey) < nearest) {
+          nearest = Math.sqrt(ex * ex + ey * ey);
+          nearestId = item.id;
+        }
+        if (ex * ex + ey * ey > 2.5 * 2.5) continue;
+        // Screen-linear u to the segment's own parameter, then its window depth there.
+        var s = (u / cb[3]) / ((1 - u) / ca[3] + u / cb[3]);
+        var p = [for (k in 0...3) a[k] + s * (b[k] - a[k])], cp = clip(p);
+        var window = (cp[2] / cp[3] + 1) * 0.5;
+        var ndc = window * 2 - 1, view = 2 * depth.far * depth.near / ((depth.far + depth.near) - ndc * (depth.far - depth.near));
+        Sys.println('  ${item.id} edge ${stroke.id} feature ${stroke.feature} step ${stroke.step} '
+          + 'from [${a.map(v -> Math.round(v * 1e5) / 1e5)}] to [${b.map(v -> Math.round(v * 1e5) / 1e5)}] '
+          + 'off ${Math.round(Math.sqrt(ex * ex + ey * ey) * 100) / 100} px, window ${window}, view gap ${Math.round((view - surface) * 1e6) / 1e3} mm');
+      }
+    }
+    Sys.println('  scanned $scanned items, $withRuntime with nodes, $withCad with CAD strokes, $strokes segments; nearest $nearest px on $nearestId');
   }
 
   static function depthImage(depth:ViewportDepth):Bytes {

@@ -83,6 +83,21 @@ inline PostProcessShaderSources post_process_shader_sources(nkgpu_backend backen
     }
 }
 
+inline SceneShaderSources edge_shader_sources(nkgpu_backend backend) {
+    switch (backend) {
+    case NKGPU_BACKEND_GLCORE:
+        return {shader_source::edge_vertex_gl, shader_source::edge_fragment_gl, NKGPU_SHADERLANGUAGE_GLSL};
+    case NKGPU_BACKEND_GLES3:
+        return {shader_source::edge_vertex_gles, shader_source::edge_fragment_gles, NKGPU_SHADERLANGUAGE_GLSL};
+    case NKGPU_BACKEND_D3D11:
+        return {shader_source::edge_vertex_hlsl, shader_source::edge_fragment_hlsl, NKGPU_SHADERLANGUAGE_HLSL5};
+    case NKGPU_BACKEND_METAL:
+        return {shader_source::edge_vertex_metal, shader_source::edge_fragment_metal, NKGPU_SHADERLANGUAGE_MSL};
+    default:
+        return {};
+    }
+}
+
 inline SceneShaderSources workplane_shader_sources(nkgpu_backend backend) {
     switch (backend) {
     case NKGPU_BACKEND_GLCORE:
