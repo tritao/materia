@@ -60,26 +60,18 @@ class PendantScene {
       };
       var problems = ReferencePendant.layout(size, false, machine).problems();
       if (problems.length > 0) throw "The pendant does not fit its controls: " + problems.join("; ");
-      var documents = new PendantDocuments(ReferencePendant.pendantCase(size, false, machine), prefix);
-      try {
-        var assembly = ReferencePendant.assembly(documents);
-        if (root != null) {
-          root.include(PendantMachine.ACCESSORY, assembly, pose);
-          assembly = root;
-        }
-        var scene = AssemblyPreview.scene(assembly, root == null ? "pendant" : "machine-with-pendant");
-        scene.presentation = PendantPresentation.build(scene.assemblyDefinition, prefix);
-        scene.project = {dynamicParts: [], motions: [], sources: documents.sources(), histories: documents.histories()};
-        scene.recipeDocument = DocumentCodec.encode(recipe);
-        scene.recipeDiagnostics = diagnostics;
-        documents.close();
-        MachineKitRecipes.forget(recipe);
-        recipe.close();
-        return scene;
-      } catch (error:Dynamic) {
-        documents.close();
-        throw error;
+      var assembly = ReferencePendant.assembly(ReferencePendant.pendantCase(size, false, machine));
+      if (root != null) {
+        root.include(PendantMachine.ACCESSORY, assembly, pose);
+        assembly = root;
       }
+      var scene = AssemblyPreview.scene(assembly, root == null ? "pendant" : "machine-with-pendant");
+      scene.presentation = PendantPresentation.build(scene.assemblyDefinition, prefix);
+      scene.recipeDocument = DocumentCodec.encode(recipe);
+      scene.recipeDiagnostics = diagnostics;
+      MachineKitRecipes.forget(recipe);
+      recipe.close();
+      return scene;
     } catch (error:Dynamic) {
       MachineKitRecipes.forget(recipe);
       recipe.close();

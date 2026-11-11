@@ -18,16 +18,16 @@ class PanelAssemblyBuilder {
 	 */
   public static function build(
     layout:PanelLayout,
-    plate:() -> Part,
-    ?shell:() -> Part,
+    plate:PanelPartSource,
+    ?shell:PanelPartSource,
     ?extras:Array<PanelExtra>,
     ?groups:Array<PanelGroup>,
     ?hardware:Array<PanelHardware>
   ):MachineAssembly {
     var assembly = new MachineAssembly();
     var housing = shell != null || (extras != null && extras.length > 0) ? new MachineAssembly() : assembly;
-    housing.addComponent("plate", new PanelSolid("PANEL-PLATE", "panel plate", plate, "PA12 nylon"));
-    if (shell != null) housing.addComponent("shell", new PanelSolid("PANEL-SHELL", "case shell", shell, "PA12 nylon"));
+    housing.addComponent("plate", PanelPartSources.solid("PANEL-PLATE", "panel plate", plate, "PA12 nylon"));
+    if (shell != null) housing.addComponent("shell", PanelPartSources.solid("PANEL-SHELL", "case shell", shell, "PA12 nylon"));
     if (extras != null) for (e in extras) housing.addComponent(e.id, e.component);
     if (housing != assembly) assembly.include("case", housing);
     // An included assembly is copied when it is included, so fill each group before including it.

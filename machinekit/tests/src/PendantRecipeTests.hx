@@ -67,7 +67,7 @@ class PendantRecipeTests {
     var histories = project.histories;
     if (histories == null) throw "The edited scene carries histories";
     var plateHistory = DocumentCodec.decode(histories[0].document);
-    check(plateHistory.parameter("case.width").value == 120, "The plate's recorded history is the edited one");
+    check(plateHistory.parameter("width").value == 120, "The plate's recorded history is the edited one");
     plateHistory.close();
     var again = DocumentCodec.decode(wider.recipeDocument);
     check(instanceOf(again).resolved("width") == 120, "The edit survives into the next saved recipe");

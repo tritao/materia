@@ -45,8 +45,10 @@ class PendantTests {
       Math.abs(pendantCase.connectorX) < layout.width / 2 - layout.wall - 15.0,
       "Receptacle hole inside the bottom wall"
     );
-    var shell = pendantCase.shell();
-    var plate = pendantCase.plate();
+    var shellDocument = PendantCaseDocument.shell(pendantCase), shell = shellDocument.part();
+    shellDocument.document.close();
+    var plateDocument = PendantCaseDocument.plate(pendantCase), plate = plateDocument.part();
+    plateDocument.document.close();
     check(shell.solidCount() == 1 && plate.solidCount() == 1, "Shell and plate are each one solid");
     var bounds = shell.shape.bounds();
     check(
@@ -138,7 +140,8 @@ class PendantTests {
       pocket != null && pocket.x < 0 && pendantCase.notes.length == 0,
       "The enabling switch fits on the left: " + pendantCase.notes.join(" | ")
     );
-    var board = pendantCase.board();
+    var boardDocument = PendantCaseDocument.board(pendantCase), board = boardDocument.part();
+    boardDocument.document.close();
     check(
       board.solidCount() == 1 && board.volume() > 0.5 * 104.0 * 200.0 * 1.6 && board.volume() < 104.0 * 200.0 * 1.6,
       "Board envelope " + board.volume() + " solids " + board.solidCount()

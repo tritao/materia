@@ -22,8 +22,8 @@ typedef PendantLink = {
  * and the board only reads the loop back there.
  */
 class PendantBoard extends PanelSolid {
-  public function new(face:PanelLayout, build:() -> Part) {
-    super("PANEL-BOARD", "pendant board", build, "FR4 PCB");
+  public function new(face:PanelLayout, recorder:machinekit.hmi.PanelSolid.PanelRecording) {
+    super("PANEL-BOARD", "pendant board", null, "FR4 PCB", recorder);
     for (link in links(face)) addPort(link.board);
   }
 

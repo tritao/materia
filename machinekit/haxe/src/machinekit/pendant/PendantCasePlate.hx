@@ -14,21 +14,13 @@ class PendantCasePlate extends PanelSolid {
   public final size:PendantSize;
 
   public function new(size:PendantSize) {
-    super("PENDANT-PLATE", "pendant face plate", () -> plate(size), "PA12 nylon");
+    super("PENDANT-PLATE", "pendant face plate", null, "PA12 nylon", b -> {
+      // The recipe's inputs: the plate records the case's width and height; thickness, wall and depth shape the whole case.
+      for (input in [{name: "thickness", value: size.thickness}, {name: "wall", value: size.wall}, {name: "depth", value: size.depth}])
+        b.length(input.name, input.value);
+      PendantCaseDocument.recordPlate(b, ReferencePendant.pendantCase(size), true);
+    });
     this.size = size;
-  }
-
-  /** The plate as the recorded steps build it, so its faces match the history the scene carries. */
-  static function plate(size:PendantSize):Part {
-    var recorded = PendantCaseDocument.plate(ReferencePendant.pendantCase(size));
-    try {
-      var part = recorded.part();
-      recorded.document.close();
-      return part;
-    } catch (error:Dynamic) {
-      recorded.document.close();
-      throw error;
-    }
   }
 
   static final recipe = new machinekit.cache.Once<ComponentType>();

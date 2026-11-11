@@ -89,23 +89,21 @@ class ReferencePendant {
   ];
 
   /**
-   * The whole pendant as an assembly: plate, shell and board in the case group (from `documents` when given, so their
-   * faces match the recorded steps), the controls by group, and the fasteners.
+   * The whole pendant as an assembly: plate, shell and board in the case group, each recording its geometry (so the scene carries
+   * their histories), the controls by group, and the fasteners.
    * Every wired control is wired to the board (`PendantBoard.wire`): the wheel's 0 V and VCC to the board's supply and A and
    * B to its inputs, the keys' contacts and LEDs, the selectors' contacts and the display's header.
    */
-  public static function assembly(?documents:PendantDocuments):MachineAssembly {
-    var pendantCase = documents == null ? pendantCase() : documents.pendantCase;
+  public static function assembly(?pendantCase:PendantCase):MachineAssembly {
+    if (pendantCase == null) pendantCase = ReferencePendant.pendantCase();
+    var made:PendantCase = pendantCase;
     var assembly = PanelAssemblyBuilder.build(
-      pendantCase.face,
-      () -> documents == null ? pendantCase.plate() : documents.plate.part(),
-      () -> documents == null ? pendantCase.shell() : documents.shell.part(),
-      [new PanelExtra(
-        "board",
-        new PendantBoard(pendantCase.face, () -> documents == null ? pendantCase.board() : documents.board.part())
-      )],
+      made.face,
+      Recorded(b -> PendantCaseDocument.recordPlate(b, made)),
+      Recorded(b -> PendantCaseDocument.recordShell(b, made)),
+      [new PanelExtra("board", new PendantBoard(made.face, b -> PendantCaseDocument.recordBoard(b, made)))],
       groups(),
-      pendantCase.hardware()
+      made.hardware()
     );
     PendantBoard.wire(assembly, pendantCase.face, groups(), "case/board");
     return assembly;
