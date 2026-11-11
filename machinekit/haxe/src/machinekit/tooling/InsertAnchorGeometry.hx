@@ -1233,7 +1233,8 @@ class InsertAnchorGeometry {
         try components = InsertAnchorGeometry.components(row.spec) catch (error:Dynamic) throw "Insert "
           + row.owner + ": " + Std.string(error);
         for (hardware in components) {
-          var occupancy = cache.posed(hardware.part, F.compose(row.pose, hardware.pose));
+          // Named by the insert and its role, so every anchor's faces are told apart on the casting.
+          var occupancy = machinekit.component.Solids.named(cache.posed(hardware.part, F.compose(row.pose, hardware.pose)), row.owner + "." + hardware.role);
           result.push(occupancy);
           // This owned copy represents excluded resin volume, not an external
           // screw machining interface on the resulting casting. Keep the exact

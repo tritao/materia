@@ -77,15 +77,33 @@ inline ElementMapPtr operation_names(const NamedShape& source, BRepFilletAPI_Mak
     return finish_names(source, finish, "chamfer");
 }
 
-// Loft: side faces are named by the first section's edges; the caps come from no single element.
+// Loft: side faces are named by the first section's edges; the caps come from no single element. A ruled loft through
+// more than two sections has a band of faces between each pair: the first band is `side(edge)`, the next ones
+// `side2(edge)`, `side3(edge)`, ... by the section edge that starts each face, so no two walls share a name.
 inline ElementMapPtr loft_names(const std::vector<NamedShape>& sections, BRepOffsetAPI_ThruSections& loft) {
+    // Banded when one first-section edge generates several faces (a ruled loft through more than two sections).
+    bool banded = false;
+    if (!sections.empty()) {
+        ShapeIndex firstEdges;
+        TopExp::MapShapes(sections.front().shape, TopAbs_EDGE, firstEdges);
+        for (int e = 1; e <= firstEdges.Extent() && !banded; ++e) banded = shapes_of(loft.Generated(firstEdges(e))).size() > 1;
+    }
     LambdaHistory history;
     history.on_deleted = [](const TopoDS_Shape&) { return true; };
-    history.on_generated = [&](const TopoDS_Shape& source, std::size_t slot) {
+    history.on_generated = [&, banded](const TopoDS_Shape& source, std::size_t slot) {
         Generated result;
-        if (slot != 0 || source.ShapeType() != TopAbs_EDGE) return result;
-        for (const auto& face : shapes_of(loft.Generated(source)))
-            if (face.ShapeType() == TopAbs_FACE) result.emplace_back(face, "side");
+        if (source.ShapeType() != TopAbs_EDGE) return result;
+        if (!banded) {
+            if (slot != 0) return result;
+            for (const auto& face : shapes_of(loft.Generated(source)))
+                if (face.ShapeType() == TopAbs_FACE) result.emplace_back(face, "side");
+            return result;
+        }
+        if (slot + 1 >= sections.size()) return result;
+        // Banded (ruled) loft: each section edge starts one face, up to the next section.
+        const auto face = loft.GeneratedFace(source);
+        if (!face.IsNull() && face.ShapeType() == TopAbs_FACE)
+            result.emplace_back(face, slot == 0 ? std::string("side") : "side" + std::to_string(slot + 1));
         return result;
     };
     auto propagated = propagate(sections, &history, loft.Shape());

@@ -28,12 +28,14 @@ class CastingCavityCad {
     });
   }
 
+  /** One prism, its faces named by the prism's id (an envelope's prisms share profiles, so their walls would otherwise repeat). */
   public static function prism(prism:CastingPrism):Part {
-    return Scope.run(scope -> {var local = scope.own(Part.prism(
+    return Scope.run(scope -> {var raw = scope.own(Part.prism(
       [for (point in prism.profile) new Vector(point.x, point.y)],
       0,
       prism.height
     ));
+    var local = scope.own(raw.named(prism.id));
     return scope.own(PosedParts.moved(local, prism.pose));
     });
   }

@@ -235,6 +235,16 @@ declares stable names for the faces it creates (`front-window.floor`,
 (today 34 weak recipes). This is what drawings, CAM setups and inspection
 points reference.
 
+Done 2026-11-11 (recorded parts): every recorded hobber part names every
+face strongly and once, asserted by the equivalence gate. CadKit naming:
+pieces of a split face of revolution are named by angular sector in the
+surface's own frame (`cyl.side{u90}`), pieces still alike are told apart by
+the faces that bound only them once those are named, and a ruled loft
+through more than two sections names each band (`side`, `side2`, ...).
+MachineKit names cast-in anchors by insert and role, casting prisms by id.
+MachineKit naming audit: 34 -> 20 recipes with weak names (pillow block
+off the exempt list); the rest are catalogue/study parts, not recorded.
+
 **Gate:** CadKit and MachineKit suites; every new feature and registered type
 round-trips through `DocumentCodec` and recomputes after a dimension change;
 sheet metal unchanged on the registry; pendant and hobber equivalence (FP0)

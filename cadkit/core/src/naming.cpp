@@ -4,6 +4,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepGProp.hxx>
+#include <BRepTools.hxx>
 #include <GProp_GProps.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <NCollection_IndexedDataMap.hxx>
@@ -112,6 +113,25 @@ gp_Pnt edge_middle(const TopoDS_Edge& edge) {
     if (BRep_Tool::Degenerated(edge)) return BRep_Tool::Pnt(TopExp::FirstVertex(edge));
     BRepAdaptor_Curve curve(edge);
     return curve.Value((curve.FirstParameter() + curve.LastParameter()) / 2);
+}
+
+// The angular sector of a piece of a split face of revolution, as `u<degrees>` of its middle around the surface's own axis,
+// from the surface's own reference direction: the halves a boolean cuts a hole's side into are told apart this way, in the
+// cutting tool's frame, so the name survives moving or turning the part. Empty for any other face.
+std::string revolution_sector(const TopoDS_Shape& shape) {
+    if (shape.ShapeType() != TopAbs_FACE) return "";
+    const TopoDS_Face face = TopoDS::Face(shape);
+    BRepAdaptor_Surface surface(face, false);
+    switch (surface.GetType()) {
+        case GeomAbs_Cylinder: case GeomAbs_Cone: case GeomAbs_Sphere: case GeomAbs_Torus: case GeomAbs_SurfaceOfRevolution: break;
+        default: return "";
+    }
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    BRepTools::UVBounds(face, u0, u1, v0, v1);
+    constexpr double turn = 2.0 * M_PI;
+    double middle = std::fmod((u0 + u1) / 2.0, turn);
+    if (middle < 0) middle += turn;
+    return "u" + std::to_string(static_cast<long>(std::lround(middle * 180.0 / M_PI)) % 360);
 }
 
 // Gives each group of equal names a weak ordinal `~k` in the order of `position`.
@@ -478,14 +498,18 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
             }
         }
         // Rule 3: pieces of a split face are told apart by the faces that bound only them.
-        if (!splits.empty()) {
-            Adjacency edgeFaces;
-            ShapeIndex faceIndex;
-            if (kind == ElementKind::Face) {
-                TopExp::MapShapesAndUniqueAncestors(result, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
-                faceIndex = resultIndex;
-            }
-            auto neighbours = [&](std::size_t piece) {
+        // Built on first use: most results have no split pieces to tell apart.
+        Adjacency edgeFaces;
+        ShapeIndex faceIndex;
+        bool adjacencyBuilt = false;
+        auto neighbours = [&](std::size_t piece) {
+                if (!adjacencyBuilt) {
+                    adjacencyBuilt = true;
+                    if (kind == ElementKind::Face) {
+                        TopExp::MapShapesAndUniqueAncestors(result, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
+                        faceIndex = resultIndex;
+                    }
+                }
                 std::set<std::string> result;
                 for (int e = 1; e <= edgeFaces.Extent(); ++e) {
                     const auto& faces = edgeFaces(e);
@@ -500,6 +524,7 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
                 }
                 return result;
             };
+        if (!splits.empty()) {
             std::vector<std::string> named(count);
             for (const auto& split : splits) {
                 std::vector<std::set<std::string>> around;
@@ -541,6 +566,54 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
             for (std::size_t i = 0; i < count; ++i) duplicates.push_back(!assigned[i].empty() && seen[assigned[i]] > 1 ? assigned[i] : "");
             bool any = false;
             for (const auto& name : duplicates) any = any || !name.empty();
+            if (any && kind == ElementKind::Face) {
+                // Pieces of one face of revolution: named by their angular sector when that tells every piece apart.
+                std::map<std::string, std::vector<std::size_t>> groups;
+                for (std::size_t i = 0; i < count; ++i) if (!duplicates[i].empty()) groups[duplicates[i]].push_back(i);
+                for (const auto& [name, pieces] : groups) {
+                    std::set<std::string> sectors;
+                    std::vector<std::string> keys;
+                    for (auto piece : pieces) {
+                        keys.push_back(revolution_sector(resultIndex(static_cast<int>(piece) + 1)));
+                        sectors.insert(keys.back());
+                    }
+                    if (sectors.count("") || sectors.size() != pieces.size()) continue;
+                    const bool emptySplit = name.size() >= 2 && name.compare(name.size() - 2, 2, "{}") == 0;
+                    for (std::size_t k = 0; k < pieces.size(); ++k) {
+                        assigned[pieces[k]] = emptySplit ? name.substr(0, name.size() - 1) + keys[k] + "}" : name + "{" + keys[k] + "}";
+                        duplicates[pieces[k]].clear();
+                    }
+                }
+                // Pieces still alike: told apart again by the faces that bound only them, now that those are named.
+                groups.clear();
+                for (std::size_t i = 0; i < count; ++i) if (!duplicates[i].empty()) groups[duplicates[i]].push_back(i);
+                for (const auto& [name, pieces] : groups) {
+                    std::vector<std::set<std::string>> around;
+                    for (auto piece : pieces) around.push_back(neighbours(piece));
+                    std::set<std::string> common = around.front();
+                    for (const auto& set : around) {
+                        std::set<std::string> kept;
+                        std::set_intersection(common.begin(), common.end(), set.begin(), set.end(), std::inserter(kept, kept.begin()));
+                        common = kept;
+                    }
+                    std::set<std::string> distinct;
+                    std::vector<std::string> owns;
+                    for (const auto& set : around) {
+                        std::vector<std::string> own;
+                        std::set_difference(set.begin(), set.end(), common.begin(), common.end(), std::back_inserter(own));
+                        owns.push_back(join(own, ",", true));
+                        distinct.insert(owns.back());
+                    }
+                    if (distinct.size() != pieces.size() || distinct.count("")) continue;
+                    const bool emptySplit = name.size() >= 2 && name.compare(name.size() - 2, 2, "{}") == 0;
+                    for (std::size_t k = 0; k < pieces.size(); ++k) {
+                        assigned[pieces[k]] = emptySplit ? name.substr(0, name.size() - 1) + owns[k] + "}" : name + "{" + owns[k] + "}";
+                        duplicates[pieces[k]].clear();
+                    }
+                }
+                any = false;
+                for (const auto& name : duplicates) any = any || !name.empty();
+            }
             if (any) {
                 std::vector<std::string> numbered = assigned;
                 number_duplicates(numbered, [&](std::size_t i) { return centre_of(resultIndex(static_cast<int>(i) + 1)); });

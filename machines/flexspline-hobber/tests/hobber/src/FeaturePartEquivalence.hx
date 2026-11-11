@@ -205,6 +205,15 @@ class FeaturePartEquivalence {
       if (history == null) throw '$id does not record its geometry';
       var labels = [for (step in history.steps) step.label];
       for (step in steps) if (labels.indexOf(step) < 0) throw '$id history lacks "$step": ${labels.join(", ")}';
+      // Recorded geometry names every face strongly and once: drawings, CAM setups and mates refer to faces by name.
+      var part = found[0].geometry(Preview), names = part.shape.elementNames(CadKit.ShapeKind.Face);
+      part.close();
+      var seen = new Map<String, Bool>(), weak:Array<String> = [];
+      for (n in names) {
+        if (!cadkit.ElementNames.isStrong(n) || seen.exists(n)) weak.push(n);
+        seen.set(n, true);
+      }
+      if (weak.length > 0) throw '$id has ${weak.length} weak or repeated face names: ${weak.slice(0, 4).join(" | ")}';
       // A step may make no faces (a relief that clears nothing today); the recording as a whole must.
       var faces = 0;
       for (step in history.steps) faces += step.faces.length;

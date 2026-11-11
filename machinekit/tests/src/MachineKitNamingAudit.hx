@@ -10,11 +10,11 @@ import machinekit.component.MachineKitComponents;
 class MachineKitNamingAudit {
   /**
 		Components with faces that only their geometry can tell apart: shrink this list, never grow it.
-		- pillow-block: the base splits the barrel's side into two mirror-image halves with the same neighbours;
-		- shaft-coupling: each set-screw hole's end is split in two the same way.
+		- shaft-coupling: each set-screw hole's planar end is split in two halves with the same neighbours.
+		(Split faces of revolution, such as a barrel's side halved by a base, are named by their angular sector.)
 		Such pieces get weak ordinals by position (`~0`, `~1`), which resolve only when the geometry confirms them.
 	*/
-  static var UNNAMED:Array<String> = ["machinekit.motion.pillow-block", "machinekit.motion.shaft-coupling"];
+  static var UNNAMED:Array<String> = ["machinekit.motion.shaft-coupling"];
 
   /**
    * Recipes with no default part: each is built from the identity of a source part, so `create()` without it is
