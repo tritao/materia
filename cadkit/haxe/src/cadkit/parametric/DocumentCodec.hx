@@ -87,6 +87,13 @@ import cadkit.parametric.RelationshipId;
 class DocumentCodec {
   public static inline var FORMAT:String = "cadkit.document";
   public static inline var VERSION:Int = 16;
+  static final BUILT_IN_TYPES:Array<String> = [
+    "boolean", "box", "chamfer", "constrained-sketch", "cylinder", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "sheet-base", "sheet-corner", "sheet-cut", "sheet-edge-flange", "sheet-hem", "sheet-rip", "shell", "sketch", "sweep", "tool-collection", "transform", "wire"
+  ];
+
+  /** Feature types this codec saves itself; `FeatureTypeRegistry` refuses them. */
+  public static function isBuiltInType(type:String):Bool return BUILT_IN_TYPES.indexOf(type) >= 0;
+
   public static function encode(document:Document):String {
     var encodedFeatures:Array<Dynamic> = [];
     for (index in 0...document.featureCount()) {
@@ -513,7 +520,11 @@ class DocumentCodec {
             labels
           ));
         } else {
-          throw new ParametricError("unsupported feature type: " + featureType);
+          var codec = FeatureTypeRegistry.codec(featureType);
+          if (codec == null) throw new ParametricError("unsupported feature type: " + featureType);
+          feature = document.add(codec.decode(requiredField(record, "data"), new FeatureCodecContext(document)));
+          if (feature.serializationType() != featureType)
+            throw new ParametricError('registered feature decoded as ${feature.serializationType()}, not $featureType');
         }
 
         if (feature.id.toInt() != featureId) throw new ParametricError("feature IDs must be contiguous and ordered");
@@ -720,6 +731,8 @@ class DocumentCodec {
       var selectedSketch:ConstrainedSketchFeature = cast feature;
       if (selectedSketch.supportFaceReference != null) excluded = [selectedSketch.supportFaceReference];
     }
+    var registered = isBuiltInType(featureType) ? null : FeatureTypeRegistry.codec(featureType);
+    if (registered != null) excluded = registered.ownedReferences(feature);
 
     var references:Array<Dynamic> = [];
     for (index in 0...feature.topologyReferenceCount()) {
@@ -1061,6 +1074,15 @@ class DocumentCodec {
         type: featureType,
         tools: [for (tool in collection.tools) tool.id.toInt()],
         labels: collection.labels.copy(),
+        references: references
+      };
+    }
+    if (registered != null) {
+      if (feature.document == null) throw new ParametricError("registered feature is not attached: " + featureType);
+      return {
+        id: feature.id.toInt(),
+        type: featureType,
+        data: registered.encode(feature, new FeatureCodecContext(feature.document)),
         references: references
       };
     }

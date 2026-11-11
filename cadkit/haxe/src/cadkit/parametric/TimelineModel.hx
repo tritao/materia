@@ -50,7 +50,7 @@ class TimelineModel {
       var owned = faces.get(id);
       rows.push({
         id: id,
-        label: feature.label != "" ? feature.label : feature.serializationType(),
+        label: feature.label != "" ? feature.label : defaultLabel(feature),
         group: feature.group,
         kind: feature.serializationType(),
         active: feature.active,
@@ -63,6 +63,13 @@ class TimelineModel {
   }
 
   /** The feature id in a face name's leading `f<id>:` tag, or -1. */
+  /** A registered type's own row name; otherwise the saved type. */
+  static function defaultLabel(feature:Feature):String {
+    var type = feature.serializationType();
+    var codec = DocumentCodec.isBuiltInType(type) ? null : FeatureTypeRegistry.codec(type);
+    return codec == null ? type : codec.defaultLabel(feature);
+  }
+
   static function creatorOf(name:String):Int {
     if (name.length < 3 || name.charAt(0) != "f") return -1;
     var end = 1;
