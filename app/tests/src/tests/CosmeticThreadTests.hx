@@ -400,7 +400,9 @@ import nativekit.scene.Transform;
       check(hidden.visibilityOverrideValues()[0].get_visible() == 0, "the view setting hides threads");
       scene.configureRenderView(new SceneView(), Transform.identity());
       check(scene.presentation.threads.nodesFor("thread")[0].equals(child), "unchanged mesh reuses its child");
-      scene.object("thread").red = 0.3;
+      var item = scene.object("thread");
+      if (item == null) throw "threaded object is missing";
+      scene.setColour("thread", 0.3, item.green, item.blue);
       scene.configureRenderView(new SceneView(), Transform.identity());
       check(
         !scene.presentation.threads.nodesFor("thread")[0].equals(child),
