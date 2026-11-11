@@ -27,6 +27,9 @@ import cadkit.parametric.features.ShellFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.ElementReference;
+import cadkit.parametric.ReferencePlaneElement;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.WireFeature;
@@ -670,6 +673,32 @@ class DocumentBuilder {
     check();
     return document.add(new TransformFeature(source, x, y, z));
   }
+
+  /** A named datum frame (a reference-plane element) that placed features can be relative to. */
+  public function datum(name:String, frame:Plane):ReferencePlaneElement {
+    check();
+    return document.createReferencePlane(name, frame);
+  }
+
+  /**
+   * `source` moved rigidly from its own frame into `frame` (relative to `datum` when given). The origin may be named
+   * dimensions, so they drive where the body sits; the orientation is exact.
+   */
+  public function place(source:Feature, x:Dimension, y:Dimension, z:Dimension, xDirection:Vector, normal:Vector,
+      ?datum:ReferencePlaneElement):PlaceFeature {
+    check();
+    var reference = datum == null ? null : new ElementReference(document.id, datum.id);
+    var feature = document.add(new PlaceFeature(source, new Plane(new Vector(x.number(), y.number(), z.number()), xDirection, normal),
+      reference));
+    bind(x, feature, "place.x");
+    bind(y, feature, "place.y");
+    bind(z, feature, "place.z");
+    return feature;
+  }
+
+  /** `source` moved rigidly into `frame` (relative to `datum` when given), all values fixed. */
+  public function placeIn(source:Feature, frame:Plane, ?datum:ReferencePlaneElement):PlaceFeature
+    return place(source, frame.origin.x, frame.origin.y, frame.origin.z, frame.xDirection, frame.normal, datum);
 
   public function rotate(source:Feature, pivot:Vector, axis:Vector, angle:Dimension):RotationFeature {
     check();

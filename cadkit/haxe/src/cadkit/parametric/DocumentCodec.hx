@@ -38,6 +38,7 @@ import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -65,7 +66,7 @@ class DocumentCodec {
   public static inline var FORMAT:String = "cadkit.document";
   public static inline var VERSION:Int = 17;
   static final BUILT_IN_TYPES:Array<String> = [
-    "boolean", "box", "chamfer", "constrained-sketch", "cylinder", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "wire"
+    "boolean", "box", "chamfer", "constrained-sketch", "cylinder", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "place", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "wire"
   ];
 
   /** Feature types this codec saves itself; `FeatureTypeRegistry` refuses them. */
@@ -383,6 +384,17 @@ class DocumentCodec {
             numberField(record, "x"),
             numberField(record, "y"),
             numberField(record, "z")
+          ));
+        } else if (featureType == "place") {
+          var datumRecord:Dynamic = Reflect.field(record, "datum");
+          feature = document.add(new PlaceFeature(
+            requiredFeature(document, intField(record, "source")),
+            new Plane(
+              new Vector(numberField(record, "x"), numberField(record, "y"), numberField(record, "z")),
+              decodeVector(requiredField(record, "xDirection")),
+              decodeVector(requiredField(record, "normal"))
+            ),
+            datumRecord == null ? null : decodeElementReferenceInDocument(datumRecord)
           ));
         } else if (featureType == "rotation") {
           feature = document.add(new RotationFeature(
@@ -809,6 +821,21 @@ class DocumentCodec {
         z: transform.z.value,
         references: references
       };
+    } else if (featureType == "place") {
+      var place:PlaceFeature = cast feature;
+      var encoded:Dynamic = {
+        id: feature.id.toInt(),
+        type: featureType,
+        source: place.source.id.toInt(),
+        x: place.x.value,
+        y: place.y.value,
+        z: place.z.value,
+        xDirection: encodeVector(place.xDirection),
+        normal: encodeVector(place.normal),
+        references: references
+      };
+      if (place.datum != null) Reflect.setField(encoded, "datum", encodeElementReference(place.datum));
+      return encoded;
     } else if (featureType == "rotation") {
       var rotation:RotationFeature = cast feature;
       return {

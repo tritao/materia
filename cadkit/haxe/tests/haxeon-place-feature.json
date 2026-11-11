@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "cadkit-place-feature"},
+  "entry": "PlaceFeatureSmoke",
+  "sourceRoots": [".", "../../examples/modeling"],
+  "dependencies": {"cadkit": {"path": "../.."}, "projectkit": {"path": "../../../projectkit"}},
+  "target": "host",
+  "outputDir": "build/place-feature"
+}

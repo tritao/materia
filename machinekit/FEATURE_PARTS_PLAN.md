@@ -143,20 +143,28 @@ written against them. Order: FP1a → FP1b → FP1c; FP1d–FP1g in parallel aft
 FP1a. Not CadKit-only: FP1c and FP1d change MachineKit (`ComponentType`,
 `BoltedFace`, `ManufacturingRoute`).
 
-**FP1a — Open feature-type registry.** `DocumentCodec` hard-codes every feature
-type (sheet metal lives inside CadKit for that reason). Add
-`FeatureTypeRegistry`: a type id with decode, encode, evaluate and timeline
-label, modelled on `DefinitionEvaluatorRegistry`. Unknown types are rejected
-on decode, never skipped. Proof: move the sheet-metal features onto it
-(cadkit/plans/SHEET_METAL.md) and register one MachineKit feature in a test.
-Unblocks castings (each `materia.casting.CastingFeature` becomes one recorded
-step evaluated by the existing casting geometry) and FP1d holes.
+**FP1a — Open feature-type registry.** Done: `FeatureTypeRegistry` +
+`FeatureCodec`; a registered type saves as `{id, type, data, references}`
+with the common fields; unknown types are rejected, naming them. Sheet metal
+moved onto it (`cadkit.sheetmetal.SheetFeatureTypes`, registered by CadKit on
+first use); its payload moved from `sheet` to `data`, so documents are now
+schema v17 (v16 rejected). SheetMetalSmoke 7643 assertions, unchanged.
+The unlanded sheet branches (`sheet-metal`, `sheet-metal-sm13-integration`)
+now need this when they are rebased (decision deferred 2026-11-11).
 
-**FP1b — Frames in documents.** A frame parameter type (origin + rotation,
-canonical mm, unit quaternion) and named **datum frame** elements that
-features attach to. Replaces translation-only `TransformFeature` plus
-single-axis rotation for placement; `PosedParts.moved` maps 1:1. A part's own
-frame and the skeleton's mount datums (FP3) are named frames.
+**FP1b — Frames in documents.** Named datum frames already existed
+(`ReferencePlaneElement`: a full `Plane`, saved, undoable, a datum
+dependency that invalidates downstream features when it moves). Added
+`PlaceFeature`: one step that moves a solid from its own frame into a frame,
+optionally relative to a datum; origin x/y/z are length parameters bindable
+to named dimensions, orientation is exact x-direction and normal vectors (no
+angles: placements are mostly axis permutations, and an angle round trip
+would break exact equivalence). Builder: `datum(name, plane)`,
+`place(source, x, y, z, xDirection, normal, ?datum)`, `placeIn(source,
+plane, ?datum)`; `Dimension` also takes `Int` literals. `PosedParts.moved`
+maps 1:1 (same `Location` placement operation). Deferred: datum frames whose
+own origin is bound to named parameters (needs element-owned parameters);
+not needed while skeleton inputs live in code (D2), needed for FP7.
 
 **FP1c — One parameter system.** `ComponentType` recipes
 (`ComponentParameter`/`ComponentValues`) and documents (`NamedParameter`) are
@@ -335,3 +343,8 @@ feature evaluators call. Update the CadKit docs and examples.
 - 2026-11-11: FP1 rewritten as foundations FP1a–FP1g; D3 settled.
 - 2026-11-11: FP0 done on branch `feature-parts` (worktree
   /media/joao/DATA1/materia-feature-parts): equivalence test + fixture.
+- 2026-11-11: FP1a done (registry, sheet metal on it, document v17); FP1b
+  done (`PlaceFeature`, builder datum/place). Pre-existing failures seen on
+  main, not caused here: CadKit AssemblyNestingSmoke and
+  AssemblyDocumentsSmoke; MachineKitSmoke stops in BomExampleTests on
+  HOBBER-X-RIB-LEFTOUTER (HobberCarriageRib has no engineering maturity).

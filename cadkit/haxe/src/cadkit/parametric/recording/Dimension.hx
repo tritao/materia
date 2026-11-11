@@ -10,6 +10,8 @@ abstract Dimension(DimensionSource) {
 
   @:from public static function ofValue(value:Float):Dimension return new Dimension(new DimensionSource(value, null));
 
+  @:from public static function ofInt(value:Int):Dimension return new Dimension(new DimensionSource(value, null));
+
   @:from public static function ofNamed(named:NamedParameter):Dimension return new Dimension(new DimensionSource(named.value, named));
 
   public inline function number():Float return this.value;
