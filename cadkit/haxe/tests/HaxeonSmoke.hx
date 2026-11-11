@@ -100,7 +100,8 @@ class HaxeonSmoke {
       {name: "FeatureRegistrySmoke", run: FeatureRegistrySmoke.run},
       {name: "PlaceFeatureSmoke", run: PlaceFeatureSmoke.run},
       {name: "ParameterRoleSmoke", run: ParameterRoleSmoke.run},
-      {name: "PlacedPrimitivesSmoke", run: PlacedPrimitivesSmoke.run}
+      {name: "PlacedPrimitivesSmoke", run: PlacedPrimitivesSmoke.run},
+      {name: "HolesFeatureSmoke", run: HolesFeatureSmoke.run}
     ])) return 0;
     var box = Shape.box(10.0, 20.0, 30.0);
     var bounds = box.bounds();

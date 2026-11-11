@@ -173,13 +173,17 @@ two systems bridged by `MachineKitRecipes`. A recorded part's recipe inputs
 **derived** (with its rule as text) or **fixed** (stock, catalog) and carries
 its `ValueBasis`. FP7 reads only these tags.
 
-**FP1d — One hole description.** Today holes are `RouteHole`
-(manufacturing), `BoltedFace`/`PinnedFace` (joints) and `HoleFeature`
-(geometry). Make one hole spec: frame, kind (clearance, tapped, dowel, bore,
-slot), thread, fit, depth, counterbore/countersink, slot axis/length. Joints
-produce specs; a registered hole feature (FP1a) cuts a set of specs in one
-step; the route, drawings and `MachinedPackageExport` read them back from the
-document. `derivedRouteHoles()` becomes a view of the document.
+**FP1d — One hole description.** Done (first half): `cadkit.parametric.HoleSpec`
+is the hole record: a cylinder in a face frame at x/y spanning from..to,
+with kind, thread, fit, through, nominal and a stable name (`J3.h2.tap`).
+MachineKit's `MachinedCut` is now an alias of it (same wire ids, so saved
+assemblies are unchanged), and `MachineComponent.machined` cuts with
+`HolesFeature.tool`, the same tool a recorded `holes` feature cuts, so a
+part built either way has identical holes and face names (hobber
+equivalence unchanged). Builder: `holes(target, specs)`. Left for FP2: the
+route table (`RouteHole`, `derivedRouteHoles`), drawings and
+`MachinedPackageExport` read the specs back from the part's document;
+slots join `HoleSpec` when a recorded part first needs one.
 
 **FP1e — Placed primitives and n-ary booleans.** From the hobber count:
 
@@ -343,6 +347,10 @@ feature evaluators call. Update the CadKit docs and examples.
 - 2026-11-11: FP1 rewritten as foundations FP1a–FP1g; D3 settled.
 - 2026-11-11: FP0 done on branch `feature-parts` (worktree
   /media/joao/DATA1/materia-feature-parts): equivalence test + fixture.
+- 2026-11-11: FP1d first half (HoleSpec, holes feature, MachinedCut alias);
+  FP1e done (box-between, cylinder-along, cutAll, unionAll); FP1c CadKit half
+  (parameter roles). Known on main: MachineAssemblyDescriptionTests fails
+  with "Group path must not be empty".
 - 2026-11-11: FP1a done (registry, sheet metal on it, document v17); FP1b
   done (`PlaceFeature`, builder datum/place). Pre-existing failures seen on
   main, not caused here: CadKit AssemblyNestingSmoke and

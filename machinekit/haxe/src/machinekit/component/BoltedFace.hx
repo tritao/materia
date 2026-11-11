@@ -19,30 +19,8 @@ typedef BoltRecess = {diameter:Float, depth:Float}
 /** Uniform drawn adjustment slots, centred on each listed hole; axis is in the face frame. */
 typedef BoltSlot = {width:Float, halfTravel:Float, axis:String}
 
-/**
- * One round hole or recess `JointFasteners` derives for a part: a cylinder of `diameter` on the axis through (`x`, `y`) of
- * `frame` (a frame in the part's own frame), spanning `from` to `to` along that frame's +Z, mm. A part that `machinable()`
- * cuts these into its geometry (`MachineComponent.machined`), so the solid, the exports and the checks see the same holes.
- */
-@:wire typedef MachinedCut = {
-  @:id(1) var frame:AssemblyFrame;
-  @:id(2) var x:Float;
-  @:id(3) var y:Float;
-  @:id(4) var diameter:Float;
-  @:id(5) var from:Float;
-  @:id(6) var to:Float;
-  /** Tapped, clearance or counterbore; the thread names the screw. */
-  @:id(7) @:optional var kind:String;
-  @:id(8) @:optional var thread:String;
-  /** Reamed fit (H7 for a dowel) and whether the hole exits the stock. */
-  @:id(9) @:optional var fit:String;
-  @:id(10) @:optional var through:Bool;
-  /**
-   * The cut's stable name, `<joint>.h<k>.<role>` (`J3.h2.tap`, `J3.h1.counterbore`): the cylinder's faces are named under
-   * it, so a mate or drawing picks "the bore of hole 2 of joint J3" whatever else the part's geometry does.
-   */
-  @:id(11) @:optional var name:String;
-};
+/** One round hole or recess `JointFasteners` derives for a part, cut by `MachineComponent.machined` (see `HoleSpec`). */
+typedef MachinedCut = cadkit.parametric.HoleSpec;
 
 enum BoltedRole {
   /**

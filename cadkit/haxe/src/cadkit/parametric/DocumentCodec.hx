@@ -42,6 +42,7 @@ import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.BoxBetweenFeature;
 import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.UnionAllFeature;
+import cadkit.parametric.features.HolesFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -69,7 +70,7 @@ class DocumentCodec {
   public static inline var FORMAT:String = "cadkit.document";
   public static inline var VERSION:Int = 17;
   static final BUILT_IN_TYPES:Array<String> = [
-    "boolean", "box", "box-between", "chamfer", "constrained-sketch", "cylinder", "cylinder-along", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "place", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "union-all", "wire"
+    "boolean", "box", "box-between", "chamfer", "constrained-sketch", "cylinder", "cylinder-along", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "holes", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "place", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "union-all", "wire"
   ];
 
   /** Feature types this codec saves itself; `FeatureTypeRegistry` refuses them. */
@@ -334,6 +335,9 @@ class DocumentCodec {
           feature = document.add(new CylinderAlongFeature(decodeVector(requiredField(record, "origin")),
             decodeVector(requiredField(record, "axis")), numberField(record, "radius"), numberField(record, "from"),
             numberField(record, "to")));
+        } else if (featureType == "holes") {
+          var specs:Array<HoleSpec> = JsonWire.decode(Json.stringify(requiredField(record, "holes")));
+          feature = document.add(new HolesFeature(requiredFeature(document, intField(record, "source")), specs));
         } else if (featureType == "union-all") {
           var partIds:Array<Dynamic> = cast requiredField(record, "parts");
           feature = document.add(new UnionAllFeature([for (partId in partIds) requiredFeature(document, integerValue(partId, "part"))]));
@@ -762,6 +766,11 @@ class DocumentCodec {
         radius: along.radius.value, from: along.from.value, to: along.to.value,
         references: references
       };
+    } else if (featureType == "holes") {
+      var drilled:HolesFeature = cast feature;
+      var specs:Array<HoleSpec> = drilled.holes;
+      return {id: feature.id.toInt(), type: featureType, source: drilled.source.id.toInt(), holes: Json.parse(JsonWire.encode(specs)),
+        references: references};
     } else if (featureType == "union-all") {
       var union:UnionAllFeature = cast feature;
       return {id: feature.id.toInt(), type: featureType, parts: [for (part in union.parts) part.id.toInt()], references: references};

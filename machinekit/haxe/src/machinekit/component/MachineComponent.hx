@@ -102,12 +102,9 @@ class MachineComponent {
     if (machining.length == 0) return part;
     var tools:Array<Part> = [];
     var index = 0;
-    for (cut in machining) {
-      // Named like the part's own bodies, so the faces a derived hole leaves are found by what they are, not by shape.
-      var tool = Solids.named(Part.cylinderSpan(cut.diameter / 2, cut.from, cut.to, cut.x, cut.y), cut.name ?? 'cut${++index}');
-      tools.push(machinekit.assembly.PosedParts.moved(tool, cut.frame));
-      tool.close();
-    }
+    // Named like the part's own bodies, so the faces a derived hole leaves are found by what they are, not by shape. The tool is
+    // the one a recorded `holes` feature cuts, so a part built either way has the same holes.
+    for (cut in machining) tools.push(cadkit.parametric.features.HolesFeature.tool(cut, cut.name != null ? cut.name : 'cut${++index}'));
     return Solids.cut(part, tools);
   }
   /**

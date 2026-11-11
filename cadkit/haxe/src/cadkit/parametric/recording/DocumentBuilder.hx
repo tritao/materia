@@ -30,6 +30,8 @@ import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.features.PlaceFeature;
+import cadkit.parametric.features.HolesFeature;
+import cadkit.parametric.HoleSpec;
 import cadkit.parametric.features.ToolCollectionFeature;
 import cadkit.parametric.features.UnionAllFeature;
 import cadkit.parametric.features.CylinderAlongFeature;
@@ -706,6 +708,12 @@ class DocumentBuilder {
     check();
     var collection = document.add(new ToolCollectionFeature(tools, labels));
     return document.add(new BooleanFeature(target, collection, BooleanOperation.Cut));
+  }
+
+  /** `target` with the holes `specs` describe cut in one step, each named by its spec. */
+  public function holes(target:Feature, specs:Array<HoleSpec>):HolesFeature {
+    check();
+    return document.add(new HolesFeature(target, specs));
   }
 
   /** Several solids fused into one, in one step. */
