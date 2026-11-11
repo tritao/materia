@@ -77,11 +77,15 @@ class HobberPartGeometry {
 
   // ---- Fastening faces (BOM_PLAN F1): the joints whose screws, holes and clearances `deriveFasteners` derives ------------------
   /** The face a guide block is bolted to: clampedToSuit with the pocket from the far side leaving `sole` under the heads. */
-  public static function blockFace(id:String, origin:Array<Float>, into:Array<Float>, across:Array<Float>, block:machinekit.motion.LinearRailBlock, thickness:Float, sole:Float):BoltedFace {
+  public static function blockFace(id:String, origin:Array<Float>, into:Array<Float>, across:Array<Float>, block:machinekit.motion.LinearRailBlock, thickness:Float, sole:Float):BoltedFace
+    return blockFaceAt(id, BoltedFace.frameOf({x: origin[0], y: origin[1], z: origin[2]}, {x: into[0], y: into[1], z: into[2]},
+      {x: across[0], y: across[1], z: across[2]}), block, thickness, sole);
+
+  /** The same face at `frame` (origin on the land, +Z into the part, +X along the rail). */
+  public static function blockFaceAt(id:String, frame:AssemblyFrame, block:machinekit.motion.LinearRailBlock, thickness:Float, sole:Float):BoltedFace {
     var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(block.spec.blockMountThread);
     var side = Math.max(block.spec.blockHoleSpacingAcross, block.spec.blockHoleSpacingAlong) + 4 * screw.diameter;
-    return BoltedFace.clampedToSuit(id, BoltedFace.frameOf({x: origin[0], y: origin[1], z: origin[2]}, {x: into[0], y: into[1], z: into[2]},
-      {x: across[0], y: across[1], z: across[2]}), side, side, screw.clearanceMedium, sole, block.spec.blockMountThread,
+    return BoltedFace.clampedToSuit(id, frame, side, side, screw.clearanceMedium, sole, block.spec.blockMountThread,
       {diameter: screw.headDiameter + 2, depth: thickness - sole});
   }
 }

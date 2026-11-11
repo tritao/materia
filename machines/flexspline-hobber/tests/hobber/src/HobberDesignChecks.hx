@@ -79,7 +79,7 @@ class HobberDesignChecks {
       for (m in members) if (Std.isOfType(m.component, HobberMadePart)) {
         count++;
         if (["A-yoke", "Y-saddle", "X-bridge",
-          "Z-saddle"].indexOf(m.component.values().token("design")) >= 0) throw "retired overhead saddle installed";
+          "Z-saddle"].indexOf((cast m.component : HobberMadePart).designId) >= 0) throw "retired overhead saddle installed";
       }
       for (mount in machine.mountContacts) {
         var first = members.filter(m -> m.id == mount.parent)[0], second = members.filter(m -> m.id == mount.child)[0];

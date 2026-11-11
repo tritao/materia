@@ -163,12 +163,27 @@ class FeaturePartEquivalence {
     return {failures: failures, notes: notes};
   }
 
+  /** The parts recorded so far really take their geometry and history from their recordings. */
+  static function checkRecorded(machine:FlexsplineHobber):Void {
+    var expected = ["Xbridge" => ["Stock · Ground plate", "Front window", "Fasteners · Derived holes"]];
+    for (id => steps in expected) {
+      var found = [for (member in machine.components()) if (member.id == id) member.component];
+      if (found.length != 1) throw 'No member $id';
+      var history = found[0].recordedHistory();
+      if (history == null) throw '$id does not record its geometry';
+      var labels = [for (step in history.steps) step.label];
+      for (step in steps) if (labels.indexOf(step) < 0) throw '$id history lacks "$step": ${labels.join(", ")}';
+      for (step in history.steps) if (step.faces.length == 0) throw '$id step "${step.label}" names no faces';
+    }
+  }
+
   public static function main():Void {
     var args = Sys.args(), write = args.indexOf("--write");
     var started = Sys.time();
     var machine = new FlexsplineHobber();
     var built = Sys.time();
     var actual = snapshot(machine);
+    checkRecorded(machine);
     var done = Sys.time();
     var parts = actual.filter(l -> StringTools.startsWith(l, "part\t")).length;
     Sys.println('Snapshot: ${actual.length} records, $parts designed parts; build ${Math.round((built - started) * 10) / 10} s, '

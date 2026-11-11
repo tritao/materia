@@ -160,22 +160,10 @@ class AssemblyPreview {
    */
   static function recordedHistory(occurrence:String, part:machinekit.component.MachineComponent,
       histories:Array<materia.project.SceneArtifact.SceneArtifactHistory>, steps:Array<materia.project.SceneSourceMap.SceneSourceFeature>):Void {
-    var document = part.recording();
-    if (document == null) return;
-    try {
-      histories.push({occurrence: occurrence, document: cadkit.parametric.DocumentCodec.encode(document)});
-      for (row in cadkit.parametric.TimelineModel.of(document)) if (row.parent < 0) steps.push({
-        id: occurrence + "#" + row.id,
-        label: row.group == "" ? row.label : row.group + " · " + row.label,
-        occurrence: occurrence,
-        faces: row.faces,
-        whole: false
-      });
-      document.close();
-    } catch (error:Dynamic) {
-      document.close();
-      throw error;
-    }
+    var history = part.recordedHistory();
+    if (history == null) return;
+    histories.push({occurrence: occurrence, document: history.document});
+    for (step in history.steps) steps.push({id: occurrence + "#" + step.id, label: step.label, occurrence: occurrence, faces: step.faces, whole: false});
   }
 
   static function displayBelt(part:SceneArtifactPart, belt:machinekit.transmission.TimingBelt, side:Int):Void {

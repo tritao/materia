@@ -111,6 +111,9 @@ class HobberSkeleton {
   /** The reference machine's skeleton. */
   public static function reference():HobberSkeleton return referenceCache.get(() -> new HobberSkeleton());
 
+  /** Names this skeleton's inputs for caches of what is built from it; only the reference skeleton exists so far. */
+  public function key():String return "reference";
+
   function new() {
     nativeTableFace = 228.0;
     xNutBlockHeight = 80.0;

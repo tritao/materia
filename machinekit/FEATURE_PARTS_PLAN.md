@@ -279,6 +279,16 @@ Done 2026-11-11 (waits for the review point below):
   seat); its solid, mass, holes, faces and BOM line, and every other part,
   match in the machine frame (inertia round-off ~1e-12 on parts placed
   through it).
+- Interfaces from the recording: the carriage declares datum frames in
+  `record` (four guide-block lands, the column-sole pads) and builds those
+  bolted faces from them (`MachineComponent.recordedDatums`); the nut-block,
+  rib, chip-cover and bellows faces come from other parts' helpers and keep
+  `movedBy` until those parts are recorded.
+- Recordings are cached: solid, history (with step rows) and datums per
+  `recordingKey` (recipe key, material, detail, machining and the part's
+  `recordingContext`, e.g. its skeleton).
+- The equivalence test also asserts the carriage's history steps and their
+  faces (a silent override mismatch once left it unrecorded).
 - Not yet seen in the editor (the review step below).
 
 **Review point:** you look at the new `HobberXCarriage.hx` and the editor tree

@@ -8,7 +8,7 @@ import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import materia.assembly.AssemblyFrames as F;
 
-/** A plate with a window, recorded by overriding `recordGeometry`: length and width are recipe inputs, thickness is ground stock. */
+/** A plate with a window, recorded by overriding `record`: length and width are recipe inputs, thickness is ground stock. */
 class RecordedTestPlate extends MachineComponent {
   public static final recipe = new machinekit.cache.Once<ComponentType>();
 
@@ -27,7 +27,7 @@ class RecordedTestPlate extends MachineComponent {
 
   override public function componentType():Null<ComponentType> return recipeType();
 
-  override public function recordGeometry(b:DocumentBuilder, detail:machinekit.component.ComponentDetail):Null<Feature> {
+  override public function record(b:DocumentBuilder, detail:machinekit.component.ComponentDetail):Null<Feature> {
     var length = b.length("length", values().number("length"));
     var width = b.length("width", mistake == "width derived" ? 80.0 : values().number("width"));
     if (mistake == "width derived") width.derivedBy("not a rule");

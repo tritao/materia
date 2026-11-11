@@ -11,6 +11,8 @@ import materia.project.MaterialLibrary;
 /** Geometry generator, named connector frames, and a BOM line for one machine part.
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
+import machinekit.component.PartRecordings.RecordedHistory;
+
 class MachineComponent {
   final facetList:Array<ComponentFacet> = [];
 
@@ -286,7 +288,7 @@ class MachineComponent {
    * derived holes, which are added as a last step). A part that records gets its solid, its hole cuts and its scene history
    * from this, so it does not also override `geometry`. Null (the default) means the part does not record yet.
    */
-  public function recordGeometry(builder:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature>
+  public function record(builder:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature>
     return null;
 
   /** The part's recording at `detail`, derived holes included, or null when it does not record; the caller closes it. */
@@ -294,13 +296,13 @@ class MachineComponent {
 
   var recordsGeometry:Null<Bool> = null;
 
-  /** Whether `recordGeometry` writes this part's geometry (asked once). */
+  /** Whether `record` writes this part's geometry (asked once). */
   public function isRecorded():Bool {
     var known = recordsGeometry;
     if (known != null) return known;
     var probe = new cadkit.parametric.recording.DocumentBuilder();
     try {
-      var records = recordGeometry(probe, Preview) != null;
+      var records = record(probe, Preview) != null;
       probe.close();
       recordsGeometry = records;
       return records;
@@ -310,11 +312,74 @@ class MachineComponent {
     }
   }
 
-  /** The part's solid: from its recording when it records. */
+  static final recordedSolids = machinekit.cache.Memos.parts("recorded-geometry", 64);
+  static final recordedHistories = new machinekit.cache.Memo<RecordedHistory>("recorded-history", 64);
+
+  /**
+   * What else a recording reads besides the recipe values, material and machining (a layout the part was made for), as stable
+   * text; part of the key its solid and history are cached under. Empty when it reads nothing else.
+   */
+  public function recordingContext():String return "";
+
+  function recordingKey(detail:ComponentDetail):String return geometryKey(detail) + "|recorded:" + recordingContext();
+
+  /** The part's solid: from its recording when it records, evaluated once per recording key. */
   public function geometry(detail:ComponentDetail = Preview):Part {
-    var document = recording(detail);
-    if (document == null) throw new NoGeometry(designation);
-    return PartRecordings.solid(document);
+    if (!isRecorded()) throw new NoGeometry(designation);
+    return recordedSolids.get(recordingKey(detail), () -> {
+      var document = recording(detail);
+      if (document == null) throw new NoGeometry(designation);
+      PartRecordings.solid(document);
+    });
+  }
+
+  static final recordedDatumTables = new machinekit.cache.Memo<Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>>("recorded-datums", 64);
+
+  /**
+   * The named datum frames the recording declares (`DocumentBuilder.datum`), in the part's own frame: a datum's normal is the
+   * frame's +Z, its x direction +X. Interfaces (bolted faces, mounts) are built from these, so they move with the geometry.
+   */
+  public function recordedDatums():Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> {
+    if (!isRecorded()) return [];
+    return recordedDatumTables.get(recordingKey(Preview), readDatums);
+  }
+
+  function readDatums():Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> {
+    var builder = new cadkit.parametric.recording.DocumentBuilder();
+    try {
+      record(builder, Preview);
+      var frames = new Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>();
+      for (datum in builder.datums()) {
+        var p = datum.plane;
+        if (frames.exists(datum.name)) throw 'Recorded part "$designation" declares datum "${datum.name}" twice';
+        frames.set(datum.name, BoltedFace.frameOf({x: p.origin.x, y: p.origin.y, z: p.origin.z}, {x: p.normal.x, y: p.normal.y, z: p.normal.z},
+          {x: p.xDirection.x, y: p.xDirection.y, z: p.xDirection.z}));
+      }
+      builder.close();
+      return frames;
+    } catch (error:Dynamic) {
+      builder.close();
+      throw error;
+    }
+  }
+
+  /** One recorded datum frame by name; throws naming the part when it is missing. */
+  public function recordedDatum(name:String):materia.assembly.AssemblyRecord.AssemblyFrame {
+    var frame = recordedDatums().get(name);
+    if (frame == null) throw 'Recorded part "$designation" declares no datum "$name"';
+    return frame;
+  }
+
+  /** The recording saved, with one row per top-level step and the faces it made, or null when the part does not record. */
+  public function recordedHistory(detail:ComponentDetail = Preview):Null<RecordedHistory> {
+    if (!isRecorded()) return null;
+    return recordedHistories.get(recordingKey(detail), () -> {
+      var document = recording(detail);
+      if (document == null) throw new NoGeometry(designation);
+      var steps = [for (row in cadkit.parametric.TimelineModel.of(document)) if (row.parent < 0)
+        {id: row.id, label: row.group == "" ? row.label : row.group + " · " + row.label, faces: row.faces}];
+      ({document: PartRecordings.encoded(document), steps: steps} : RecordedHistory);
+    });
   }
 
   /**

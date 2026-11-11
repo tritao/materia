@@ -7,8 +7,11 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.ParameterRole;
 import cadkit.parametric.recording.DocumentBuilder;
 
+/** A part's saved recording and its top-level steps (history row id, label with its group, faces it made). */
+typedef RecordedHistory = {document:String, steps:Array<{id:Int, label:String, faces:Array<Int>}>};
+
 /**
- * What `MachineComponent` does with a part's recording (`MachineComponent.recordGeometry`): the derived holes as a last step, the
+ * What `MachineComponent` does with a part's recording (`MachineComponent.record`): the derived holes as a last step, the
  * check that recipe inputs and editable dimensions are one set, and the solid and saved form taken from it.
  */
 class PartRecordings {
@@ -21,7 +24,7 @@ class PartRecordings {
     var builder = new DocumentBuilder();
     var document:Null<Document> = null;
     try {
-      var body = component.recordGeometry(builder, detail);
+      var body = component.record(builder, detail);
       if (body == null) {
         builder.close();
         return null;

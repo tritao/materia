@@ -5,6 +5,7 @@ import machinekit.hobbing.*;
 import cadkit.modeling.Part;
 import machinekit.motion.ErobActuatorPart;
 import cadkit.modeling.Vector;
+import cadkit.modeling.Plane;
 import machinekit.assembly.PosedParts;
 import machinekit.component.*;
 import machinekit.component.BoltedFace.PinnedFace;
@@ -34,8 +35,14 @@ class HobberXCarriage extends HobberMadePart {
   public static function columnSoleFace(pad:hobber.HobberSkeleton.ColumnSolePad):BoltedFace {
     var cx=(pad.x0+pad.x1)/2;
     var cy=(pad.y0+pad.y1)/2;
-    return BoltedFace.clamped("column-sole-"+pad.id,
-      BoltedFace.frameOf({x:cx,y:cy,z:xCarriageTop()},{x:0,y:0,z:-1},{x:1,y:0,z:0}),
+    return columnSoleFaceAt(pad, BoltedFace.frameOf({x:cx,y:cy,z:xCarriageTop()},{x:0,y:0,z:-1},{x:1,y:0,z:0}));
+  }
+
+  /** The sole pad's clamped face at `frame` (origin at the pad centre on the deck top, +Z down into the deck). */
+  public static function columnSoleFaceAt(pad:hobber.HobberSkeleton.ColumnSolePad, frame:AssemblyFrame):BoltedFace {
+    var cx=(pad.x0+pad.x1)/2;
+    var cy=(pad.y0+pad.y1)/2;
+    return BoltedFace.clamped("column-sole-"+pad.id, frame,
       [for (x in pad.boltXs) {x:x-cx,y:cy-pad.boltY}],
       9.0,11.0,"M8",{diameter:15.0,depth:9.0},false);
   }
@@ -69,6 +76,9 @@ class HobberXCarriage extends HobberMadePart {
   }
   override public function componentType():Null<ComponentType> return carriageType();
 
+  /** The recording reads the skeleton, so it is part of the cache key. */
+  override public function recordingContext():String return "skeleton:" + skeleton.key();
+
   /** Part datum frame to this carriage's own frame. */
   function fromDatum():AssemblyFrame return F.inverse(skeleton.xCarriageSeat());
 
@@ -87,7 +97,15 @@ class HobberXCarriage extends HobberMadePart {
     // Open at the front (it starts 5 mm ahead of the deck), 80 mm into the deck and 300 mm wide: clears the hob and work.
     var front = -(skeleton.columnRear - skeleton.xDeckFront) / 2;
     var window = b.boxBetween(front - 5, front + 80, -150, 150, -1, X_CARRIAGE_THICKNESS + 1);
-    return b.label(b.cutAll(plate, [window], ["front window"]), "Front window");
+    var body = b.label(b.cutAll(plate, [window], ["front window"]), "Front window");
+    // The carriage's own interfaces, in its frame: the four guide-block lands under it and the column's sole pads on top.
+    var seat = skeleton.xCarriageSeat();
+    for (side in [-1, 1]) for (row in [skeleton.xBlockFront, skeleton.xBlockRear])
+      b.datum(blockId(side, row), new Plane(new Vector(row - seat.x, side * skeleton.bedRailCentre, 0), Vector.X(), Vector.Z()));
+    for (pad in skeleton.columnSolePads())
+      b.datum("column-sole-" + pad.id, new Plane(new Vector((pad.x0 + pad.x1) / 2 - seat.x, (pad.y0 + pad.y1) / 2, X_CARRIAGE_THICKNESS),
+        Vector.X(), new Vector(0, 0, -1)));
+    return body;
   }
   override public function machinable():Bool return true;
   override public function pinnedFaces():Array<PinnedFace> return {
@@ -116,15 +134,19 @@ class HobberXCarriage extends HobberMadePart {
       {name: "column sole seat and rib bond lands", tolerance: 0.02, roughnessRa: 1.6}
     ]);
   };
-  /** The carriage's bolted faces, worked out in the part datum frame (the shared helpers' frame) and given in its own. */
+  function blockId(side:Int, row:Float):String return "block" + (side < 0 ? "L" : "R") + (row == skeleton.xBlockFront ? "1" : "2");
+
+  /**
+   * The carriage's bolted faces: its own (block lands, sole pads) at the datums its recording declares, then the faces other
+   * parts' helpers still work out in the part datum frame, moved into this one.
+   */
   override public function fasteningFaces():Array<BoltedFace> {
-    var faces:Array<BoltedFace>=[];
+    var own:Array<BoltedFace> = [];
     var block = machinekit.motion.LinearRailBlock.metric("HGH25CA", machinekit.motion.LinearRailBlock.SUPPLIER);
-        for (side in [-1, 1]) for (row in [skeleton.xBlockFront, skeleton.xBlockRear])
-          faces.push(HobberPartGeometry.blockFace("block" + (side < 0 ? "L" : "R") + (row == skeleton.xBlockFront ? "1" : "2"), [row, side * skeleton.bedRailCentre, xCarriageBottom()],
-            [0.0, 0, 1], [1.0, 0, 0], block, 20, X_BLOCK_SOLE));
-        // Two derived M8 per ground corner pad, spread over the whole column base.
-        for (pad in skeleton.columnSolePads()) faces.push(columnSoleFace(pad));
+    for (side in [-1, 1]) for (row in [skeleton.xBlockFront, skeleton.xBlockRear])
+      own.push(HobberPartGeometry.blockFaceAt(blockId(side, row), recordedDatum(blockId(side, row)), block, 20, X_BLOCK_SOLE));
+    for (pad in skeleton.columnSolePads()) own.push(columnSoleFaceAt(pad, recordedDatum("column-sole-" + pad.id)));
+    var faces:Array<BoltedFace>=[];
         faces.push(HobberDriveBar.nutBlockFace(HobberDrives.x(), X_CARRIAGE_THICKNESS, [0.0, 0, 0]));
         faces = faces.concat(HobberChipCover.carriageReceivers()).concat(skeleton.zBellowsDeckReceivers());
         // The X scale head's two M4 enter from the seat side (below, before the carriage is set on the rails) and thread into the rib's underside.
@@ -135,6 +157,6 @@ class HobberXCarriage extends HobberMadePart {
             246, b.high - b.low, 15, 20, BoltedFace.ThreadMaterial.Steel, rib.boltSize()));
         }
     var toOwn = fromDatum();
-    return [for (face in faces) face.movedBy(toOwn)];
+    return own.concat([for (face in faces) face.movedBy(toOwn)]);
   }
 }

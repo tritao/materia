@@ -68,6 +68,7 @@ import cadkit.sheetmetal.SheetSide;
 class DocumentBuilder {
   private final document:Document;
   private var finished:Bool;
+  private final declaredDatums:Array<ReferencePlaneElement> = [];
 
   public function new() {
     document = new Document();
@@ -725,8 +726,13 @@ class DocumentBuilder {
   /** A named datum frame (a reference-plane element) that placed features can be relative to. */
   public function datum(name:String, frame:Plane):ReferencePlaneElement {
     check();
-    return document.createReferencePlane(name, frame);
+    var element = document.createReferencePlane(name, frame);
+    declaredDatums.push(element);
+    return element;
   }
+
+  /** The datum frames recorded so far, in order. */
+  public function datums():Array<ReferencePlaneElement> return declaredDatums.copy();
 
   /**
    * `source` moved rigidly from its own frame into `frame` (relative to `datum` when given). The origin may be named
