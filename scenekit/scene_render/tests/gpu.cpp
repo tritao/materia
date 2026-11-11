@@ -758,6 +758,62 @@ void stroke_visibility_regression(nkgpu_renderer renderer) {
             assert(darkening(edged,plain,{-0.002f,-0.01f,0},1)<30&&"the block's own back edge stays hidden");
         }
     }
+    {   // A slab like a carriage plate: a big face toward the camera and a narrow side face seen at a grazing 12
+        // degrees. The side face's outer silhouette must carry as much line as the fold between the two faces; the
+        // depth test alone lost the half of the ribbon lying over the grazing face itself.
+        samples=1;
+        const Point toward{-forward[0],-forward[1],0};
+        const auto across=normalize(cross(forward,{0,0,1}));
+        const auto facing=normalize({toward[0],toward[1],0});
+        const float grazing=4.0f*3.14159265f/180.0f;
+        const Point e1=normalize({across[0]*std::cos(grazing)+facing[0]*std::sin(grazing),
+                                  across[1]*std::cos(grazing)+facing[1]*std::sin(grazing),0});
+        Point e2{-e1[1],e1[0],0};
+        if(e2[0]*toward[0]+e2[1]*toward[1]<0)e2={-e2[0],-e2[1],0};
+        const float h1=0.01f,h2=0.1f,h3=0.06f;
+        auto corner=[&](float s1,float s2,float s3){return Point{s1*h1*e1[0]+s2*h2*e2[0],s1*h1*e1[1]+s2*h2*e2[1],s3*h3};};
+        auto scene=std::make_shared<Scene>();const auto white=material_in(scene);
+        // The frame may be left-handed after turning e2 toward the camera; draw both sides.
+        scene->material_store().find(white)->edit_state().flags|=static_cast<unsigned>(nkscene::MaterialFlags::DoubleSided);
+        const auto id=scene->reserve_geometry_id();
+        {   auto &payload=scene->geometry_store().create(id).edit_payload();
+            for(int i=0;i<8;++i)payload.vertices.push_back({corner(i&1?1.f:-1.f,i&2?1.f:-1.f,i&4?1.f:-1.f)});
+            payload.indices={0,2,1, 1,2,3, 4,5,6, 5,7,6, 0,1,4, 1,5,4, 2,6,3, 3,6,7, 0,4,2, 2,4,6, 1,3,5, 3,7,5};
+            const auto node=scene->reserve_node_id();
+            Transaction create(scene);create.add_create(node);create.add_geometry(node,id);create.add_material(node,white);
+            ChangeSet changes;assert(scene->commit(create,changes)==NKS_OK);create.close();
+        }
+        auto set_segments=[&](std::vector<nkscene::GeometryPayload::StrokeSegment> next){
+            scene->geometry_store().find(id)->edit_payload().stroke_segments=std::move(next);};
+        const Point fold_low=corner(1,1,-1),fold_high=corner(1,1,1),outline_low=corner(1,-1,-1),outline_high=corner(1,-1,1);
+        // Per row around a line's middle, its coverage summed across it (relative darkening, so a line over white
+        // background and one over a grey face compare).
+        auto line_rows=[&](const std::vector<std::uint8_t> &edged,const std::vector<std::uint8_t> &plain,Point low,Point high){
+            const auto a=pixel(low),b=pixel(high);std::vector<double> rows;
+            for(int y=std::min(a[1],b[1])+8;y<=std::max(a[1],b[1])-8;++y){
+                const double t=double(y-a[1])/double(b[1]-a[1]);const int cx=int(a[0]+t*(b[0]-a[0]));double row=0;
+                for(int x=cx-3;x<=cx+3;++x){const auto i=std::size_t(y*width+x)*4;
+                    row+=std::max(0.0,1.0-double(edged[i])/std::max(1.0,double(plain[i])));}
+                rows.push_back(row);
+            }
+            std::sort(rows.begin(),rows.end());
+            return rows;
+        };
+        view.studio_lighting.surface_detail=with_prepass;
+        nkscene::NativeKitGpuExecutor executor(renderer);
+        set_segments({{fold_low,fold_high,1},{outline_low,outline_high,1}});
+        const auto edged=capture(executor,scene);
+        set_segments({});
+        const auto plain=capture(executor,scene);
+        const auto fold=line_rows(edged,plain,fold_low,fold_high),outline=line_rows(edged,plain,outline_low,outline_high);
+        assert(fold.size()>20&&outline.size()>20);
+        const double fold_median=fold[fold.size()/2],outline_median=outline[outline.size()/2];
+        std::printf("stroke visibility: grazing face, coverage per row: fold %.2f (least %.2f), silhouette %.2f (least %.2f)\n",
+            fold_median,fold.front(),outline_median,outline.front());
+        std::fflush(stdout);
+        assert(outline.front()>0.75*outline_median&&fold.front()>0.75*fold_median&&"both lines are whole along their length");
+        assert(outline_median>0.8*fold_median&&outline_median<1.25*fold_median&&"a silhouette carries a fold's weight");
+    }
     std::puts("stroke visibility passed");
 }
 

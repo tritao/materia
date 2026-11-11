@@ -41,12 +41,35 @@ vec3 surface_step(ivec2 p, ivec2 axis, vec3 here, float part) {
     return forward ? a : b;
 }
 
-// Whether another part's visible surface lies in front of this stroke point. Comparing depths at the pixel would need
-// a tolerance of a pixel's worth of the surface's slope, more than a thin wall over a hidden edge; instead that
-// surface's tangent plane is carried to the exact point, which only needs a small tolerance. The stroke's own part is
-// left to the depth test, which hides its own back edges.
-bool behind_other_part(vec3 point) {
-    if (surface_viewport.z < 0.5) return false;
+float depth_of(vec3 point) {
+    vec4 clip = surface_view_projection * vec4(point, 1.0);
+    return clip.z / clip.w;
+}
+
+// The visible surface's depth change across one pixel at p (the larger neighbour difference on each axis, so it
+// holds across a crease), on the part shown there.
+float depth_slope(ivec2 p, float depth, float part) {
+    float slope = 0.0;
+    for (int axis = 0; axis < 2; ++axis) {
+        ivec2 step = axis == 0 ? ivec2(1, 0) : ivec2(0, 1);
+        float change = 0.0;
+        vec4 ahead = surface_at(p + step), behind = surface_at(p - step);
+        if (ahead.w > 0.5 && part_at(p + step) == part) change = max(change, abs(depth_of(ahead.xyz) - depth));
+        if (behind.w > 0.5 && part_at(p - step) == part) change = max(change, abs(depth - depth_of(behind.xyz)));
+        slope += change;
+    }
+    return slope;
+}
+
+// Whether the visible surface at this stroke point's pixel hides the point. Every fragment of the ribbon asks about
+// the same point on the edge, so a line is drawn whole or not at all.
+// - background: visible;
+// - the stroke's own part: the point lies on that surface up to the pixel centre's offset (under a pixel), so it is
+//   hidden when it lies deeper than the surface's depth change over one pixel: a part's back edges, the inner edges
+//   of its holes, however grazing the view;
+// - another part: comparing depths would need that same tolerance, larger than a thin wall over a hidden edge, so the
+//   part's tangent plane is carried to the exact point; hidden beyond 2 % of a pixel footprint behind it.
+bool hidden_by_surface(vec3 point) {
     vec4 clip = surface_view_projection * vec4(point, 1.0);
     if (clip.w <= 0.0) return false;
     ivec2 p = ivec2(floor((clip.xy / clip.w * 0.5 + 0.5) * surface_viewport.xy));
@@ -54,7 +77,10 @@ bool behind_other_part(vec3 point) {
     vec4 shown = surface_at(p);
     if (shown.w < 0.5) return false;
     float part = part_at(p);
-    if (part == stroke_instance) return false;
+    if (part == stroke_instance) {
+        float surface_depth = depth_of(shown.xyz);
+        return clip.z / clip.w > surface_depth + depth_slope(p, surface_depth, part) + 1.0e-6;
+    }
     vec3 n = cross(surface_step(p, ivec2(1, 0), shown.xyz, part), surface_step(p, ivec2(0, 1), shown.xyz, part));
     float area = length(n);
     if (area <= 0.0) return false;
@@ -68,8 +94,10 @@ bool behind_other_part(vec3 point) {
 }
 
 void main() {
-    if (abs(support_sidedness) == 1.0 && gl_FrontFacing != (support_sidedness > 0.0)) discard;
-    if (behind_other_part(world_position)) discard;
+    if (surface_viewport.z > 0.5) {
+        // Support strips only win depth ties for the depth test; the ribbon alone covers the line here.
+        if (support_sidedness != 0.0 || hidden_by_surface(world_position)) discard;
+    } else if (abs(support_sidedness) == 1.0 && gl_FrontFacing != (support_sidedness > 0.0)) discard;
     vec2 line_coordinate = line_coordinate_homogeneous.xy / line_coordinate_homogeneous.z;
     vec2 nearest = vec2(clamp(line_coordinate.x, 0.0, line_length), 0.0);
     float signed_distance = length(line_coordinate - nearest) - line_half_width;

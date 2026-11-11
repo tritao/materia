@@ -494,6 +494,8 @@ struct NativeKitGpuExecutor::State {
         nkgpu_pipeline blend{};
         nkgpu_pipeline indexed_blend{};
         nkgpu_pipeline stroke{};
+        /** Strokes decided by the visible-surface buffer instead of the depth test. */
+        nkgpu_pipeline stroke_surface{};
         nkgpu_pipeline contour{};
         nkgpu_pipeline workplane{};
         std::array<nkgpu_pipeline, 3> caps{};
@@ -592,7 +594,7 @@ struct NativeKitGpuExecutor::State {
     ~State() { release_gpu(); }
 
     void destroy_pass_pipelines(PassPipelines &set) noexcept {
-        for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke, &set.contour,
+        for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke, &set.stroke_surface, &set.contour,
                                &set.workplane, &set.caps[0], &set.caps[1], &set.caps[2], &set.indexed_parity}) {
             if (renderer.id && pipeline->id)
                 (void)nkgpu_pipeline_destroy(renderer, *pipeline);
@@ -975,9 +977,10 @@ nkgpu_result apply_stroke_surfaces(StateT &state, const RenderPlan &plan, bool a
 }
 
 template <class StateT>
-bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples, bool contour = false) {
+bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples, bool contour = false,
+                            bool surface_tested = false) {
     auto &set = state.pipelines[pipeline_slot(samples)];
-    auto &pipeline = contour ? set.contour : set.stroke;
+    auto &pipeline = contour ? set.contour : surface_tested ? set.stroke_surface : set.stroke;
     if (pipeline.id)
         return true;
     nkgpu_result result = NKGPU_OK;
@@ -1078,7 +1081,8 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
 
     nkgpu_depth_state depth{};
     depth.enabled = 1;
-    depth.compare = NKGPU_COMPAREFUNC_LESS_EQUAL;
+    // With the visible-surface buffer the shader decides each stroke point once, for the whole ribbon width.
+    depth.compare = surface_tested ? NKGPU_COMPAREFUNC_ALWAYS : NKGPU_COMPAREFUNC_LESS_EQUAL;
     depth.write_enabled = 0;
     // Only resolve coplanar ties. Slope bias can pull hidden ribbons through
     // thin foreground surfaces; the shader preserves the centerline slope.
@@ -1146,9 +1150,11 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         });
     if (!has_strokes)
         return true;
-    if (!ensure_stroke_pipeline(state, stats, samples))
+    const bool surface_tested = state.stroke_surfaces_active;
+    if (!ensure_stroke_pipeline(state, stats, samples, false, surface_tested))
         return false;
-    const auto &stroke_pipeline = state.pipelines[pipeline_slot(samples)].stroke;
+    const auto &stroke_pipeline = surface_tested ? state.pipelines[pipeline_slot(samples)].stroke_surface
+                                                 : state.pipelines[pipeline_slot(samples)].stroke;
     const auto width = std::max(state.viewport_width, 1u);
     const auto height = std::max(state.viewport_height, 1u);
     StrokeUniformData viewport{{static_cast<float>(width), static_cast<float>(height),
@@ -1227,7 +1233,8 @@ bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot, std:
             if (!geometry->second.indexed && !geometry->second.lods.empty() &&
                 !ensure_pipeline(state, stats, true, blended, samples)) return false;
         }
-        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(state, stats, samples))
+        if (geometry->second.stroke_vertex_count && (!ensure_stroke_pipeline(state, stats, samples) ||
+                                                     !ensure_stroke_pipeline(state, stats, samples, false, true)))
             return false;
     }
     return true;
