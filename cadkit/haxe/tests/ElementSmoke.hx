@@ -15,8 +15,8 @@ import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.ParametricError;
-import cadkit.parametric.features.BoxFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.DefinitionOutputFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -32,7 +32,7 @@ private class FailingElementFeature extends Feature {
   override public function evaluate(context:EvaluationContext):EvaluationResult throw "intentional element output failure";
 }
 
-private class CountingBoxFeature extends BoxFeature {
+private class CountingBoxFeature extends BlockFeature {
   public var evaluations:Int;
 
   public function new() {
@@ -123,7 +123,7 @@ class ElementSmoke {
     datumOnlyDocument.close();
 
     var document = new Document();
-    var box = document.add(new BoxFeature(10, 20, 30));
+    var box = document.add(BlockFeature.corner(10, 20, 30));
     var first = document.createElement("First wall", box);
     var second = document.createElement("Second wall", box);
     check(document.elementCount() == 2, "element registry count");
@@ -158,7 +158,7 @@ class ElementSmoke {
       "removal undo restores the referenced identity"
     );
 
-    var replacement = document.add(new BoxFeature(5, 5, 5));
+    var replacement = document.add(BlockFeature.corner(5, 5, 5));
     first.setOutput(replacement);
     check(first.id.value == firstId && first.output == replacement, "output replacement preserves element identity");
     check(document.undo() && first.output == box, "output replacement is undoable");
@@ -179,7 +179,7 @@ class ElementSmoke {
     check(document.findElement(transient.id) == null, "transaction cancellation restores the element registry");
 
     var otherDocument = new Document();
-    var otherBox = otherDocument.add(new BoxFeature(1, 1, 1));
+    var otherBox = otherDocument.add(BlockFeature.corner(1, 1, 1));
     failed = false;
     try document.createElement("Foreign", otherBox) catch (error:Dynamic) failed = true;
     check(failed, "cross-document element outputs are rejected");
@@ -187,7 +187,7 @@ class ElementSmoke {
     document.close();
 
     var persisted = new Document();
-    var persistedBox = persisted.add(new BoxFeature(12, 13, 14));
+    var persistedBox = persisted.add(BlockFeature.corner(12, 13, 14));
     var persistedElement = persisted.createElement("Persisted wall", persistedBox);
     persisted.setOutput(persistedBox);
     persisted.recompute();
@@ -366,9 +366,9 @@ class ElementSmoke {
     twoLevel.close();
 
     var hierarchy = new Document();
-    var parentFeature = hierarchy.add(new BoxFeature(2, 2, 2));
-    var childFeature = hierarchy.add(new BoxFeature(1, 1, 1));
-    var otherFeature = hierarchy.add(new BoxFeature(2, 2, 2));
+    var parentFeature = hierarchy.add(BlockFeature.corner(2, 2, 2));
+    var childFeature = hierarchy.add(BlockFeature.corner(1, 1, 1));
+    var otherFeature = hierarchy.add(BlockFeature.corner(2, 2, 2));
     var parentElement = hierarchy.createElement("Parent", parentFeature);
     var childElement = hierarchy.createElement("Child", childFeature);
     var otherParent = hierarchy.createElement("Other parent", otherFeature);
@@ -458,8 +458,8 @@ class ElementSmoke {
     parts.close();
 
     var graph = new Document();
-    var graphBody = graph.add(new BoxFeature(10, 20, 30));
-    var graphOpening = graph.add(new CylinderFeature(2, 10));
+    var graphBody = graph.add(BlockFeature.corner(10, 20, 30));
+    var graphOpening = graph.add(CylinderAlongFeature.upZ(2, 10));
     graph.defineTypedParameter("body.width", 10, ParameterKind.Length, "mm").bind(graphBody.width);
     graph.defineTypedParameter("body.depth", 20, ParameterKind.Length, "mm").bind(graphBody.depth);
     graph.defineTypedParameter("body.height", 30, ParameterKind.Length, "mm").bind(graphBody.height);

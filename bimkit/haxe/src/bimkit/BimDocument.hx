@@ -25,7 +25,7 @@ import cadkit.parametric.RelationshipId;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.LevelBoxFeature;
 import cadkit.parametric.features.DefinitionOutputFeature;
 import cadkit.parametric.features.ToolCollectionFeature;
@@ -141,7 +141,7 @@ class BimDocument implements Observable {
   public function createSlab(name:String, width:Float, depth:Float, thickness:Float):Element {
     var transaction = cad.beginTransaction();
     try {
-      var body = cad.add(new BoxFeature(width, depth, thickness));
+      var body = cad.add(BlockFeature.corner(width, depth, thickness));
       cad.trackFeatureCreation(body);
       var slab = cad.createElement(name, body);
       slab.setProperty(TypedProperty.token("bim.class", BimSchema.Slab, BimSchema.ElementClass));
@@ -424,7 +424,7 @@ class BimDocument implements Observable {
   public function createWall(name:String, length:Float, thickness:Float, height:Float):Element {
     var transaction = cad.beginTransaction();
     try {
-      var body = cad.add(new BoxFeature(length, thickness, height));
+      var body = cad.add(BlockFeature.corner(length, thickness, height));
       cad.trackFeatureCreation(body);
       var wall = cad.createElement(name, body);
       installWall(wall.id, body);
@@ -663,10 +663,10 @@ class BimDocument implements Observable {
     var transaction = cad.beginTransaction();
     try {
       if (role.body != null) {
-        var body:BoxFeature = cast role.body;
-        body.width.set(length);
-        body.depth.set(thickness);
-        if (height != null) body.height.set(height);
+        var body:BlockFeature = cast role.body;
+        body.x.set(length);
+        body.y.set(thickness);
+        if (height != null) body.z.set(height);
       } else {
         if (height != null) throw new BimError("level-driven wall height follows its levels");
         var body:LevelBoxFeature = cast role.levelBody;

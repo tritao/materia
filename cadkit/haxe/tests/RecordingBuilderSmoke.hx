@@ -3,7 +3,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.Feature;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ParametricError;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.recording.DocumentBuilder;
@@ -19,7 +19,7 @@ class RecordingBuilderSmoke {
   }
 
   public static function run():Void {
-    var cube:Null<BoxFeature> = null;
+    var cube:Null<BlockFeature> = null;
     var document = DocumentBuilder.build(function(builder) {
       var size = builder.dimension("cube.size", 5);
       var feature = builder.box(size, size, size);
@@ -29,13 +29,13 @@ class RecordingBuilderSmoke {
       builder.polyline([new Vector(), new Vector(1, 0, 0)]);
     }
     );
-    var cubeFeature:BoxFeature = cast cube;
+    var cubeFeature:BlockFeature = cast cube;
     check(document.namedParameters().length == 1, "one shared dimension");
     check(document.parameter("cube.size").bindings().length == 3, "shared dimension bindings");
     near(document.result().volume(), 125);
     document.parameter("cube.size").set(7);
     check(
-      cubeFeature.width.value == 7 && cubeFeature.depth.value == 7 && cubeFeature.height.value == 7,
+      cubeFeature.x.value == 7 && cubeFeature.y.value == 7 && cubeFeature.z.value == 7,
       "shared direct edit propagation"
     );
     document.recompute();
@@ -47,8 +47,8 @@ class RecordingBuilderSmoke {
     check(document.redo(), "shared dimension redo");
     document.recompute();
     near(document.result().volume(), 343);
-    cubeFeature.width.set(8);
-    check(cubeFeature.depth.value == 8 && cubeFeature.height.value == 8, "bound feature edit propagation");
+    cubeFeature.x.set(8);
+    check(cubeFeature.y.value == 8 && cubeFeature.z.value == 8, "bound feature edit propagation");
     document.recompute();
     near(document.result().volume(), 512);
     check(document.undo(), "bound feature edit undo");
@@ -200,7 +200,7 @@ class RecordingBuilderSmoke {
     document.recompute();
     close(document.displayedShape().volume(), 1728);
     var rejected = false;
-    try document.add(new cadkit.parametric.features.BoxFeature(1, 1, 1)) catch (error:ParametricError) rejected = true;
+    try document.add(cadkit.parametric.features.BlockFeature.corner(1, 1, 1)) catch (error:ParametricError) rejected = true;
     check(rejected, "features cannot be added while rolled back");
     document.rollTo(-1);
     document.recompute();

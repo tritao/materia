@@ -11,7 +11,6 @@ import cadkit.parametric.ParameterKind;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
@@ -27,7 +26,6 @@ import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.ShellFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.SweepFeature;
-import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.features.PlaceFeature;
@@ -44,7 +42,6 @@ import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.WireFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
-import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
@@ -400,22 +397,13 @@ class DocumentBuilder {
     return feature;
   }
 
-  public function box(width:Dimension, depth:Dimension, height:Dimension):BoxFeature {
-    check();
-    var feature = document.add(new BoxFeature(width.number(), depth.number(), height.number()));
-    bind(width, feature, "box.width");
-    bind(depth, feature, "box.depth");
-    bind(height, feature, "box.height");
-    return feature;
-  }
+  /** A block from the origin to (`width`, `depth`, `height`): `block` with every axis starting at the origin. */
+  public function box(width:Dimension, depth:Dimension, height:Dimension):BlockFeature
+    return block(width, depth, height, [BlockFeature.MIN, BlockFeature.MIN, BlockFeature.MIN]);
 
-  public function cylinder(radius:Dimension, height:Dimension):CylinderFeature {
-    check();
-    var feature = document.add(new CylinderFeature(radius.number(), height.number()));
-    bind(radius, feature, "cylinder.radius");
-    bind(height, feature, "cylinder.height");
-    return feature;
-  }
+  /** A cylinder up +Z from the origin: `cylinderAlong` the Z axis from 0 to `height`. */
+  public function cylinder(radius:Dimension, height:Dimension):CylinderAlongFeature
+    return cylinderAlong(new Vector(), Vector.Z(), radius, 0, height);
 
   public function wire(source:Feature):WireFeature {
     check();
@@ -749,10 +737,9 @@ class DocumentBuilder {
     return document.add(PocketFeature.throughAll(target, profile));
   }
 
-  public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
-    check();
-    return document.add(new TransformFeature(source, x, y, z));
-  }
+  /** `source` moved by (`x`, `y`, `z`) without turning: `place` with the frame's axes the document's. */
+  public function translate(source:Feature, x:Dimension, y:Dimension, z:Dimension):PlaceFeature
+    return place(source, x, y, z, Vector.X(), Vector.Z());
 
   /** A feature of a type another package registered (`FeatureTypeRegistry`), recorded as is. */
   public function addFeature<T:Feature>(feature:T):T {

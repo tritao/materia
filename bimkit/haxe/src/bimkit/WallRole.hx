@@ -2,14 +2,14 @@ package bimkit;
 
 import cadkit.parametric.ElementId;
 import cadkit.parametric.Feature;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.LevelBoxFeature;
 
 /** BIM metadata for a straight vertical wall; geometry stays in CadKit. */
 class WallRole {
   public final elementId:ElementId;
   public final uncutOutput:Feature;
-  public final body:Null<BoxFeature>;
+  public final body:Null<BlockFeature>;
   public final levelBody:Null<LevelBoxFeature>;
 
   public function new(elementId:ElementId, uncutOutput:Feature) {
@@ -24,8 +24,8 @@ class WallRole {
 
   private function get_length():Float {
     if (body != null) {
-      var box:BoxFeature = cast body;
-      return box.width.value;
+      var box:BlockFeature = cast body;
+      return box.x.value;
     }
     var level:LevelBoxFeature = cast levelBody;
     return level.width.value;
@@ -35,8 +35,8 @@ class WallRole {
 
   private function get_thickness():Float {
     if (body != null) {
-      var box:BoxFeature = cast body;
-      return box.depth.value;
+      var box:BlockFeature = cast body;
+      return box.y.value;
     }
     var level:LevelBoxFeature = cast levelBody;
     return level.depth.value;
@@ -46,8 +46,8 @@ class WallRole {
 
   private function get_height():Float {
     if (body != null) {
-      var box:BoxFeature = cast body;
-      return box.height.value;
+      var box:BlockFeature = cast body;
+      return box.z.value;
     }
     var level:LevelBoxFeature = cast levelBody;
     return level.height(uncutOutput.document);

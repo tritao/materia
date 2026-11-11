@@ -32,6 +32,9 @@ class CylinderAlongFeature extends Feature {
     this.to = new Parameter(this, "cylinder.to", to, -1e300, false, 1e300, ParameterKind.Length);
   }
 
+  /** A cylinder up +Z from the origin to `height`. */
+  public static function upZ(radius:Float, height:Float):CylinderAlongFeature return new CylinderAlongFeature(new Vector(), Vector.Z(), radius, 0, height);
+
   override public function serializationType():String return "cylinder-along";
 
   /** A unit vector perpendicular to the axis, fixed by the axis alone so the frame is reproducible. */

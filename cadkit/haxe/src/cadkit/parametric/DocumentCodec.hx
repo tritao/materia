@@ -28,8 +28,6 @@ import cadkit.parametric.features.BooleanOperation;
 import cadkit.threads.ThreadSpec;
 import materia.project.ThreadSpecData;
 import haxeon.wire.JsonWire;
-import cadkit.parametric.features.BoxFeature;
-import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.ImportedShapeFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.PocketFeature;
@@ -37,7 +35,6 @@ import cadkit.parametric.features.FaceFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
-import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -63,9 +60,9 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
   public static inline var FORMAT:String = "cadkit.document";
-  public static inline var VERSION:Int = 17;
+  public static inline var VERSION:Int = 18;
   static final BUILT_IN_TYPES:Array<String> = [
-    "boolean", "box", "chamfer", "constrained-sketch", "cylinder", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "transform", "wire"
+    "boolean", "chamfer", "constrained-sketch", "datum-sketch", "definition-output", "extrude", "face", "fillet", "grid", "hole", "imported-step", "level-box", "level-extrude", "linear-pattern", "loft", "mirror", "offset", "pocket", "polar-pattern", "polyline", "project", "revolve", "rotation", "shell", "sketch", "sweep", "tool-collection", "wire"
   ];
 
   /** Feature types this codec saves itself; `FeatureTypeRegistry` refuses them. */
@@ -315,14 +312,7 @@ class DocumentCodec {
             ),
             Reflect.hasField(record, "radius") ? numberField(record, "radius") : 0
           ));
-        } else if (featureType == "box") {
-          feature = document.add(new BoxFeature(
-            numberField(record, "width"),
-            numberField(record, "depth"),
-            numberField(record, "height")
-          ));
-        } else if (featureType == "cylinder") {
-          feature = document.add(new CylinderFeature(numberField(record, "radius"), numberField(record, "height")));
+
         } else if (featureType == "imported-step") {
           feature = document.add(new ImportedShapeFeature(stringField(record, "stepText")));
         } else if (featureType == "face") {
@@ -382,13 +372,7 @@ class DocumentCodec {
             optionalEdgeFingerprints(record),
             optionalSelection(record)
           ));
-        } else if (featureType == "transform") {
-          feature = document.add(new TransformFeature(
-            requiredFeature(document, intField(record, "source")),
-            numberField(record, "x"),
-            numberField(record, "y"),
-            numberField(record, "z")
-          ));
+
         } else if (featureType == "rotation") {
           feature = document.add(new RotationFeature(
             requiredFeature(document, intField(record, "source")),
@@ -712,25 +696,6 @@ class DocumentCodec {
       };
       if (sketch.radius != null) Reflect.setField(encodedSketch, "radius", sketch.radius.value);
       return encodedSketch;
-    } else if (featureType == "box") {
-      var box:BoxFeature = cast feature;
-      return {
-        id: feature.id.toInt(),
-        type: featureType,
-        width: box.width.value,
-        depth: box.depth.value,
-        height: box.height.value,
-        references: references
-      };
-    } else if (featureType == "cylinder") {
-      var cylinder:CylinderFeature = cast feature;
-      return {
-        id: feature.id.toInt(),
-        type: featureType,
-        radius: cylinder.radius.value,
-        height: cylinder.height.value,
-        references: references
-      };
     } else if (featureType == "imported-step") {
       var imported:ImportedShapeFeature = cast feature;
       return {id: feature.id.toInt(), type: featureType, stepText: imported.stepText, references: references};
@@ -810,17 +775,6 @@ class DocumentCodec {
       };
       appendEdgeFingerprints(chamferRecord, chamfer.edgeReferences);
       return chamferRecord;
-    } else if (featureType == "transform") {
-      var transform:TransformFeature = cast feature;
-      return {
-        id: feature.id.toInt(),
-        type: featureType,
-        source: transform.source.id.toInt(),
-        x: transform.x.value,
-        y: transform.y.value,
-        z: transform.z.value,
-        references: references
-      };
     } else if (featureType == "rotation") {
       var rotation:RotationFeature = cast feature;
       return {

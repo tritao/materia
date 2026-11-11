@@ -15,8 +15,8 @@ import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.OffsetFeature;
 import cadkit.parametric.features.ShellFeature;
 import cadkit.parametric.features.ProjectFeature;
-import cadkit.parametric.features.BoxFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.GridFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
@@ -44,14 +44,14 @@ class DocumentModelingSmoke {
     var document = new Document();
     var disc = document.add(new SketchFeature("circle", 2));
     var wire = document.add(new WireFeature(disc));
-    var top = document.add(new TransformFeature(wire, 0, 0, 5));
+    var top = document.add(PlaceFeature.offset(wire, 0, 0, 5));
     var loft = document.add(new LoftFeature([wire, top]));
     var path = document.add(new PolylineFeature([new Vector(), new Vector(0, 0, 5)]));
     var sweep = document.add(new SweepFeature(disc, path));
     var offset = document.add(new OffsetFeature(wire, 1));
     var target = document.add(new SketchFeature("rectangle", 20, 20));
     var projected = document.add(new ProjectFeature(top, target, new Vector(0, 0, -1)));
-    var box = document.add(new BoxFeature(10, 10, 10));
+    var box = document.add(BlockFeature.corner(10, 10, 10));
     var shell = document.add(new ShellFeature(
       box,
       -1,
@@ -156,9 +156,9 @@ class DocumentModelingSmoke {
     document.close();
 
     var splitDocument = new Document();
-    var splitBase = splitDocument.add(new BoxFeature(10, 10, 10));
-    var splitTool = splitDocument.add(new BoxFeature(2, 20, 20));
-    var splitPlacement = splitDocument.add(new TransformFeature(splitTool, 20, -5, -5));
+    var splitBase = splitDocument.add(BlockFeature.corner(10, 10, 10));
+    var splitTool = splitDocument.add(BlockFeature.corner(2, 20, 20));
+    var splitPlacement = splitDocument.add(PlaceFeature.offset(splitTool, 20, -5, -5));
     var splitCut = splitDocument.add(new BooleanFeature(splitBase, splitPlacement, BooleanOperation.Cut));
     var splitFinish = splitDocument.add(new FilletFeature(
       splitCut,
@@ -190,7 +190,7 @@ class DocumentModelingSmoke {
     check(splitDocument.undo(), "split undo");
     splitDocument.recompute();
     transaction = splitDocument.beginTransaction();
-    splitTool.width.set(20);
+    splitTool.x.set(20);
     splitPlacement.x.set(-5);
     transaction.commit();
     reported = false;

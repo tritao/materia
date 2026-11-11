@@ -11,14 +11,14 @@ import cadkit.parametric.ReferenceState;
 import cadkit.parametric.RecomputeError;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FaceFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.ToolCollectionFeature;
 import cadkit.parametric.TopologyReference;
 import cadkit.parametric.TopologyFingerprint;
@@ -301,9 +301,9 @@ class HaxeonSmoke {
     operation.close();
 
     var document = new Document();
-    var baseFeature = document.add(new BoxFeature(10.0, 20.0, 30.0));
-    var rawToolFeature = document.add(new CylinderFeature(2.0, 30.0));
-    var toolFeature = document.add(new TransformFeature(rawToolFeature, 5.0, 10.0, 0.0));
+    var baseFeature = document.add(BlockFeature.corner(10.0, 20.0, 30.0));
+    var rawToolFeature = document.add(CylinderAlongFeature.upZ(2.0, 30.0));
+    var toolFeature = document.add(PlaceFeature.offset(rawToolFeature, 5.0, 10.0, 0.0));
     var resultFeature = document.add(new BooleanFeature(baseFeature, toolFeature, BooleanOperation.Cut));
     var extrudePrototype = new ExtrudeFeature(baseFeature, 0.0, 0.0, 5.0);
     var revolvePrototype = new RevolveFeature(baseFeature, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.5707963267948966);
@@ -312,7 +312,7 @@ class HaxeonSmoke {
     extrudePrototype.close();
     revolvePrototype.close();
     var foreignDocument = new Document();
-    var foreignFeature = foreignDocument.add(new BoxFeature(1.0, 1.0, 1.0));
+    var foreignFeature = foreignDocument.add(BlockFeature.corner(1.0, 1.0, 1.0));
     var foreignDependencyRejected = false;
     try {
       document.add(new BooleanFeature(baseFeature, foreignFeature, BooleanOperation.Cut));
@@ -364,7 +364,7 @@ class HaxeonSmoke {
     var centimetreDocument = DocumentCodec.decode(DocumentCodec.encode(new Document(null, true, "cm")));
     if (centimetreDocument.lengthUnit != "cm" || Math.abs(centimetreDocument.metresPerUnit - 0.01) > 1e-12) return 101;
     if (loaded.featureCount() != 4) return 38;
-    var loadedBase:BoxFeature = cast loaded.featureAt(0);
+    var loadedBase:BlockFeature = cast loaded.featureAt(0);
     var loadedResult = loaded.featureAt(3).currentShape();
     if (loadedResult == null || loadedResult.volume() != originalVolume) return 39;
     var loadedReference = loadedBase.topologyReferenceAt(0);
@@ -372,7 +372,7 @@ class HaxeonSmoke {
     if (loadedReference.state != ReferenceState.Remapped || loaded.lastRemapReport.remapped <= 0) return 55;
 
     var loadedTransaction = loaded.beginTransaction();
-    loadedBase.width.set(14.0);
+    loadedBase.x.set(14.0);
     loadedTransaction.commit();
     loaded.recompute();
     var loadedExpanded = loaded.featureAt(3).currentShape();
@@ -387,7 +387,7 @@ class HaxeonSmoke {
     loaded.close();
 
     var transaction = document.beginTransaction();
-    baseFeature.width.set(12.0);
+    baseFeature.x.set(12.0);
     transaction.commit();
     document.recompute();
     var expandedShape = resultFeature.currentShape();
@@ -420,7 +420,7 @@ class HaxeonSmoke {
     document.close();
 
     var sweepDocument = new Document();
-    var sweepBase = sweepDocument.add(new BoxFeature(10.0, 20.0, 30.0));
+    var sweepBase = sweepDocument.add(BlockFeature.corner(10.0, 20.0, 30.0));
     sweepDocument.recompute();
     var sweepBaseShape = sweepBase.currentShape();
     if (sweepBaseShape == null) return 69;
@@ -452,7 +452,7 @@ class HaxeonSmoke {
       || sweepFillet.currentShape() == null || sweepFillet.currentShape().volume() <= 0.0 || sweepChamfer.currentShape()
       == null || sweepChamfer.currentShape().volume() <= 0.0 || sweepProfile.fingerprintData() == null) return 76;
     var sweepTransaction = sweepDocument.beginTransaction();
-    sweepBase.width.set(12.0);
+    sweepBase.x.set(12.0);
     sweepTransaction.commit();
     sweepDocument.recompute();
     if (sweepProfile.currentShape() == null
@@ -468,7 +468,7 @@ class HaxeonSmoke {
     sweepDocument.close();
 
     var selectedDocument = new Document();
-    var selectedBase = selectedDocument.add(new BoxFeature(10.0, 20.0, 30.0));
+    var selectedBase = selectedDocument.add(BlockFeature.corner(10.0, 20.0, 30.0));
     selectedDocument.recompute();
     var selectedBaseShape = selectedBase.currentShape();
     if (selectedBaseShape == null) return 81;
@@ -484,7 +484,7 @@ class HaxeonSmoke {
       || selectedChamferFeature.currentShape().volume() <= 0.0) return 82;
 
     var selectedTransaction = selectedDocument.beginTransaction();
-    selectedBase.width.set(12.0);
+    selectedBase.x.set(12.0);
     selectedTransaction.commit();
     selectedDocument.recompute();
     if (!selectedFilletFeature.edgeReferences[0].isResolved() || !selectedChamferFeature.edgeReferences[0].isResolved()
@@ -505,9 +505,9 @@ class HaxeonSmoke {
     selectedDocument.close();
 
     var deletedDocument = new Document();
-    var deletedBase = deletedDocument.add(new BoxFeature(10.0, 20.0, 30.0));
-    var deletedCylinder = deletedDocument.add(new CylinderFeature(2.0, 30.0));
-    var deletedTool = deletedDocument.add(new TransformFeature(deletedCylinder, 5.0, 10.0, 0.0));
+    var deletedBase = deletedDocument.add(BlockFeature.corner(10.0, 20.0, 30.0));
+    var deletedCylinder = deletedDocument.add(CylinderAlongFeature.upZ(2.0, 30.0));
+    var deletedTool = deletedDocument.add(PlaceFeature.offset(deletedCylinder, 5.0, 10.0, 0.0));
     var deletedSource = deletedDocument.add(new BooleanFeature(deletedBase, deletedTool, BooleanOperation.Cut));
     deletedDocument.recompute();
     var deletedSourceShape = deletedSource.currentShape();
@@ -569,8 +569,8 @@ class HaxeonSmoke {
     deletedDocument.close();
 
     var ambiguousDocument = new Document();
-    var ambiguousFirst = ambiguousDocument.add(new CylinderFeature(10.0, 100.0));
-    var ambiguousSecond = ambiguousDocument.add(new CylinderFeature(10.0, 100.0));
+    var ambiguousFirst = ambiguousDocument.add(CylinderAlongFeature.upZ(10.0, 100.0));
+    var ambiguousSecond = ambiguousDocument.add(CylinderAlongFeature.upZ(10.0, 100.0));
     var ambiguousBase = ambiguousDocument.add(new ToolCollectionFeature(
       [ambiguousFirst, ambiguousSecond],
       ["first", "second"]

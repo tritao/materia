@@ -5,9 +5,9 @@ import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyResolution.ResolutionMethod;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
@@ -21,8 +21,8 @@ import cadkit.sketch.SketchPoint;
 class NamingRepairSmoke {
   public static function run():Void {
     var document = new Document();
-    var plate = document.add(new BoxFeature(60, 40, 10));
-    var slot = document.add(new TransformFeature(document.add(new BoxFeature(4, 60, 30)), -50, -10, -5));
+    var plate = document.add(BlockFeature.corner(60, 40, 10));
+    var slot = document.add(PlaceFeature.offset(document.add(BlockFeature.corner(4, 60, 30)), -50, -10, -5));
     var body = document.add(new BooleanFeature(plate, slot, BooleanOperation.Cut));
     document.recompute();
     var shape = body.currentShape();

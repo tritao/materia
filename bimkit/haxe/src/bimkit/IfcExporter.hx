@@ -16,7 +16,7 @@ import cadkit.parametric.QuantityKind;
 import cadkit.parametric.Relationship;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.UnitConversion;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.LevelBoxFeature;
 import sys.io.File;
 
@@ -736,9 +736,11 @@ private class Ifc4Document {
   }
 
   function featureDimensions(feature:Feature):Null<IfcBoxDimensions> {
-    if (Std.isOfType(feature, BoxFeature)) {
-      var box:BoxFeature = cast feature;
-      return new IfcBoxDimensions(box.width.value, box.depth.value, box.height.value);
+    if (Std.isOfType(feature, BlockFeature)) {
+      var box:BlockFeature = cast feature;
+      // An IFC box extrudes from the element's origin, so only a block that starts there is one.
+      if (box.align.join(",") != [BlockFeature.MIN, BlockFeature.MIN, BlockFeature.MIN].join(",")) return null;
+      return new IfcBoxDimensions(box.x.value, box.y.value, box.z.value);
     }
     if (Std.isOfType(feature, LevelBoxFeature)) {
       var box:LevelBoxFeature = cast feature;

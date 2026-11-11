@@ -1670,7 +1670,7 @@ class EditorScene implements Observable {
     }
   }
 
-  /** Set any feature's named parameter (`slot.x`, `box.width`) as one undoable edit. */
+  /** Set any feature's named parameter (`slot.x`, `block.x`) as one undoable edit. */
   public function setCadFeatureParameter(id:String, featureId:Int, parameter:String, value:Float):Void {
     var session = requireCadSession(id);
     var feature = session.document.featureById(featureId);

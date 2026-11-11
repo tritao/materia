@@ -3,7 +3,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BooleanFeature;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.HoleFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.recording.DocumentBuilder;
@@ -11,7 +11,7 @@ import cadkit.parametric.recording.DocumentBuilder;
 /** Half-bracket workflow with fused body symmetry and mirrored counterbore tools. */
 class MirroredMountingBracket {
   public final document:Document;
-  public var half(default, null):BoxFeature;
+  public var half(default, null):BlockFeature;
   public var body(default, null):MirrorFeature;
   public var counterbore(default, null):HoleFeature;
   public var counterbores(default, null):MirrorFeature;

@@ -42,6 +42,10 @@ class PlaceFeature extends Feature {
     z = new Parameter(this, "place.z", frame.origin.z, -1e300, false, 1e300, ParameterKind.Length);
   }
 
+  /** `source` moved by (`x`, `y`, `z`) without turning. */
+  public static function offset(source:Feature, x:Float, y:Float, z:Float):PlaceFeature
+    return new PlaceFeature(source, new Plane(new Vector(x, y, z), Vector.X(), Vector.Z()));
+
   override public function serializationType():String return "place";
 
   override public function dependencies():Array<FeatureId> return [source.id];

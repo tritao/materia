@@ -36,6 +36,9 @@ class BlockFeature extends Feature {
     for (a in this.align) if (a != MIN && a != CENTRE && a != MAX) throw new ParametricError("unknown block alignment: " + a);
   }
 
+  /** A block from the origin to (`x`, `y`, `z`): every axis starts at the origin. */
+  public static function corner(x:Float, y:Float, z:Float):BlockFeature return new BlockFeature(x, y, z, [MIN, MIN, MIN]);
+
   override public function serializationType():String return "block";
 
   static function start(size:Float, align:String):Float return align == MIN ? 0 : align == CENTRE ? -size / 2 : -size;

@@ -9,7 +9,7 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import haxe.Json;
 
 private class FailingBimFeature extends Feature {
@@ -506,8 +506,8 @@ class BimKitSmoke {
     );
     check(model.redo(), "rehosting is redoable as one update");
     var role = model.wallRole(secondWall.id);
-    var fixedBody:cadkit.parametric.features.BoxFeature = cast role.body;
-    fixedBody.width.set(1000);
+    var fixedBody:cadkit.parametric.features.BlockFeature = cast role.body;
+    fixedBody.x.set(1000);
     failed = false;
     try model.cad.recompute() catch (error:Dynamic) failed = true;
     check(

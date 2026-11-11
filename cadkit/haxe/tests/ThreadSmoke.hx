@@ -11,7 +11,7 @@ import cadkit.threads.ThreadedFace.ThreadStart;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.SelectionRecipe;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.HoleFeature;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
@@ -35,7 +35,7 @@ class ThreadSmoke {
     check(internalRootRejected, "only an external ISO metric thread has this basic minor-diameter envelope");
     var top = new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1);
     var d = new Document();
-    var plate = d.add(new BoxFeature(60, 40, 30));
+    var plate = d.add(BlockFeature.corner(60, 40, 30));
     var a = d.add(HoleFeature.tapped(plate, top, Vector.X(), "blind", -15, 0, 5, 25, spec, 20));
     var b = d.add(HoleFeature.tapped(plate, top, Vector.X(), "blind", 0, 0, 5, 25, spec, 12));
     var plain = d.add(HoleFeature.plain(plate, top, Vector.X(), "blind", 15, 0, 5, 25));
@@ -65,7 +65,7 @@ class ThreadSmoke {
     d.close();
 
     var patterned = new Document();
-    var target = patterned.add(new BoxFeature(40, 40, 8));
+    var target = patterned.add(BlockFeature.corner(40, 40, 8));
     var tool = patterned.add(HoleFeature.tapped(target, top, Vector.X(), "through-all", 0, 0, 5, 1, spec, 20));
     var pattern = patterned.add(new LinearPatternFeature(tool, 2, 12, Vector.X(), 2, 12, Vector.Y()));
     var finalCut = patterned.add(new BooleanFeature(target, pattern, BooleanOperation.Cut));

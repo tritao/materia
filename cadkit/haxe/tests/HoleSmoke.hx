@@ -4,7 +4,7 @@ import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.HoleFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 
@@ -21,7 +21,7 @@ class HoleSmoke {
     var top = new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1);
 
     var blindDocument = new Document();
-    var blindTarget = blindDocument.add(new BoxFeature(20, 20, 10));
+    var blindTarget = blindDocument.add(BlockFeature.corner(20, 20, 10));
     var blindTool = blindDocument.add(HoleFeature.plain(blindTarget, top, Vector.X(), "blind", 0, 0, 4, 3));
     var diameter = blindDocument.defineParameter("hole.diameter", 4);
     var depth = blindDocument.defineParameter("hole.depth", 3);
@@ -43,20 +43,20 @@ class HoleSmoke {
     blindDocument.close();
 
     var throughDocument = new Document();
-    var throughTarget = throughDocument.add(new BoxFeature(20, 20, 10));
+    var throughTarget = throughDocument.add(BlockFeature.corner(20, 20, 10));
     var throughTool = throughDocument.add(HoleFeature.plain(throughTarget, top, Vector.X(), "through-all", 5, 0, 4));
     var throughCut = throughDocument.add(new BooleanFeature(throughTarget, throughTool, BooleanOperation.Cut));
     throughDocument.setOutput(throughCut);
     throughDocument.recompute();
     near(throughDocument.result().volume(), 20 * 20 * 10 - Math.PI * 2 * 2 * 10);
     near(throughTool.currentShape().bounds().get_min().get_x(), 15 - 2);
-    throughTarget.height.set(15);
+    throughTarget.z.set(15);
     throughDocument.recompute();
     near(throughDocument.result().volume(), 20 * 20 * 15 - Math.PI * 2 * 2 * 15);
     throughDocument.close();
 
     var counterboreDocument = new Document();
-    var counterboreTarget = counterboreDocument.add(new BoxFeature(30, 30, 10));
+    var counterboreTarget = counterboreDocument.add(BlockFeature.corner(30, 30, 10));
     var counterboreTool = counterboreDocument.add(HoleFeature.counterbore(
       counterboreTarget,
       top,
@@ -109,7 +109,7 @@ class HoleSmoke {
     lid.close();
 
     var countersinkDocument = new Document();
-    var countersinkTarget = countersinkDocument.add(new BoxFeature(30, 30, 10));
+    var countersinkTarget = countersinkDocument.add(BlockFeature.corner(30, 30, 10));
     var countersinkTool = countersinkDocument.add(HoleFeature.countersink(
       countersinkTarget,
       top,

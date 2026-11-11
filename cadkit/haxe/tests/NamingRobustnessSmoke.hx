@@ -12,16 +12,16 @@ import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyReference;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.SketchFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
@@ -101,7 +101,7 @@ class NamingRobustnessSmoke {
   static function boxCase(edit:String, chamfer:Bool):Void {
     var row = 'box ${chamfer ? "chamfer top/+y" : "fillet top/+x"} | $edit';
     var document = new Document();
-    var box = document.add(new BoxFeature(10, 20, 30));
+    var box = document.add(BlockFeature.corner(10, 20, 30));
     document.recompute();
     var shape = box.currentShape();
     var edgeIndex = chamfer ? find(shape, CadKit.ShapeKind.Edge, s -> lineAt(s, 5, 20, 30, 1, 0, 0)) : find(
@@ -119,16 +119,16 @@ class NamingRobustnessSmoke {
     document.recompute();
     switch edit {
       case "width":
-        box.width.set(14);
+        box.x.set(14);
       case "depth":
-        box.depth.set(26);
+        box.y.set(26);
       case "height":
-        box.height.set(24);
+        box.z.set(24);
       case _:
     }
     var reference = chamfer
       ? (cast finish : ChamferFeature).edgeReferences[0] : (cast finish : FilletFeature).edgeReferences[0];
-    var w = box.width.value, d = box.depth.value, h = box.height.value;
+    var w = box.x.value, d = box.y.value, h = box.z.value;
     judgeReference(
       row,
       document,
@@ -142,9 +142,9 @@ class NamingRobustnessSmoke {
   static function plateCase(edit:String):Void {
     var row = 'plate sketch on top face | $edit';
     var document = new Document();
-    var plate = document.add(new BoxFeature(60, 40, 10));
-    var hole = document.add(new TransformFeature(document.add(new CylinderFeature(3, 30)), -50, 20, -5));
-    var slot = document.add(new TransformFeature(document.add(new BoxFeature(4, 60, 30)), -50, -10, -5));
+    var plate = document.add(BlockFeature.corner(60, 40, 10));
+    var hole = document.add(PlaceFeature.offset(document.add(CylinderAlongFeature.upZ(3, 30)), -50, 20, -5));
+    var slot = document.add(PlaceFeature.offset(document.add(BlockFeature.corner(4, 60, 30)), -50, -10, -5));
     var drilled = document.add(new BooleanFeature(plate, hole, BooleanOperation.Cut));
     var body = document.add(new BooleanFeature(drilled, slot, BooleanOperation.Cut));
     document.recompute();
@@ -158,9 +158,9 @@ class NamingRobustnessSmoke {
     var splits = false;
     switch edit {
       case "thickness":
-        plate.height.set(14);
+        plate.z.set(14);
       case "width":
-        plate.width.set(80);
+        plate.x.set(80);
       case "hole inside":
         hole.x.set(15);
       case "slot across":
@@ -168,7 +168,7 @@ class NamingRobustnessSmoke {
         splits = true;
       case _:
     }
-    var height = plate.height.value;
+    var height = plate.z.value;
     // A face split in two has no single answer: only a report is right.
     judgeReference(row, document, sketch.supportFaceReference, s -> !splits && planeAt(s, height, 1));
     document.close();
@@ -206,8 +206,8 @@ class NamingRobustnessSmoke {
   static function patternCase(edit:String):Void {
     var row = 'pattern fillet boss 1 rim | $edit';
     var document = new Document();
-    var plate = document.add(new BoxFeature(80, 30, 10));
-    var boss = document.add(new TransformFeature(document.add(new CylinderFeature(3, 5)), 40, 15, 10));
+    var plate = document.add(BlockFeature.corner(80, 30, 10));
+    var boss = document.add(PlaceFeature.offset(document.add(CylinderAlongFeature.upZ(3, 5)), 40, 15, 10));
     var pattern = document.add(new LinearPatternFeature(boss, 3, 15, Vector.X()));
     var body = document.add(new BooleanFeature(plate, pattern, BooleanOperation.Fuse));
     document.recompute();

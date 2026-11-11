@@ -193,6 +193,14 @@ slots join `HoleSpec` when a recorded part first needs one.
   the remaining built-ins out of `DocumentCodec`'s branch chain onto
   `FeatureCodec`s in `CadKitFeatureTypes`, so every type is one class and
   one codec.
+  Done 2026-11-11 (first half): `box`, `cylinder` and `transform` retired,
+  each an exact subset of `block` (minimum-corner), `cylinder-along` (+Z)
+  and `place` (no turn); the builder keeps `box`/`cylinder`/`translate` as
+  shortcuts that record those, and the features have matching factories
+  (`BlockFeature.corner`, `CylinderAlongFeature.upZ`, `PlaceFeature.offset`).
+  `rotation` stays: its editable angle is not something `place` (exact
+  vectors) does. Documents are schema v18. Face names are unchanged (same
+  primitives), so the naming goldens hold. Left: the built-ins onto codecs.
 - BOM: one helper for the "Assumed made part" engineering metadata the
   hobber parts repeat; `ScrewLinearModulePart`'s stock and route as a
   function of its recipe values, so its requirements do not build a part.

@@ -3,7 +3,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BooleanFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.HoleFeature;
 import cadkit.parametric.features.PolarPatternFeature;
 import cadkit.parametric.recording.DocumentBuilder;
@@ -11,7 +11,7 @@ import cadkit.parametric.recording.DocumentBuilder;
 /** Resizable flange with a face-attached polar pattern of through countersunk holes. */
 class CountersunkFlange {
   public final document:Document;
-  public var flange(default, null):CylinderFeature;
+  public var flange(default, null):CylinderAlongFeature;
   public var hole(default, null):HoleFeature;
   public var holes(default, null):PolarPatternFeature;
   public var finish(default, null):BooleanFeature;

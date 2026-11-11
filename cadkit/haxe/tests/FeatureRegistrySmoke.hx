@@ -12,7 +12,7 @@ import cadkit.parametric.Parameter;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.TimelineModel;
 import cadkit.parametric.TopologyReference;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 
 /** A feature type defined outside CadKit: a vertical drill at the source's origin corner, `depth` deep. */
 class CornerDrillFeature extends Feature {
@@ -101,7 +101,7 @@ class FeatureRegistrySmoke {
   public static function run():Void {
     // Unknown types fail to decode, naming the type; this runs before registration on purpose.
     var probe = new Document();
-    var box = probe.add(new BoxFeature(20, 20, 10));
+    var box = probe.add(BlockFeature.corner(20, 20, 10));
     probe.add(new CornerDrillFeature(box, 4, 10, "probe"));
     throws(() -> DocumentCodec.encode(probe), "unsupported feature type: test-corner-drill", "encoding an unregistered type");
     probe.close();
@@ -121,7 +121,7 @@ class FeatureRegistrySmoke {
     throws(() -> FeatureTypeRegistry.register(new SheetNameCodec()), "already registered: sheet-base", "a sheet-metal name");
 
     var document = new Document();
-    var plate = document.add(new BoxFeature(20, 20, 10));
+    var plate = document.add(BlockFeature.corner(20, 20, 10));
     var drill = document.add(new CornerDrillFeature(plate, 4, 10, "keeps its own data"));
     var radius = document.defineParameter("drill.r", 4);
     radius.bind(drill.parameter("drill.radius"));

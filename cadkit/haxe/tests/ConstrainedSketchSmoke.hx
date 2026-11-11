@@ -16,11 +16,11 @@ import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.parametric.SelectionRecipe;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 
 class ConstrainedSketchSmoke {
   static function check(value:Bool, message:String):Void {
@@ -678,10 +678,10 @@ class ConstrainedSketchSmoke {
     stagedDocument.close();
 
     var observerDocument = new Document();
-    var observerBox = observerDocument.add(new BoxFeature(10, 8, 2));
+    var observerBox = observerDocument.add(BlockFeature.corner(10, 8, 2));
     observerDocument.setOutput(observerBox);
     observerDocument.recompute();
-    observerBox.width.set(12);
+    observerBox.x.set(12);
     observerDocument.afterRecompute = failObserver;
     failed = false;
     try observerDocument.recompute() catch (error:Dynamic) failed = true;
@@ -751,7 +751,7 @@ class ConstrainedSketchSmoke {
     ));
     var topSelection = new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1);
     var attachedDocument = new Document();
-    var attachedBox = attachedDocument.add(new BoxFeature(20, 30, 10));
+    var attachedBox = attachedDocument.add(BlockFeature.corner(20, 30, 10));
     var attachedFeature = attachedDocument.add(new ConstrainedSketchFeature(
       attachedModel,
       attachedBox,
@@ -771,8 +771,8 @@ class ConstrainedSketchSmoke {
     attachedDocument.recompute();
     near(attachedDocument.result().center().get_z(), 12);
     near(flippedFeature.currentShape().center().get_z(), 8);
-    attachedBox.height.set(15);
-    attachedBox.width.set(24);
+    attachedBox.z.set(15);
+    attachedBox.x.set(24);
     attachedDocument.recompute();
     near(attachedDocument.result().center().get_x(), 12);
     near(attachedDocument.result().center().get_z(), 17);
@@ -783,7 +783,7 @@ class ConstrainedSketchSmoke {
     attachedDocument.close();
 
     var ambiguousDocument = new Document();
-    var ambiguousBox = ambiguousDocument.add(new BoxFeature(20, 30, 10));
+    var ambiguousBox = ambiguousDocument.add(BlockFeature.corner(20, 30, 10));
     var ambiguousFaces = new SelectionRecipe("face", "plane", Vector.Z(), "all", Vector.Z(), 1);
     var ambiguousAttached = ambiguousDocument.add(new ConstrainedSketchFeature(
       attachedModel,
@@ -798,7 +798,7 @@ class ConstrainedSketchSmoke {
     ambiguousDocument.close();
 
     var pocketDocument = new Document();
-    var pocketBox = pocketDocument.add(new BoxFeature(20, 30, 10));
+    var pocketBox = pocketDocument.add(BlockFeature.corner(20, 30, 10));
     var pocketProfile = pocketDocument.add(new ConstrainedSketchFeature(
       fixedRectangle(8, 6),
       pocketBox,
@@ -820,7 +820,7 @@ class ConstrainedSketchSmoke {
     check(pocketDocument.redo(), "pocket depth redo");
     pocketDocument.recompute();
     near(pocketDocument.result().volume(), 20 * 30 * 10 - 8 * 6 * 4);
-    pocketBox.height.set(15);
+    pocketBox.z.set(15);
     pocketDocument.recompute();
     near(pocketDocument.result().volume(), 20 * 30 * 15 - 8 * 6 * 4);
     near(pocketProfile.currentShape().center().get_z(), 15);
@@ -831,7 +831,7 @@ class ConstrainedSketchSmoke {
     pocketDocument.close();
 
     var throughDocument = new Document();
-    var throughBox = throughDocument.add(new BoxFeature(20, 30, 10));
+    var throughBox = throughDocument.add(BlockFeature.corner(20, 30, 10));
     var throughProfile = throughDocument.add(new ConstrainedSketchFeature(
       fixedRectangle(8, 6),
       throughBox,
@@ -842,7 +842,7 @@ class ConstrainedSketchSmoke {
     throughDocument.setOutput(throughPocket);
     throughDocument.recompute();
     near(throughDocument.result().volume(), (20 * 30 - 8 * 6) * 10);
-    throughBox.height.set(15);
+    throughBox.z.set(15);
     throughDocument.recompute();
     near(throughDocument.result().volume(), (20 * 30 - 8 * 6) * 15);
     var restoredThrough = DocumentCodec.decode(DocumentCodec.encode(throughDocument));
@@ -864,9 +864,9 @@ class ConstrainedSketchSmoke {
     enclosure.close();
 
     var selectionFailureDocument = new Document();
-    var selectionBase = selectionFailureDocument.add(new BoxFeature(20, 30, 10));
-    var selectionCutter = selectionFailureDocument.add(new BoxFeature(2, 30, 20));
-    var movingCutter = selectionFailureDocument.add(new TransformFeature(selectionCutter, 30, 0, 0));
+    var selectionBase = selectionFailureDocument.add(BlockFeature.corner(20, 30, 10));
+    var selectionCutter = selectionFailureDocument.add(BlockFeature.corner(2, 30, 20));
+    var movingCutter = selectionFailureDocument.add(PlaceFeature.offset(selectionCutter, 30, 0, 0));
     var changingSupport = selectionFailureDocument.add(new BooleanFeature(
       selectionBase,
       movingCutter,

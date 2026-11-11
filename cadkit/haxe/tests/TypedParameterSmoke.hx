@@ -4,7 +4,7 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.Parameter;
 import cadkit.parametric.ParameterExpression;
 import cadkit.parametric.ParameterKind;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 
 private class TypedParameterProbeFeature extends Feature {
   public final permissive:Parameter;
@@ -56,7 +56,7 @@ class TypedParameterSmoke {
     near(count.value, 4);
     near(doubledCount.value, 8);
 
-    var wall = document.add(new BoxFeature(width.value, depth.value, height.value));
+    var wall = document.add(BlockFeature.corner(width.value, depth.value, height.value));
     width.bind(wall.width);
     depth.bind(wall.depth);
     height.bind(wall.height);
@@ -64,7 +64,7 @@ class TypedParameterSmoke {
     document.recompute();
     near(document.result().volume(), 2000 * 300 * 2500);
     var failed = false;
-    try wall.height.set(1000) catch (error:Dynamic) failed = true;
+    try wall.z.set(1000) catch (error:Dynamic) failed = true;
     check(failed && height.value == 2500, "bound expression parameters are read-only");
 
     upper.set(4, "m");
@@ -109,22 +109,22 @@ class TypedParameterSmoke {
     near(earlier.valueIn("m"), 2.3);
 
     var historyDocument = new Document();
-    var historyBox = historyDocument.add(new BoxFeature(10, 8, 6));
+    var historyBox = historyDocument.add(BlockFeature.corner(10, 8, 6));
     var historyWidth = historyDocument.defineTypedParameter("history.width", 10, ParameterKind.Length, "mm");
     historyDocument.defineTypedParameter("history.other", 20, ParameterKind.Length, "mm");
     historyWidth.bind(historyBox.width);
     historyDocument.setExpression("history.width", "history.other");
-    near(historyBox.width.value, 20);
+    near(historyBox.x.value, 20);
     check(historyDocument.undo(), "bound expression undo");
-    near(historyBox.width.value, 10);
+    near(historyBox.x.value, 10);
     check(historyWidth.expression == null, "bound expression undo restores the expression");
     check(historyDocument.redo(), "bound expression redo");
-    near(historyBox.width.value, 20);
+    near(historyBox.x.value, 20);
     check(historyDocument.undo(), "bound expression second undo");
     var cancelled = historyDocument.beginTransaction();
     historyDocument.setExpression("history.width", "history.other");
     cancelled.cancel();
-    near(historyBox.width.value, 10);
+    near(historyBox.x.value, 10);
     check(historyWidth.expression == null, "cancelled bound expression restores the expression");
     historyDocument.close();
 
@@ -150,7 +150,7 @@ class TypedParameterSmoke {
     try probe.looseCount.set(2.5) catch (error:Dynamic) failed = true;
     check(failed && probe.looseCount.value == 2, "direct bound slot edits enforce the named count type");
     var typedAngle = validationDocument.defineTypedParameter("validation.angle", 10, ParameterKind.Angle, "rad");
-    var typedBox = validationDocument.add(new BoxFeature(10, 10, 10));
+    var typedBox = validationDocument.add(BlockFeature.corner(10, 10, 10));
     failed = false;
     try typedAngle.bind(typedBox.depth) catch (error:Dynamic) failed = true;
     check(failed, "typed feature bindings require compatible quantities");

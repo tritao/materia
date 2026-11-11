@@ -7,9 +7,9 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.ChamferFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.GridFeature;
@@ -26,7 +26,7 @@ import cadkit.parametric.features.ShellFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.ToolCollectionFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.WireFeature;
 
 /**
@@ -84,13 +84,13 @@ class NamingFeaturesSmoke {
 
   static function build(model:String, d:Document):Feature {
     var top = new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1);
-    if (model == "box") return d.add(new BoxFeature(10, 20, 30));
-    if (model == "cylinder") return d.add(new CylinderFeature(5, 10));
-    if (model == "fillet") return d.add(new FilletFeature(d.add(new BoxFeature(10, 20, 30)), 1));
-    if (model == "chamfer") return d.add(new ChamferFeature(d.add(new BoxFeature(10, 20, 30)), 1));
+    if (model == "box") return d.add(BlockFeature.corner(10, 20, 30));
+    if (model == "cylinder") return d.add(CylinderAlongFeature.upZ(5, 10));
+    if (model == "fillet") return d.add(new FilletFeature(d.add(BlockFeature.corner(10, 20, 30)), 1));
+    if (model == "chamfer") return d.add(new ChamferFeature(d.add(BlockFeature.corner(10, 20, 30)), 1));
     if (model == "fuse" || model == "cut" || model == "common") {
-      var a = d.add(new BoxFeature(20, 20, 10));
-      var b = d.add(new TransformFeature(d.add(new CylinderFeature(4, 30)), 10, 10, -5));
+      var a = d.add(BlockFeature.corner(20, 20, 10));
+      var b = d.add(PlaceFeature.offset(d.add(CylinderAlongFeature.upZ(4, 30)), 10, 10, -5));
       return d.add(new BooleanFeature(
         a,
         b,
@@ -118,21 +118,21 @@ class NamingFeaturesSmoke {
     }
     if (model == "loft") {
       var wire = d.add(new WireFeature(d.add(new SketchFeature("rectangle", 10, 10))));
-      return d.add(new LoftFeature([wire, d.add(new TransformFeature(wire, 0, 0, 5))]));
+      return d.add(new LoftFeature([wire, d.add(PlaceFeature.offset(wire, 0, 0, 5))]));
     }
     if (model == "sweep") {
       var path = d.add(new PolylineFeature([new Vector(), new Vector(0, 0, 10), new Vector(10, 0, 20)]));
       return d.add(new SweepFeature(d.add(new SketchFeature("rectangle", 2, 2)), path));
     }
-    if (model == "shell") return d.add(new ShellFeature(d.add(new BoxFeature(10, 10, 10)), -1, top));
+    if (model == "shell") return d.add(new ShellFeature(d.add(BlockFeature.corner(10, 10, 10)), -1, top));
     if (model == "pocket") {
-      var box = d.add(new BoxFeature(20, 30, 10));
+      var box = d.add(BlockFeature.corner(20, 30, 10));
       var profile = d.add(new cadkit.parametric.features.ConstrainedSketchFeature(rectangle(8,
         6), box, top, Vector.X()));
       return d.add(PocketFeature.blind(box, profile, 3));
     }
     if (model == "hole" || model == "counterbore" || model == "countersink" || model == "counterbore pattern") {
-      var target = d.add(new BoxFeature(30, 30, 10));
+      var target = d.add(BlockFeature.corner(30, 30, 10));
       var tool:Feature = model == "hole" ? d.add(HoleFeature.plain(target,
         top, Vector.X(), "blind", 0, 0, 4, 3)) : model == "countersink" ? d.add(HoleFeature.countersink(
           target,
@@ -168,15 +168,15 @@ class NamingFeaturesSmoke {
       ));
       return d.add(new BooleanFeature(target, tool, BooleanOperation.Cut));
     }
-    var plate = d.add(new BoxFeature(80, 80, 10));
-    var boss = d.add(new TransformFeature(d.add(new CylinderFeature(3, 5)), 40, 40, 10));
+    var plate = d.add(BlockFeature.corner(80, 80, 10));
+    var boss = d.add(PlaceFeature.offset(d.add(CylinderAlongFeature.upZ(3, 5)), 40, 40, 10));
     if (model == "linear pattern") return d.add(new BooleanFeature(
       plate,
       d.add(new LinearPatternFeature(boss, 3, 15, Vector.X())),
       BooleanOperation.Fuse
     ));
     if (model == "polar pattern") return d.add(new PolarPatternFeature(
-      d.add(new CylinderFeature(2, 5)),
+      d.add(CylinderAlongFeature.upZ(2, 5)),
       4,
       20,
       2 * Math.PI,
@@ -189,17 +189,17 @@ class NamingFeaturesSmoke {
       d.add(new GridFeature(boss, 2, 2, 15, 15)),
       BooleanOperation.Fuse
     ));
-    var offCenter = d.add(new TransformFeature(d.add(new BoxFeature(10, 10, 10)), 5, 0, 0));
+    var offCenter = d.add(PlaceFeature.offset(d.add(BlockFeature.corner(10, 10, 10)), 5, 0, 0));
     if (model == "mirror both") return d.add(new MirrorFeature(offCenter, new Vector(), Vector.X(), "both"));
     if (model == "mirror fuse") return d.add(new MirrorFeature(
-      d.add(new TransformFeature(d.add(new BoxFeature(10, 10, 10)), -2, 0, 0)),
+      d.add(PlaceFeature.offset(d.add(BlockFeature.corner(10, 10, 10)), -2, 0, 0)),
       new Vector(),
       Vector.X(),
       "fuse"
     ));
     if (model == "rotation") return d.add(new RotationFeature(offCenter, new Vector(), Vector.Z(), Math.PI / 2));
-    var first = d.add(new CylinderFeature(2, 5));
-    var second = d.add(new TransformFeature(d.add(new CylinderFeature(2, 5)), 10, 0, 0));
+    var first = d.add(CylinderAlongFeature.upZ(2, 5));
+    var second = d.add(PlaceFeature.offset(d.add(CylinderAlongFeature.upZ(2, 5)), 10, 0, 0));
     return d.add(new ToolCollectionFeature([first, second], ["first", "second"]));
   }
 

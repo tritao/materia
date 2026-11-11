@@ -76,7 +76,7 @@ class NamingSmoke {
   /** A reference whose name was made by a feature the document no longer has is `Deleted`, not merely lost. */
   static function checkDeleted():Void {
     var document = new cadkit.parametric.Document();
-    var box = document.add(new cadkit.parametric.features.BoxFeature(10, 20, 30));
+    var box = document.add(cadkit.parametric.features.BlockFeature.corner(10, 20, 30));
     var fillet = document.add(new cadkit.parametric.features.FilletFeature(box, 1));
     document.recompute();
     var gone = cadkit.parametric.TopologyFingerprint.fromData(

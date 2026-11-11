@@ -1,13 +1,13 @@
 import cadkit.parametric.Document;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.ParametricError;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.recording.DocumentBuilder;
 
 /** Wall height derived from upper and base level elevations in explicit units. */
 class ExpressionDrivenWall {
   public final document:Document;
-  public var wall(default, null):BoxFeature;
+  public var wall(default, null):BlockFeature;
 
   public function new() {
     document = DocumentBuilder.build(function(builder) {

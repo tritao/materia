@@ -2,14 +2,14 @@ import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.features.BooleanFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.PolarPatternFeature;
 import cadkit.parametric.recording.DocumentBuilder;
 
 /** Circular flange with an editable full-circle bolt-hole pattern. */
 class ParametricFlange {
   public final document:Document;
-  public var body(default, null):CylinderFeature;
+  public var body(default, null):CylinderAlongFeature;
   public var holes(default, null):PolarPatternFeature;
   public var finish(default, null):BooleanFeature;
 

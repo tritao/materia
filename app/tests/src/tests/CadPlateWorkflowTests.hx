@@ -737,13 +737,13 @@ class CadPlateWorkflowTests {
       check(scene.createCadPart(), "create an editable part for split-face repair");
       var id = scene.selectedId;
       var session = scene.cadSession(id);
-      var slot:Null<cadkit.parametric.features.TransformFeature> = null;
+      var slot:Null<cadkit.parametric.features.PlaceFeature> = null;
       var sketchIndex = -1;
       session.perform(function(owner) {
         var d = owner.document;
-        var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
-        var tool = d.add(new cadkit.parametric.features.TransformFeature(
-          d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
+        var plate = d.add(cadkit.parametric.features.BlockFeature.corner(60, 40, 10));
+        var tool = d.add(cadkit.parametric.features.PlaceFeature.offset(
+          d.add(cadkit.parametric.features.BlockFeature.corner(4, 60, 30)),
           -50,
           -10,
           -5
@@ -779,7 +779,7 @@ class CadPlateWorkflowTests {
 
       step = "load it with the slot across the plate";
       // As a document saved before its support was split would load: the reference stays broken, with its candidates.
-      var moving:cadkit.parametric.features.TransformFeature = cast slot;
+      var moving:cadkit.parametric.features.PlaceFeature = cast slot;
       session.perform(function(owner) {
         moving.x.set(28);
         try owner.document.recompute() catch (_:Dynamic) {
@@ -796,7 +796,7 @@ class CadPlateWorkflowTests {
       );
       // TN9: candidates read as words, the feature tags as the features.
       check(
-        issues[0].candidates[0].indexOf("box ") == 0 && issues[0].candidates[0].indexOf("top (piece)") > 0,
+        issues[0].candidates[0].indexOf("block ") == 0 && issues[0].candidates[0].indexOf("top (piece)") > 0,
         "candidates name their feature and role: " + issues[0].candidates[0]
       );
 
@@ -841,9 +841,9 @@ class CadPlateWorkflowTests {
       var sketchIndex = -1;
       session.perform(function(owner) {
         var d = owner.document;
-        var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
-        var tool = d.add(new cadkit.parametric.features.TransformFeature(
-          d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
+        var plate = d.add(cadkit.parametric.features.BlockFeature.corner(60, 40, 10));
+        var tool = d.add(cadkit.parametric.features.PlaceFeature.offset(
+          d.add(cadkit.parametric.features.BlockFeature.corner(4, 60, 30)),
           -50,
           -10,
           -5
@@ -878,7 +878,7 @@ class CadPlateWorkflowTests {
 
       step = "move the slot across the plate";
       var failed = false;
-      try scene.setCadFeatureParameter(id, slotId, "transform.x", 28) catch (_:Dynamic) failed = true;
+      try scene.setCadFeatureParameter(id, slotId, "place.x", 28) catch (_:Dynamic) failed = true;
       var asked = scene.pendingReferenceChoice();
       check(failed && asked != null, "the edit stops and asks which piece the sketch means");
       var pending: {message: String, candidates: Array<String>} = cast asked;
@@ -891,12 +891,12 @@ class CadPlateWorkflowTests {
       scene.cancelPendingReferenceChoice();
       var slot = session.document.featureById(slotId);
       check(
-        scene.pendingReferenceChoice() == null && slot.parameter("transform.x").value == -50 && reference.isResolved(),
+        scene.pendingReferenceChoice() == null && slot.parameter("place.x").value == -50 && reference.isResolved(),
         "cancelling keeps the previous model"
       );
 
       step = "make the edit again and choose the right-hand piece";
-      try scene.setCadFeatureParameter(id, slotId, "transform.x", 28) catch (_:Dynamic) {
+      try scene.setCadFeatureParameter(id, slotId, "place.x", 28) catch (_:Dynamic) {
       }
       check(scene.pendingReferenceChoice() != null, "the edit asks again");
       var choices = reference.candidates();
@@ -904,7 +904,7 @@ class CadPlateWorkflowTests {
       var right = choices[0].x > choices[1].x ? 0 : 1;
       check(scene.resolvePendingReferenceChoice(right), "apply the edit with the chosen piece");
       check(
-        session.document.featureById(slotId).parameter("transform.x").value == 28
+        session.document.featureById(slotId).parameter("place.x").value == 28
         && reference.isResolved() && reference.currentShape().center().get_x() > 30,
         "the slot moved and the sketch sits on the right-hand piece"
       );
@@ -912,7 +912,7 @@ class CadPlateWorkflowTests {
       step = "undo and redo the edit";
       check(
         scene.document.undo()
-        && session.document.featureById(slotId).parameter("transform.x").value == -50 && reference.isResolved()
+        && session.document.featureById(slotId).parameter("place.x").value == -50 && reference.isResolved()
         && reference.currentShape().center().get_x() < 31 && reference.currentShape().center().get_x() > 29,
         "undo puts the slot and the sketch's face back"
       );
@@ -939,7 +939,7 @@ class CadPlateWorkflowTests {
       var boxId = -1;
       session.perform(function(owner) {
         var d = owner.document;
-        var box = d.add(new cadkit.parametric.features.BoxFeature(30, 20, 10));
+        var box = d.add(cadkit.parametric.features.BlockFeature.corner(30, 20, 10));
         d.recompute();
         boxId = box.id.toInt();
         var shape = box.currentShape();
@@ -989,7 +989,7 @@ class CadPlateWorkflowTests {
         "the picked edge can repair it: " + Std.string(issues)
       );
       check(
-        scene.selectedElementLabel().indexOf("box ") == 0
+        scene.selectedElementLabel().indexOf("block ") == 0
         && scene.selectedElementLabel().indexOf("edge between back and top") > 0,
         "the pick reads as words: " + scene.selectedElementLabel()
       );

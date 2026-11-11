@@ -3,7 +3,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.NamedParameter;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.parametric.recording.DocumentBuilder;
@@ -15,7 +15,7 @@ import cadkit.sketch.SketchPoint;
 /** Resizable enclosure with a blind top recess and two through-holes on one side. */
 class AttachedPocketEnclosure {
   public final document:Document;
-  public var enclosure(default, null):BoxFeature;
+  public var enclosure(default, null):BlockFeature;
   public var topProfile(default, null):ConstrainedSketchFeature;
   public var topPocket(default, null):PocketFeature;
   public var sideProfile(default, null):ConstrainedSketchFeature;

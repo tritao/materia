@@ -17,7 +17,7 @@ import cadkit.parametric.PersistentReference;
 import cadkit.parametric.Placement;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 
 private class TypedPropertyBoxEvaluator implements DefinitionEvaluator {
   public function new() {
@@ -60,7 +60,7 @@ class TypedPropertySmoke {
     var placed = document.worldPlacement(source).location.plane.origin;
     check(placed.x == 10 && placed.y == 20 && placed.z == 30, "generic persistent objects support placement");
 
-    var feature = document.add(new BoxFeature(2, 3, 4));
+    var feature = document.add(BlockFeature.corner(2, 3, 4));
     var definition = document.createDefinition(
       "Typed property type",
       "cadkit.test.typed-property",

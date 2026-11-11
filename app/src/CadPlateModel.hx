@@ -11,7 +11,7 @@ import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.HoleFeature;
 
 typedef CadPlateParameters = {
@@ -86,14 +86,14 @@ class CadPlateModel implements CadSessionModel {
     var holeX = holeXMetres * scale, holeY = holeYMetres * scale;
     var result = new Document();
     try {
-      var base = result.add(new BoxFeature(width, height, thickness));
+      var base = result.add(BlockFeature.corner(width, height, thickness));
       var top = new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1);
       var hole = result.add(HoleFeature.plain(base, top, Vector.X(), "through-all", holeX, holeY, diameter));
       var cut = result.add(new BooleanFeature(base, hole, BooleanOperation.Cut));
       result.setOutput(cut);
-      result.defineTypedParameter(WIDTH, width, ParameterKind.Length, "mm").bind(base.width);
-      result.defineTypedParameter(HEIGHT, height, ParameterKind.Length, "mm").bind(base.depth);
-      result.defineTypedParameter(THICKNESS, thickness, ParameterKind.Length, "mm").bind(base.height);
+      result.defineTypedParameter(WIDTH, width, ParameterKind.Length, "mm").bind(base.x);
+      result.defineTypedParameter(HEIGHT, height, ParameterKind.Length, "mm").bind(base.y);
+      result.defineTypedParameter(THICKNESS, thickness, ParameterKind.Length, "mm").bind(base.z);
       result.defineTypedParameter(HOLE_DIAMETER, diameter, ParameterKind.Length, "mm").bind(hole.diameter);
       result.defineTypedParameter(HOLE_X, holeX, ParameterKind.Length, "mm").bind(hole.x);
       result.defineTypedParameter(HOLE_Y, holeY, ParameterKind.Length, "mm").bind(hole.y);

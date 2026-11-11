@@ -5,7 +5,7 @@ import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ReferencePlaneElement;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.recording.DocumentBuilder;
 
@@ -39,7 +39,7 @@ class PlaceFeatureSmoke {
   public static function run():Void {
     // An axis permutation, as machine placements usually are: part x along world y, part z along world x.
     var turn = new Plane(new Vector(100, -20, 50), new Vector(0, 1, 0), new Vector(1, 0, 0));
-    var box:Null<BoxFeature> = null;
+    var box:Null<BlockFeature> = null;
     var placed:Null<PlaceFeature> = null;
     var document = DocumentBuilder.build(function(builder) {
       var mountX = builder.length("mount.x", 100);
@@ -48,7 +48,7 @@ class PlaceFeatureSmoke {
       builder.output(placed);
     });
     if (box == null || placed == null) throw "PlaceFeatureSmoke: builder did not record";
-    // BoxFeature's box spans [0, w] x [0, d] x [0, h] in its own frame.
+    // BlockFeature's box spans [0, w] x [0, d] x [0, h] in its own frame.
     checkBounds(output(document), expectedBounds(10, 20, 30, [turn]), "placed box");
     check(Math.abs(output(document).volume() - 6000) < 1e-6, "volume kept");
 

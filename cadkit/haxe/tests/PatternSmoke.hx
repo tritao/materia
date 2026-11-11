@@ -4,11 +4,11 @@ import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.PolarPatternFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.FilletFeature;
@@ -25,9 +25,9 @@ class PatternSmoke {
 
   public static function run():Void {
     var document = new Document();
-    var target = document.add(new BoxFeature(30, 10, 5));
-    var tool = document.add(new CylinderFeature(1, 5));
-    var positionedTool = document.add(new TransformFeature(tool, 15, 5, 0));
+    var target = document.add(BlockFeature.corner(30, 10, 5));
+    var tool = document.add(CylinderAlongFeature.upZ(1, 5));
+    var positionedTool = document.add(PlaceFeature.offset(tool, 15, 5, 0));
     var holes = document.add(new LinearPatternFeature(positionedTool, 3, 8, Vector.X()));
     var count = document.defineParameter("holes.count", 3);
     var spacing = document.defineParameter("holes.spacing", 8);
@@ -67,9 +67,9 @@ class PatternSmoke {
     document.close();
 
     var additionDocument = new Document();
-    var additionTarget = additionDocument.add(new BoxFeature(30, 10, 5));
-    var boss = additionDocument.add(new BoxFeature(1, 1, 1));
-    var positionedBoss = additionDocument.add(new TransformFeature(boss, 15, 5, 5));
+    var additionTarget = additionDocument.add(BlockFeature.corner(30, 10, 5));
+    var boss = additionDocument.add(BlockFeature.corner(1, 1, 1));
+    var positionedBoss = additionDocument.add(PlaceFeature.offset(boss, 15, 5, 5));
     var bosses = additionDocument.add(new LinearPatternFeature(positionedBoss, 3, 5, Vector.X()));
     var added = additionDocument.add(new BooleanFeature(additionTarget, bosses, BooleanOperation.Fuse));
     additionDocument.setOutput(added);
@@ -78,7 +78,7 @@ class PatternSmoke {
     additionDocument.close();
 
     var twoAxisDocument = new Document();
-    var seed = twoAxisDocument.add(new BoxFeature(1, 1, 1));
+    var seed = twoAxisDocument.add(BlockFeature.corner(1, 1, 1));
     var array = twoAxisDocument.add(new LinearPatternFeature(seed, 3, 4, new Vector(1, 1, 0), 2, 6, Vector.Z()));
     twoAxisDocument.setOutput(array);
     twoAxisDocument.recompute();
@@ -87,8 +87,8 @@ class PatternSmoke {
     twoAxisDocument.close();
 
     var polarDocument = new Document();
-    var flange = polarDocument.add(new CylinderFeature(30, 6));
-    var boltHole = polarDocument.add(new CylinderFeature(2, 6));
+    var flange = polarDocument.add(CylinderAlongFeature.upZ(30, 6));
+    var boltHole = polarDocument.add(CylinderAlongFeature.upZ(2, 6));
     var boltHoles = polarDocument.add(new PolarPatternFeature(
       boltHole,
       6,
@@ -127,7 +127,7 @@ class PatternSmoke {
     polarDocument.close();
 
     var orientationDocument = new Document();
-    var orientationSeed = orientationDocument.add(new BoxFeature(2, 1, 1));
+    var orientationSeed = orientationDocument.add(BlockFeature.corner(2, 1, 1));
     var fixedOrientation = orientationDocument.add(new PolarPatternFeature(
       orientationSeed,
       2,
@@ -181,7 +181,7 @@ class PatternSmoke {
     ventilationExample.close();
 
     var rotationDocument = new Document();
-    var rotationSource = rotationDocument.add(new BoxFeature(2, 1, 1));
+    var rotationSource = rotationDocument.add(BlockFeature.corner(2, 1, 1));
     var rotation = rotationDocument.add(new RotationFeature(
       rotationSource,
       new Vector(1, 0, 0),
@@ -210,7 +210,7 @@ class PatternSmoke {
     rotationDocument.close();
 
     var mirrorDocument = new Document();
-    var mirrorSource = mirrorDocument.add(new BoxFeature(10, 5, 3));
+    var mirrorSource = mirrorDocument.add(BlockFeature.corner(10, 5, 3));
     var reflected = mirrorDocument.add(new MirrorFeature(mirrorSource, new Vector(), Vector.X(), "copy"));
     var retained = mirrorDocument.add(new MirrorFeature(mirrorSource, new Vector(), Vector.X(), "both"));
     var fusedMirror = mirrorDocument.add(new MirrorFeature(mirrorSource, new Vector(), Vector.X(), "fuse"));
@@ -256,7 +256,7 @@ class PatternSmoke {
 
     var profileMirrorDocument = new Document();
     var profile = profileMirrorDocument.add(new SketchFeature("rectangle", 2, 4));
-    var movedProfile = profileMirrorDocument.add(new TransformFeature(profile, 3, 0, 0));
+    var movedProfile = profileMirrorDocument.add(PlaceFeature.offset(profile, 3, 0, 0));
     var mirroredProfile = profileMirrorDocument.add(new MirrorFeature(movedProfile, new Vector(), Vector.X(), "copy"));
     profileMirrorDocument.setOutput(mirroredProfile);
     profileMirrorDocument.recompute();

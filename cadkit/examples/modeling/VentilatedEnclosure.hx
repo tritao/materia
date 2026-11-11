@@ -3,7 +3,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.NamedParameter;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.PocketFeature;
@@ -16,7 +16,7 @@ import cadkit.sketch.SketchPoint;
 /** Resizable enclosure with a workplane-aware row of through ventilation slots. */
 class VentilatedEnclosure {
   public final document:Document;
-  public var enclosure(default, null):BoxFeature;
+  public var enclosure(default, null):BlockFeature;
   public var slot(default, null):ConstrainedSketchFeature;
   public var slots(default, null):LinearPatternFeature;
   public var finish(default, null):PocketFeature;

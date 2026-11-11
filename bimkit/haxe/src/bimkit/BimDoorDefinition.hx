@@ -7,8 +7,8 @@ import cadkit.parametric.Document;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
-import cadkit.parametric.features.BoxFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.BlockFeature;
+import cadkit.parametric.features.PlaceFeature;
 
 /** Factory for an authored reusable door type with a panel body and hosted opening tool. */
 class BimDoorDefinition {
@@ -16,19 +16,19 @@ class BimDoorDefinition {
     var transaction = document.beginTransaction();
     var graph = new Document(null, false);
     try {
-      var body = graph.add(new BoxFeature(width, depth, height));
-      var openingBox = graph.add(new BoxFeature(width, depth + 2, height));
-      var opening = graph.add(new TransformFeature(openingBox, 0, -1, 0));
+      var body = graph.add(BlockFeature.corner(width, depth, height));
+      var openingBox = graph.add(BlockFeature.corner(width, depth + 2, height));
+      var opening = graph.add(PlaceFeature.offset(openingBox, 0, -1, 0));
 
       var bindings = new Map<String, String>();
-      bindInput(graph, bindings, "width", width, body.width);
-      bindInput(graph, bindings, "height", height, body.height);
-      bindInput(graph, bindings, "depth", depth, body.depth);
-      graph.parameter("width").bind(openingBox.width);
-      graph.parameter("height").bind(openingBox.height);
+      bindInput(graph, bindings, "width", width, body.x);
+      bindInput(graph, bindings, "height", height, body.z);
+      bindInput(graph, bindings, "depth", depth, body.y);
+      graph.parameter("width").bind(openingBox.x);
+      graph.parameter("height").bind(openingBox.z);
       graph.defineTypedParameter("cut.overlap", 1, QuantityKind.Length, "mm");
       graph.defineExpression("opening.depth",
-        QuantityKind.Length, "mm", "depth + 2 * cut.overlap").bind(openingBox.depth);
+        QuantityKind.Length, "mm", "depth + 2 * cut.overlap").bind(openingBox.y);
       graph.defineExpression("opening.y", QuantityKind.Length, "mm", "-cut.overlap").bind(opening.y);
 
       var outputFeatures = new Map<String, Int>();

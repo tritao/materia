@@ -3,7 +3,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BooleanFeature;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.HoleFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.recording.DocumentBuilder;
@@ -11,7 +11,7 @@ import cadkit.parametric.recording.DocumentBuilder;
 /** Resizable lid with four face-attached, through counterbored mounting holes. */
 class CounterboredEnclosureLid {
   public final document:Document;
-  public var lid(default, null):BoxFeature;
+  public var lid(default, null):BlockFeature;
   public var hole(default, null):HoleFeature;
   public var holes(default, null):LinearPatternFeature;
   public var finish(default, null):BooleanFeature;

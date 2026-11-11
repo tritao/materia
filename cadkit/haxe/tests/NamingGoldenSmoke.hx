@@ -5,13 +5,13 @@ import cadkit.parametric.Document;
 import cadkit.parametric.Feature;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
-import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.BlockFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
-import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.CylinderAlongFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.LinearPatternFeature;
-import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.PlaceFeature;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
@@ -55,11 +55,11 @@ class NamingGoldenSmoke {
   }
 
   static function build(model:String, document:Document):Feature {
-    if (model == "box fillet") return document.add(new FilletFeature(document.add(new BoxFeature(10, 20, 30)), 1));
+    if (model == "box fillet") return document.add(new FilletFeature(document.add(BlockFeature.corner(10, 20, 30)), 1));
     if (model == "plate hole slot") {
-      var plate = document.add(new BoxFeature(60, 40, 10));
-      var hole = document.add(new TransformFeature(document.add(new CylinderFeature(3, 30)), 15, 20, -5));
-      var slot = document.add(new TransformFeature(document.add(new BoxFeature(4, 60, 30)), 28, -10, -5));
+      var plate = document.add(BlockFeature.corner(60, 40, 10));
+      var hole = document.add(PlaceFeature.offset(document.add(CylinderAlongFeature.upZ(3, 30)), 15, 20, -5));
+      var slot = document.add(PlaceFeature.offset(document.add(BlockFeature.corner(4, 60, 30)), 28, -10, -5));
       var drilled = document.add(new BooleanFeature(plate, hole, BooleanOperation.Cut));
       return document.add(new BooleanFeature(drilled, slot, BooleanOperation.Cut));
     }
@@ -73,8 +73,8 @@ class NamingGoldenSmoke {
       for (index in 0...4) sketch.addEntity(SketchEntity.line("line" + index, "p" + index, "p" + ((index + 1) % 4)));
       return document.add(ExtrudeFeature.along(document.add(new ConstrainedSketchFeature(sketch)), 5, Vector.Z()));
     }
-    var plate = document.add(new BoxFeature(80, 30, 10));
-    var boss = document.add(new TransformFeature(document.add(new CylinderFeature(3, 5)), 40, 15, 10));
+    var plate = document.add(BlockFeature.corner(80, 30, 10));
+    var boss = document.add(PlaceFeature.offset(document.add(CylinderAlongFeature.upZ(3, 5)), 40, 15, 10));
     var bosses = document.add(new LinearPatternFeature(boss, 2, 15, Vector.X()));
     return document.add(new BooleanFeature(plate, bosses, BooleanOperation.Fuse));
   }
