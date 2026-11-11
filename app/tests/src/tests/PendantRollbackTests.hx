@@ -1,5 +1,7 @@
 package tests;
 
+import NativeKitScene;
+
 import app.EditorSceneTree;
 import materia.project.SceneArtifact;
 import nativekit.scene.GeometryData;
@@ -13,7 +15,7 @@ import nativekit.scene.GeometryData;
   }
   /** Lowest and highest z of a geometry's positions (float32 triples). */
   static function zRange(geometry:GeometryData):{low:Float, high:Float} {
-    var stream = geometry.stream(1);
+    var stream = geometry.stream(NksceneVertexSemantic.Position);
     if (stream == null) throw "Geometry has no positions";
     var stride = stream.stride == 0 ? 12 : stream.stride, low = 1e30, high = -1e30;
     for (index in 0...stream.count) {

@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import toolpathkit.tool.CutterProfile;
@@ -89,9 +91,9 @@ class CutterGeometry {
       }
     }
     var geometry = new GeometryData();
-    geometry.addStream(1, 2, positions, vertices, 12);
-    geometry.addStream(2, 2, normals, vertices, 12);
-    geometry.addStream(6, 4, colors, vertices, 4);
+    geometry.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, vertices, 12);
+    geometry.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, vertices, 12);
+    geometry.addStream(NksceneVertexSemantic.Color0, NksceneVertexFormat.Unorm8x4, colors, vertices, 4);
     geometry.setIndexBuffer(indices, triangles * 3);
     geometry.setBounds(low[0], low[1], low[2], high[0], high[1], high[2]);
     return geometry;

@@ -26,7 +26,7 @@ env['LD_LIBRARY_PATH'] = ':'.join([str(haxeon / 'out'), str(haxeon / '.tools/has
 with tempfile.TemporaryDirectory(prefix='materia-artifact-browser-') as directory:
     directory = Path(directory)
     compiler = directory / 'compiler.hl'
-    subprocess.run([str(haxeon / '.tools/haxe/haxe'), '-cp', 'src', '-main', 'compiler.tools.HaxeonCompiler', '-hl', str(compiler)], cwd=haxeon, env=env, check=True)
+    subprocess.run([str(haxeon / '.tools/haxe/haxe'), 'common.hxml', '-main', 'compiler.tools.HaxeonCompiler', '-hl', str(compiler)], cwd=haxeon, env=env, check=True)
     modules = {}
     for target in ['wasm32', 'wasm-gc']:
         output = directory / (target + '.wasm')

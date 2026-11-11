@@ -109,7 +109,7 @@ class MachineAngleControl implements View {
   var move = function(event:UiEvent) {
     var state:AngleDrag = drag.value, bounds = RenderNode.latest(node).resolved;
     if (!state.active || bounds == null || !enabled) return;
-    var p = point(event), fine = (event.modifiers & UiModifier.Shift) != 0 ? 0.1 : 1.0;
+    var p = point(event), fine = event.modifiers.contains(UiModifier.Shift) ? 0.1 : 1.0;
     var angle = Math.atan2(p.x - bounds.width / 2, bounds.height / 2 - p.y) * 180 / Math.PI;
     var delta = dial ? deltaAngle(state.angle, angle) : p.x - state.x;
     var next = value + delta * fine;
@@ -124,7 +124,7 @@ class MachineAngleControl implements View {
   if (bounds == null) return;
   var p = point(event), angle = Math.atan2(p.x - bounds.width / 2, bounds.height / 2 - p.y) * 180 / Math.PI;
   event.capturePointer();
-  if (dial && (event.modifiers & UiModifier.Shift) == 0 && Math.pow(p.x - bounds.width / 2, 2) + Math.pow(
+  if (dial && !event.modifiers.contains(UiModifier.Shift) && Math.pow(p.x - bounds.width / 2, 2) + Math.pow(
     p.y - bounds.height / 2,
     2
   ) > 16) emit(value + deltaAngle(
@@ -147,7 +147,7 @@ class MachineAngleControl implements View {
   finish(false);
   });
   node.on(UiEventKind.KeyDown, event -> {if (!enabled) return;
-  var step = (event.modifiers & UiModifier.Shift) != 0 ? 0.1 : 1.0;
+  var step = event.modifiers.contains(UiModifier.Shift) ? 0.1 : 1.0;
   if (event.key == UiKey.Left || event.key == UiKey.Down) emit(value - step);
   else if (event.key == UiKey.Right || event.key == UiKey.Up) emit(value + step);
   else return;

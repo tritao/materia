@@ -17,7 +17,7 @@ if [[ ! -x "$haxe_bin" || ! -x "$hashlink_bin" ]]; then
     exit 1
 fi
 
-"$haxe_bin" --cwd "$haxeon_dir" -cp src --run compiler.tools.HaxeonCompiler \
+"$haxe_bin" --cwd "$haxeon_dir" common.hxml --run compiler.tools.HaxeonCompiler \
     --output="$output" \
     --entry=SimBindingRuntime \
     --root="$module_dir/tests/haxeon" \

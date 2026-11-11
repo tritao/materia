@@ -11,7 +11,7 @@ out="$here/build"
 mkdir -p "$out"
 compiler="$out/haxeon-compiler.hl"
 if [[ ! -f "$compiler" ]] || [[ -n $(find "$haxeon/src" -name '*.hx' -newer "$compiler" -print -quit) ]]; then
-	"$haxeon/.tools/haxe/haxe" --cwd "$haxeon" -cp src -hl "$compiler" -main compiler.tools.HaxeonCompiler
+	"$haxeon/.tools/haxe/haxe" --cwd "$haxeon" common.hxml -hl "$compiler" -main compiler.tools.HaxeonCompiler
 fi
 kits=("$repo/cnckit/haxe" "$repo/toolpathkit/haxe")
 # RobotKit's model is reached through its imports alone; its runtime needs the native core, which the docs

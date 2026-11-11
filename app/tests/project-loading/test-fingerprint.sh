@@ -21,7 +21,7 @@ cp "$repo_root/haxeon/tests/ffi/host_error.hxi" "$fixture/fx.hxi"
 echo one > "$fixture/declared.txt"
 echo native > "$fixture/app/build/host/native/kit/libkit.hdll"
 haxe="$repo_root/haxeon/.tools/haxe/haxe"
-"$haxe" --cwd "$repo_root/haxeon" -cp src -cp "$repo_root/app/tools" -main MateriaProjectModuleBuild -hl "$fixture/build.hl"
+"$haxe" --cwd "$repo_root/haxeon" common.hxml -cp "$repo_root/app/tools" -main MateriaProjectModuleBuild -hl "$fixture/build.hl"
 n=0
 fingerprint() { # prints the fingerprint the build reports
   rm -f "$fixture/out.record.json"

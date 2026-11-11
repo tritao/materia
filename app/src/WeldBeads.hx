@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import app.SimulationAssemblyParts.SimulationAssemblyPart;
 import haxe.io.Bytes;
 import materia.project.SceneArtifact.SceneArtifactWeld;
@@ -353,9 +355,9 @@ class WeldBeads implements SessionMember {
       colours.set(vertex * 4 + 3, METAL & 0xFF);
     }
     for (i in 0...indices.length) indexBytes.setInt32(i * 4, indices[i]);
-    data.addStream(1, 2, positionBytes, vertices, 12);
-    data.addStream(2, 2, normalBytes, vertices, 12);
-    data.addStream(6, 4, colours, vertices, 4);
+    data.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positionBytes, vertices, 12);
+    data.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normalBytes, vertices, 12);
+    data.addStream(NksceneVertexSemantic.Color0, NksceneVertexFormat.Unorm8x4, colours, vertices, 4);
     data.setIndexBuffer(indexBytes, indices.length);
     if (vertices > 0) {
       var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];

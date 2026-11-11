@@ -8,7 +8,7 @@ class ImageData {
   final value:nkscene_image_data;
   var pixels:Bytes = Bytes.alloc(0);
 
-  public function new(width:Int, height:Int, format:Int = 2) {
+  public function new(width:Int, height:Int, format:NksceneImageFormat = NksceneImageFormat.Rgba8) {
     if (width <= 0 || height <= 0) throw "Image dimensions must be positive";
     value = new nkscene_image_data();
     value.set_struct_size(nkscene_image_data.size());

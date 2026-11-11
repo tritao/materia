@@ -1,5 +1,7 @@
 package tests;
 
+import NativeKitScene;
+
 import app.EditorScene;
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
@@ -20,7 +22,7 @@ import nativekit.scene.Transform;
     var indices = Bytes.alloc(12);
     for (index in 0...3) indices.setInt32(index * 4, index);
     var data = new GeometryData();
-    data.addStream(1, 2, positions, 3, 12);
+    data.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, 3, 12);
     data.setIndexBuffer(indices, 3);
     data.setBounds(offset, 0, 0, offset + 0.01, 0.01, 0);
     return data;
@@ -38,8 +40,8 @@ import nativekit.scene.Transform;
       indices.setInt32(i * 4, i);
     }
     var geometry = new GeometryData();
-    geometry.addStream(1, 2, positions, 3, 12);
-    geometry.addStream(2, 2, normals, 3, 12);
+    geometry.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, 3, 12);
+    geometry.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, 3, 12);
     geometry.setIndexBuffer(indices, 3);
     geometry.setBounds(x - 0.1, -0.1, 0, x + 0.1, 0.1, 0);
     return geometry;

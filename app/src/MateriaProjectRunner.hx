@@ -575,6 +575,19 @@ class MateriaProjectRunner {
     );
   }
 
+  /** The compiler's class paths, from Haxeon's `common.hxml` (the file every stock-Haxe build of the compiler starts from). */
+  static function compilerClassPaths(home:String):Array<String> {
+    var file = ProjectPath.join([home, "common.hxml"]);
+    if (!FileSystem.exists(file)) throw "Haxeon compiler class paths are missing: " + file;
+    var roots = [];
+    for (line in File.getContent(file).split("\n")) {
+      var trimmed = StringTools.trim(line);
+      if (StringTools.startsWith(trimmed, "-cp ")) roots.push(ProjectPath.join([home, StringTools.trim(trimmed.substr(4))]));
+    }
+    if (roots.length == 0) throw "Haxeon's common.hxml lists no class paths";
+    return roots;
+  }
+
   /** Bootstrap tools once per source version, then execute them on HashLink instead of Haxe's interpreter. */
   static function runProjectTool(
     mainClass:String,
@@ -597,13 +610,13 @@ class MateriaProjectRunner {
     ]);
     if (toolDirectory == null || !ensureCacheDirectory(toolDirectory)) return runCommand(
       haxe,
-      ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools, "--run", mainClass].concat(arguments),
+      ["--cwd", home, "common.hxml", "-cp", tools, "--run", mainClass].concat(arguments),
       description,
       control
     );
     var identificationStarted = Sys.time();
     var sources:Array<String> = [];
-    collectToolSources(ProjectPath.join([home, "src"]), sources, control);
+    for (root in compilerClassPaths(home)) collectToolSources(root, sources, control);
     collectToolSources(tools, sources, control);
     sources.sort(Reflect.compare);
     var identity = new StringBuf();
@@ -625,7 +638,7 @@ class MateriaProjectRunner {
         try {
           runCommand(
             haxe,
-            ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools, "-main", mainClass, "-hl", temporary],
+            ["--cwd", home, "common.hxml", "-cp", tools, "-main", mainClass, "-hl", temporary],
             "Could not build " + mainClass,
             control
           );

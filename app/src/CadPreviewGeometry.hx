@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import materia.project.SceneArtifact.SceneArtifactPart;
@@ -74,8 +76,8 @@ class CadPreviewGeometry {
         || second >= part.vertexCount || third >= part.vertexCount) throw "CAD mesh has an out-of-range triangle index";
       if (includeTopology) geometry.addTriangle(first, second, third);
     }
-    geometry.addStream(1, 2, positions, part.vertexCount, 12);
-    geometry.addStream(2, 2, normals, part.vertexCount, 12);
+    geometry.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, part.vertexCount, 12);
+    geometry.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, part.vertexCount, 12);
     if (!includeTopology) geometry.setIndexBuffer(part.indices, part.indexCount);
     for (range in part.faceRanges) {
       if (range.firstIndex < 0 || range.indexCount < 0 || range.firstIndex % 3 != 0 || range.indexCount % 3 != 0

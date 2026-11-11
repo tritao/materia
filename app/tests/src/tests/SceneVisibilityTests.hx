@@ -434,7 +434,7 @@ import sys.FileSystem;
     var key = new UiEvent(UiEventKind.KeyDown, new WidgetId(1), 0, 0, 0, 0, 0, UiKey.Space);
     HierarchyTreeView.handleKey(key, () -> count++);
     check(count == 1 && key.defaultPrevented && key.propagationStopped, "tree Space toggles and consumes event");
-    var modified = new UiEvent(UiEventKind.KeyDown, new WidgetId(1), 0, 0, 0, 0, 0, UiKey.Space, 1);
+    var modified = new UiEvent(UiEventKind.KeyDown, new WidgetId(1), 0, 0, 0, 0, 0, UiKey.Space, haxeon.ui.core.UiModifier.Shift);
     HierarchyTreeView.handleKey(modified, () -> count++);
     check(count == 1 && !modified.defaultPrevented, "modified Space is left alone");
     var repeat = new UiEvent(UiEventKind.KeyRepeat, new WidgetId(1), 0, 0, 0, 0, 0, UiKey.Space);
@@ -644,8 +644,8 @@ import sys.FileSystem;
       ui.key(UiEventKind.KeyDown, UiKey.Space);
       ui.key(UiEventKind.KeyUp, UiKey.Space);
       check(scene.isVisible("project:cover"), "focused eye Space toggles exactly once");
-      ui.key(UiEventKind.KeyDown, UiKey.Space, 1);
-      ui.key(UiEventKind.KeyUp, UiKey.Space, 1);
+      ui.key(UiEventKind.KeyDown, UiKey.Space, haxeon.ui.core.UiModifier.Shift);
+      ui.key(UiEventKind.KeyUp, UiKey.Space, haxeon.ui.core.UiModifier.Shift);
       check(
         scene.isVisible("project:cover") && scene.selectedId == "project:other",
         "modified Space on an eye does not activate it or its row"

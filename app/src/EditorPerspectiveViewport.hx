@@ -99,12 +99,12 @@ class EditorPerspectiveViewport implements View implements Observable {
       var point = geometry.localToViewport(new haxeon.ui.Point(geometry.width / 2, geometry.height / 2));
       benchmarkX = point.x;
       benchmarkY = point.y;
-      context.pointerDown(benchmarkX, benchmarkY, 2, 0, BENCHMARK_POINTER_ID);
+      context.pointerDown(benchmarkX, benchmarkY, 2, haxeon.ui.core.UiModifier.empty(), BENCHMARK_POINTER_ID);
       benchmarkDragging = true;
     }
     // Captured pointer coordinates may leave the window, just as during a native drag.
     benchmarkX -= Math.PI / 180.0 / 0.008;
-    context.pointerMove(benchmarkX, benchmarkY, 0, BENCHMARK_POINTER_ID);
+    context.pointerMove(benchmarkX, benchmarkY, haxeon.ui.core.UiModifier.empty(), BENCHMARK_POINTER_ID);
     benchmarkInputs.push({startedAtSeconds: started, inputMilliseconds: (Sys.time() - started) * 1000,
       yaw: camera.yaw, pitch: camera.pitch, orbiting: orbiting(), viewSetupMilliseconds: lastViewSetupSeconds * 1000,
       planPrepareMilliseconds: renderer == null ? 0.0 : renderer.lastPlanPrepareSeconds * 1000});
@@ -878,7 +878,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   function flyKey(event:UiEvent, down:Bool):Bool {
     if (!flying()) return false;
     var key = event.key;
-    flyFast = (event.modifiers & UiModifier.Shift) != 0;
+    flyFast = event.modifiers.contains(UiModifier.Shift);
     if (key == 340 || key == 344) flyFast = down; // Left / right Shift
     var movement = key == UiKey.W || key == UiKey.A || key == UiKey.S || key == UiKey.D || key == 81 || key == 69;
     if (!movement && key != 340 && key != 344) return false;
@@ -2292,7 +2292,7 @@ class EditorPerspectiveViewport implements View implements Observable {
           return;
         }
         clearFlyKeys();
-        flyFast = (event.modifiers & UiModifier.Shift) != 0;
+        flyFast = event.modifiers.contains(UiModifier.Shift);
         navigationPointer = event.pointerId;
         navigationMode = 8;
         pointerX = pointerStartX = event.x;
@@ -2305,10 +2305,10 @@ class EditorPerspectiveViewport implements View implements Observable {
         return;
       }
       if (event.button != 0 && event.button != 2) return;
-      var navigate = event.button == 2 || (event.button == 0 && (event.modifiers & UiModifier.Alt) != 0);
+      var navigate = event.button == 2 || (event.button == 0 && event.modifiers.contains(UiModifier.Alt));
       if (navigate) {
         navigationPointer = event.pointerId;
-        navigationMode = (event.modifiers & UiModifier.Shift) != 0 ? 2 : 1;
+        navigationMode = event.modifiers.contains(UiModifier.Shift) ? 2 : 1;
         pointerX = pointerStartX = event.x;
         pointerY = pointerStartY = event.y;
         pointerMoved = false;
@@ -2468,7 +2468,7 @@ class EditorPerspectiveViewport implements View implements Observable {
         if (pivot == null) camera.orbit(deltaX, deltaY);
         else camera.orbitAround(deltaX, deltaY, pivot[0], pivot[1], pivot[2]);
       } else if (navigationMode == 8) {
-        flyFast = (event.modifiers & UiModifier.Shift) != 0;
+        flyFast = event.modifiers.contains(UiModifier.Shift);
         camera.look(deltaX, deltaY);
       } else if (navigationMode == 2) camera.pan(
         deltaX * inspectionLensScale(),
@@ -2478,7 +2478,7 @@ class EditorPerspectiveViewport implements View implements Observable {
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY, viewportWidth, viewportHeight);
       else if (navigationMode == 5 && assemblyDrag != null) {
         // Joints with detents click to a position unless Alt is held.
-        assemblyDrag.setFreeDetents((event.modifiers & UiModifier.Alt) != 0);
+        assemblyDrag.setFreeDetents(event.modifiers.contains(UiModifier.Alt));
         updateAssemblyDrag(event.localX, event.localY);
       } else if (navigationMode == 6 && sketchPointDragging) {
         var point = sketchPlanePoint(event.localX, event.localY);
@@ -2531,7 +2531,7 @@ class EditorPerspectiveViewport implements View implements Observable {
         endSketchPointDrag(event.kind == UiEventKind.PointerUp);
       } else if (navigationMode == 5 && assemblyDrag != null) {
         if (event.kind == UiEventKind.PointerUp) {
-          assemblyDrag.setFreeDetents((event.modifiers & UiModifier.Alt) != 0);
+          assemblyDrag.setFreeDetents(event.modifiers.contains(UiModifier.Alt));
           updateAssemblyDrag(event.localX, event.localY);
           assemblyDrag.commit();
         } else assemblyDrag.cancel();
@@ -2698,7 +2698,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   }
 
   function visibilityKey(event:UiEvent):Bool {
-    if (event.key != UiKey.Space || event.modifiers != 0 || flying() || scene.hasActiveSketchEdit()) return false;
+    if (event.key != UiKey.Space || !event.modifiers.isEmpty() || flying() || scene.hasActiveSketchEdit()) return false;
     event.preventDefault();
     event.stopPropagation();
     if (event.kind == UiEventKind.KeyDown && navigationPointer == null && matePick == null && editingEnabled()) {

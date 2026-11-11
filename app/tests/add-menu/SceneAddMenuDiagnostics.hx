@@ -108,7 +108,7 @@ class SceneAddMenuDiagnostics {
           var submitted = mode != "burst" || index % 2 == 1;
           if (submitted) root = editor.submit(frame);
           var t4 = Sys.time();
-          var metrics = editor.ui.lastFrameMetrics;
+          var metrics = editor.ui.frameMetrics;
           var row = {size: size, mode: mode, index: index, x: x, y: y, hit: hits,
             before: before, after: editor.hierarchyAddVisible, menuCount: menuCount(root),
             reused: metrics == null ? false : metrics.reusedSubmission,

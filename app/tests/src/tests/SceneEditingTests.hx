@@ -1,5 +1,7 @@
 package tests;
 
+import NativeKitScene;
+
 import haxeon.ui.widgets.text.Text;
 
 
@@ -1947,8 +1949,8 @@ import materia.project.MaterialLibrary;
     indices.setInt32(4, 1);
     indices.setInt32(8, 2);
     var geometry = new GeometryData();
-    geometry.addStream(1, 2, positions, 3, 12);
-    geometry.addStream(2, 2, normals, 3, 12);
+    geometry.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, 3, 12);
+    geometry.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, 3, 12);
     geometry.setIndexBuffer(indices, 3);
     geometry.addSubelement(0, 1, 7);
     geometry.setBounds(-0.1, -0.1, 0.0, 0.1, 0.1, 0.0);

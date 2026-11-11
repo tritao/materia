@@ -1,5 +1,7 @@
 package app.editor;
 
+import NativeKitScene;
+
 import app.EditorScene;
 import app.EditorScene.SceneBridge;
 import app.CadGeometryData;
@@ -214,7 +216,7 @@ private typedef ThreadGroup = {
     if (source == null) return null;
     if (sampler == null) {
       sampler = owner.scene.createSampler();
-      owner.scene.setSamplerData(sampler, new SamplerData().setWrap(1, 1).setFilters(2, 2));
+      owner.scene.setSamplerData(sampler, new SamplerData().setWrap(NksceneSamplerWrap.Repeat, NksceneSamplerWrap.Repeat).setFilters(NksceneSamplerFilter.Linear, NksceneSamplerFilter.Linear));
     }
     var image = owner.scene.createImage();
     owner.scene.setImageData(image, black(source));
@@ -328,7 +330,7 @@ private typedef ThreadGroup = {
     if (pair == null) {
       if (sampler == null) {
         sampler = owner.scene.createSampler();
-        owner.scene.setSamplerData(sampler, new SamplerData().setWrap(1, 1).setFilters(2, 2));
+        owner.scene.setSamplerData(sampler, new SamplerData().setWrap(NksceneSamplerWrap.Repeat, NksceneSamplerWrap.Repeat).setFilters(NksceneSamplerFilter.Linear, NksceneSamplerFilter.Linear));
       }
       var colorImage = owner.scene.createImage(), normalImage = owner.scene.createImage();
       owner.scene.setImageData(colorImage, color());

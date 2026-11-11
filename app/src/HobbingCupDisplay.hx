@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import nativekit.scene.GeometryData;
 import haxe.io.Bytes;
 
@@ -21,7 +23,7 @@ class HobbingCupDisplay {
       (x, y, z) -> [x, y, z],
       256
     );
-    var colors = geometry.stream(6);
+    var colors = geometry.stream(NksceneVertexSemantic.Color0);
     if (colors != null) for (i in 0...colors.bytes.length) colors.bytes.set(i, 255);
     return geometry;
   }
@@ -31,7 +33,7 @@ class HobbingCupDisplay {
       positions = Bytes.alloc((a + b) * 12), normals = Bytes.alloc((a + b) * 12), colors = Bytes.alloc((a + b) * 4);
     var lo = [1e30, 1e30, 1e30], hi = [-1e30, -1e30, -1e30], at = 0;
     for (source in [band, body]) {
-      var p = source.stream(1), n = source.stream(2), c = source.stream(6);
+      var p = source.stream(NksceneVertexSemantic.Position), n = source.stream(NksceneVertexSemantic.Normal), c = source.stream(NksceneVertexSemantic.Color0);
       if (p == null || n == null) throw "Cup mesh requires positions and normals";
       for (i in 0...source.vertexCount()) {
         var x = p.bytes.getFloat(i * 12), y = p.bytes.getFloat(i * 12 + 4), z = p.bytes.getFloat(i * 12 + 8);
@@ -63,7 +65,7 @@ class HobbingCupDisplay {
       // Omit the band/body joining cap, including whole radial cells beneath the body.
       var buried = source == band;
       for (i in local) {
-        var p = source.stream(1), n = source.stream(2);
+        var p = source.stream(NksceneVertexSemantic.Position), n = source.stream(NksceneVertexSemantic.Normal);
         if (p == null || n == null) throw "Cup mesh streams absent";
         var rx = (p.bytes.getFloat(i * 12) + center[0]) * 1000, ry = (p.bytes.getFloat(i * 12 + 4) + center[1]) * 1000;
         if (n.bytes.getFloat(i * 12 + 8) < 0.9 || Math.abs((p.bytes.getFloat(i * 12 + 8) + center[2]) * 1000 - bandTop)
@@ -78,9 +80,9 @@ class HobbingCupDisplay {
     }
     var indices = Bytes.alloc(corners.length * 4);
     for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
-    return new GeometryData().addStream(1, 2, positions, a + b, 12).addStream(2, 2, normals, a + b, 12).addStream(
-      6,
-      4,
+    return new GeometryData().addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, a + b, 12).addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, a + b, 12).addStream(
+      NksceneVertexSemantic.Color0,
+      NksceneVertexFormat.Unorm8x4,
       colors,
       a + b,
       4

@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import app.AssemblyRobot.AssemblyPart;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -120,8 +122,8 @@ class CableChainVisuals {
       if (same) continue;
       d.mesh.update(d.chain, position, scale, d.part.center, fixed);
       var mesh = d.mesh, g = new GeometryData();
-      g.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
-      g.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
+      g.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, mesh.positions, mesh.vertexCount, 12);
+      g.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, mesh.normals, mesh.vertexCount, 12);
       g.setIndexBuffer(mesh.indices, mesh.indexCount);
       g.setBounds(mesh.minimum[0], mesh.minimum[1], mesh.minimum[2], mesh.maximum[0], mesh.maximum[1], mesh.maximum[2]);
       changed.set("project:" + d.visual.occurrence, g);

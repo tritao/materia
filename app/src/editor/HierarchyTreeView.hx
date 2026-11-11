@@ -15,7 +15,7 @@ class HierarchyTreeView implements View {
     var node = tree.build(context);
     node.on(UiEventKind.KeyDown, function(event) handleKey(event, toggle));
     node.on(UiEventKind.KeyRepeat, function(event) {
-      if (event.key == UiKey.Space && event.modifiers == 0) {
+      if (event.key == UiKey.Space && event.modifiers.isEmpty()) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -24,7 +24,7 @@ class HierarchyTreeView implements View {
     return node;
   }
   public static function handleKey(event:UiEvent, toggle:Void -> Void):Void {
-    if (event.key != UiKey.Space || event.modifiers != 0 || event.kind != UiEventKind.KeyDown) return;
+    if (event.key != UiKey.Space || !event.modifiers.isEmpty() || event.kind != UiEventKind.KeyDown) return;
     event.preventDefault();
     event.stopPropagation();
     toggle();

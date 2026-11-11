@@ -15,7 +15,7 @@ if [[ ! -x "$haxe" || ! -x "$hl" ]]; then
 fi
 trap 'rm -f "$output"' EXIT
 
-"$haxe" --cwd "$haxeon_root" -cp src --run compiler.tools.HaxeonCompiler \
+"$haxe" --cwd "$haxeon_root" common.hxml --run compiler.tools.HaxeonCompiler \
 	--output="$output" --entry=SensorWireVectorCheck \
 	--root=stdlib \
 	--root="$sensor_root/sensor_io/haxe" \

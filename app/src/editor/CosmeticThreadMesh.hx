@@ -1,5 +1,7 @@
 package app.editor;
 
+import NativeKitScene;
+
 import app.CadGeometryData.CadThreadGeometry;
 import cadkit.threads.ThreadSurface;
 import haxe.io.Bytes;
@@ -12,9 +14,9 @@ class CosmeticThreadMesh {
   public static function build(base:GeometryData, thread:CadThreadGeometry):GeometryData {
     var face = base.subelementGeometry(thread.source.faceIndex);
     if (face == null) throw 'Thread ${thread.source.faceName} has no base face triangles';
-    var positions = face.stream(1), normals = face.stream(2);
-    if (positions == null || normals == null || positions.format != 2
-      || normals.format != 2) throw 'Thread ${thread.source.faceName} needs Float32 position and normal streams';
+    var positions = face.stream(NksceneVertexSemantic.Position), normals = face.stream(NksceneVertexSemantic.Normal);
+    if (positions == null || normals == null || positions.format != NksceneVertexFormat.Float32x3
+      || normals.format != NksceneVertexFormat.Float32x3) throw 'Thread ${thread.source.faceName} needs Float32 position and normal streams';
     var points:Array<Float> = [], normalValues:Array<Float> = [], triangles:Array<Int> = [];
     var positionStride = positions.stride == 0 ? 12 : positions.stride,
       normalStride = normals.stride == 0 ? 12 : normals.stride;
@@ -67,9 +69,9 @@ class CosmeticThreadMesh {
       uvBytes.setFloat(index * 8, surface.uvs[index * 2]);
       uvBytes.setFloat(index * 8 + 4, surface.uvs[index * 2 + 1]);
     }
-    result.addStream(1, 2, positionBytes, count, 12);
-    result.addStream(2, 2, normalBytes, count, 12);
-    result.addStream(4, 1, uvBytes, count, 8);
+    result.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positionBytes, count, 12);
+    result.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normalBytes, count, 12);
+    result.addStream(NksceneVertexSemantic.Texcoord0, NksceneVertexFormat.Float32x2, uvBytes, count, 8);
     result.addSubelement(0, result.triangleCount(), thread.source.faceIndex);
     if (count > 0) result.setBounds(low[0], low[1], low[2], high[0], high[1], high[2]);
     return result;

@@ -65,7 +65,7 @@ class MoonrakerClient {
       case HttpComplete(source, id, code, response):
         if (closed || Int64.compare(id, requestId) != 0) return;
         if (code != Result.Ok) networkError = code
-          == HttpError.Timeout ? "Moonraker reply timed out" : 'Moonraker HTTP transport failed: $code';
+          == Result.HttpTimeout ? "Moonraker reply timed out" : 'Moonraker HTTP transport failed: $code';
         else {
           var headers = new Map<String, String>();
           for (header in response.headers) headers.set(header.name, header.value);

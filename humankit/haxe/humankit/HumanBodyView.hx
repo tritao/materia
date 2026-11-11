@@ -1,5 +1,7 @@
 package humankit;
 
+import NativeKitScene;
+
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import nativekit.scene.MaterialData;
@@ -179,8 +181,8 @@ class HumanBodyView {
       }
     }
     var half = length * 0.5 + radius;
-    return new GeometryData().addStream(1,
-      2, positions, vertex, 12).addStream(2, 2, normals, vertex, 12).setIndexBuffer(
+    return new GeometryData().addStream(NksceneVertexSemantic.Position,
+      NksceneVertexFormat.Float32x3, positions, vertex, 12).addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, vertex, 12).setIndexBuffer(
         indices,
         index
       ).setBounds(

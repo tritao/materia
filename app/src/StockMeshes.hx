@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import stockkit.Stock;
@@ -91,9 +93,9 @@ class StockMeshes {
       indexBase += mesh.triangleCount * 3;
     }
     var geometry = new GeometryData();
-    geometry.addStream(1, 2, positions, vertices, 12);
-    geometry.addStream(2, 2, normals, vertices, 12);
-    geometry.addStream(6, 4, colors, vertices, 4);
+    geometry.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, vertices, 12);
+    geometry.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, vertices, 12);
+    geometry.addStream(NksceneVertexSemantic.Color0, NksceneVertexFormat.Unorm8x4, colors, vertices, 4);
     geometry.setIndexBuffer(indices, triangles * 3);
     // Bounds of the meshes' own vertices, so a chunk culls as itself.
     if (vertices > 0) {

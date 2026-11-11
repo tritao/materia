@@ -26,7 +26,7 @@ gpu_header="$nativekit_dir/modules/gpu/include/nativekit_gpu.h"
 import_hxi() {
 	(
 		cd "$haxeon_dir"
-		"$haxe_bin" --cwd "$haxeon_dir" -cp src --run FfiImportMain "$@"
+		"$haxe_bin" --cwd "$haxeon_dir" common.hxml --run FfiImportMain "$@"
 	)
 }
 
@@ -106,7 +106,8 @@ import_hxi \
 output="$generated_dir/nativekit-scene.hx.hl"
 (
 	cd "$haxeon_dir"
-	"$haxe_bin" -cp "$haxeon_dir/src" -cp "$module_dir/tests/haxeon" --run HxiNativeKitSceneMain \
+	mapfile -t compiler_class_path < <("$haxeon_dir/scripts/compiler-class-paths.sh" --cp-args)
+	"$haxe_bin" "${compiler_class_path[@]}" -cp "$module_dir/tests/haxeon" --run HxiNativeKitSceneMain \
 		"$output" "$generated_dir/nativekit-scene.hxi" "$generated_dir/nativekit-scene-render.hxi" \
 		"$generated_dir/nativekit-scene-interaction.hxi" "$haxeon_dir" "$scenekit_dir" \
 		"$generated_dir/nativekit.hxi" "$generated_dir/nativekit-gpu.hxi"

@@ -1,5 +1,7 @@
 package animkit.scene;
 
+import NativeKitScene;
+
 import haxeon.animation.AnimationAsset;
 import haxeon.animation.AnimationInstance;
 import haxe.io.Bytes;
@@ -23,11 +25,6 @@ import nativekit.scene.Transform;
  * still be live during construction, which reads its indices, UVs, and images.
  */
 class SkinnedModel {
-  static inline var SEMANTIC_POSITION:Int = 1;
-  static inline var SEMANTIC_NORMAL:Int = 2;
-  static inline var SEMANTIC_TEXCOORD0:Int = 4;
-  static inline var FORMAT_FLOAT32X2:Int = 1;
-  static inline var FORMAT_FLOAT32X3:Int = 2;
   static inline var ALPHA_MASK:Int = 2;
   static inline var ALPHA_BLEND:Int = 3;
 
@@ -83,20 +80,20 @@ class SkinnedModel {
   function geometryData(index:Int, bounds:Array<Float>):GeometryData {
     var vertexCount = instance.asset.primitives[index].vertexCount;
     var data = new GeometryData().addStream(
-      SEMANTIC_POSITION,
-      FORMAT_FLOAT32X3,
+      NksceneVertexSemantic.Position,
+      NksceneVertexFormat.Float32x3,
       instance.readPositions(index),
       vertexCount,
       12
     ).addStream(
-      SEMANTIC_NORMAL,
-      FORMAT_FLOAT32X3,
+      NksceneVertexSemantic.Normal,
+      NksceneVertexFormat.Float32x3,
       instance.readNormals(index),
       vertexCount,
       12
     );
     var uv = texcoords[index];
-    if (uv != null) data.addStream(SEMANTIC_TEXCOORD0, FORMAT_FLOAT32X2, uv, vertexCount, 8);
+    if (uv != null) data.addStream(NksceneVertexSemantic.Texcoord0, NksceneVertexFormat.Float32x2, uv, vertexCount, 8);
     data.setIndexBuffer(indices[index], instance.asset.primitives[index].indexCount);
     // The whole-model bounds contain every primitive and cost no per-vertex Haxe work.
     return data.setBounds(bounds[0], bounds[1], bounds[2], bounds[3], bounds[4], bounds[5]);

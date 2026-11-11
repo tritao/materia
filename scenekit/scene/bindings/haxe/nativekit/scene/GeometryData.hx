@@ -6,7 +6,7 @@ import haxe.io.Bytes;
 /** Borrowed vertex stream; callers must keep its bytes immutable. */
 typedef GeometryStream = {
   var bytes:Bytes;
-  var format:Int;
+  var format:NksceneVertexFormat;
   var count:Int;
   var stride:Int;
 }
@@ -20,8 +20,8 @@ class GeometryData {
   final streams:Array<nkscene_vertex_stream> = [];
   final strokeSegments:Array<nkscene_stroke_segment> = [];
   final streamData:Array<Bytes> = [];
-  final streamSemantics:Array<Int> = [];
-  final streamFormats:Array<Int> = [];
+  final streamSemantics:Array<NksceneVertexSemantic> = [];
+  final streamFormats:Array<NksceneVertexFormat> = [];
   final streamStrides:Array<Int> = [];
   final streamCounts:Array<Int> = [];
   final indexValues:Array<Int> = [];
@@ -75,13 +75,13 @@ class GeometryData {
     return this;
   }
 
-  public function setPrimitiveType(primitiveType:Int):GeometryData {
+  public function setPrimitiveType(primitiveType:NkscenePrimitiveType):GeometryData {
     value.set_primitive_type(primitiveType);
     return this;
   }
 
   /** Adds one tightly packed or explicitly strided vertex attribute stream. */
-  public function addStream(semantic:Int, format:Int, data:Bytes, count:Int, stride:Int = 0):GeometryData {
+  public function addStream(semantic:NksceneVertexSemantic, format:NksceneVertexFormat, data:Bytes, count:Int, stride:Int = 0):GeometryData {
     if (count < 0 || stride < 0) throw "Geometry stream count and stride must be non-negative";
     var stream = new nkscene_vertex_stream();
     stream.set_struct_size(nkscene_vertex_stream.size());
@@ -96,7 +96,7 @@ class GeometryData {
     streamFormats.push(format);
     streamStrides.push(stride);
     streamCounts.push(count);
-    if (semantic == 1) {
+    if (semantic == NksceneVertexSemantic.Position) {
       if (positionStreamCount != null) throw "Geometry data can contain only one position stream";
       positionStreamCount = count;
     }
@@ -166,7 +166,7 @@ class GeometryData {
     == null ? indexValues.length : packedIndexCount) / 3);
 
   /** Read a stream without copying it, for overlays on the same tessellation. */
-  public function stream(semantic:Int):Null<GeometryStream> {
+  public function stream(semantic:NksceneVertexSemantic):Null<GeometryStream> {
     for (index in 0...streamSemantics.length) if (streamSemantics[index] == semantic) return {
       bytes: streamData[index],
       format: streamFormats[index],

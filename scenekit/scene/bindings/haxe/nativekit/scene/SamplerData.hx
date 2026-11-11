@@ -9,21 +9,21 @@ class SamplerData {
   public function new() {
     value = new nkscene_sampler_data();
     value.set_struct_size(nkscene_sampler_data.size());
-    value.set_min_filter(2);
-    value.set_mag_filter(2);
-    value.set_wrap_u(1);
-    value.set_wrap_v(1);
-    value.set_wrap_w(1);
+    value.set_min_filter(NksceneSamplerFilter.Linear);
+    value.set_mag_filter(NksceneSamplerFilter.Linear);
+    value.set_wrap_u(NksceneSamplerWrap.Repeat);
+    value.set_wrap_v(NksceneSamplerWrap.Repeat);
+    value.set_wrap_w(NksceneSamplerWrap.Repeat);
     value.set_max_anisotropy(1.0);
   }
 
-  public function setFilters(minFilter:Int, magFilter:Int):SamplerData {
+  public function setFilters(minFilter:NksceneSamplerFilter, magFilter:NksceneSamplerFilter):SamplerData {
     value.set_min_filter(minFilter);
     value.set_mag_filter(magFilter);
     return this;
   }
 
-  public function setWrap(wrapU:Int, wrapV:Int, wrapW:Int = 1):SamplerData {
+  public function setWrap(wrapU:NksceneSamplerWrap, wrapV:NksceneSamplerWrap, wrapW:NksceneSamplerWrap = NksceneSamplerWrap.Repeat):SamplerData {
     value.set_wrap_u(wrapU);
     value.set_wrap_v(wrapV);
     value.set_wrap_w(wrapW);

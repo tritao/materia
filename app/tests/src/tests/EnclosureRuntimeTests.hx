@@ -399,8 +399,8 @@ class EnclosureRuntimeTests {
         camera.distance == distance && camera.yaw == angle[0] && camera.pitch == angle[1],
         "Wheel zoom preserves camera position and orientation"
       );
-      function pointer(kind:String, x:Float, y:Float, modifiers:Int = 0, button:Int = 2):haxeon.ui.core.UiEvent {
-        var event = new haxeon.ui.core.UiEvent(kind, imageNode.id, x, y, 0, 0, button, 0, modifiers);
+      function pointer(kind:String, x:Float, y:Float, ?modifiers:haxeon.ui.core.UiModifier, button:Int = 2):haxeon.ui.core.UiEvent {
+        var event = new haxeon.ui.core.UiEvent(kind, imageNode.id, x, y, 0, 0, button, 0, modifiers == null ? haxeon.ui.core.UiModifier.empty() : modifiers);
         @:privateAccess imageNode.invokePhase(event, "bubble");
         return event;
       }
@@ -429,9 +429,9 @@ class EnclosureRuntimeTests {
         "Live target motion preserves the user's pan and orbit"
       );
       var selection = editor.session.scene.selectedId;
-      pointer(haxeon.ui.core.UiEventKind.PointerDown, 200, 150, 0, 0);
-      pointer(haxeon.ui.core.UiEventKind.PointerMove, 240, 170, 0, 0);
-      pointer(haxeon.ui.core.UiEventKind.PointerUp, 240, 170, 0, 0);
+      pointer(haxeon.ui.core.UiEventKind.PointerDown, 200, 150, haxeon.ui.core.UiModifier.empty(), 0);
+      pointer(haxeon.ui.core.UiEventKind.PointerMove, 240, 170, haxeon.ui.core.UiModifier.empty(), 0);
+      pointer(haxeon.ui.core.UiEventKind.PointerUp, 240, 170, haxeon.ui.core.UiModifier.empty(), 0);
       check(
         selection == editor.session.scene.selectedId && beforeHistory == editor.session.document.history.undoCount,
         "Inspection navigation cannot select or edit the scene"

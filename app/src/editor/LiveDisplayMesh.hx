@@ -1,5 +1,7 @@
 package app.editor;
 
+import NativeKitScene;
+
 import app.CadGeometryData.CadDetailGeometry;
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
@@ -46,9 +48,9 @@ class LiveDisplayMesh {
       result.addTriangle(0, 1, 2);
       result.addTriangle(0, 2, 3);
     }
-    result.addStream(1, 2, positions, 4, 12);
-    result.addStream(2, 2, normals, 4, 12);
-    result.addStream(4, 1, uvs, 4, 8);
+    result.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, 4, 12);
+    result.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normals, 4, 12);
+    result.addStream(NksceneVertexSemantic.Texcoord0, NksceneVertexFormat.Float32x2, uvs, 4, 8);
     result.addSubelement(0, result.triangleCount(), detail.source.faceIndex);
     result.setBounds(low[0], low[1], low[2], high[0], high[1], high[2]);
     return result;

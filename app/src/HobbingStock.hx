@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import haxe.io.Bytes;
 import gearkit.*;
 import stockkit.*;
@@ -182,9 +184,9 @@ class HobbingStock {
       mesh.positions.getFloat(i * 12 + axis * 4) / 1000 - centerMetres[axis]
     );
     var g = new GeometryData();
-    g.addStream(1, 2, positions, mesh.vertexCount, 12);
-    g.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
-    g.addStream(6, 4, mesh.colors, mesh.vertexCount, 4);
+    g.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positions, mesh.vertexCount, 12);
+    g.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, mesh.normals, mesh.vertexCount, 12);
+    g.addStream(NksceneVertexSemantic.Color0, NksceneVertexFormat.Unorm8x4, mesh.colors, mesh.vertexCount, 4);
     g.setIndexBuffer(mesh.indices, mesh.triangleCount * 3);
     g.setBounds(
       -stock.grid.radiusMax / 1000 - centerMetres[0],

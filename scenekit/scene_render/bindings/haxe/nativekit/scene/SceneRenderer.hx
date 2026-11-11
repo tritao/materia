@@ -357,7 +357,7 @@ class SceneRenderer {
     if (status != 0) throw '$operation failed with NativeKit scene status $status';
   }
 
-  static function checkGpu(status:Int, operation:String):Void {
-    if (status != 0) throw '$operation failed with NativeKit GPU status $status: ${NativeKitGpu.nkgpu_last_error()}';
+  static function checkGpu(status:GpuStatus, operation:String):Void {
+    if (status != GpuStatus.Ok) throw '$operation failed with NativeKit GPU status $status: ${NativeKitGpu.nkgpu_last_error()}';
   }
 }

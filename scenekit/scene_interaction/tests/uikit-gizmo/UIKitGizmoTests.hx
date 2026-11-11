@@ -44,7 +44,7 @@ class UIKitGizmoTests {
       0,
       0,
       0,
-      0,
+      haxeon.ui.core.UiModifier.empty(),
       null,
       null,
       0,

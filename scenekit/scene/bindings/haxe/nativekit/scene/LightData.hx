@@ -9,7 +9,7 @@ class LightData {
   public function new() {
     value = new nkscene_light_data();
     value.set_struct_size(nkscene_light_data.size());
-    value.set_type(1);
+    value.set_type(NksceneLightType.Directional);
     setColor(1.0, 1.0, 1.0);
     value.set_intensity(1.0);
     value.set_range(10.0);
@@ -17,7 +17,7 @@ class LightData {
     value.set_outer_cone_angle(Math.PI / 4.0);
   }
 
-  public function setType(type:Int):LightData {
+  public function setType(type:NksceneLightType):LightData {
     value.set_type(type);
     return this;
   }

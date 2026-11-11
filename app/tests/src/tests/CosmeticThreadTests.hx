@@ -1,5 +1,7 @@
 package tests;
 
+import NativeKitScene;
+
 import app.CadGeometryData;
 import app.CadSceneGeometry;
 import app.EditorScene;
@@ -28,7 +30,7 @@ import nativekit.scene.Transform;
     if (!value) throw message;
   }
   static function near(a:Float, b:Float, message:String):Void check(Math.abs(a - b) < 5e-7, message + ': $a != $b');
-  static function stream(data:GeometryData, semantic:Int):GeometryStream {
+  static function stream(data:GeometryData, semantic:NksceneVertexSemantic):GeometryStream {
     var value = data.stream(semantic);
     if (value == null) throw 'No stream $semantic';
     return value;
@@ -67,7 +69,7 @@ import nativekit.scene.Transform;
     if (source == null) throw "Missing source face";
     var overlay = CosmeticThreadMesh.build(full, full.threads[0]);
     check(overlay.triangleCount() == source.triangleCount(), "unclipped triangles retain the face's triangle count");
-    var original = stream(source, 1).bytes, retained = stream(overlay, 1).bytes;
+    var original = stream(source, NksceneVertexSemantic.Position).bytes, retained = stream(overlay, NksceneVertexSemantic.Position).bytes;
     var sourcePoints:Map<String, Bool> = [];
     for (index in 0...source.vertexCount()) sourcePoints.set(pointKey(original, index), true);
     for (index in 0...overlay.vertexCount()) check(
@@ -82,7 +84,7 @@ import nativekit.scene.Transform;
       overlay.vertexCount() >= count && overlay.vertexCount() < count + 10,
       "only the seam duplicates source vertices"
     );
-    var uv = stream(overlay, 4).bytes;
+    var uv = stream(overlay, NksceneVertexSemantic.Texcoord0).bytes;
     for (triangle in 0...overlay.triangleCount()) {
       var values = [for (corner in 0...3) uv.getFloat(overlay.indexAt(triangle * 3 + corner) * 8)];
       check(
@@ -96,8 +98,8 @@ import nativekit.scene.Transform;
       left.threads[0]
     );
     check(rightMesh.triangleCount() == leftMesh.triangleCount(), "hand does not change clipped triangles");
-    var rightUv = stream(rightMesh, 4).bytes, leftUv = stream(leftMesh, 4).bytes;
-    var rightPoints = stream(rightMesh, 1).bytes;
+    var rightUv = stream(rightMesh, NksceneVertexSemantic.Texcoord0).bytes, leftUv = stream(leftMesh, NksceneVertexSemantic.Texcoord0).bytes;
+    var rightPoints = stream(rightMesh, NksceneVertexSemantic.Position).bytes;
     var end = 0.0;
     for (index in 0...rightMesh.vertexCount()) {
       near(
@@ -198,7 +200,7 @@ import nativekit.scene.Transform;
       var cad:CadGeometryData = cast CadSceneGeometry.fromMesh(part.shape.tessellate(), part.shape);
       var overlay = CosmeticThreadMesh.build(cad, cad.threads[0]);
       check(overlay.triangleCount() > 0, "ball race overlay exists");
-      var positions = stream(overlay, 1).bytes;
+      var positions = stream(overlay, NksceneVertexSemantic.Position).bytes;
       for (index in 0...overlay.vertexCount()) {
         var z = positions.getFloat(index * 12 + 8);
         check(z >= 0.05 - 1e-7 && z <= (length - 25) / 1000 + 1e-7, "overlay excludes both journals");

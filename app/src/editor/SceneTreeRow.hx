@@ -132,7 +132,7 @@ private class IsolateAction implements View {
     var id = context.id("action");
     var result = context.selfUpdating(id, () -> {
       var flags = context.interactionStates.get(id);
-      var focused = (flags & StyleState.Focused) != 0;
+      var focused = flags.contains(StyleState.Focused);
       var style = new LayoutStyle();
       style.width = LayoutAxis.fixed(24);
       style.height = LayoutAxis.fixed(24);
@@ -156,7 +156,7 @@ private class IsolateAction implements View {
       var color = context.theme.tokens.textSecondary;
       var focusColor = context.theme.tokens.focusRing;
       node.onPaint((canvas, _) -> {
-        var shown = focused || (context.interactionStates.get(rowId) & StyleState.Hovered) != 0;
+        var shown = focused || context.interactionStates.get(rowId).contains(StyleState.Hovered);
         if (focused) canvas.strokeTransient(new PathBuilder().roundRect(0.75, 0.75, 22.5, 22.5, 4).build(), focusColor, 1.5);
         if (shown) canvas.withState(target -> {
           target.translate(5, 5);
@@ -215,12 +215,12 @@ private class VisibilityEye implements View {
   }
   );
   node.on(UiEventKind.Activate, function(event) {
-    if (event.modifiers == 0) activate(event);
+    if (event.modifiers.isEmpty()) activate(event);
     else event.stopPropagation();
   }
   );
   node.on(UiEventKind.KeyDown, function(event) {
-    if (event.modifiers == 0 && (event.key == UiKey.Space || event.key == UiKey.Enter)) activate(event);
+    if (event.modifiers.isEmpty() && (event.key == UiKey.Space || event.key == UiKey.Enter)) activate(event);
   }
   );
   node.on(UiEventKind.KeyRepeat, function(event) {
@@ -231,7 +231,7 @@ private class VisibilityEye implements View {
   }
   );
   var color = effective ? context.theme.tokens.textPrimary : context.theme.tokens.textSecondary;
-  var focused = (node.states & haxeon.ui.style.StyleState.Focused) != 0;
+  var focused = node.states.contains(haxeon.ui.style.StyleState.Focused);
   var focusColor = context.theme.tokens.focusRing;
   node.onPaint(function(canvas, _) {
     if (focused) canvas.strokeTransient(new PathBuilder().roundRect(0.75,

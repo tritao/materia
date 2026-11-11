@@ -10,7 +10,7 @@ haxe_bin=${HAXEON_HAXE_BIN:-"$haxeon_dir/.tools/haxe/haxe"}
 output=$(mktemp --suffix=.hl)
 trap 'rm -f "$output"' EXIT
 
-"$haxe_bin" --cwd "$haxeon_dir" -cp src --run compiler.tools.HaxeonCompiler \
+"$haxe_bin" --cwd "$haxeon_dir" common.hxml --run compiler.tools.HaxeonCompiler \
     --output="$output" \
     --entry=MujocoBindingCompile \
     --root="$module_dir/tests/haxeon" \

@@ -79,10 +79,10 @@ import haxeon.ui.core.UiModifier;
     registerGridSpacing(app, "scene.grid-spacing-0.1", "Grid spacing: 0.1 m", 0.1);
     registerGridSpacing(app, "scene.grid-spacing-0.2", "Grid spacing: 0.2 m", 0.2);
     registerGridSpacing(app, "scene.grid-spacing-0.5", "Grid spacing: 0.5 m", 0.5);
-    registerNudgeCommand(app, "scene.nudge-left", "Nudge left", UiKey.Left, 0, -0.1, 0.0);
-    registerNudgeCommand(app, "scene.nudge-right", "Nudge right", UiKey.Right, 0, 0.1, 0.0);
-    registerNudgeCommand(app, "scene.nudge-up", "Nudge up", UiKey.Up, 0, 0.0, 0.1);
-    registerNudgeCommand(app, "scene.nudge-down", "Nudge down", UiKey.Down, 0, 0.0, -0.1);
+    registerNudgeCommand(app, "scene.nudge-left", "Nudge left", UiKey.Left, UiModifier.empty(), -0.1, 0.0);
+    registerNudgeCommand(app, "scene.nudge-right", "Nudge right", UiKey.Right, UiModifier.empty(), 0.1, 0.0);
+    registerNudgeCommand(app, "scene.nudge-up", "Nudge up", UiKey.Up, UiModifier.empty(), 0.0, 0.1);
+    registerNudgeCommand(app, "scene.nudge-down", "Nudge down", UiKey.Down, UiModifier.empty(), 0.0, -0.1);
     registerNudgeCommand(app, "scene.nudge-left-large", "Nudge left (large)", UiKey.Left, UiModifier.Shift, -1.0, 0.0);
     registerNudgeCommand(app,
       "scene.nudge-right-large", "Nudge right (large)", UiKey.Right, UiModifier.Shift, 1.0, 0.0);
@@ -124,7 +124,7 @@ import haxeon.ui.core.UiModifier;
     id:String,
     label:String,
     key:Int,
-    modifiers:Int,
+    modifiers:UiModifier,
     deltaX:Float,
     deltaY:Float
   ):Void {

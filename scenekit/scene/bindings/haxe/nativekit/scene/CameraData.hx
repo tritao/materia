@@ -9,7 +9,7 @@ class CameraData {
   public function new() {
     value = new nkscene_camera_data();
     value.set_struct_size(nkscene_camera_data.size());
-    value.set_projection(1);
+    value.set_projection(NksceneCameraProjection.Perspective);
     value.set_fov_y(Math.PI / 3.0);
     value.set_orthographic_height(10.0);
     value.set_near_plane(0.01);
@@ -18,7 +18,7 @@ class CameraData {
   }
 
   public function setPerspective(fovY:Float, nearPlane:Float, farPlane:Float, aspectRatio:Float = 0.0):CameraData {
-    value.set_projection(1);
+    value.set_projection(NksceneCameraProjection.Perspective);
     value.set_fov_y(fovY);
     value.set_near_plane(nearPlane);
     value.set_far_plane(farPlane);
@@ -27,7 +27,7 @@ class CameraData {
   }
 
   public function setOrthographic(height:Float, nearPlane:Float, farPlane:Float, aspectRatio:Float = 0.0):CameraData {
-    value.set_projection(2);
+    value.set_projection(NksceneCameraProjection.Orthographic);
     value.set_orthographic_height(height);
     value.set_near_plane(nearPlane);
     value.set_far_plane(farPlane);

@@ -1,5 +1,7 @@
 package app.editor;
 
+import NativeKitScene;
+
 import app.CadGeometryData.CadDetailGeometry;
 import haxe.io.Bytes;
 import materia.project.SurfaceDetailRenderData.SurfaceDetailKinds;
@@ -14,9 +16,9 @@ class CosmeticDetailMesh {
   public static function build(base:GeometryData, detail:CadDetailGeometry):GeometryData {
     var face = base.subelementGeometry(detail.source.faceIndex);
     if (face == null) throw 'Detail ${detail.source.faceName} has no base face triangles';
-    var positions = face.stream(1), normals = face.stream(2);
-    if (positions == null || normals == null || positions.format != 2
-      || normals.format != 2) throw 'Detail ${detail.source.faceName} needs Float32 position and normal streams';
+    var positions = face.stream(NksceneVertexSemantic.Position), normals = face.stream(NksceneVertexSemantic.Normal);
+    if (positions == null || normals == null || positions.format != NksceneVertexFormat.Float32x3
+      || normals.format != NksceneVertexFormat.Float32x3) throw 'Detail ${detail.source.faceName} needs Float32 position and normal streams';
     var positionStride = positions.stride == 0 ? 12 : positions.stride,
       normalStride = normals.stride == 0 ? 12 : normals.stride;
     var triangles = face.triangleCount();
@@ -55,9 +57,9 @@ class CosmeticDetailMesh {
       }
       result.addTriangle(triangle * 3, triangle * 3 + 1, triangle * 3 + 2);
     }
-    result.addStream(1, 2, positionBytes, count, 12);
-    result.addStream(2, 2, normalBytes, count, 12);
-    result.addStream(4, 1, uvBytes, count, 8);
+    result.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, positionBytes, count, 12);
+    result.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, normalBytes, count, 12);
+    result.addStream(NksceneVertexSemantic.Texcoord0, NksceneVertexFormat.Float32x2, uvBytes, count, 8);
     result.addSubelement(0, result.triangleCount(), detail.source.faceIndex);
     if (count > 0) result.setBounds(low[0], low[1], low[2], high[0], high[1], high[2]);
     return result;

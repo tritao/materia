@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import app.AssemblyRobot.AssemblyPart;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -165,8 +167,8 @@ class BeltVisuals {
       var mesh = display.mesh;
       mesh.update(display.belt, phase, side, visual.thickness, scale, display.part.center);
       var geometry = new GeometryData();
-      geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
-      geometry.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
+      geometry.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, mesh.positions, mesh.vertexCount, 12);
+      geometry.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, mesh.normals, mesh.vertexCount, 12);
       geometry.setIndexBuffer(mesh.indices, mesh.indexCount);
       geometry.setBounds(
         mesh.minimum[0],

@@ -1173,9 +1173,9 @@ private typedef InputProbe = {
     measurePrimitive(
       "new StyleTarget",
       n,
-      function(i) new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0)
+      function(i) new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"])
     );
-    var target = new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0);
+    var target = new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"]);
     measurePrimitive(
       "resolve (cache hit)",
       n,

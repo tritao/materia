@@ -270,7 +270,7 @@ import haxeon.ui.widgets.layout.Spacer;
           ui.pointerMove(bounds.x + anchor.x + step * 25, bounds.y + anchor.y + step * 12);
           check(viewport.updateRetainedPaint(), "camera paint reaches the mounted viewport");
           ui.submitCached(() -> layout, new LayoutFrame(size[0], size[1]), "coordinates");
-          var metrics = ui.lastFrameMetrics;
+          var metrics = ui.frameMetrics;
           check(metrics != null && metrics.reusedSubmission, "camera-only moves reuse the submitted UI tree");
           check(viewport.hoveredObjectId == null, "orbit moves keep surface hover suspended");
           check(viewport.orbitPivot == pivot, "orbit pivot stays fixed across view rebuilds");

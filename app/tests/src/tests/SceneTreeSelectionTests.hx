@@ -31,7 +31,7 @@ import sys.FileSystem;
   }
   static function selected(root:RenderNode, key:String):Bool {
     var node = find(root, key);
-    return node != null && node.semantics != null && (node.semantics.states & AccessibilityState.Selected) != 0;
+    return node != null && node.semantics != null && node.semantics.states.contains(AccessibilityState.Selected);
   }
   public static function main():Int {
     run();

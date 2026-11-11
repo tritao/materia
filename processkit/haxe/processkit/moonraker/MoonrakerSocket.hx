@@ -131,7 +131,7 @@ class MoonrakerSocket {
 
   function sendFrame(bytes:Bytes):Void {
     var code = TransportInterop.sendStatus(transport.borrow(), bytes);
-    if (code != 0) throw 'Moonraker transport send failed: $code';
+    if (code != Result.Ok) throw 'Moonraker transport send failed: $code';
   }
 
   function handle(message:Bytes, now:Float):Void {

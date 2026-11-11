@@ -12,7 +12,7 @@ mkdir -p "$(dirname -- "$output")"
 
 "$haxe" \
 	--cwd "$haxeon_root" \
-	-cp src \
+	common.hxml \
 	--run compiler.tools.HaxeonCompiler \
 	--target=hl \
 	"--output=$output" \

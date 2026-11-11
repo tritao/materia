@@ -40,7 +40,7 @@ class HobberScenarioTests {
         var current = find(root, "Scenario: Cutting");
         var semantics = current.semantics;
         if (semantics == null) throw "missing scenario semantics";
-        check((semantics.states & AccessibilityState.Selected) != 0, "current scenario has no selected state");
+        check(semantics.states.contains(AccessibilityState.Selected), "current scenario has no selected state");
         var idle = find(root, "Scenario: Idle / doors");
         var fill = idle.layout.style.background;
         check(fill != null && fill.alpha == 0, "inactive scenario has a filled background");

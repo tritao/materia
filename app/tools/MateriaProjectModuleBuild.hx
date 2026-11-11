@@ -158,7 +158,7 @@ class MateriaProjectModuleBuild {
     for (path in declared) add(paths, path);
     for (index in 7...args.length) add(paths, args[index]);
     // Compiler implementation changes still invalidate generated code.
-    addHaxeSources(paths, Path.join([home, "src"]));
+    for (root in build.CompilerSources.roots(Path.join([home, "src"]))) addHaxeSources(paths, root);
     add(paths, Path.join([tools, "MateriaProjectModuleBuild.hx"]));
     var rows:Array<Array<String>> = haxe.Json.parse(File.getContent(outputPrefix + ".inputs.json"));
     rows.sort((a, b) -> Reflect.compare(a[0], b[0]));

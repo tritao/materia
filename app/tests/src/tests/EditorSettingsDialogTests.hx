@@ -118,7 +118,7 @@ import sys.FileSystem;
     );
     check(editor.settingsPanel != null, "the recorded chord did not run anything or close the dialog");
     click(editor, frame, "shortcut:editor.settings");
-    editor.ui.key(UiEventKind.KeyDown, UiKey.Escape, 0);
+    editor.ui.key(UiEventKind.KeyDown, UiKey.Escape, UiModifier.empty());
     editor.submit(frame);
     check(
       editor.settingsPanel != null && shortcuts(editor).shortcutText("editor.settings") == "Ctrl+Shift+O",

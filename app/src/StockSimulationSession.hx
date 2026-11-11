@@ -1,5 +1,7 @@
 package app;
 
+import NativeKitScene;
+
 import cadkit.modeling.Curve;
 import cadkit.modeling.Part;
 import cadkit.modeling.Sketch;
@@ -137,9 +139,9 @@ class StockSimulationSession {
       ByDeviation(target, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE)
     );
     var geometry = new GeometryData();
-    geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
-    geometry.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
-    geometry.addStream(6, 4, mesh.colors, mesh.vertexCount, 4);
+    geometry.addStream(NksceneVertexSemantic.Position, NksceneVertexFormat.Float32x3, mesh.positions, mesh.vertexCount, 12);
+    geometry.addStream(NksceneVertexSemantic.Normal, NksceneVertexFormat.Float32x3, mesh.normals, mesh.vertexCount, 12);
+    geometry.addStream(NksceneVertexSemantic.Color0, NksceneVertexFormat.Unorm8x4, mesh.colors, mesh.vertexCount, 4);
     geometry.setIndexBuffer(mesh.indices, mesh.triangleCount * 3);
     geometry.setBounds(-width / 2, -height / 2, -depth / 2, width / 2, height / 2, depth / 2);
     lastMesh = mesh;

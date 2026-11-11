@@ -281,8 +281,8 @@ class FakeMoonrakerServer {
       if (link.dropped) continue;
       var buffer = Bytes.alloc(65536);
       var received = nativekit.ffi.NativeKit.nk_transport_receive(link.transport, buffer);
-      if (received.status == -205) continue;
-      if (received.status == -206) {
+      if (received.status == Result.TransportWouldBlock) continue;
+      if (received.status == Result.TransportClosed) {
         TransportInterop.close(link.transport);
         link.dropped = true;
         continue;

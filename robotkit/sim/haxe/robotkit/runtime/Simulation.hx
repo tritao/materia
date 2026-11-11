@@ -295,13 +295,14 @@ class Simulation {
         native.set_channel_a(channelA);
         native.set_channel_b(drive.channelB == null ? -1 : channelB);
         native.set_normally_to_a(drive.normallyToA ? 1 : 0);
-        native.set_control(switch drive.control {
+        var control = switch drive.control {
           case PressureEffort:
             RkCylinderControl.PressureEffort;
           case FlowLimited:
             RkCylinderControl.FlowLimited;
-        }
-        );
+        };
+        // The struct carries the control law as a fixed-width u32.
+        native.set_control(control.rawValue());
         native.set_extension_force(drive.extensionForce);
         native.set_retraction_force(drive.retractionForce);
         native.set_extend_sign(drive.extendSign);
