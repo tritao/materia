@@ -34,7 +34,6 @@ class HobberMadePart extends MachineComponent {
         "GE-Z-scale-seat",
         "GE-Z-scale-arm",
         "GE-chip-tray",
-        "GE-enclosure",
         "GE-coolant",
         "GE-spindle-seat",
         "GE-motor-cradle",
@@ -53,7 +52,7 @@ class HobberMadePart extends MachineComponent {
       "machinekit.hobbing.saddle",
       parameters(),
       v -> create(v.token("design"), v)
-    ).versioned(6).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
+    ).versioned(7).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
       .procured(_ -> Make("steel fabrication and machining"))
       .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]));
   }
@@ -68,7 +67,6 @@ class HobberMadePart extends MachineComponent {
       if (values != null) for (name in ["tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"])
         if (values.get(name) != null) table.setNumber(name, values.number(name));
       new HobberChipTray(table);
-    case "GE-enclosure": new HobberEnclosurePanel(values);
     case "GE-coolant": new HobberCoolantPort();
     case "GE-spindle-seat": new HobberSpindleSeat(values);
     case "GE-motor-cradle": new HobberMotorCradle(values);

@@ -657,6 +657,9 @@ class DocumentBuilder {
       } else if (Std.isOfType(source, SketchFeature)) {
         var primitive:SketchFeature = cast source;
         direction = primitive.plane.normal;
+      } else if (Std.isOfType(source, PolygonFeature)) {
+        var polygon:PolygonFeature = cast source;
+        direction = polygon.plane.normal;
       } else {
         direction = Vector.Z();
       }
