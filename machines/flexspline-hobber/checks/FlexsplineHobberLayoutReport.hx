@@ -108,7 +108,7 @@ class FlexsplineHobberLayoutReport {
       + (px(0) - 100) + '" y="670">hob centre radial = 0</text>');
     var dimensions = [
       {x: 70.0, label: "Y guide axis plane: 70 mm"},
-      {x: hobber.HobberLayout.get().swivelNativeX, label: "A output flange face: " + hobber.HobberLayout.get().swivelNativeX + " mm"},
+      {x: hobber.HobberSkeleton.reference().swivelNativeX, label: "A output flange face: " + hobber.HobberSkeleton.reference().swivelNativeX + " mm"},
       {x: 135.0, label: "Z saddle plate front: 135 mm"},
       {x: 161.0, label: "Z guide axis plane: 161 mm"}
     ];
@@ -213,7 +213,7 @@ class FlexsplineHobberLayoutReport {
       },
       headStackMm: {
         yGuidePlane: 70,
-        swivelOutputFlangeFace: hobber.HobberLayout.get().swivelNativeX,
+        swivelOutputFlangeFace: hobber.HobberSkeleton.reference().swivelNativeX,
         swivelPlateBackFace: 100,
         zSaddleFront: 135,
         zGuidePlane: 161,

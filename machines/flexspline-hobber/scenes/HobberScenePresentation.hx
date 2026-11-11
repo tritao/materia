@@ -59,9 +59,9 @@ class HobberScenePresentation {
         wall: machine.mandrel.parameterNumber("sleeveWall"),
         length: machine.mandrel.parameterNumber("sleeveLength"),
         radialTravel: machine.mandrel.parameterNumber("radialFitGap"),
-        retractX: hobber.HobberLayout.get().xRetract,
-        frontApproachMm: hobber.HobberLayout.get().frontApproach,
-        liftMm: hobber.HobberLayout.get().frontLift
+        retractX: hobber.HobberSkeleton.reference().xRetract,
+        frontApproachMm: hobber.HobberSkeleton.reference().frontApproach,
+        liftMm: hobber.HobberSkeleton.reference().frontLift
       };
     }
     if (scene.project == null) scene.project = {dynamicParts: [], motions: []};

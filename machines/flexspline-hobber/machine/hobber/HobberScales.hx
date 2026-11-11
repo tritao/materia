@@ -52,7 +52,7 @@ typedef HobberScaleAxis = {
  */
 class HobberScales {
   /** Top of the bed beam beside the X guide (work z), mm, measured on the casting. */
-  static function bedBeamTop():Float return HobberLayout.get().heights().bedTopZ - HobberFrame.PART_DATUM_Z;
+  static function bedBeamTop():Float return HobberSkeleton.reference().heights().bedTopZ - HobberFrame.PART_DATUM_Z;
   /**
    * Thickness of the ground bar the housing stands on, mm: the two M8 (DIN 7984 low head, the JFT-40's 5.75 mm counterbores) through the 12.25 mm left under the head need
    * 8 mm of thread in the seat, which takes the 25 mm screw, and its 12.75 mm of engagement is tapped through 15 mm.
@@ -69,7 +69,7 @@ class HobberScales {
   public static inline final COLUMN_WALL_Y = 120.0;
 
   /** Which channel wall the Z scale stands on: the one away from the Z screw's pads (+1 is the +y wall). */
-  public static function zWallSign():Float return HobberLayout.get().zAxisY() < 0 ? 1.0 : -1.0;
+  public static function zWallSign():Float return HobberSkeleton.reference().zAxisY() < 0 ? 1.0 : -1.0;
   /**
    * Where the Z scale's hole line runs along x, mm. The head stands deeper in the channel than the housing (away from the open front, `across` +x): the housing's bar (32 wide,
    * centred on it) then covers x 184.6..216.6 on the wall, just inside the casting's front edge at x 186 (the bottom face is 13.5 from the hole line), and the head (13 wide)
@@ -89,19 +89,19 @@ class HobberScales {
   /** Each axis' scale, derived once per axis and shared: no caller changes it. */
   static final cache = new machinekit.cache.Memo<HobberScaleAxis>("hobber-scales", 8);
 
-  static function overtravel():Float return HobberLayout.get().overtravel;
+  static function overtravel():Float return HobberSkeleton.reference().overtravel;
 
   /** Axis travel the scale must cover (lower, upper joint values), conservative: the design stroke, not the cut-dependent one. */
   public static function stroke(id:String):{lower:Float, upper:Float} return switch id {
-    case "X": {lower: HobberLayout.get().xMin, upper: HobberLayout.get().xRetract};
-    case "Y": {lower: -HobberLayout.get().moduleSpec().stroke / 2, upper: HobberLayout.get().moduleSpec().stroke / 2};
-    case "Z": {lower: HobberLayout.get().zTravelMin, upper: HobberLayout.get().zTravelMax};
+    case "X": {lower: HobberSkeleton.reference().xMin, upper: HobberSkeleton.reference().xRetract};
+    case "Y": {lower: -HobberSkeleton.reference().moduleSpec().stroke / 2, upper: HobberSkeleton.reference().moduleSpec().stroke / 2};
+    case "Z": {lower: HobberSkeleton.reference().zTravelMin, upper: HobberSkeleton.reference().zTravelMax};
     default: throw 'No scale for axis $id';
   };
 
   public static function x():HobberScaleAxis return axis("X");
   public static function y():HobberScaleAxis return cache.get("Y",()->{
-    var s=HobberLayout.get().moduleSpec(),mount=HobberLayout.get().modulePose();
+    var s=HobberSkeleton.reference().moduleSpec(),mount=HobberSkeleton.reference().modulePose();
     var hp=F.compose(mount,s.scalePose()),tp=F.compose(mount,s.scalePose(true));
     var normal=F.transformVector(hp,0,1,0),along=F.transformVector(hp,0,0,1),across=F.transformVector(hp,-1,0,0);
     var body=new machinekit.motion.ScrewLinearModulePart(s.values().setToken("role","wallLeft")).geometry(),b=machinekit.assembly.PosedParts.boxOf(body);body.close();
@@ -116,11 +116,11 @@ class HobberScales {
     return switch id {
       case "X":
         // The head centre is at x 262 at joint zero; the housing starts so the head's travel sits in the window.
-        var at = HobberLayout.get().xScaleHeadStation - startFor;
-        {toSeat: [0.0, 0, -1], along: [1.0, 0, 0], start: [at, HobberLayout.get().nativeXScaleHoleY, bedBeamTop() + SEAT_BAR], side: 1.0, plate: false, headCentre: startFor, air: "end", bend: "none"};
+        var at = HobberSkeleton.reference().xScaleHeadStation - startFor;
+        {toSeat: [0.0, 0, -1], along: [1.0, 0, 0], start: [at, HobberSkeleton.reference().nativeXScaleHoleY, bedBeamTop() + SEAT_BAR], side: 1.0, plate: false, headCentre: startFor, air: "end", bend: "none"};
       case "Z":
-        var at = HobberLayout.get().nativeHobCentreZ + HobberLayout.get().zScaleHeadOffset - startFor, w = zWallSign();
-        {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [HobberLayout.get().nativeZScaleHoleX, w * (COLUMN_WALL_Y - SEAT_BAR), at], side: w, plate: false, headCentre: startFor, air: "end", bend: "none"};
+        var at = HobberSkeleton.reference().nativeHobCentreZ + HobberSkeleton.reference().zScaleHeadOffset - startFor, w = zWallSign();
+        {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [HobberSkeleton.reference().nativeZScaleHoleX, w * (COLUMN_WALL_Y - SEAT_BAR), at], side: w, plate: false, headCentre: startFor, air: "end", bend: "none"};
       default:
         throw 'No scale for axis $id';
     };

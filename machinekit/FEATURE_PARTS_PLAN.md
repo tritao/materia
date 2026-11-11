@@ -244,22 +244,19 @@ geometry (enforcement needs that rename, not reflection).
 
 ### FP3 — Hobber skeleton
 
-Replace `HobberLayout` with `HobberSkeleton`:
+Done (structural half, 2026-11-11): `HobberLayout` is `HobberSkeleton`, its
+global accessor `reference()` (the reference machine's skeleton).
+`FlexsplineHobber` takes an optional skeleton (`skeleton`, reference by
+default) and passes it to every `HobberUnit`, which no longer fetches the
+global; the units use their own. Equivalence unchanged.
 
-- **Inputs**: today's constructor constants, grouped (travels, rail centres,
-  table, Z column, swivel/spindle) with a doc line each.
-- **Derived**: the `heights()` stack and the other derived values.
-- **Datums**: one named frame (FP1b) per part mount (`xCarriage.seat`,
-  `zSaddle.seat`, …), replacing `partAt(0,0,PART_DATUM_Z)` and
-  `sourcePose(...)` call sites.
-- Passed explicitly: `FlexsplineHobber` builds one and hands it to each
-  `HobberUnit` and part constructor; `HobberMadePart.create` passes
-  `HobberSkeleton.reference()`. No `get()`, no cache singleton.
-
-Pure refactor: parts keep the native frame in this phase.
-
-**Gate:** zero hits for `HobberLayout.get(`; FP0 equivalence identical;
-hobber checks green.
+Per part, not up front: about 170 `reference()` calls remain in part
+classes' static helpers and tests. Each part takes the skeleton explicitly
+(and its mount frame from it) when it is recorded in its own frame (FP4,
+FP5), because recording rewrites those helpers anyway; converting them now
+would mean rewriting every part twice. Gate moved to the end of FP5: zero
+`HobberSkeleton.reference()` outside `FlexsplineHobber` and recipe
+construction.
 
 ### FP4 — Pilot: `HobberXCarriage`
 

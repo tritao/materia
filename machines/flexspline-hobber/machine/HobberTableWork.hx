@@ -18,8 +18,8 @@ class HobberTableWork extends HobberUnit {
   public final tableSpec:RotaryAxisSpec;
   public final mandrel:ExpandingMandrel;
   public final workOrigin:AssemblyFrame;
-  public function new(spec:GearSpec, ?rotaryAxis:PrecisionRotaryAxis) {
-    super("tableWork");
+  public function new(skeleton:HobberSkeleton, spec:GearSpec, ?rotaryAxis:PrecisionRotaryAxis) {
+    super("tableWork", skeleton);
     var installed:machinekit.motion.PrecisionRotaryAxis = rotaryAxis
       == null ? new machinekit.motion.PurchasedRotaryTable() : rotaryAxis;
     table = installed.assembly();

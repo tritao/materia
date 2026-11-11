@@ -16,7 +16,7 @@ class HobberTrayClearanceStudy {
     var folder = root + "/machines/flexspline-hobber",
       p:Dynamic = haxe.Json.parse(sys.io.File.getContent(folder + "/studies/data/tray-mounting-proposal.json"));
     var blank:Array<Float> = p.tray.blankMm, opening:Array<Float> = p.tray.openingBoundsMm;
-    var z = hobber.HobberLayout.get().foundationDimensions("bed")[2];
+    var z = hobber.HobberSkeleton.reference().foundationDimensions("bed")[2];
     var raw = Part.box(blank[0], blank[1], blank[2]), sheet = raw.translated(new Vector(
       0,
       0,

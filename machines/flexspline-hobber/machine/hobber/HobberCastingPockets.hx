@@ -18,13 +18,13 @@ class HobberCastingPockets {
   static inline final DECK_RIB_WIDTH = 50.0;
 
   public static function plinth(width:Float, depth:Float, height:Float):Array<CastingFeature> {
-    var layout = HobberLayout.get().xNominal();
+    var layout = HobberSkeleton.reference().xNominal();
     var wall = WALL;
     var footInset = 120.0, footBossHalf = MineralCastBed.FOOT_BOSS_WIDTH / 2;
     var tableHalf = MineralCastBed.TABLE_INSERT_WIDTH / 2 + MineralCastBed.SOURCE_STEEL_COVER_MM,
       ribHalf = MineralCastBed.PLINTH_CORE_WEB / 2;
     var driveRibHalf = MineralCastBed.DRIVE_RIB_HALF_WIDTH;
-    var railCentre = HobberLayout.get().bedRailCentre, railBeamHalf = MineralCastBed.BED_RAIL_BEAM_WIDTH / 2;
+    var railCentre = HobberSkeleton.reference().bedRailCentre, railBeamHalf = MineralCastBed.BED_RAIL_BEAM_WIDTH / 2;
     var capHalf = 150.0, webCentre = 112.5;
     var frontDeckRibX = 100.0, middleDeckRibX = 160.0, rearDeckRibX = 220.0, deckRibY = 80.0;
     var deckRibHalf = DECK_RIB_WIDTH / 2;

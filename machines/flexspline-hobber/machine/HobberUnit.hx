@@ -22,16 +22,16 @@ typedef HobberMount = {
  * Each unit owns its parts; the containing machine joins only these interfaces. */
 class HobberUnit extends MachineAssembly {
   public final key:String;
-  public final layout:HobberLayout;
-  public final heights:hobber.HobberLayout.HobberHeightStack;
+  public final layout:HobberSkeleton;
+  public final heights:hobber.HobberSkeleton.HobberHeightStack;
   public final mounts:Array<HobberMount> = [];
   public final mountContacts:Array<{parent:String, child:String}> = [];
   final hosts:Map<String, {member:String, connector:Null<String>}> = [];
 
-  public function new(key:String) {
+  public function new(key:String, skeleton:HobberSkeleton) {
     super();
     this.key = key;
-    layout = HobberLayout.get();
+    layout = skeleton;
     heights = layout.heights();
   }
   public function host(role:String, member:String, ?connector:String):Void hosts.set(role, {member:member, connector:connector});

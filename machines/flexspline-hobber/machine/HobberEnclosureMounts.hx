@@ -1,5 +1,5 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import machinekit.assembly.MachineAssembly;
 import machinekit.enclosure.GeneratedEnclosure;
 import machinekit.structural.BlockBracket;
@@ -10,7 +10,7 @@ class HobberEnclosureMounts {
   public static function install(assembly:MachineAssembly, shell:GeneratedEnclosure):Void {
     assembly.group(HobberCell.shellGroup("frame/Base outriggers"));
     var poses = assembly.solvedPoses(), l = shell.layout, root = "enclosure/frame/post00", index = 0;
-    for (seat in HobberLayout.get().enclosureSeats()) {
+    for (seat in HobberSkeleton.reference().enclosureSeats()) {
       var parent = "machine/bed/" + seat.id, pad = poses.get(parent);
       if (pad == null) throw "Missing enclosure foundation insert " + parent;
       var face = F.compose(pad, assembly.memberConnectorFrame(parent, "top")), side = face.x < l.centreX() ? -1 : 1;

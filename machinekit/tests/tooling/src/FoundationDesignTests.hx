@@ -490,7 +490,7 @@ class FoundationDesignTests {
         == machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Supported;
       var boxes = boxSupported ? row.part.body.materialBoxes() : null;
       var half = row.id == "hobber-bed"
-        ? hobber.HobberLayout.get().xNominal().footSpan / 2 : row.part.body.parameterNumber("width") / 2;
+        ? hobber.HobberSkeleton.reference().xNominal().footSpan / 2 : row.part.body.parameterNumber("width") / 2;
       currentRows.push({
         id: row.id,
         sourceFingerprint: materia.tooling.ToolingCodec.inputFingerprint(sourceInput),

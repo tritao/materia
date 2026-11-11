@@ -1,5 +1,5 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import haxe.io.Bytes;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.component.ComponentValues;
@@ -32,7 +32,7 @@ class LinearModulePreview {
 
   public static function hobberY():Bytes {
     HobberComponents.install();
-    var module = new ScrewLinearModule(HobberLayout.get().moduleSpec(), new HobberYPart(new ComponentValues().setToken("role", "base")),
+    var module = new ScrewLinearModule(HobberSkeleton.reference().moduleSpec(), new HobberYPart(new ComponentValues().setToken("role", "base")),
       new HobberYPart(new ComponentValues().setToken("role", "carriage")));
     return preview(module, "Hobber Y module v2 (30 mm)");
   }

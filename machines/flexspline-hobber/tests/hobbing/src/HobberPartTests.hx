@@ -136,7 +136,7 @@ class HobberPartTests {
     near(new MineralCastBed().body.parameterNumber("depth"), 800, 0, "current bed uses moving-column footprint");
     near(
       new MineralCastBed().body.parameterNumber("width"),
-      hobber.HobberLayout.get().xNominal().bedLength,
+      hobber.HobberSkeleton.reference().xNominal().bedLength,
       0,
       "bed radial length covers loading retract"
     );
@@ -144,7 +144,7 @@ class HobberPartTests {
     near(column.body.parameterNumber("height"), 500, 0, "moving column height");
     check(column.components().filter(entry -> entry.id == "basePlate").length == 0,
       "column sole uses separate supported corners, without the replaced rear strip");
-    for (pad in HobberLayout.get().columnSolePads()) {
+    for (pad in HobberSkeleton.reference().columnSolePads()) {
       var matches=column.components().filter(entry -> entry.id == pad.id);
       check(matches.length == 1,"one physical column sole pad "+pad.id);
       var insert:CastInsert=cast matches[0].component;
@@ -499,7 +499,7 @@ class HobberPartTests {
     Sys.println('Hobber geometry: $assertions assertions passed');
   }
   static function zBellows():Void {
-    var p=HobberLayout.get().zBellowsPlan();
+    var p=HobberSkeleton.reference().zBellowsPlan();
     check(p.stroke>=210 && p.compressed<=p.space,"Z bellows spans travel and overtravel");
     for(role in [machinekit.cover.WayCoverSection.WayCoverRole.Fixed,machinekit.cover.WayCoverSection.WayCoverRole.Moving]) {
       var original=new machinekit.cover.WayCoverSection(p.row,role,role==machinekit.cover.WayCoverSection.WayCoverRole.Fixed?p.fixedLevel():p.movingLevel(),p.width,p.height,p.stroke,p.space,p.shape);
@@ -512,7 +512,7 @@ class HobberPartTests {
       check(rebuilt.materialSpec()==made.materialSpec(),"Z bellows steel flange survives recipe roundtrip");
       shape.close();
     }
-    for(mount in [HobberLayout.get().zBellowsMovingMount(),HobberLayout.get().zBellowsFixedUpperMount()]) {
+    for(mount in [HobberSkeleton.reference().zBellowsMovingMount(),HobberSkeleton.reference().zBellowsFixedUpperMount()]) {
       var shape=mount.geometry();check(shape.solidCount()==1,"Z bellows bracket is one connected made part: "+mount.designation+" solids="+shape.solidCount());shape.close();
     }
     Sys.println('Hobber Z bellows: $assertions assertions passed');

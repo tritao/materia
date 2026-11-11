@@ -15,8 +15,8 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 class HobberElectricalRack extends HobberUnit {
 
-  public function new(tableSpec:RotaryAxisSpec) {
-    super("electrical");
+  public function new(skeleton:HobberSkeleton, tableSpec:RotaryAxisSpec) {
+    super("electrical", skeleton);
     var supply = new ThreePhaseRectifier(
       new AcMains(ThreePhase, new AcRmsVoltage(400), 50),
       new DcCurrent(40),

@@ -51,9 +51,9 @@ class HobberChipCover extends MachineComponent {
     return rows;
   }
   // Front row stays behind the skirt at the parked carriage, including driver radius.
-  public static function rearLidCentre():Float return (386 + HobberLayout.get().xRetract + 9 + 560) / 2;
+  public static function rearLidCentre():Float return (386 + HobberSkeleton.reference().xRetract + 9 + 560) / 2;
   public static function rearLidHoles():Array<BoltHole> return [
-    {x:386 + HobberLayout.get().xRetract + 9 - rearLidCentre(), y:0.0}, {x:560 - rearLidCentre(), y:0.0}];
+    {x:386 + HobberSkeleton.reference().xRetract + 9 - rearLidCentre(), y:0.0}, {x:560 - rearLidCentre(), y:0.0}];
   public static function plugs():Array<{id:String,parent:String,x:Float,y:Float,z:Float}> return [
     for(front in [true,false])for(side in [-1,1]) {id:"X"+(front?"front":"rear")+"Plug"+(side<0?"Left":"Right"),
       parent:front?"XfrontCover":"XrearCover",x:footX(front),y:side*footY(),z:front?224.0:234.0}

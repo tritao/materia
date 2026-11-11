@@ -16,8 +16,8 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 class HobberFoundation extends HobberUnit {
   public final bed:MineralCastBed;
   public final column:MineralCastColumn;
-  public function new() {
-    super("foundation");
+  public function new(skeleton:HobberSkeleton) {
+    super("foundation", skeleton);
     // The bed and the column size independently (each its own anchors, lifting trials and casting): side by side.
     function sizedBed():machinekit.structural.MineralFoundation return new MineralCastBed();
     function sizedColumn():machinekit.structural.MineralFoundation return new MineralCastColumn();

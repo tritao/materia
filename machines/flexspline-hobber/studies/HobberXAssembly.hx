@@ -1,6 +1,6 @@
 import hobber.*;
 import machinekit.hobbing.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import hobber.HobberCarriageRib;
 
 /** Assembly instructions are keyed to the actual derived joints, never a second bolt list.
@@ -33,9 +33,9 @@ class HobberXAssembly {
       joints:[for (face in ["blockL1","blockL2","blockR1","blockR2"]) {member:"Xbridge",face:face,method:"shim or adjust"}]
         .concat([{member:"Xbridge",face:"nut-block",method:"indicate then match-pin"}])
         .concat([for (role in HobberCarriageRib.ROLES) {member:"Xrib-"+role,face:"*",method:"drawing dowels"}])},
-    {id:"A6 sole", parts:[for (pad in HobberLayout.get().columnSolePads()) "column/"+pad.id],
+    {id:"A6 sole", parts:[for (pad in HobberSkeleton.reference().columnSolePads()) "column/"+pad.id],
       tools:["c-test-mandrel","dial-indicator","magnetic-base","square-granite"], measurement:"Indicate Z parallel to C mandrel in two planes; A6 sole matching/indication and match-pin release remains open. No pin or bond credit in slip/stiffness.",
-      joints:[for (pad in HobberLayout.get().columnSolePads()) {member:"Xbridge",face:"column-sole-"+pad.id,method:"shim or adjust"}]},
+      joints:[for (pad in HobberSkeleton.reference().columnSolePads()) {member:"Xbridge",face:"column-sole-"+pad.id,method:"shim or adjust"}]},
     {id:"A11 scale", parts:["XscaleSeat","Xscale","XscaleHead"], tools:["dial-indicator","magnetic-base","feeler-gauges","af3-low-profile-key"],
       measurement:"Adjust at head to scale supplier parallelism and 1 +/-0.3 mm gap; check full reading travel before guards. Service uses an ASSUMED AF3 key envelope: 6 mm projection plus 3.5 mm diameter bend/handle, 90 mm reach along X; a straight 20 mm driver hits the bed. Confirm the tool before release.",
       joints:[for (id in ["XscaleSeat","Xscale","XscaleHead"]) {member:id,face:"*",method:"shim or adjust"}]},
@@ -46,7 +46,7 @@ class HobberXAssembly {
     var machine=new FlexsplineHobber(); check(machine);
     var carriage=["Xbridge"].concat([for (role in HobberCarriageRib.ROLES) "Xrib-"+role]);
     Sys.println("XC measured deck+ribs mass kg: " + HobberJointLoads.massOf(machine,carriage)
-      + "; sole pads kg: " + HobberJointLoads.massOf(machine,[for (pad in HobberLayout.get().columnSolePads()) "column/"+pad.id]));
+      + "; sole pads kg: " + HobberJointLoads.massOf(machine,[for (pad in HobberSkeleton.reference().columnSolePads()) "column/"+pad.id]));
   }
   /** Installed scale-head screws must be reachable with guards removed,
    * including the stationary bed (which moves relative to the head). */
@@ -150,7 +150,7 @@ class HobberXAssembly {
     var travel=machine.travel.filter(t->t.id=="X")[0];
     for(front in [true,false]) {
       var state=new cadkit.modeling.AssemblyState(machine.definition());
-      state.setJoint("X",front?travel.upper:travel.lower);state.setJoint("Z",hobber.HobberLayout.get().zTravelMax);state.forwardKinematics();
+      state.setJoint("X",front?travel.upper:travel.lower);state.setJoint("Z",hobber.HobberSkeleton.reference().zTravelMax);state.forwardKinematics();
       var poses=machine.solvedPoses(state);
       for(joint in derived.joints)if(joint.clampedFace=="pad"&&StringTools.startsWith(joint.clampedMember,front?"XcoverFront":"XcoverRear")) {
         var host=members.filter(m->m.id==joint.receivingMember)[0],hp=poses.get(host.id);if(hp==null)throw "Missing guard receiver pose";

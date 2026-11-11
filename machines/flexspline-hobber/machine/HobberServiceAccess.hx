@@ -55,23 +55,23 @@ class HobberServiceAccess {
     }
     var nutGroup=below("Ymodule/nutCarrier").concat(["Ymodule/nutCarrier"]);
     var carriageBundle=below("Ymodule/carriage").concat(["Ymodule/carriage"]).filter(id->!nutGroup.contains(id)&&!StringTools.startsWith(id,"Ymodule/block")&&id!="Ymodule/scaleHead");
-    out.push(ServiceRemoval("yCarriageWithdrawal",carriageBundle,[{direction:[0.0,-1,0],distance:HobberLayout.get().moduleSpec().carriageThickness+40}],
-      ["Ymodule/scaleHead"],[{joint:"X",value:HobberLayout.get().xRetract}]));
+    out.push(ServiceRemoval("yCarriageWithdrawal",carriageBundle,[{direction:[0.0,-1,0],distance:HobberSkeleton.reference().moduleSpec().carriageThickness+40}],
+      ["Ymodule/scaleHead"],[{joint:"X",value:HobberSkeleton.reference().xRetract}]));
     var shaft = machine.spindle.motor.rating.shaftLength;
     out.push(ServiceRemoval("bMotorWithdrawal", ["spindle/motor", "spindle/motorShaft", "spindle/motorEncoder"],
       [{direction: away(axisOf("spindle/motor", 0, 0, 1)), distance: shaft + 10 + SERVICE_CLEARANCE}], ["spindle/belt", "spindle/motorPulley"], []));
     out.push(ServiceRemoval("bBeltRemoval", ["spindle/belt"],
       [{direction: away(axisOf("spindle/housing", 0, 0, 1)), distance: 2 * HobSpindle.BELT_WIDTH + SERVICE_CLEARANCE}], [], []));
     out.push(ServiceRemoval("outboardRetainersWithdrawal", ["outboardLocknut", "outboardInnerSpacer"],
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 16.0}], [], [{joint: "X", value: HobberLayout.get().xRetract}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 16.0}], [], [{joint: "X", value: HobberSkeleton.reference().xRetract}]));
     out.push(ServiceRemoval("outboardWithdrawal", HobberBSpindle.outboardMembers(),
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"], [{joint: "X", value: HobberLayout.get().xRetract}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"], [{joint: "X", value: HobberSkeleton.reference().xRetract}]));
     out.push(ServiceRemoval("spindleCartridgeWithdrawal", cartridgeMembers(),
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"].concat(HobberBSpindle.outboardMembers()), [{joint: "X", value: HobberLayout.get().xRetract}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"].concat(HobberBSpindle.outboardMembers()), [{joint: "X", value: HobberSkeleton.reference().xRetract}]));
     // The flange is motor-side. Release the nut flange, motor and BK12;
     // the BF12 stays and the barrel slides through the stationary nut block.
     var x = HobberDrives.x();
-    var rearward = HobberLayout.get().xNominal().bedRear - (x.axis.start[0] - x.length) + SERVICE_CLEARANCE;
+    var rearward = HobberSkeleton.reference().xNominal().bedRear - (x.axis.start[0] - x.length) + SERVICE_CLEARANCE;
     out.push(ServiceRemoval("xScrewWithdrawal", ["Xscrew", "Xcoupling", "Xnut"],
       [{direction: [0.0,1,0], distance: rearward}],
       ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []));
@@ -84,7 +84,7 @@ class HobberServiceAccess {
     out.push(ServiceRemoval("xChipGuardWithdrawal",HobberChipCover.fixedMembers(),
       [{direction:[0.0,0,1],distance:100.0}],stack,[]));
     var head = below("Ymodule/base").concat(["Ymodule/base"]).filter(id -> id != "Ymodule/motor" && id != "Ymodule/motorShaft");
-    var retract = [{joint:"X",value:HobberLayout.get().xRetract}];
+    var retract = [{joint:"X",value:HobberSkeleton.reference().xRetract}];
     // Keep the head on the actuator: the adapter output screws are buried
     // behind the swivel plate. Release the saddle from its blocks and nut
     // block, and support the disconnected scale head on the fixed scale.

@@ -65,7 +65,7 @@ class HobberAccuracyChecks {
     var poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine());
     var tool = F.transformPoint(F.compose(back, F.compose(poses.get("hob"), machine.hob.connector("centre").frame)), 0, 0, 0);
     i.hobHeightMm = Math.abs(tool.z - 280.0);
-    i.aLeverMm = Math.sqrt(tool.y * tool.y + Math.pow(tool.z - HobberLayout.get().nativeHobCentreZ, 2)) + i.aEngagementMm;
+    i.aLeverMm = Math.sqrt(tool.y * tool.y + Math.pow(tool.z - HobberSkeleton.reference().nativeHobCentreZ, 2)) + i.aEngagementMm;
     for (row in machine.tableSpec.all()) {
       i.table.set(row.name, row.value);
       i.tableBasis.set(row.name, Std.string(row.basis));

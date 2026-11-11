@@ -87,7 +87,7 @@ class HobberDriveBar extends HobberMadePart {
     var axis=barAxis(designId),support=barSupport(designId),blank=HobberPartGeometry.padBox(HobberDrives.barBounds(axis,support));
     if(axis.id=="Z"&&support=="floating") {
       var range=HobberScales.stroke("Z"),over=HobberScales.overtravel();
-      [Solids.cut(blank,[HobberLayout.get().envelope(range.lower-over,range.upper+over,HobberLayout.get().zRunningGap)])];
+      [Solids.cut(blank,[HobberSkeleton.reference().envelope(range.lower-over,range.upper+over,HobberSkeleton.reference().zRunningGap)])];
     } else [blank];
   };
   override public function manufacturingRoute():Null<ManufacturingRoute> return {

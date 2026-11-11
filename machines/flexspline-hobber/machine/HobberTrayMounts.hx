@@ -1,5 +1,5 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import machinekit.assembly.MachineAssembly;
 import machinekit.enclosure.GeneratedEnclosure;
 import machinekit.enclosure.TrayClamp;
@@ -13,7 +13,7 @@ class HobberTrayMounts {
     // Group the clamps by the bed edge they hold: the two ends are named by the table they face (the column runs at the
     // other end), the long sides by the scene axis they face.
     var tableX = F.compose(F.inverse(casting), poses.get("machine/bed/tablePlate")).x;
-    for (row in HobberLayout.get().trayClampSeats()) {
+    for (row in HobberSkeleton.reference().trayClampSeats()) {
       var parent = "machine/bed/" + row.id;
       var seat = F.compose(poses.get(parent), assembly.memberConnectorFrame(parent, "top"));
       var out = Math.abs(row.pose.y) > 300 ? F.transformVector(casting,

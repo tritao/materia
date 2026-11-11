@@ -1,5 +1,5 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import hobber.MineralCastBed;
 import machinekit.structural.LevelingFoot;
 import machinekit.component.MachineKitComponents;
@@ -16,7 +16,7 @@ class HobberFootChecks {
       n++;
       if (!ok) throw label;
     }
-    var machine = new FlexsplineHobber(), members = machine.components(), feet = HobberLayout.get().feet();
+    var machine = new FlexsplineHobber(), members = machine.components(), feet = HobberSkeleton.reference().feet();
     check(feet.length == 3, "three primary support points");
     check(
       machine.bed.insertLocations().filter(p -> StringTools.startsWith(p.id, "foot")).length == 0,

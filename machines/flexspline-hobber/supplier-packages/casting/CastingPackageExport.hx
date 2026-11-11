@@ -1,5 +1,5 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import machinekit.assembly.PosedParts;
 import hobber.MineralCastBed;
 import hobber.MineralCastColumn;
@@ -125,7 +125,7 @@ class CastingPackageExport {
     var foundation:MineralFoundation = kind == "bed" ? new MineralCastBed() : new MineralCastColumn();
     var sized = Sys.time() - began;
     var body = foundation.body, cache = new PosedParts(), closers:Array<cadkit.modeling.Part> = [];
-    var dims = HobberLayout.get().foundationDimensions(kind);
+    var dims = HobberSkeleton.reference().foundationDimensions(kind);
     var asCast = body.asCastGeometry();
     closers.push(asCast);
     var bounds = PosedParts.boxOf(asCast);
@@ -305,7 +305,7 @@ class CastingPackageExport {
 
     var lifting = [for (l in foundation.liftingPoints()) {id: l.id, insertId: l.insertId, holeId: l.holeId}];
     var feet:Array<Dynamic> = [];
-    if (kind == "bed") for (f in HobberLayout.get().feet()) feet.push({
+    if (kind == "bed") for (f in HobberSkeleton.reference().feet()) feet.push({
       x: f.x,
       y: f.y,
       plate: [MineralCastBed.FOOT_PLATE_WIDTH, MineralCastBed.FOOT_PLATE_WIDTH, MineralCastBed.FOOT_PLATE_THICKNESS]

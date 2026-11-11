@@ -16,7 +16,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** GE-spindle-seat; owns its stock, interfaces and manufacturing route. */
 class HobberSpindleSeat extends HobberMadePart {
-  public static function seatY0():Float return HobberLayout.get().spindleNativeY - Bt30SpindleData.CLAMP_TO;
+  public static function seatY0():Float return HobberSkeleton.reference().spindleNativeY - Bt30SpindleData.CLAMP_TO;
   /** Derive every X stack plane from the fixed bed seat and catalogue guide.
    * Replicated block pads occupy relieved plate material, adding no axis height. */
   public static function headFaceX():Float return SEAT_X1;
@@ -64,7 +64,7 @@ class HobberSpindleSeat extends HobberMadePart {
     var block = HobberPartGeometry.box(SEAT_X0, SEAT_X1, seatY0(), SEAT_Y1, SEAT_LOW, SEAT_HALF);
     var tongue = HobberPartGeometry.box(SEAT_X0, SEAT_TONGUE_X1, SEAT_Y1 - 1, SEAT_TONGUE_Y1, SEAT_TONGUE_Z0, SEAT_HALF);
     var cuts = [HobberPartGeometry.boreY(SEAT_BORE / 2, seatY0() - 0.1, SEAT_Y1 + 0.1, 0, 0), HobberPartGeometry.box(-SEAT_SLIT / 2, SEAT_SLIT / 2, seatY0() - 0.1, HobberMotorCradle.cradleFaceY() - HobberMotorCradle.CRADLE_SLIT_END, 0, SEAT_HALF + 0.1)];
-    var blank=Solids.cut(Solids.union([block,tongue]),cuts),keep=HobberLayout.get().headClearance(),trimmed=blank.intersect(keep);blank.close();keep.close();
+    var blank=Solids.cut(Solids.union([block,tongue]),cuts),keep=HobberSkeleton.reference().headClearance(),trimmed=blank.intersect(keep);blank.close();keep.close();
     return HobberPartGeometry.withHoles(trimmed,seatHoles(false).concat(HobberMotorCradle.cradleHoles(true)));
   }
 

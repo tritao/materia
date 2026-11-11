@@ -15,7 +15,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 class HobberZBellowsPart extends WayCoverSection {
   static final recipe=new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return WayCoverSection.recipeType().parameters().filter(p->p.name!="material").map(p->switch p.name {
-    case "row":P.choice("row",[HobberLayout.get().zBellowsRow],HobberLayout.get().zBellowsRow);
+    case "row":P.choice("row",[HobberSkeleton.reference().zBellowsRow],HobberSkeleton.reference().zBellowsRow);
     case "section":P.choice("section",["Box"],"Box");
     case "nesting":P.choice("nesting",["GrowsToFixed"],"GrowsToFixed");
     case "height":P.length("height",17.2);

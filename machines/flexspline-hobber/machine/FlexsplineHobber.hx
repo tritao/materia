@@ -31,7 +31,7 @@ class FlexsplineHobber extends MachineAssembly {
   /** The servo's own joint: the belt couples it to B, and the hob drive is bound on it. */
   public static final B_MOTOR = "spindle/motor-turn";
   public static final A = "swivel/A";
-  public static final Y = HobberLayout.Y_JOINT;
+  public static final Y = HobberSkeleton.Y_JOINT;
   /**
    * ASSUMED holding torque of the A brake, N m at the output flange. ZeroErr has not published it (asked 2026-11-03); this is the
    * actuator's rated output torque (87 N m, ratio 100), a placeholder for a spring-applied holding brake of this class. Replace it from
@@ -55,29 +55,32 @@ class FlexsplineHobber extends MachineAssembly {
   public final precisionMounts:Array<{name:String, parent:String}> = [];
   public final mountContacts:Array<{parent:String, child:String}> = [];
   public final units:Array<HobberUnit>;
+  /** The layout every unit is placed from (the reference machine's unless given). */
+  public final skeleton:HobberSkeleton;
   final zUnit:HobberZAxis;
-  public function new(?spec:GearSpec,gashes:Int=12,detailedHob:Bool=false,?rotaryAxis:PrecisionRotaryAxis) {
+  public function new(?spec:GearSpec,gashes:Int=12,detailedHob:Bool=false,?rotaryAxis:PrecisionRotaryAxis,?skeleton:HobberSkeleton) {
     super();
     HobberComponents.install();
-    var layout=HobberLayout.get();
+    this.skeleton=skeleton==null?HobberSkeleton.reference():skeleton;
+    var layout=this.skeleton;
     this.spec=spec==null?new GearSpec(0.3,200,8,new Involute(20*Math.PI/180)):spec;
     if(this.spec.internal)throw "external hobbing machine requires external gear";
-    var foundation=new HobberFoundation();
+    var foundation=new HobberFoundation(layout);
     bed=foundation.bed; column=foundation.column;
-    var work=new HobberTableWork(this.spec,rotaryAxis);
+    var work=new HobberTableWork(layout,this.spec,rotaryAxis);
     table=work.table; tableSpec=work.tableSpec; mandrel=work.mandrel; workOrigin=work.workOrigin;
-    var cutter=new HobberBSpindle(this.spec,gashes,detailedHob);
+    var cutter=new HobberBSpindle(layout,this.spec,gashes,detailedHob);
     spindle=cutter.spindle; hob=cutter.hob;
     var minX=Math.max(25,mandrel.parameterNumber("outside")/2+hob.design.outsideDiameter/2+0.2);
     var cutDistance=this.spec.pitchRadius()+hob.design.pitchDiameter/2+this.spec.profileShift*this.spec.module;
     if(cutDistance<minX||cutDistance>100||this.spec.faceWidth>20)throw "gear/fixture exceeds hobber capacity";
     travel=[{id:"X",lower:minX,upper:layout.xRetract,initial:cutDistance},
       {id:"Y",lower:-15,upper:15,initial:0},{id:"Z",lower:layout.zTravelMin,upper:layout.zTravelMax,initial:0}];
-    var xUnit=new HobberXAxis(cutDistance,minX);
-    zUnit=new HobberZAxis(); zBellows=zUnit.zBellows; zBellowsMounts=zUnit.zBellowsMounts;
-    var head=new HobberAHead(); swivel=head.swivel;
-    var yUnit=new HobberYStage(); yModule=yUnit.yModule;
-    var rack=new HobberElectricalRack(tableSpec);
+    var xUnit=new HobberXAxis(layout,cutDistance,minX);
+    zUnit=new HobberZAxis(layout); zBellows=zUnit.zBellows; zBellowsMounts=zUnit.zBellowsMounts;
+    var head=new HobberAHead(layout); swivel=head.swivel;
+    var yUnit=new HobberYStage(layout); yModule=yUnit.yModule;
+    var rack=new HobberElectricalRack(layout,tableSpec);
     units=[foundation,work,xUnit,zUnit,head,yUnit,cutter,rack];
     var owners=[for(unit in units) unit.key=>unit];
     for(unit in units) for(mount in unit.mounts) {

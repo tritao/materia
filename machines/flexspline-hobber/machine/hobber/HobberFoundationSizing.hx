@@ -29,8 +29,8 @@ class HobberFoundationSizing {
   static inline final COLUMN_LIFT_PROPOSED_Y_MM = 60;
 
   public static function resolve(kind:String):HobberSizedFoundation {
-    var body = HobberLayout.get().foundationBodyValues(kind);
-    var rows = HobberMountingHoles.derive(kind, HobberLayout.get().foundationPlacements(kind));
+    var body = HobberSkeleton.reference().foundationBodyValues(kind);
+    var rows = HobberMountingHoles.derive(kind, HobberSkeleton.reference().foundationPlacements(kind));
     var rule = InsertAnchorSelection.sourceDemandRule("hobber-" + kind + "-source-anchors");
     var failures:Array<String> = [];
     for (size in rule.allowedNominalDiametersMm) {
@@ -94,7 +94,7 @@ class HobberFoundationSizing {
     rows:Array<CastInsertPlacement>,
     rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule
   ):Array<CastInsertPlacement> {
-    var d = HobberLayout.get().foundationDimensions("column"), cover = MineralCastBed.SOURCE_STEEL_COVER_MM;
+    var d = HobberSkeleton.reference().foundationDimensions("column"), cover = MineralCastBed.SOURCE_STEEL_COVER_MM;
     var choice = InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(LIFT_THREAD_MM).mating());
     var policy = machinekit.design.ThreadedHolePolicy.resolve(choice.thread, C45Bright);
     var x0 = MineralCastColumn.COLUMN_HEAD_WIDTH / 2 + cover, x1 = d[0] / 2 - cover;
@@ -206,7 +206,7 @@ class HobberFoundationSizing {
     var mass = FoundationSizing.asCastMass(new MineralFoundation(body, result.concat(sites)));
     if (mass.mass <= 0 || !Math.isFinite(mass.mass)
       || mass.unaccounted.length > 0) throw "Hobber lifting layout requires known source mass: plinth";
-    var d = HobberLayout.get().foundationDimensions("bed");
+    var d = HobberSkeleton.reference().foundationDimensions("bed");
     var proposed = InsertAnchorSelection.liftingPositions(
       {x: -d[0] / 2, y: -d[1] / 2, z: 0, width: d[0], depth: d[1], height: d[2]},
       {x: mass.centreOfMass.x, y: mass.centreOfMass.y, z: mass.centreOfMass.z},

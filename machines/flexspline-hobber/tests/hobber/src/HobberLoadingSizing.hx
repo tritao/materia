@@ -165,15 +165,15 @@ class HobberLoadingSizing {
     var frontMax = 0.0, topMax = 0.0;
     for (row in rows) for (result in (cast row.results:Array<Dynamic>)) {
       var limit = result.direction
-        == "front" ? hobber.HobberLayout.get().xRetract : hobber.HobberLayout.get().topRetract;
+        == "front" ? hobber.HobberSkeleton.reference().xRetract : hobber.HobberSkeleton.reference().topRetract;
       if (result.roundedRetractMm > limit) throw "loading retract obstructs a supported size";
       if (result.direction == "front") frontMax = Math.max(frontMax, result.roundedRetractMm);
       else topMax = Math.max(topMax, result.roundedRetractMm);
     }
-    if (frontMax != hobber.HobberLayout.get().xRetract || topMax != hobber.HobberLayout.get().topRetract) throw "loading retract must be the geometry-derived 5 mm round-up for the largest required corridor";
+    if (frontMax != hobber.HobberSkeleton.reference().xRetract || topMax != hobber.HobberSkeleton.reference().topRetract) throw "loading retract must be the geometry-derived 5 mm round-up for the largest required corridor";
     Sys.println(haxe.Json.stringify({
-      mechanicalFront: hobber.HobberLayout.get().xNominal(),
-      mechanicalTopAlternative: hobber.HobberLayout.get().xDimensions(hobber.HobberLayout.get().topRetract),
+      mechanicalFront: hobber.HobberSkeleton.reference().xNominal(),
+      mechanicalTopAlternative: hobber.HobberSkeleton.reference().xDimensions(hobber.HobberSkeleton.reference().topRetract),
       basis: "Assumed side-jaw gripper and front wrist; actual head solids; all A enclosed by 1-degree samples plus R*half-angle displacement padding; B stopped, Y=Z=0; exact hollow-cup and unpadded jaw/fixture paths checked separately",
       configurations: rows
     }));

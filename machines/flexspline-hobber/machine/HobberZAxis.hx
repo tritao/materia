@@ -16,8 +16,8 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 class HobberZAxis extends HobberUnit implements machinekit.cover.WayCover.CoverMembers {
   public final zBellows:Array<machinekit.cover.WayCover>=[];
   public final zBellowsMounts:Array<String>=[];
-  public function new() {
-    super("zAxis");
+  public function new(skeleton:HobberSkeleton) {
+    super("zAxis", skeleton);
     var centre=0.0;
     for (placed in layout.rails("column", layout.foundationPlacements("column"))) {
       var insert = "column/" + placed.insertId;
@@ -61,7 +61,7 @@ class HobberZAxis extends HobberUnit implements machinekit.cover.WayCover.CoverM
     PosedParts.scope(cache->{
       for(cover in zBellows) {
         var ids=cover.members();
-        for(q in [HobberLayout.get().zBellowsLowerLimit(),0.0,HobberLayout.get().zBellowsUpperLimit()]) {
+        for(q in [layout.zBellowsLowerLimit(),0.0,layout.zBellowsUpperLimit()]) {
           var shapes:Array<cadkit.modeling.Part>=[];
           for(i in 0...ids.length) {
             var id=ids[i],entry=entries.filter(m->m.id==id)[0],pose=poses.get(id);
@@ -83,22 +83,22 @@ class HobberZAxis extends HobberUnit implements machinekit.cover.WayCover.CoverM
 
   /** Bellows flanges and loose skins use the shared coupled-cover builder. */
   function installZBellows():Void {
-    var p=HobberLayout.get().zBellowsPlan();
+    var p=layout.zBellowsPlan();
     for(side in [-1,1])for(upper in [false,true]) {
       var id="Zbellows"+(side<0?"Left":"Right")+(upper?"Upper":"Lower"),moving=id+"MovingMount",fixed=id+"FixedMount";
       group("Protection/"+id+"/Mounts");
-      var movingPose=HobberFrame.sourcePose(HobberLayout.get().zBellowsPose(side,upper,false));
-      fixedPart(moving,HobberLayout.get().zBellowsMovingMount(),movingPose,"Zplate");zBellowsMounts.push(moving);
+      var movingPose=HobberFrame.sourcePose(layout.zBellowsPose(side,upper,false));
+      fixedPart(moving,layout.zBellowsMovingMount(),movingPose,"Zplate");zBellowsMounts.push(moving);
       if(upper) {
-        var mount=HobberLayout.get().zBellowsFixedUpperMount(),pose=HobberFrame.sourcePose(HobberLayout.get().zBellowsPose(side,true,true));
+        var mount=layout.zBellowsFixedUpperMount(),pose=HobberFrame.sourcePose(layout.zBellowsPose(side,true,true));
         var face=mount.fasteningFaces().filter(f->f.id=="column")[0];
         var contact=F.compose(pose,face.frame);
-        var rail=HobberLayout.get().rails("column",HobberLayout.get().foundationPlacements("column")).filter(r->side*r.contact.y>0)[0];
+        var rail=layout.rails("column",layout.foundationPlacements("column")).filter(r->side*r.contact.y>0)[0];
         externalPart(fixed,mount,pose,"foundation","column-"+rail.insertId,contact);zBellowsMounts.push(fixed);
       }
-      var origin=HobberFrame.sourcePose(HobberLayout.get().zBellowsPose(side,upper,true)),cover=machinekit.cover.WayCover.installOn(this,this,{
+      var origin=HobberFrame.sourcePose(layout.zBellowsPose(side,upper,true)),cover=machinekit.cover.WayCover.installOn(this,this,{
         id:id,row:p.row.id,fixedParent:upper?fixed:"Xbridge",movingParent:moving,
-        leader:{id:"Z",lower:HobberLayout.get().zBellowsLowerLimit(),upper:HobberLayout.get().zBellowsUpperLimit(),initial:0.0},
+        leader:{id:"Z",lower:layout.zBellowsLowerLimit(),upper:layout.zBellowsUpperLimit(),initial:0.0},
         origin:[origin.x,origin.y,origin.z],along:[0.0,0,upper?-1.0:1.0],up:[0.0,-1,0],width:p.width,height:p.height,space:p.space,shape:p.shape});
       zBellows.push(cover);
       var last=cover.skinMembers[cover.skinMembers.length-1];

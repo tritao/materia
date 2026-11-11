@@ -123,10 +123,10 @@ class HobberEnclosureFit {
       var loading:PartBox = {
         minX: origin.x - r - 25,
         maxX: origin.x + r + 25,
-        minY: Math.min(origin.y - hobber.HobberLayout.get().frontApproach - r - 80, swept.minY - 225),
+        minY: Math.min(origin.y - hobber.HobberSkeleton.reference().frontApproach - r - 80, swept.minY - 225),
         maxY: origin.y + 15,
         minZ: origin.z - 60,
-        maxZ: origin.z + 80 + hobber.HobberLayout.get().frontLift
+        maxZ: origin.z + 80 + hobber.HobberSkeleton.reference().frontLift
       };
       // Tray overlaps the casting perimeter by the rebate width.
       var a = machinekit.enclosure.TraySeat.WIDTH;

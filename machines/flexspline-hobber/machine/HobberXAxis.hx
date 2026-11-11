@@ -15,8 +15,8 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 class HobberXAxis extends HobberUnit {
 
-  public function new(cutDistance:Float, minX:Float) {
-    super("xAxis");
+  public function new(skeleton:HobberSkeleton, cutDistance:Float, minX:Float) {
+    super("xAxis", skeleton);
     var centre=0.0;
     for (placed in layout.rails("bed", layout.foundationPlacements("bed"))) {
       var insert = "bed/" + placed.insertId;

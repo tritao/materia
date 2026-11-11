@@ -1,5 +1,5 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.assembly.PosedParts;
 import cadkit.modeling.Part;
@@ -21,7 +21,7 @@ class HobberLoadingChecks {
       var machine = new FlexsplineHobber(spec), model = new cadkit.modeling.AssemblyModel("mm");
       machine.addTo(model, "");
       var state = model.initialState();
-      state.setJoint("X", HobberLayout.get().xRetract);
+      state.setJoint("X", HobberSkeleton.reference().xRetract);
       state.setJoint(FlexsplineHobber.Y, 0);
       state.setJoint("Z", 0);
       state.setJoint(FlexsplineHobber.B, 0);
@@ -35,7 +35,7 @@ class HobberLoadingChecks {
       var protrusion = machine.mandrel.parameterNumber("height") - seat;
       if (protrusion >= cup.component.parameterNumber("height")
         - cup.component.parameterNumber("endThickness")) throw "mandrel hits closed cup end";
-      if (HobberLayout.get().frontLift - protrusion < 5) throw "front transfer fails 5 mm mandrel clearance";
+      if (HobberSkeleton.reference().frontLift - protrusion < 5) throw "front transfer fails 5 mm mandrel clearance";
       var radius = spec.tipRadius(), gripper = [box(-radius - 80, -radius - 25, -radius - 25, radius + 25, 40, 80)];
       for (side in [-1, 1]) gripper.push(box(
         -radius - 30,
@@ -45,8 +45,8 @@ class HobberLoadingChecks {
         30,
         55
       ));
-      var samples = [for (x in [-HobberLayout.get().frontApproach, -150.0, -75, 0]) {
-        x:x, lift:HobberLayout.get().frontLift
+      var samples = [for (x in [-HobberSkeleton.reference().frontApproach, -150.0, -75, 0]) {
+        x:x, lift:HobberSkeleton.reference().frontLift
       }
       ];
       for (lift in [20.0, 10, 5, 0]) samples.push({x: 0.0, lift: lift});
@@ -54,12 +54,12 @@ class HobberLoadingChecks {
       for (jaw in gripper) {
         var b = PosedParts.boxOf(jaw);
         sweptJaws.push(box(
-          b.minX - HobberLayout.get().frontApproach,
+          b.minX - HobberSkeleton.reference().frontApproach,
           b.maxX,
           b.minY,
           b.maxY,
           b.minZ,
-          b.maxZ + HobberLayout.get().frontLift
+          b.maxZ + HobberSkeleton.reference().frontLift
         ));
       }
       try {

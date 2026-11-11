@@ -15,8 +15,8 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 class HobberYStage extends HobberUnit {
   public final yModule:ScrewLinearModule;
-  public function new() {
-    super("yStage");
+  public function new(skeleton:HobberSkeleton) {
+    super("yStage", skeleton);
     yModule=new ScrewLinearModule(layout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")));
     yModule.takeServiceRemoval("carriage");
     include("Ymodule",yModule,heights.yModule);

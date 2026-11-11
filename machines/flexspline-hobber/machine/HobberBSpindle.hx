@@ -16,8 +16,8 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 class HobberBSpindle extends HobberUnit {
   public final spindle:HobSpindle;
   public final hob:Hob;
-  public function new(spec:GearSpec, gashes:Int, detailedHob:Bool) {
-    super("bSpindle");
+  public function new(skeleton:HobberSkeleton, spec:GearSpec, gashes:Int, detailedHob:Bool) {
+    super("bSpindle", skeleton);
     var profile = spec.profile();
     var hobTool = Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),
       1, 32, gashes), spec, 40, 16, false, detailedHob);

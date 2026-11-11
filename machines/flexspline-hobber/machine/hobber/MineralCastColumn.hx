@@ -22,7 +22,7 @@ class MineralCastColumn extends machinekit.structural.MineralFoundation {
 
   public function new() {
     var source = HobberFoundationSizing.resolve("column");
-    super(source.body, source.placements, HobberLayout.get().columnSolePads()[0].id, null, source.liftingPoints);
+    super(source.body, source.placements, HobberSkeleton.reference().columnSolePads()[0].id, null, source.liftingPoints);
     // Keep the insert at its purpose datum; split a large anchor pattern by
     // its physical sides so the scene does not bury twenty parts in one folder.
     for(row in insertLocations())if(row.purpose=="lifting-mount") {

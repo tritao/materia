@@ -1,5 +1,5 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import gearkit.ConjugateRack;
 import gearkit.GearSpec;
 import gearkit.Involute;
@@ -33,7 +33,7 @@ class SupplierPackageExport {
   static inline final WALL = 0.6;
   static inline final CLEARANCE = 0.02;
   static inline final RIM_LAND = 0.3;
-  // Work datum (tooth band) z = 363 mm in the machine; table face HobberLayout.get().nativeTableFace = 228 mm.
+  // Work datum (tooth band) z = 363 mm in the machine; table face HobberSkeleton.reference().nativeTableFace = 228 mm.
   static inline final WORK_DATUM = 363.0;
   static inline final TABLE_FACE = 228.0;
   // FlexsplineCupBlank defaults: blank OD 62 over the band, 40 mm tall, 2 mm closed end.

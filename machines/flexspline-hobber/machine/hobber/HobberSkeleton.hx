@@ -98,13 +98,18 @@ typedef HobberHeightStack = {
   swivel:AssemblyFrame, yModule:AssemblyFrame, spindle:AssemblyFrame
 };
 
-/** The hobber's single lazy layout record. Native manufacturing datums and
- * machine placements share these inputs; no layout class owns a second copy. */
-class HobberLayout {
+/**
+ * The hobber's skeleton: the layout inputs every unit and part is placed from, the values derived from them (the height
+ * stack, rail and pad positions) and the frames parts mount at. `FlexsplineHobber` takes one and hands it to each unit;
+ * a part made from its recipe alone uses the reference machine's (`reference()`). Parts still reading `reference()`
+ * themselves take the skeleton explicitly when they are recorded in their own frames.
+ */
+class HobberSkeleton {
 
-  static final layoutCache = new machinekit.cache.Once<HobberLayout>();
+  static final referenceCache = new machinekit.cache.Once<HobberSkeleton>();
   final heightsCache = new machinekit.cache.Once<HobberHeightStack>();
-  public static function get():HobberLayout return layoutCache.get(() -> new HobberLayout());
+  /** The reference machine's skeleton. */
+  public static function reference():HobberSkeleton return referenceCache.get(() -> new HobberSkeleton());
 
   function new() {
     nativeTableFace = 228.0;
@@ -1205,8 +1210,8 @@ class HobberLayout {
   function zBellowsGuide():machinekit.motion.LinearRailProfile.LinearRailProfileSpec {
     var g=LinearRailSystem.catalog().get("HGH15CA");if(g==null)throw "Missing Z zBellowsGuide";return g;
   }
-  final zBellowsRailCache=new machinekit.cache.Once<HobberLayout.HobberPlacedRail>();
-  function zBellowsRail():HobberLayout.HobberPlacedRail return zBellowsRailCache.get(()->rails("column",foundationPlacements("column"))[0]);
+  final zBellowsRailCache=new machinekit.cache.Once<HobberSkeleton.HobberPlacedRail>();
+  function zBellowsRail():HobberSkeleton.HobberPlacedRail return zBellowsRailCache.get(()->rails("column",foundationPlacements("column"))[0]);
   public function zBellowsSurfaceX():Float return zBellowsRail().contact.x;
   public function zBellowsLowerLimit():Float return zTravelMin-HobberScales.overtravel();
   public function zBellowsUpperLimit():Float return zTravelMax+HobberScales.overtravel();

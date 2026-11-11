@@ -1,11 +1,11 @@
 import hobber.*;
-import hobber.HobberLayout;
+import hobber.HobberSkeleton;
 import machinekit.hobbing.*;
 import machinekit.component.MachineComponent;
 import materia.assembly.AssemblyFrames as F;
 
 /** Read-only export for the FEM checks (fem/hobber_fem.py): STEP of the four parts in their authored frame, their holes, and the masses and
-    centres the loads need (servo group on the cradle, head on the A flange), all in the authored frame (work frame, z measured from HobberLayout.get().nativeHobCentreZ).
+    centres the loads need (servo group on the cradle, head on the A flange), all in the authored frame (work frame, z measured from HobberSkeleton.reference().nativeHobCentreZ).
     Usage: hl main.hl <output dir>. Nothing here changes the model. */
 class HobberFemExport {
   static function r(v:Float, digits:Int = 4):Float {
@@ -50,7 +50,7 @@ class HobberFemExport {
     sys.FileSystem.createDirectory(dir);
     var machine = new FlexsplineHobber();
     if(args.length==2&&args[1]=="y-module") {exportY(machine,dir);return;}
-    var poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine()), seatZ = HobberLayout.get().nativeHobCentreZ;
+    var poses = machine.solvedPoses(), back = F.inverse(hobber.HobberFrame.workToMachine()), seatZ = HobberSkeleton.reference().nativeHobCentreZ;
     var partList:Array<Dynamic> = [];
     var out:Dynamic = {parts: partList};
     function at(id:String, x:Float, y:Float, z:Float) return F.transformPoint(F.compose(back, poses.get(id)), x, y, z);
@@ -135,7 +135,7 @@ class HobberFemExport {
       mz += props.mass * p.z;
     }
     var tool = F.transformPoint(F.compose(back, F.compose(poses.get("hob"), machine.hob.connector("centre").frame)), 0, 0, 0);
-    out.head = {mass: mass, com: [r(mx / mass), r(my / mass), r(mz / mass - seatZ)], outputFaceX: HobberLayout.get().swivelNativeX, hob: [r(tool.x), r(tool.y), r(tool.z - seatZ)]};
+    out.head = {mass: mass, com: [r(mx / mass), r(my / mass), r(mz / mass - seatZ)], outputFaceX: HobberSkeleton.reference().swivelNativeX, hob: [r(tool.x), r(tool.y), r(tool.z - seatZ)]};
     out.seatZ = seatZ;
     // Z moving mass (everything on the Z joint) for the saddle's inertial loads.
     var moving = new Map<String, Bool>();

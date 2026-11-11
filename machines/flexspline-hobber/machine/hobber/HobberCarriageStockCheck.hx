@@ -17,7 +17,7 @@ class HobberCarriageStockCheck {
   public static function result():{stockFlatnessMm:Float, hiwinMountHeightMm:Float,
     blockHeightVariationMm:Float, requiredMm:Float, finishingRequired:Bool, assumedStock:Bool} {
     var stock = GroundStock.plate(GroundStock.STEEL, HobberXCarriage.X_CARRIAGE_THICKNESS);
-    var spacing = 2 * HobberLayout.get().bedRailCentre;
+    var spacing = 2 * HobberSkeleton.reference().bedRailCentre;
     var allowance = 0.085 * spacing / 500;
     var flatness = stock.flatness * spacing / 100;
     var required = Math.min(allowance, Math.min(BLOCK_HEIGHT_VARIATION_MM, PAD_COPLANARITY_MM));

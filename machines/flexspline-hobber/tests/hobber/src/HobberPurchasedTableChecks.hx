@@ -127,7 +127,7 @@ class HobberPurchasedTableChecks {
     check(part.axis.basis("radialRunout") == machinekit.transmission.ValueBasis.Measured, "Measured basis persists");
     var m = new FlexsplineHobber(), cache = new machinekit.assembly.PosedParts(), poses = m.solvedPoses();
     var raw = cadkit.modeling.Part.cylinderSpan(19.99,
-      -590, HobberLayout.get().nativeTableFace + 20), cylinder = machinekit.assembly.PosedParts.moved(
+      -590, HobberSkeleton.reference().nativeTableFace + 20), cylinder = machinekit.assembly.PosedParts.moved(
         raw,
         hobber.HobberFrame.workToMachine()
       );

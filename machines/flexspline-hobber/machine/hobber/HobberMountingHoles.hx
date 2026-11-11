@@ -15,16 +15,16 @@ import materia.casting.InsertManufacturing.InsertHoleRoute;
 class HobberMountingHoles {
   public static function derive(kind:String, rows:Array<CastInsertPlacement>):Array<CastInsertPlacement> {
     var result = rows.copy();
-    for (placed in HobberLayout.get().rails(kind, rows)) {
+    for (placed in HobberSkeleton.reference().rails(kind, rows)) {
       var indices = [for (index in 0...result.length) if (result[index].id == placed.insertId) index];
       if (indices.length != 1) throw "Placed bought part needs one source seat: " + placed.insertId;
       var index = indices[0], row = result[index], clearance = placed.rail.mountingHole();
-      var toInsert = F.compose(F.inverse(F.compose(HobberLayout.get().foundationDatum(kind), row.pose)), placed.pose);
+      var toInsert = F.compose(F.inverse(F.compose(HobberSkeleton.reference().foundationDatum(kind), row.pose)), placed.pose);
       var part = InsertMountPattern.derive(
         row.part,
         placed.rail,
         "hobber-" + kind + "/" + placed.memberId,
-        HobberLayout.get().railFingerprint(placed),
+        HobberSkeleton.reference().railFingerprint(placed),
         toInsert,
         [for (connector in placed.rail.mountingConnectors()) connector.name],
         placed.rail.mountingThread(),
@@ -43,7 +43,7 @@ class HobberMountingHoles {
       );
       result[index] = {id: row.id, purpose:row.purpose, pose: row.pose, openings: row.openings, part: addFixture(row.id, part)};
     }
-    if(kind=="column")for(placed in HobberLayout.get().rails(kind,rows))for(index in 0...result.length)if(result[index].id==placed.insertId) {
+    if(kind=="column")for(placed in HobberSkeleton.reference().rails(kind,rows))for(index in 0...result.length)if(result[index].id==placed.insertId) {
       var row=result[index];
       result[index]={id:row.id,purpose:row.purpose,pose:row.pose,openings:row.openings,part:addBellowsHoles(row,placed.contact.y<0?-1:1)};
     }
@@ -52,7 +52,7 @@ class HobberMountingHoles {
       var row = result[index];
       result[index] = {id: row.id, purpose:row.purpose, pose: row.pose, openings: row.openings, part: addPadHoles(kind, row)};
     }
-    if (kind == "column") for (pad in HobberLayout.get().columnSolePads())
+    if (kind == "column") for (pad in HobberSkeleton.reference().columnSolePads())
       for (index in 0...result.length) if (result[index].id == pad.id) {
         var row=result[index];
         result[index]={id:row.id,purpose:row.purpose,pose:row.pose,openings:row.openings,part:addSoleHoles(row,pad)};
@@ -63,8 +63,8 @@ class HobberMountingHoles {
   /** The made upper bracket owns its source drilling pattern. Transfer after
    * indicating it on the existing rail insert; no independent hole list. */
   static function addBellowsHoles(row:CastInsertPlacement,side:Int):CastInsert {
-    var mount=HobberLayout.get().zBellowsFixedUpperMount(),face=mount.fasteningFaces().filter(f->f.id=="column")[0];
-    var toInsert=F.compose(F.inverse(F.compose(HobberLayout.get().foundationDatum("column"),row.pose)),F.compose(HobberLayout.get().zBellowsPose(side,true,true),face.frame));
+    var mount=HobberSkeleton.reference().zBellowsFixedUpperMount(),face=mount.fasteningFaces().filter(f->f.id=="column")[0];
+    var toInsert=F.compose(F.inverse(F.compose(HobberSkeleton.reference().foundationDatum("column"),row.pose)),F.compose(HobberSkeleton.reference().zBellowsPose(side,true,true),face.frame));
     var part=row.part,spec=part.insertSpec(),thickness=part.boxDimensions(row.id).height;
     var size=switch face.role {case Clamped(thread,_,_,_):if(thread==null)throw "Bellows bracket needs its selected thread";thread;case _:throw "Bellows source must follow a clamped face";};
     var choice=InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(Std.parseFloat(size.substr(1))).mating()),n=0;
@@ -80,7 +80,7 @@ class HobberMountingHoles {
 
   /** Reserve the sole joint's transferred service threads before choosing
    * cast anchors. The clamped face owns the pattern; no second hole list. */
-  static function addSoleHoles(row:CastInsertPlacement,pad:HobberLayout.ColumnSolePad):CastInsert {
+  static function addSoleHoles(row:CastInsertPlacement,pad:HobberSkeleton.ColumnSolePad):CastInsert {
     var face=HobberXCarriage.columnSoleFace(pad);
     var size=switch face.role {
       case Clamped(thread,_,_,_): if (thread==null) throw "Sole joint needs a selected thread"; thread;
@@ -90,7 +90,7 @@ class HobberMountingHoles {
     var part=row.part;
     var spec=part.insertSpec();
     var thickness=part.boxDimensions(row.id).height;
-    var toInsert=F.compose(F.inverse(F.compose(HobberLayout.get().foundationDatum("column"),row.pose)),face.frame);
+    var toInsert=F.compose(F.inverse(F.compose(HobberSkeleton.reference().foundationDatum("column"),row.pose)),face.frame);
     var n=0;
     for (point in face.holes) {
       var q=F.transformPoint(toInsert,point.x,point.y,0);
@@ -112,7 +112,7 @@ class HobberMountingHoles {
    * Guard feet have their own threads in the insert, off both ground bars. */
   static function addPadHoles(kind:String,row:CastInsertPlacement):CastInsert {
     var d=kind=="bed"?HobberDrives.x():HobberDrives.z(),part=row.part,spec=part.insertSpec();
-    var inverse=F.inverse(F.compose(HobberLayout.get().foundationDatum(kind),row.pose)),thickness=part.boxDimensions(row.id).height;
+    var inverse=F.inverse(F.compose(HobberSkeleton.reference().foundationDatum(kind),row.pose)),thickness=part.boxDimensions(row.id).height;
     for(support in ["fixed","floating"]) {
       var choice=InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(Std.parseFloat(HobberPadBolts.thread(d,support).substr(1))).mating()),n=0;
       for(point in HobberPadBolts.points(d,support)) {
@@ -144,7 +144,7 @@ class HobberMountingHoles {
     });
     if (gaps.length == 0) throw "No inter-station land for the declared fixture thread: " + id;
     var thickness = part.boxDimensions(id).height;
-    var fixture = InsertHoles.records(HobberLayout.get().fixtureHoles(thickness))[0];
+    var fixture = InsertHoles.records(HobberSkeleton.reference().fixtureHoles(thickness))[0];
     fixture.frame.y = gaps[0];
     spec.holes.push(fixture);
     switch spec.origin {

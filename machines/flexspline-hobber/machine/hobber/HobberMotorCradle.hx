@@ -96,7 +96,7 @@ class HobberMotorCradle extends HobberMadePart {
   /** The rest block's footprint and top, mm (seat frame): the FE couples its top to the servo group through the shim pack. */
   public static function cradleRest():{x0:Float, x1:Float, y0:Float, y1:Float, top:Float} return {x0: CRADLE_REST_X0, x1: CRADLE_REST_X1, y0: CRADLE_REST_Y0, y1: CRADLE_REST_Y1, top: cradleRestTop()};
   /** Work y of the wall's front face (the motor flange face). */
-  public static function cradleFaceY():Float return HobberLayout.get().spindleNativeY - HobSpindle.MOTOR_FACE_Z;
+  public static function cradleFaceY():Float return HobberSkeleton.reference().spindleNativeY - HobSpindle.MOTOR_FACE_Z;
   /** The servo's axis in work x (the cradle's authored frame). */
   public static inline function cradleMotorX():Float return CRADLE_MOTOR_X;
   /**
