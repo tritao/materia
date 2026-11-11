@@ -108,7 +108,10 @@ import haxeon.ui.widgets.text.Text;
       frame
     );
     check(findLabel(panel, "Scene preset") == null, "mission panel does not select project scenes");
-    var overlay = editor.ui.submit(editor.viewportWithControls(new Text("Scene"), 800), frame);
+    var overlay = editor.ui.submit(
+      new ContextView(context -> editor.viewportWithControls(context, new Text("Scene"), 800)),
+      frame
+    );
     check(
       findLabel(overlay, "Scene preset") != null && find(overlay, "viewport-mission-steps") == null,
       "project overlay selects legacy scene presets without inventing a mission"

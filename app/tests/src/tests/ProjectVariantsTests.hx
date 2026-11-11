@@ -120,7 +120,10 @@ import materia.project.SceneArtifact;
     editor.documentChanged();
     var original = editor.session.document, smallGeometry = editor.scene.records()[0].width;
     var frame = new LayoutFrame(800, 600);
-    var ui = editor.ui.submit(editor.viewportWithControls(new Text("Scene"), 800), frame);
+    var ui = editor.ui.submit(
+      new ContextView(context -> editor.viewportWithControls(context, new Text("Scene"), 800)),
+      frame
+    );
     check(
       find(ui, "Configuration") && find(ui, "Study") && !find(ui, "Demo"),
       "project selector separates configurations and studies without a demo chooser"
@@ -165,7 +168,10 @@ import materia.project.SceneArtifact;
       !pending.switchAllowed && StringTools.startsWith(pending.status, "Opening large · "),
       "pending selection reports target and locks chooser"
     );
-    var loadingUi = editor.ui.submit(editor.viewportWithControls(new Text("Scene"), 800), frame);
+    var loadingUi = editor.ui.submit(
+      new ContextView(context -> editor.viewportWithControls(context, new Text("Scene"), 800)),
+      frame
+    );
     check(
       find(loadingUi, "Loading project selection") && find(loadingUi, "Cancel"),
       "chooser shows live progress and cancellation while preparing"
