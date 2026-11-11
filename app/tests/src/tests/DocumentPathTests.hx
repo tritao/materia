@@ -47,6 +47,25 @@ import haxeon.ui.core.UiKey;
         DocumentPathLabel.documentPath(editor.session) == editor.session.path,
         "saved document path takes precedence over source path"
       );
+      editor.startLoading = app.editor.ExampleCatalog.launchEntry(source);
+      editor.startLoadingPhase = "Fingerprinting the project and checking cached build dependencies";
+      var statusMessage = editor.statusSelectionLabel();
+      check(statusMessage.length > 48, "loading fixture exceeds the former character limit");
+      function status(width:Float):RenderNode {
+        editor.viewportWidth = width;
+        return editor.ui.submit(editor.statusBar(editor.ui.buildContext), new LayoutFrame(width, 28));
+      }
+      root = status(1600);
+      check(find(root, statusMessage).layout.text == statusMessage, "wide status bar shows the full loading message");
+      root = status(400);
+      var statusText = find(root, statusMessage);
+      check(statusText.layout.text != statusMessage && StringTools.endsWith(statusText.layout.text, "…"),
+        "narrow status bar ellipsizes by available width");
+      var runtime = find(root, editor.statusRuntimeLabel()).globalBounds();
+      check(runtime.x + runtime.width <= 400.1, "long loading messages leave runtime status inside the window");
+      root = status(1600);
+      check(find(root, statusMessage).layout.text == statusMessage, "widening the status bar restores the full message");
+      editor.startLoading = null;
       editor.dispose();
     } catch (error:Dynamic) {
       editor.dispose();

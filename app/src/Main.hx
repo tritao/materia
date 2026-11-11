@@ -2127,20 +2127,21 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
 
     var left = statusSelectionLabel();
     var right = statusRuntimeLabel();
-    var narrow = viewportWidth < 700.0, wide = viewportWidth >= 900.0;
+    var wide = viewportWidth >= 900.0;
     var copying = Sys.time() - statusCopiedAt < STATUS_COPIED_SECONDS;
     if (copying) invalidateView();
-    var selectionText = new Text(
-      shortenLabel(copying ? "Copied to clipboard" : left, narrow ? 20 : 48),
-      null,
-      simulation.error == null ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger,
-      TextStyleOverride.text(12.0)
+    var message = copying ? "Copied to clipboard" : left;
+    var selectionText = new haxeon.ui.widgets.text.MiddleEllipsisText(
+      "status-selection-text", message, false,
+      TextStyleOverride.combine(TextStyleOverride.text(12.0), TextStyleOverride.foreground(
+        simulation.error == null ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger))
     );
     var copyable = statusSelectionCopyText() != null;
     var selectionView:View = selectionText;
     if (copyable) {
       // Clicking the selection text copies what it names: the object's reference, and the picked face when there is one.
       var buttonStyle = new LayoutStyle();
+      buttonStyle.width = LayoutAxis.grow();
       buttonStyle.height = LayoutAxis.fixed(STATUS_HEIGHT - 6.0);
       buttonStyle.padding = new Insets(6.0, 0.0, 6.0, 0.0);
       var copy = new Button("", buttonStyle, function() {
@@ -2155,10 +2156,11 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       copy.accessibilityLabel = "Copy reference to the selection: " + left;
       selectionView = copy;
     }
-    var items:Array<KeyedView> = [
-      new KeyedView("selection", selectionView),
-      new KeyedView("space", new Spacer("status-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0)))
-    ];
+    var selectionTip = new Tooltip("status-selection-tooltip", selectionView, new Text(message));
+    selectionTip.fillAnchor = true;
+    selectionTip.placement = haxeon.ui.widgets.overlays.TooltipPlacement.Above;
+    selectionTip.showWhen = function() return selectionText.truncated;
+    var items:Array<KeyedView> = [new KeyedView("selection", selectionTip)];
     var mates = session.assemblyMateStatus();
     if (mates != null) {
       var trouble = StringTools.startsWith(mates, "Mates conflict") || session.assemblyMateProblem != null;
