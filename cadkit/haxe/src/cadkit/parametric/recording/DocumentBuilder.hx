@@ -347,6 +347,18 @@ class DocumentBuilder {
     return constrainedSketch(sketch, new Map());
   }
 
+  /** Circles of one radius at fixed centres, as a constrained sketch in `plane` (XY when omitted); circle `i` is the entity `c<i>`. */
+  public function circlesSketch(centres:Array<Vector>, radius:Float, ?plane:Plane):ConstrainedSketchFeature {
+    if (centres.length == 0) throw new ParametricError("a circles sketch needs at least one centre");
+    var sketch = new ConstrainedSketch(plane);
+    for (i in 0...centres.length) {
+      sketch.addPoint(new SketchPoint("o" + i, centres[i].x, centres[i].y));
+      sketch.addConstraint(SketchConstraint.fixed("fixed" + i, "o" + i));
+      sketch.addEntity(SketchEntity.circle("c" + i, "o" + i, radius));
+    }
+    return constrainedSketch(sketch, new Map());
+  }
+
   /** Record a constrained sketch and bind dimension constraint IDs to named parameters. */
   public function constrainedSketch(sketch:ConstrainedSketch,
     dimensions:Map<String, NamedParameter>):ConstrainedSketchFeature {

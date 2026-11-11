@@ -313,12 +313,15 @@ Group 2: chip tray (inputs = the table it fits; CadKit `polygon` profile),
 electrical panel (cut-plate route added); the unused GE-enclosure panel
 removed (shared recipe v7). The X chip covers (sides, lids, skirt) record
 as CadKit sheet metal: a mild-steel 2 mm sheet base from a fixed polygon
-sketch, edge flanges with R2 bends, then solid cuts for tool ports and
-clearances; the folded solids match the old box-and-ring solids exactly.
+sketch, edge flanges with R2 bends; tool ports and the skirt's nut
+clearance are sheet cuts in the blank (so the flat pattern carries them),
+and the skirt's far lip is three flanges either side of its two notches
+(the old box cut left an unmakeable sliver of bend there: −118 mm³, the
+only geometry change). Everything else matches the old solids exactly.
 CadKit gained named edge selection for flanges and hems (wall + outline
 identity, `DocumentBuilder.sheetFlange`, saved as `edges`) so recording
-code never picks faces, and `DocumentBuilder.polygonSketch`. Open: ports
-and clearances as sheet cuts so the flat pattern carries them.
+code never picks faces, and `DocumentBuilder.polygonSketch` /
+`circlesSketch`. Joint holes are still solid cuts after the sheet.
 Group 3 and 4: outboard carrier, spindle seat, Y module base and carriage,
 B motor cradle, Z saddle. Along the way: CadKit `cut-all` is its own
 feature on the native multi-tool cut (a boolean against a compound of

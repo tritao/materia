@@ -130,8 +130,7 @@ class HobberChipCover extends MachineComponent {
     var n = points.length;
     var corners = [for (p in points) new Vector(p[0], mirrored ? -p[1] : p[1])];
     if (mirrored) corners.reverse();
-    var plane = new Plane(new Vector(0, 0, top), Vector.X(), Vector.Z());
-    var base = b.label(b.sheetBase(b.label(b.polygonSketch(corners, plane), "Outline"), stock()), "Blank");
+    var base = b.label(b.sheetBase(b.label(b.polygonSketch(corners, topPlane(top)), "Outline"), stock()), "Blank");
     return {base: base, edge: i -> "sketch:e" + (mirrored ? (2 * n - 2 - i) % n : i)};
   }
 
@@ -151,40 +150,43 @@ class HobberChipCover extends MachineComponent {
     return b.label(flange(b, down, down.wallIds()[0], "flange:tip", 10, true), "Foot");
   }
 
-  static function toolPorts(b:DocumentBuilder, front:Bool):Array<Feature> return [for (y in [-footY(), footY()])
-    b.cylinderAlong(new Vector(footX(front), y, 0), Vector.Z(), machinekit.standard.PanelHolePlug.HOLE / 2, front ? 221 : 231, front ? 225 : 235)];
+  /** The cover's top plane, where its blank is sketched (material below). */
+  static function topPlane(z:Float):Plane return new Plane(new Vector(0, 0, z), Vector.X(), Vector.Z());
 
-  /** Lid: the front one turns down over the skirt end; both carry the tool ports. */
+  /** Lid: the front one turns down over the skirt end; both carry the tool ports, cut in the blank. */
   static function lid(b:DocumentBuilder, front:Bool):Feature {
-    var nut = nutBounds(), end = 20 + nut.minX - 3, start = 115 + nut.maxX + 3;
-    var body:Feature = if (front) {
-      var s = sheet(b, [[174, -65], [end, -65], [end, 65], [174, 65]], 224, false);
+    var nut = nutBounds(), end = 20 + nut.minX - 3, start = 115 + nut.maxX + 3, top = front ? 224.0 : 234.0;
+    var body:SheetFeature = if (front) {
+      var s = sheet(b, [[174, -65], [end, -65], [end, 65], [174, 65]], top, false);
       b.label(flange(b, s.base, 1, s.edge(3), 5, false), "Front lip");
-    } else sheet(b, [[start, -65], [REAR_END, -65], [REAR_END, 65], [start, 65]], 234, false).base;
-    return b.label(b.cutAll(body, toolPorts(b, front), ["port", "port"]), "Tool ports");
+    } else sheet(b, [[start, -65], [REAR_END, -65], [REAR_END, 65], [start, 65]], top, false).base;
+    var ports = b.label(b.circlesSketch([for (y in [-footY(), footY()]) new Vector(footX(front), y)], machinekit.standard.PanelHolePlug.HOLE / 2,
+      topPlane(top)), "Port circles");
+    return b.label(b.sheetCut(body, ports, 1), "Tool ports");
   }
 
   /**
-   * Skirt: a plate with lips down at both ends and, along each side, a skirt down in three spans with two tabs between them
-   * that step up and out to the carriage receivers.
+   * Skirt: a plate with lips down at both ends, the far one in three pieces either side of two notches, and along each side a
+   * skirt down in three spans with two tabs between them that step up and out to the carriage receivers. The nut clearance is
+   * cut in the blank.
    */
   static function skirt(b:DocumentBuilder):Feature {
-    var spans = [124.0, 160, 180, 340, 360, 382];
-    var points = [for (x in spans) [x, -76.0]].concat([for (i in 0...spans.length) [spans[spans.length - 1 - i], 76.0]]);
+    var spans = [124.0, 160, 180, 340, 360, 382], notches = [-76.0, -73, -65, 65, 73, 76];
+    var points = [for (x in spans) [x, -76.0]].concat([for (y in notches.slice(1, 5)) [382, y]])
+      .concat([for (i in 0...spans.length) [spans[spans.length - 1 - i], 76.0]]);
     var s = sheet(b, points, 248, false), n = points.length;
     var walls:SheetFeature = s.base;
-    walls = b.label(flange(b, walls, 1, s.edge(5), 5.5, false), "End lip");
-    walls = b.label(flange(b, walls, 1, s.edge(n - 1), 5.5, false), "End lip");
-    // Edges 0..4 run along y = -76, 6..10 along y = +76; the even ones are skirt spans, the odd ones tabs.
-    for (i in [0, 2, 4, 6, 8, 10]) walls = b.label(flange(b, walls, 1, s.edge(i), 28, false), "Skirt");
-    for (i in [1, 3, 7, 9]) {
+    // Edges 0..4 run along y = -76 and 10..14 along y = +76 (even: skirt spans, odd: tabs); 5..9 are the far end, 15 the near end.
+    for (i in [5, 7, 9, n - 1]) walls = b.label(flange(b, walls, 1, s.edge(i), 5.5, false), "End lip");
+    for (i in [0, 2, 4, 10, 12, 14]) walls = b.label(flange(b, walls, 1, s.edge(i), 28, false), "Skirt");
+    for (i in [1, 3, 11, 13]) {
       var riser = b.label(flange(b, walls, 1, s.edge(i), 6, true), "Tab riser");
       walls = b.label(flange(b, riser, riser.wallIds()[0], "flange:tip", 28, false), "Tab");
     }
-    var nut = nutBounds();
-    var clear:Array<Feature> = [b.boxBetween(nut.minX - 3, nut.maxX + 3, nut.minY - 3, nut.maxY + 3, 245, 249), b.boxBetween(381, 387, 65, 73, 237, 245),
-      b.boxBetween(381, 387, -73, -65, 237, 245)];
-    return b.label(b.cutAll(walls, clear, ["nut clearance", "lip notch", "lip notch"]), "Clearances");
+    var nut = nutBounds(), x0 = nut.minX - 3, x1 = nut.maxX + 3, y0 = nut.minY - 3, y1 = nut.maxY + 3;
+    var outline = b.label(b.polygonSketch([new Vector(x0, y0), new Vector(x1, y0), new Vector(x1, y1), new Vector(x0, y1)], topPlane(248)),
+      "Nut clearance outline");
+    return b.label(b.sheetCut(walls, outline, 1), "Nut clearance");
   }
 
   override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> return switch role {

@@ -184,7 +184,7 @@ class FeaturePartEquivalence {
       "XcoverRearRight" => ["Blank", "Upstand", "Web", "Foot", "Fasteners · Derived holes"],
       "XfrontCover" => ["Blank", "Front lip", "Tool ports", "Fasteners · Derived holes"],
       "XrearCover" => ["Blank", "Tool ports", "Fasteners · Derived holes"],
-      "Xskirt" => ["Blank", "End lip", "Skirt", "Tab riser", "Tab", "Clearances", "Fasteners · Derived holes"],
+      "Xskirt" => ["Blank", "End lip", "Skirt", "Tab riser", "Tab", "Nut clearance", "Fasteners · Derived holes"],
       "electricalPanel" => ["Welded panel"],
       "outboardCarrier" => ["Carrier"],
       "spindleSeat" => ["Block", "Bore and slit", "Swivel clearance", "Clamp screw holes"],
