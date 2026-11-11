@@ -48,13 +48,8 @@ class HobberZSaddle extends HobberMadePart {
   public static function swivelRunningGap():Float return HobberZSaddle.SWIVEL_PLATE_FRONT - HobberSkeleton.reference().swivelNativeX;
   /** Depth of the pocket from the plate's back face to the housing's front face. */
   public static function swivelPocketDepth():Float return HobberZSaddle.SWIVEL_PLATE_BACK - (HobberSkeleton.reference().swivelNativeX - ErobActuatorPart.SEAT_Z);
-  /** The pocket, output bore and screw clearance holes the Z saddle needs, in the saddle's frame (the work frame lowered by `SEAT_Z`). */
-  public static function swivelHousingCutout():Part {
-    var tool = new ErobActuatorPart().mountingCutout(HobberZSaddle.swivelPocketDepth(), HobberZSaddle.swivelRunningGap(), 0.4, 0, ErobActuatorPart.PILOT_BORE_CLEARANCE);
-    var placed = PosedParts.moved(tool, F.fromRotationMatrix(HobberSkeleton.reference().swivelNativeX, 0, 0, HobberSkeleton.reference().swivelRotation));
-    tool.close();
-    return placed;
-  }
+  /** Where the eRob housing sits in the saddle's frame: on the swivel axis at its seat, axis along the work frame's -x. */
+  public static function actuatorPose():AssemblyFrame return F.fromRotationMatrix(HobberSkeleton.reference().swivelNativeX, 0, 0, HobberSkeleton.reference().swivelRotation);
   public static inline final PLATE_BLOCK_SOLE = 6.0;
   // ---- A axis and spindle seat (FRAME_PLAN R1, R2) ------------------------------------------------------------------------------
   public static function platePositions():Array<{y:Float, z:Float}> {
@@ -69,7 +64,36 @@ class HobberZSaddle extends HobberMadePart {
   }
   /** The ring's end screws into the output flange are heads sunk this deep (the head is 4: flush with the plate end, 0.2 over). */
   public static inline final RING_HEAD_RECESS = 4.2;
-  public function new(?values:ComponentValues) { super("GE-Z-saddle",values); finish(true); }
+  static final saddleRecipe = new machinekit.cache.Once<ComponentType>();
+
+  public static function saddleType():ComponentType return saddleRecipe.get(() -> new ComponentType("machinekit.hobbing.z-saddle", [],
+    _ -> new HobberZSaddle(), false, false, null, false).versioned(1).numbered(_ -> "HOBBER-GE-Z-SADDLE")
+    .procured(_ -> Make("steel fabrication and machining")).requiring(_ -> route().requirements()));
+
+  public function new(?values:ComponentValues) {
+    super("GE-Z-saddle", values, new ComponentValues());
+    finish(true);
+  }
+  override public function componentType():Null<ComponentType> return saddleType();
+
+  /**
+   * One milled plate between the swivel seat (x 135) and the guide-block faces (x 148), in the saddle's frame (the hob centre on
+   * the A axis): the eRob's pocket opens in the back face, the web in front of the housing carries its 16 screws and the output
+   * bore. Datums for the four block lands and the eRob's front face place those bolted faces.
+   */
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var plate = b.label(b.boxBetween(135, 148, -175, 175, -65, 170), "Plate");
+    var tools = new ErobActuatorPart().recordMountingCutout(b, actuatorPose(), swivelPocketDepth(), swivelRunningGap(), 0.4, 0, ErobActuatorPart.PILOT_BORE_CLEARANCE);
+    var seat = b.label(b.cutAll(plate, tools, [for (t in tools) t.label]), "eRob seat");
+    for (side in [-1, 1]) for (row in [0.0, HobberSkeleton.reference().zBlockSpacing])
+      HobberRecording.datum(b, blockId(side, row), BoltedFace.frameOf({x: 148.0, y: side * 145.0, z: row}, {x: -1.0, y: 0, z: 0}, {x: 0.0, y: 1, z: 0}));
+    HobberRecording.datum(b, "erob", erobFrame());
+    return seat;
+  }
+
+  static function blockId(side:Int, row:Float):String return "block" + (side < 0 ? "L" : "R") + (row == 0 ? "1" : "2");
+  static function erobFrame():AssemblyFrame return BoltedFace.frameOf({x: HobberSkeleton.reference().swivelNativeX - machinekit.motion.ErobActuatorPart.SEAT_Z, y: 0.0, z: 0.0},
+    {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0});
   override public function machinable():Bool return true;
   override public function pinnedFaces():Array<PinnedFace> return {
     [HobberDriveBar.nutBlockPins(HobberDrives.z(), [0.0, 0, zSaddleOriginZ()])];
@@ -77,12 +101,9 @@ class HobberZSaddle extends HobberMadePart {
   override public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return {
     derivedRouteHoles().concat(erobPilotBore());
   };
-  override public function pieces():Array<Part> return {
-    // One milled plate between the swivel seat (x 135) and the block faces (x 148), with the nut block's bolts.
-    // The eRob's pocket opens in the back face (x 148); the web in front of the housing carries its 16 screws and the output bore.
-    [Solids.cut(HobberPartGeometry.box(135, 148, -175, 175, -65, 170), [HobberZSaddle.swivelHousingCutout()])];
-  };
-  override public function manufacturingRoute():Null<ManufacturingRoute> return {
+  override public function manufacturingRoute():Null<ManufacturingRoute> return route();
+
+  static function route():ManufacturingRoute return {
     ManufacturingRoute.milled(2, "fine", [
       {name: "block faces, back", tolerance: 0.02, roughnessRa: 1.6},
       {name: "eRob seat: output bore, front face web and pocket", tolerance: 0.05, roughnessRa: 1.6}
@@ -93,11 +114,11 @@ class HobberZSaddle extends HobberMadePart {
     faces=faces.concat(HobberSkeleton.reference().zBellowsSaddleReceivers());
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
         for (side in [-1, 1]) for (row in [0.0, HobberSkeleton.reference().zBlockSpacing])
-          faces.push(HobberPartGeometry.blockFace("block" + (side < 0 ? "L" : "R") + (row == 0 ? "1" : "2"), [148.0, side * 145.0, row], [-1.0, 0, 0], [0.0, 1, 0], block, 13, PLATE_BLOCK_SOLE));
+          faces.push(HobberPartGeometry.blockFaceAt(blockId(side, row), recordedDatum(blockId(side, row)), block, 13, PLATE_BLOCK_SOLE));
         // Flush heads keep the fixed Z chip shield clear throughout saddle travel.
         faces.push(HobberDriveBar.nutBlockFace(HobberDrives.z(), 6.5, [0.0, 0, zSaddleOriginZ()], {diameter: 12.0, depth: 6.5}));
         // The eRob housing's 16 M4 into its front face, passed through the 5 mm web from the front (x 135): the plane is the housing's front face.
-        faces.push(BoltedFace.clamped("erob", BoltedFace.frameOf({x: HobberSkeleton.reference().swivelNativeX - machinekit.motion.ErobActuatorPart.SEAT_Z, y: 0.0, z: 0.0}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
+        faces.push(BoltedFace.clamped("erob", recordedDatum("erob"),
           [for (i in 0...machinekit.motion.ErobActuatorData.FIXED_BOLT_COUNT) {
             var b = machinekit.motion.ErobActuatorPart.fixedBolt(i);
             {x: b.x, y: b.y};

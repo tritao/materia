@@ -185,7 +185,8 @@ class FeaturePartEquivalence {
       "spindleSeat" => ["Block", "Bore and slit", "Swivel clearance", "Clamp screw holes"],
       "Ymodule/base" => ["Swept deck relief"],
       "Ymodule/carriage" => ["Spindle flange relief"],
-      "motorCradle" => ["Cradle body", "Slit and rib window", "Servo register and slots", "Jack screw"]
+      "motorCradle" => ["Cradle body", "Slit and rib window", "Servo register and slots", "Jack screw"],
+      "Zplate" => ["eRob seat"]
     ];
     for (id => steps in expected) {
       var found = [for (member in machine.components()) if (member.id == id) member.component];

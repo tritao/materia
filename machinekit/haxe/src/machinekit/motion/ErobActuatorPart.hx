@@ -23,6 +23,7 @@ import machinekit.transmission.ValueBasis;
 import materia.assembly.AssemblyDefinition.AssemblyActuator;
 import materia.assembly.AssemblyDefinition.AssemblyEncoder;
 import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /**
  * One physical side of an eRob 110 actuator, which is one purchase: the fixed `housing` (stator, amplifier, front
@@ -323,27 +324,47 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
    * it. Output: the part bolted to the flange, ahead of z=0: 12 M4 clearance holes (Ø4.6 as drawn), and a bore for the
    * hollow axis that is the pilot's size plus `pilotClearance`.
    */
-  public function mountingCutout(pocketDepth:Float = 8, runningGap:Float = 1, pilotClearance:Float = 0.4, depth:Float = 0, ?outputClearance:Float):Part {
+  /**
+   * The cylinders a host is cut with to take this actuator, in its frame (along its axis): the housing's pocket, output bore and 16
+   * screw clearances, or the output flange's 12 clearances and bore. Each is named; `mountingCutout` and `recordMountingCutout`
+   * both build from this one list.
+   */
+  public function cutoutCylinders(pocketDepth:Float = 8, runningGap:Float = 1, pilotClearance:Float = 0.4, depth:Float = 0,
+      ?outputClearance:Float):Array<{name:String, radius:Float, z0:Float, z1:Float, x:Float, y:Float}> {
     if (!(pocketDepth >= D.POCKET_DEPTH_MIN) || !(runningGap >= 0) || !(pilotClearance >= 0)) throw "eRob mounting cutout needs a pocket of at least 8 mm and non-negative gaps";
-    var tools:Array<Part> = [];
+    var out = [];
     if (variant == HOUSING) {
       var floor = SEAT_Z, bottom = floor - pocketDepth, top = -runningGap;
       var screw = SocketHeadCapScrew.metric("M4", 10);
-      tools.push(Solids.named(Part.cylinderSpan((D.BODY_DIAMETER + 2 * D.BODY_DIAMETER_TOLERANCE + pilotClearance) / 2, bottom - 0.1, floor), "pocket"));
-      tools.push(Solids.named(Part.cylinderSpan((D.OUTPUT_PILOT_DIAMETER + (outputClearance ?? pilotClearance + 1)) / 2, floor - 0.1, top + 0.1), "outputBore"));
+      out.push({name: "pocket", radius: (D.BODY_DIAMETER + 2 * D.BODY_DIAMETER_TOLERANCE + pilotClearance) / 2, z0: bottom - 0.1, z1: floor, x: 0.0, y: 0.0});
+      out.push({name: "outputBore", radius: (D.OUTPUT_PILOT_DIAMETER + (outputClearance ?? pilotClearance + 1)) / 2, z0: floor - 0.1, z1: top + 0.1, x: 0.0, y: 0.0});
       for (i in 0...D.FIXED_BOLT_COUNT) {
         var p = fixedBolt(i);
-        tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, floor - 0.1, top + 0.1, p.x, p.y), 'fixedBolt${i + 1}'));
+        out.push({name: 'fixedBolt${i + 1}', radius: screw.clearanceDiameter(Medium) / 2, z0: floor - 0.1, z1: top + 0.1, x: p.x, y: p.y});
       }
     } else {
       var thickness = depth > 0 ? depth : 10;
       for (i in 0...D.OUTPUT_BOLT_COUNT) {
         var p = outputBolt(i);
-        tools.push(Solids.named(Part.cylinderSpan(D.OUTPUT_CLEARANCE_HOLE / 2, -0.1, thickness + 0.1, p.x, p.y), 'outputBolt${i + 1}'));
+        out.push({name: 'outputBolt${i + 1}', radius: D.OUTPUT_CLEARANCE_HOLE / 2, z0: -0.1, z1: thickness + 0.1, x: p.x, y: p.y});
       }
-      tools.push(Solids.named(Part.cylinderSpan((D.BORE_DIAMETER + pilotClearance) / 2, -0.1, thickness + 0.1), "bore"));
+      out.push({name: "bore", radius: (D.BORE_DIAMETER + pilotClearance) / 2, z0: -0.1, z1: thickness + 0.1, x: 0.0, y: 0.0});
     }
-    return Solids.union(tools);
+    return out;
+  }
+
+  public function mountingCutout(pocketDepth:Float = 8, runningGap:Float = 1, pilotClearance:Float = 0.4, depth:Float = 0, ?outputClearance:Float):Part
+    return Solids.union([for (c in cutoutCylinders(pocketDepth, runningGap, pilotClearance, depth, outputClearance))
+      Solids.named(Part.cylinderSpan(c.radius, c.z0, c.z1, c.x, c.y), c.name)]);
+
+  /** The same cylinders recorded in a host's recording, the actuator at `pose` in the host's frame; labelled by name. */
+  public function recordMountingCutout(b:cadkit.parametric.recording.DocumentBuilder, pose:AssemblyFrame, pocketDepth:Float = 8, runningGap:Float = 1,
+      pilotClearance:Float = 0.4, depth:Float = 0, ?outputClearance:Float):Array<cadkit.parametric.Feature> {
+    var axis = AssemblyFrames.transformVector(pose, 0, 0, 1);
+    return [for (c in cutoutCylinders(pocketDepth, runningGap, pilotClearance, depth, outputClearance)) {
+      var o = AssemblyFrames.transformPoint(pose, c.x, c.y, 0);
+      b.label(b.cylinderAlong(new cadkit.modeling.Vector(o.x, o.y, o.z), new cadkit.modeling.Vector(axis.x, axis.y, axis.z), c.radius, c.z0, c.z1), c.name);
+    }];
   }
 
   /** Gap (diameter) between the output pilot and its bore in the plate that holds the housing, `ErobActuatorPart.mountingFace` and `ErobMount`. */
