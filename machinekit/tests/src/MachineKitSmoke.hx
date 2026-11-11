@@ -3099,145 +3099,117 @@ class MachineKitSmoke {
     near(state.worldConnector("c", "seat").z, 20, "Compatible third occurrence shares the second definition");
   }
 
-  /** The groups of this suite, each independent of the others, so that the workspace can run them as parallel shards. */
+  /**
+   * The groups of this suite, each independent of the others, so that the workspace can run them as parallel shards and one
+   * run can pick a few: `-- --only BomExampleTests,Pendant*`, `-- --list`, `-- --keep-going` (see `haxeon.test.Shards`).
+   */
   static function main():Void {
-    if (Sys.getEnv("MACHINEKIT_SCREWDRIVER_ONLY") == "1") {
-      ScrewdriverProcessTests.run();
-      ScrewdrivingMissionTests.run();
-      ScrewRecoveryTests.run();
-      return;
-    }
-    if (Sys.getEnv("MACHINEKIT_BRAKE_ONLY") == "1") {
-      MotorBrakeTests.run();
-      return;
-    }
-    if (Sys.getEnv("MACHINEKIT_MILL_ONLY") == "1") {
-      MillPartTests.run();
-      return;
-    }
-    if (Sys.getEnv("MACHINEKIT_PRINTING_ONLY") == "1") {
-      PrintingPartTests.run();
-      PrintingJobBindingTests.run();
-      CoreXyPrinterChecks.run();
-      PrinterKlipperTests.run();
-      return;
-    }
-    if (Sys.getEnv("MACHINEKIT_KLIPPER_ONLY") == "1") {
-      PrinterKlipperTests.run();
-      return;
-    }
-    var everything = Shards.run([{name: "ControllerWiringTests.run", run: () -> {
-      BomDocumentTests.run();
-      BomExampleTests.run();
-      PartNumberKeyTests.run();
-      ProcurementTests.run();
-      ControllerWiringTests.run();
-    }, weight: 0.05}, {
-      name: "OperatorProfileTests.run",
+    var everything = Shards.run([{name: "BomDocumentTests", run: BomDocumentTests.run, weight: 0.01}, {name: "BomExampleTests", run: BomExampleTests.run, weight: 0.01}, {name: "PartNumberKeyTests", run: PartNumberKeyTests.run, weight: 0.01}, {name: "ProcurementTests", run: ProcurementTests.run, weight: 0.01}, {name: "ControllerWiringTests", run: ControllerWiringTests.run, weight: 0.01}, {
+      name: "OperatorProfileTests",
       run: OperatorProfileTests.run,
       weight: 0.05
     }, {
-      name: "PendantCompilerTests.run",
+      name: "PendantCompilerTests",
       run: PendantCompilerTests.run,
       weight: 0.05
     }, {
-      name: "PendantJogDriverTests.run",
+      name: "PendantJogDriverTests",
       run: PendantJogDriverTests.run,
       weight: 0.05
     }, {
-      name: "PanelLayoutTests.run",
+      name: "PanelLayoutTests",
       run: PanelLayoutTests.run,
       weight: 0.3
     }, {
-      name: "PendantTests.run",
+      name: "PendantTests",
       run: PendantTests.run,
       weight: 0.5
     }, {
-      name: "HmiPartsTests.run",
+      name: "HmiPartsTests",
       run: HmiPartsTests.run,
       weight: 0.5
     }, {
-      name: "TendingCell.TendingMissionChecks.run",
+      name: "TendingCell.TendingMissionChecks",
       run: () -> TendingCell.TendingMissionChecks.run(),
       weight: 1.0
     }, {
-      name: "FastenerThreadTests.run",
+      name: "FastenerThreadTests",
       run: FastenerThreadTests.run,
       weight: 0.05
     }, {
-      name: "FastenerDataTests.run",
+      name: "FastenerDataTests",
       run: FastenerDataTests.run,
       weight: 0.05
     }, {
-      name: "FasteningTests.run",
+      name: "FasteningTests",
       run: FasteningTests.run,
       weight: 0.05
     }, {
-      name: "ScrewdriverProcessTests.run",
+      name: "ScrewdriverProcessTests",
       run: ScrewdriverProcessTests.run,
       weight: 0.05
     }, {
-      name: "ScrewdrivingMissionTests.run",
+      name: "ScrewdrivingMissionTests",
       run: ScrewdrivingMissionTests.run,
       weight: 0.05
     }, {
-      name: "ScrewRecoveryTests.run",
+      name: "ScrewRecoveryTests",
       run: ScrewRecoveryTests.run,
       weight: 0.05
     }, {
-      name: "ScrewdrivingEquipmentTests.run",
+      name: "ScrewdrivingEquipmentTests",
       run: ScrewdrivingEquipmentTests.run,
       weight: 1.5
     }, {
-      name: "AxisBuilderChecks.run",
+      name: "AxisBuilderChecks",
       run: () -> AxisBuilderChecks.run(),
       weight: 1.0
     }, {
-      name: "AssemblyIntegrityTests.run",
+      name: "AssemblyIntegrityTests",
       run: () -> AssemblyIntegrityTests.run(),
       weight: 1.0
     }, {
-      name: "ManufacturingRouteTests.run",
+      name: "ManufacturingRouteTests",
       run: () -> ManufacturingRouteTests.run(),
       weight: 1.0
     }, {
-      name: "NutBlockTests.run",
+      name: "NutBlockTests",
       run: () -> NutBlockTests.run(),
       weight: 1.0
     }, {
-      name: "SheetRouterChecks.run",
+      name: "SheetRouterChecks",
       run: () -> SheetRouterChecks.run(),
       weight: 4.0
     }, {
-      name: "SheetRouterSizingChecks.run",
+      name: "SheetRouterSizingChecks",
       run: () -> SheetRouterSizingChecks.run(),
       weight: 1.0
     }, {
-      name: "GantryChecks.run",
+      name: "GantryChecks",
       run: () -> GantryChecks.run(),
       weight: 1.0
     }, {
-      name: "RotaryHeadCheck.run",
+      name: "RotaryHeadCheck",
       run: () -> RotaryHeadCheck.run(),
       weight: 1.0
     }, {
-      name: "LinearTrackCheck.run",
+      name: "LinearTrackCheck",
       run: () -> LinearTrackCheck.run(),
       weight: 1.0
     }, {
-      name: "TrackArmChecks.run",
+      name: "TrackArmChecks",
       run: () -> TrackArmChecks.run(),
       weight: 1.0
     }, {
-      name: "OverheadArmChecks.run",
+      name: "OverheadArmChecks",
       run: () -> OverheadArmChecks.run(),
       weight: 1.0
     }, {
-      name: "GantryPickerChecks.run",
+      name: "GantryPickerChecks",
       run: () -> GantryPickerChecks.run(),
       weight: 1.0
     }, {
-      name: "BenchMillPreview.BenchMillChecks.run",
+      name: "BenchMillPreview.BenchMillChecks",
       run: () -> BenchMillPreview.BenchMillChecks.run(),
       weight: 1.0
     }, {
@@ -3245,69 +3217,69 @@ class MachineKitSmoke {
       run: () -> BenchMillGuideLoads.run(new BenchMill(), SceneArtifact.decode(BenchMillPreview.mill()), ""),
       weight: 1.0
     }, {
-      name: "BenchMillPreview.EnclosedMillChecks.run",
+      name: "BenchMillPreview.EnclosedMillChecks",
       run: () -> BenchMillPreview.EnclosedMillChecks.run(),
       weight: 1.0
     }, {name: "BenchMillGuideLoads.enclosed", run: () -> {var cell = new EnclosedBenchMill();
     BenchMillGuideLoads.run(cell.mill, SceneArtifact.decode(BenchMillPreview.enclosure()), "mill/");
-    }, weight:1.0}, {name: "GuideSupportTests.run", run: () -> GuideSupportTests.run(), weight: 1.0}, {
-      name: "TendingReach.run",
+    }, weight:1.0}, {name: "GuideSupportTests", run: () -> GuideSupportTests.run(), weight: 1.0}, {
+      name: "TendingReach",
       run: () -> TendingReach.run(),
       weight: 1.0
     }, {
-      name: "TendingControllers.TendingControllerChecks.run",
+      name: "TendingControllers.TendingControllerChecks",
       run: () -> TendingControllers.TendingControllerChecks.run(),
       weight: 1.0
     }, {
-      name: "MotorBrakeTests.run",
+      name: "MotorBrakeTests",
       run: () -> MotorBrakeTests.run(),
       weight: 0.5
     }, {
-      name: "CobotArmPreview.CobotArmChecks.run",
+      name: "CobotArmPreview.CobotArmChecks",
       run: () -> CobotArmPreview.CobotArmChecks.run(),
       weight: 1.0
     }, {
-      name: "MobileWelderChecks.run",
+      name: "MobileWelderChecks",
       run: () -> MobileWelderChecks.run(false),
       weight: 1.0
     }, {
-      name: "FlexsplineHobberChecks.run",
+      name: "FlexsplineHobberChecks",
       run: () -> FlexsplineHobberChecks.run(),
       weight: 0.1
     }, {
-      name: "HobberPartTests.run",
+      name: "HobberPartTests",
       run: () -> HobberPartTests.run(),
       weight: 0.1
     }, {
-      name: "MillPartTests.run",
+      name: "MillPartTests",
       run: () -> MillPartTests.run(),
       weight: 1.0
     }, {
-      name: "PneumaticPartTests.run",
+      name: "PneumaticPartTests",
       run: () -> PneumaticPartTests.run(),
       weight: 1.0
     }, {
-      name: "HydraulicPartTests.run",
+      name: "HydraulicPartTests",
       run: () -> HydraulicPartTests.run(),
       weight: 0.5
     }, {
-      name: "ToolProfileTests.run",
+      name: "ToolProfileTests",
       run: () -> ToolProfileTests.run(),
       weight: 0.1
     }, {
-      name: "ToolLayoutTests.run",
+      name: "ToolLayoutTests",
       run: () -> ToolLayoutTests.run(),
       weight: 0.1
     }, {
-      name: "PressBrakeInterfaceTests.run",
+      name: "PressBrakeInterfaceTests",
       run: () -> PressBrakeInterfaceTests.run(),
       weight: 0.1
     }, {
-      name: "PressBrakePartTests.run",
+      name: "PressBrakePartTests",
       run: () -> PressBrakePartTests.run(),
       weight: 0.1
     }, {
-      name: "PressBrakeChecks.run",
+      name: "PressBrakeChecks",
       run: () -> PressBrakeChecks.run(),
       weight: 1.0
     }, {
@@ -3315,35 +3287,35 @@ class MachineKitSmoke {
       run: namedStepperFaces,
       weight: 0.1
     }, {
-      name: "MachineKitNamingAudit.run",
+      name: "MachineKitNamingAudit",
       run: MachineKitNamingAudit.run,
       weight: 0.4
     }, {
-      name: "MachineAssemblyDescriptionTests.run",
+      name: "MachineAssemblyDescriptionTests",
       run: MachineAssemblyDescriptionTests.run,
       weight: 10.5
     }, {
-      name: "EndEffectorTests.run",
+      name: "EndEffectorTests",
       run: EndEffectorTests.run,
       weight: 0.05
     }, {
-      name: "EndEffectorSetTests.run",
+      name: "EndEffectorSetTests",
       run: EndEffectorSetTests.run,
       weight: 0.05
     }, {
-      name: "GripperIntegrityTests.run",
+      name: "GripperIntegrityTests",
       run: GripperIntegrityTests.run,
       weight: 1.0
     }, {
-      name: "EndEffectorComponentTests.run",
+      name: "EndEffectorComponentTests",
       run: EndEffectorComponentTests.run,
       weight: 0.05
     }, {
-      name: "EndEffectorExampleChecks.run",
+      name: "EndEffectorExampleChecks",
       run: EndEffectorExampleChecks.run,
       weight: 0.1
     }, {
-      name: "RobotArmChecks.run",
+      name: "RobotArmChecks",
       run: RobotArmChecks.run,
       weight: 0.6
     }, {
@@ -3355,7 +3327,7 @@ class MachineKitSmoke {
       run: RobotArmPhysicalTests.main,
       weight: 3.0
     }, {
-      name: "CncRouterChecks.run",
+      name: "CncRouterChecks",
       run: CncRouterChecks.run,
       weight: 4
     }, {
@@ -3363,35 +3335,35 @@ class MachineKitSmoke {
       run: FoldedZRouterCheck.main,
       weight: 5.1
     }, {
-      name: "MobileBaseChecks.run",
+      name: "MobileBaseChecks",
       run: MobileBaseChecks.run,
       weight: 2
     }, {
-      name: "RobotWelderChecks.run",
+      name: "RobotWelderChecks",
       run: RobotWelderChecks.run,
       weight: 11.3
     }, {
-      name: "CoreXyPlotterChecks.run",
+      name: "CoreXyPlotterChecks",
       run: CoreXyPlotterChecks.run,
       weight: 2.7
     }, {
-      name: "CoreXyDriveTests.run",
+      name: "CoreXyDriveTests",
       run: CoreXyDriveTests.run,
       weight: 0.5
     }, {
-      name: "PrintingPartTests.run",
+      name: "PrintingPartTests",
       run: PrintingPartTests.run,
       weight: 0.3
     }, {
-      name: "PrintingJobBindingTests.run",
+      name: "PrintingJobBindingTests",
       run: PrintingJobBindingTests.run,
       weight: 0.5
     }, {
-      name: "CoreXyPrinterChecks.run",
+      name: "CoreXyPrinterChecks",
       run: CoreXyPrinterChecks.run,
       weight: 4
     }, {
-      name: "PrinterKlipperTests.run",
+      name: "PrinterKlipperTests",
       run: PrinterKlipperTests.run,
       weight: 3
     }, {
@@ -3399,19 +3371,19 @@ class MachineKitSmoke {
       run: assemblyPreviewSharing,
       weight: 0.05
     }, {
-      name: "RecipeContractTests.run",
+      name: "RecipeContractTests",
       run: RecipeContractTests.run,
       weight: 7.1
     }, {
-      name: "MotorDriverTests.run",
+      name: "MotorDriverTests",
       run: MotorDriverTests.run,
       weight: 0.05
     }, {
-      name: "PowerSupplyTests.run",
+      name: "PowerSupplyTests",
       run: PowerSupplyTests.run,
       weight: 0.05
     }, {
-      name: "GearboxTests.run",
+      name: "GearboxTests",
       run: GearboxTests.run,
       weight: 0.05
     }, {
@@ -3427,7 +3399,7 @@ class MachineKitSmoke {
       run: documentPreview,
       weight: 0.4
     }, {
-      name: "MachineKitReferenceTests.run",
+      name: "MachineKitReferenceTests",
       run: MachineKitReferenceTests.run,
       weight: 0.05
     }, {
