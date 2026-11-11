@@ -79,7 +79,9 @@ import nativekit.scene.DepthPrecision;
           // Open what the state names.
           var variant = state.variant;
           if (variant != null && editor.session.projectVariant != variant) {
-            editor.projectVariants.select(variant);
+            // The project lists its variants once its entrypoint has compiled.
+            if (editor.projectVariants.snapshot().variants.filter(v -> v.id == variant).length == 1)
+              editor.projectVariants.select(variant);
             continue;
           }
           var document = state.document;
