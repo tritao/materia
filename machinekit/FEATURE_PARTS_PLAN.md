@@ -313,6 +313,20 @@ removed (shared recipe v7). The X chip covers are folded 2 mm sheet built
 today from boxes and quarter-ring "bends": they move to CadKit sheet-metal
 documents (sheet base, edge flanges, R2 bends, so they get flat patterns)
 as their own step, not recorded box for box.
+Group 3 and 4: outboard carrier, spindle seat, Y module base and carriage,
+B motor cradle, Z saddle. Along the way: CadKit `cut-all` is its own
+feature on the native multi-tool cut (a boolean against a compound of
+overlapping tools silently cut nothing); the timeline credits a face to the
+top-level step containing its creator (nested sub-steps); the eRob lists
+its mounting cutout as named cylinders and can record them in a host
+(`recordMountingCutout`); the skeleton's sweptDeckRelief and the parts'
+static geometry builders are removed as their parts record them.
+
+Left in FP5: the X chip covers (sheet metal, above), the Z bellows sections
+(bought, on MachineKit's `WayCoverSection`: they record when that base does,
+FP8), and the mineral castings (step 5). Faces some parts still take from
+other parts' helpers in the part datum frame (the carriage's nut-block, rib,
+cover and bellows receivers) move to datums as those helpers are reworked.
 
 In order, simplest first, one commit per part, each gated by FP0 equivalence:
 
