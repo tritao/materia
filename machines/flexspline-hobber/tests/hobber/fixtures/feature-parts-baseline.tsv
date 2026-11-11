@@ -1,0 +1,1188 @@
+face	Xbridge#blockL1	role=Clamped(M6,6.6,10,$anon:{depth:Float,diameter:Float}) w=59 h=59 fx=220 fy=147.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#blockL2	role=Clamped(M6,6.6,10,$anon:{depth:Float,diameter:Float}) w=59 h=59 fx=220 fy=345.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#blockR1	role=Clamped(M6,6.6,10,$anon:{depth:Float,diameter:Float}) w=59 h=59 fx=-220 fy=147.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#blockR2	role=Clamped(M6,6.6,10,$anon:{depth:Float,diameter:Float}) w=59 h=59 fx=-220 fy=345.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#column-sole-soleFrontLeft	role=Clamped(M8,9,11,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=157.5 fy=281.625 fz=917 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-10,-7.5 hole=10,-7.5
+face	Xbridge#column-sole-soleFrontRight	role=Clamped(M8,9,11,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-160 fy=281.625 fz=917 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-10,-15 hole=10,-15
+face	Xbridge#column-sole-soleRearLeft	role=Clamped(M8,9,11,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=145 fy=381.625 fz=917 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-10,5 hole=10,5
+face	Xbridge#column-sole-soleRearRight	role=Clamped(M8,9,11,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-145 fy=381.625 fz=917 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-10,-22.5 hole=10,-22.5
+face	Xbridge#nut-block	role=Clamped(M6,6.6,20,null) w=0 h=0 fx=0 fy=286.125 fz=897 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=-20,0 hole=20,0
+face	Xbridge#rib-leftInner	role=Receiving(M6,15,20,false,Steel) w=246 h=20 fx=130 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#rib-leftOuter	role=Receiving(M6,15,20,false,Steel) w=246 h=20 fx=170 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#rib-rightInner	role=Receiving(M6,15,20,false,Steel) w=246 h=20 fx=-130 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#rib-scale	role=Receiving(M5,15,20,false,Steel) w=246 h=17.8 fx=-150.2 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#skirt-170--1	role=Receiving(M4,10,20,false,Steel) w=14 h=14 fx=100 fy=215.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#skirt-170-1	role=Receiving(M4,10,20,false,Steel) w=14 h=14 fx=-100 fy=215.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#skirt-350--1	role=Receiving(M4,10,20,false,Steel) w=14 h=14 fx=100 fy=395.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#skirt-350-1	role=Receiving(M4,10,20,false,Steel) w=14 h=14 fx=-100 fy=395.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	Xbridge#z-bellows--1	role=Receiving(M3,8,20,false,Steel) w=67.5 h=24 fx=145 fy=209.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 holes=-
+face	Xbridge#z-bellows-1	role=Receiving(M3,8,20,false,Steel) w=67.5 h=24 fx=-145 fy=209.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 holes=-
+face	XcoverFrontLeft#lid	role=Clamped(M3,4,2,null) w=0 h=0 fx=59.5 fy=242 fz=859 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	XcoverFrontLeft#pad	role=Clamped(M3,4,2,null) w=0 h=0 fx=42 fy=204 fz=777 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	XcoverFrontRight#lid	role=Clamped(M3,4,2,null) w=0 h=0 fx=-59.5 fy=242 fz=859 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	XcoverFrontRight#pad	role=Clamped(M3,4,2,null) w=0 h=0 fx=-42 fy=204 fz=777 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	XcoverRearLeft#lid	role=Through(M3,4,2) w=0 h=0 fx=59.5 fy=532.5 fz=869 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-27.5,0 hole=27.5,0
+face	XcoverRearLeft#pad	role=Clamped(M3,4,2,null) w=0 h=0 fx=42 fy=453 fz=777 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	XcoverRearRight#lid	role=Through(M3,4,2) w=0 h=0 fx=-59.5 fy=532.5 fz=869 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-27.5,0 hole=27.5,0
+face	XcoverRearRight#pad	role=Clamped(M3,4,2,null) w=0 h=0 fx=-42 fy=453 fz=777 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	XdriveFixedBar#insert	role=Clamped(M4,4.5,10.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=0 fy=433.5 fz=777 fr0=0 fr1=1 fr2=0 fr3=-1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-12.5,-12 hole=-12.5,12 hole=-0.5,-12 hole=-0.5,12
+face	XdriveFixedBar#seat-fixed	role=Receiving(null,15,15,true,Steel) w=75 h=70 fx=0 fy=433.5 fz=792 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 holes=-
+face	XdriveFloatingBar#insert	role=Clamped(M3,3.4,11.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=0 fy=197 fz=777 fr0=0 fr1=1 fr2=0 fr3=-1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,-5 hole=0,5
+face	XdriveFloatingBar#seat-floating	role=Receiving(null,15,15,true,Steel) w=35 h=65 fx=0 fy=197 fz=792 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 holes=-
+face	XfrontCover#side-1	role=Through(M3,4,2) w=0 h=0 fx=59.5 fy=242 fz=859 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	XfrontCover#side1	role=Through(M3,4,2) w=0 h=0 fx=-59.5 fy=242 fz=859 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	XrearCover#side-1	role=Clamped(M3,4,2,null) w=0 h=0 fx=59.5 fy=532.5 fz=869 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-27.5,0 hole=27.5,0
+face	XrearCover#side1	role=Clamped(M3,4,2,null) w=0 h=0 fx=-59.5 fy=532.5 fz=869 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-27.5,0 hole=27.5,0
+face	Xrib-leftInner#plate	role=Clamped(M6,6.6,33.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=130 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-108,0 hole=-68,0 hole=-28,0 hole=12,0 hole=52,0 hole=102,0
+face	Xrib-leftOuter#plate	role=Clamped(M6,6.6,33.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=170 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-108,0 hole=-68,0 hole=-28,0 hole=12,0 hole=52,0 hole=102,0
+face	Xrib-rightInner#plate	role=Clamped(M6,6.6,33.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-130 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-108,0 hole=-68,0 hole=-28,0 hole=12,0 hole=52,0 hole=102,0
+face	Xrib-scale#plate	role=Clamped(M5,5.5,11.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-150.2 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-108,0 hole=-68,0 hole=-43,0 hole=12,0 hole=62,0 hole=102,0
+face	Xrib-scale#scale-head	role=Receiving(null,8,17,false,Steel) w=72 h=16 fx=-151.3 fy=318.125 fz=880 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 holes=-
+face	XscaleSeat#scale-housing	role=Receiving(M8,15,15,true,Steel) w=0 h=0 fx=-177.4 fy=382 fz=862 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-117.5,-2.6 hole=117.5,-2.6
+face	Xskirt#tab170--1	role=Clamped(M4,5,2,null) w=0 h=0 fx=100 fy=215.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	Xskirt#tab170-1	role=Clamped(M4,5,2,null) w=0 h=0 fx=-100 fy=215.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	Xskirt#tab350--1	role=Clamped(M4,5,2,null) w=0 h=0 fx=100 fy=395.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	Xskirt#tab350-1	role=Clamped(M4,5,2,null) w=0 h=0 fx=-100 fy=395.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	Ymodule/base#actuator-output	role=Clamped(M4,4.6,5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=0 fy=169.625 fz=1000 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=38.5,0 hole=33.341978,-19.25 hole=19.25,-33.341978 hole=0,-38.5 hole=-19.25,-33.341978 hole=-33.341978,-19.25 hole=-38.5,0 hole=-33.341978,19.25 hole=-19.25,33.341978 hole=0,38.5 hole=19.25,33.341978 hole=33.341978,19.25
+face	Ymodule/base#fixed	role=Receiving(M6,12,12,true,Steel) w=71 h=75 fx=19.5 fy=160.625 fz=1145 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Ymodule/base#floating	role=Receiving(M6,12,12,true,Steel) w=18 h=75 fx=-137 fy=160.625 fz=1145 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Ymodule/base#stopFront	role=Receiving(M6,12,12,true,Steel) w=40 h=20 fx=-141 fy=160.625 fz=1187 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Ymodule/base#stopRear	role=Receiving(M6,12,12,true,Steel) w=40 h=20 fx=-45 fy=160.625 fz=1187 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Ymodule/base#wall-1	role=Receiving(M6,12,12,true,Steel) w=230 h=25 fx=-60 fy=160.625 fz=1070 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Ymodule/base#wall1	role=Receiving(M6,12,12,true,Steel) w=230 h=25 fx=-60 fy=160.625 fz=1220 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Ymodule/carriage#block-1-1	role=Clamped(M4,4.5,5.8,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-92 fy=100.625 fz=1075 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=-13,-13 hole=-13,13 hole=13,-13 hole=13,13
+face	Ymodule/carriage#block-11	role=Clamped(M4,4.5,5.8,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-28 fy=100.625 fz=1075 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=-13,-13 hole=-13,13 hole=13,-13 hole=13,13
+face	Ymodule/carriage#block1-1	role=Clamped(M4,4.5,5.8,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-92 fy=100.625 fz=1215 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=-13,-13 hole=-13,13 hole=13,-13 hole=13,13
+face	Ymodule/carriage#block11	role=Clamped(M4,4.5,5.8,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-28 fy=100.625 fz=1215 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=-13,-13 hole=-13,13 hole=13,-13 hole=13,13
+face	Ymodule/carriage#nut-carrier	role=Clamped(M6,6.6,3.5999999999999996,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-93 fy=100.625 fz=1145 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=0,-33 hole=0,33
+face	Ymodule/carriage#outboard-carrier	role=Clamped(M4,4.5,10,null) w=0 h=0 fx=-30 fy=90.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=1 fr8=0 hole=-8,-45 hole=-8,45 hole=8,-45 hole=8,45
+face	Ymodule/carriage#scale-head-carrier	role=Clamped(M4,4.5,5.6,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-78 fy=100.625 fz=1037 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=0,-10 hole=0,10
+face	Ymodule/carriage#seat	role=Clamped(M8,9,10,null) w=0 h=0 fx=0 fy=90.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=1 fr8=0 hole=95,-38 hole=95,46 hole=115,-38 hole=115,46
+face	ZbellowsLeftLower-fixed#fixed	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=145 fy=221.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZbellowsLeftLower-moving#moving	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=145 fy=221.625 fz=962 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZbellowsLeftUpper-fixed#fixed	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=145 fy=221.625 fz=1370.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZbellowsLeftUpper-moving#moving	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=145 fy=221.625 fz=1145.7 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZbellowsRightLower-fixed#fixed	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=-145 fy=221.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZbellowsRightLower-moving#moving	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=-145 fy=221.625 fz=962 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZbellowsRightUpper-fixed#fixed	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=-145 fy=221.625 fz=1370.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZbellowsRightUpper-moving#moving	role=Clamped(M3,3.4,3,null) w=0 h=0 fx=-145 fy=221.625 fz=1145.7 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=-26.75,7.7 hole=-26.75,19.5 hole=26.75,7.7 hole=26.75,19.5
+face	ZdriveFixedBar#insert	role=Clamped(M4,4.5,35.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-81 fy=286.625 fz=1350.5 fr0=0 fr1=1 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=-1 fr7=0 fr8=0 hole=-12.5,-12 hole=-12.5,12 hole=-0.5,-12 hole=-0.5,12
+face	ZdriveFixedBar#seat-fixed	role=Receiving(null,20,40,false,Steel) w=75 h=70 fx=-81 fy=246.625 fz=1350.5 fr0=0 fr1=1 fr2=0 fr3=0 fr4=0 fr5=1 fr6=1 fr7=0 fr8=0 holes=-
+face	ZdriveFloatingBar#insert	role=Clamped(M3,3.4,36.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-81 fy=286.625 fz=954 fr0=0 fr1=1 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=-1 fr7=0 fr8=0 hole=0,-5 hole=0,5
+face	ZdriveFloatingBar#seat-floating	role=Receiving(null,20,40,false,Steel) w=35 h=65 fx=-81 fy=246.625 fz=954 fr0=0 fr1=1 fr2=0 fr3=0 fr4=0 fr5=1 fr6=1 fr7=0 fr8=0 holes=-
+face	Zplate#bellows--1-false	role=Receiving(M4,12,13,false,Steel) w=67.5 h=24 fx=145 fy=193.625 fz=976 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 holes=-
+face	Zplate#bellows--1-true	role=Receiving(M4,12,13,false,Steel) w=67.5 h=24 fx=145 fy=193.625 fz=1131.7 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Zplate#bellows-1-false	role=Receiving(M4,12,13,false,Steel) w=67.5 h=24 fx=-145 fy=193.625 fz=976 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 holes=-
+face	Zplate#bellows-1-true	role=Receiving(M4,12,13,false,Steel) w=67.5 h=24 fx=-145 fy=193.625 fz=1131.7 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Zplate#blockL1	role=Clamped(M4,4.5,6,$anon:{depth:Float,diameter:Float}) w=42 h=42 fx=145 fy=193.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Zplate#blockL2	role=Clamped(M4,4.5,6,$anon:{depth:Float,diameter:Float}) w=42 h=42 fx=145 fy=193.625 fz=1110 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Zplate#blockR1	role=Clamped(M4,4.5,6,$anon:{depth:Float,diameter:Float}) w=42 h=42 fx=-145 fy=193.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Zplate#blockR2	role=Clamped(M4,4.5,6,$anon:{depth:Float,diameter:Float}) w=42 h=42 fx=-145 fy=193.625 fz=1110 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	Zplate#erob	role=Clamped(M4,4.5,5,null) w=0 h=0 fx=0 fy=185.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 hole=51,0 hole=47.117856,19.516855 hole=36.062446,36.062446 hole=19.516855,47.117856 hole=0,51 hole=-19.516855,47.117856 hole=-36.062446,36.062446 hole=-47.117856,19.516855 hole=-51,0 hole=-47.117856,-19.516855 hole=-36.062446,-36.062446 hole=-19.516855,-47.117856 hole=0,-51 hole=19.516855,-47.117856 hole=36.062446,-36.062446 hole=47.117856,-19.516855
+face	Zplate#nut-block	role=Clamped(M6,6.6,6.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-81 fy=193.625 fz=1045.5 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=-20,0 hole=20,0
+face	ZscaleArm#scale-head	role=Receiving(null,11,14.2,false,Steel) w=72 h=16 fx=87 fy=274.325 fz=1060.5 fr0=0 fr1=0 fr2=-1 fr3=0 fr4=1 fr5=0 fr6=1 fr7=0 fr8=0 holes=-
+face	ZscaleSeat#scale-housing	role=Receiving(M8,15,15,true,Steel) w=0 h=0 fx=105 fy=248.225 fz=1192.5 fr0=0 fr1=0 fr2=1 fr3=0 fr4=-1 fr5=0 fr6=1 fr7=0 fr8=0 hole=-167.5,2.6 hole=167.5,2.6
+face	bed/driveSeat#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-16.6 fy=203.8 fz=757 fr0=1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,131.7 hole=0,263.4 hole=16.6,263.4 hole=33.2,0 hole=33.2,131.7 hole=33.2,263.4
+face	bed/driveSeat#seat2	role=Receiving(M3,18.25,19.25,false,Steel) w=0 h=0 fx=42 fy=204 fz=777 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=-84,0 hole=0,-249 hole=-84,-249 hole=-47,7 hole=-37,7
+face	bed/driveSeat#seat3	role=Receiving(M4,17.6,19,false,Steel) w=0 h=0 fx=42 fy=204 fz=777 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-54,-242 hole=-30,-242 hole=-54,-230 hole=-30,-230
+face	bed/driveSeat#seat4	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=42 fy=204 fz=777 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-42,-131.5
+face	bed/enclosureSeat00#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=380 fy=-216.6 fz=767 fr0=0 fr1=0 fr2=1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=1 fr8=0 hole=0,0 hole=33.2,0
+face	bed/enclosureSeat00#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=400 fy=-200 fz=767 fr0=0 fr1=0 fr2=-1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=-1 fr8=0 hole=0,0
+face	bed/enclosureSeat02#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-380 fy=-216.6 fz=767 fr0=0 fr1=0 fr2=-1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=-1 fr8=0 hole=0,0 hole=33.2,0
+face	bed/enclosureSeat02#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-400 fy=-200 fz=767 fr0=0 fr1=0 fr2=1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=1 fr8=0 hole=0,0
+face	bed/enclosureSeat20#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=380 fy=513.4 fz=767 fr0=0 fr1=0 fr2=1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=1 fr8=0 hole=0,0 hole=33.2,0
+face	bed/enclosureSeat20#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=400 fy=530 fz=767 fr0=0 fr1=0 fr2=-1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=-1 fr8=0 hole=0,0
+face	bed/enclosureSeat22#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-380 fy=513.4 fz=767 fr0=0 fr1=0 fr2=-1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=-1 fr8=0 hole=0,0 hole=33.2,0
+face	bed/enclosureSeat22#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-400 fy=530 fz=767 fr0=0 fr1=0 fr2=1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=1 fr8=0 hole=0,0
+face	bed/liftAdditional1#seat1	role=Receiving(M6,26.5,28.5,false,Steel) w=0 h=0 fx=351 fy=335.689783 fz=817 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,20.5 hole=0,61.5 hole=0,82 hole=16.6,0 hole=16.6,20.5 hole=16.6,61.5 hole=16.6,82
+face	bed/liftAdditional1#seat2	role=Receiving(M12,23.5,27,false,Steel) w=0 h=0 fx=310 fy=343.989783 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/liftAdditional2#seat1	role=Receiving(M6,26.5,28.5,false,Steel) w=0 h=0 fx=-269 fy=335.689783 fz=817 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,20.5 hole=0,61.5 hole=0,82 hole=16.6,0 hole=16.6,20.5 hole=16.6,61.5 hole=16.6,82
+face	bed/liftAdditional2#seat2	role=Receiving(M12,23.5,27,false,Steel) w=0 h=0 fx=-310 fy=343.989783 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/liftLeft#seat1	role=Receiving(M6,26.5,28.5,false,Steel) w=0 h=0 fx=351 fy=-158.3 fz=817 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,20.5 hole=0,61.5 hole=0,82 hole=16.6,0 hole=16.6,20.5 hole=16.6,61.5 hole=16.6,82
+face	bed/liftLeft#seat2	role=Receiving(M12,23.5,27,false,Steel) w=0 h=0 fx=310 fy=-150 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/liftRight#seat1	role=Receiving(M6,26.5,28.5,false,Steel) w=0 h=0 fx=-269 fy=-158.3 fz=817 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,20.5 hole=0,61.5 hole=0,82 hole=16.6,0 hole=16.6,20.5 hole=16.6,61.5 hole=16.6,82
+face	bed/liftRight#seat2	role=Receiving(M12,23.5,27,false,Steel) w=0 h=0 fx=-310 fy=-150 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/railLeft#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=211.8 fy=181 fz=837 fr0=1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,166 hole=0,182.6 hole=0,215.8 hole=0,232.4 hole=0,249 hole=0,282.2 hole=0,33.2 hole=0,49.8 hole=0,66.4 hole=0,99.6 hole=0,149.4
+face	bed/railLeft#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=220 fy=290 fz=857 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,210 hole=0,150 hole=0,90 hole=0,30 hole=0,-30 hole=0,-90 hole=0,-150
+face	bed/railRight#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-228.2 fy=181 fz=837 fr0=1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,166 hole=0,182.6 hole=0,215.8 hole=0,232.4 hole=0,249 hole=0,282.2 hole=0,33.2 hole=0,49.8 hole=0,66.4 hole=0,99.6 hole=0,149.4
+face	bed/railRight#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-220 fy=290 fz=857 fr0=1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,210 hole=0,150 hole=0,90 hole=0,30 hole=0,-30 hole=0,-90 hole=0,-150
+face	bed/tablePlate#seat1	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=123.2 fy=-123.2 fz=635 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,246.4
+face	bed/tablePlate#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=0 fy=80 fz=655 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat0#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=361 fy=-200 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat1#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=361 fy=165 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat2#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=361 fy=530 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat3#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=-361 fy=-200 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat4#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=-361 fy=165 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat5#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=-361 fy=530 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat6#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=150 fy=-259.5 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat7#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=-150 fy=-259.5 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat8#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=150 fy=589.5 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	bed/trayClampSeat9#seat1	role=Receiving(M6,6,25,false,Steel) w=0 h=0 fx=-150 fy=589.5 fz=847 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0
+face	column/driveSeat#seat1	role=Receiving(M5,17.15,18.75,false,Steel) w=0 h=0 fx=-104.3 fy=306.625 fz=1163.1 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=0,0 hole=0,13.9 hole=0,27.8 hole=13.9,0 hole=13.9,27.8 hole=27.8,0 hole=27.8,27.8
+face	column/driveSeat#seat2	role=Receiving(M3,18.25,19.25,false,Steel) w=0 h=0 fx=-93 fy=286.625 fz=1363 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=7,409 hole=17,409
+face	column/driveSeat#seat3	role=Receiving(M4,17.6,19,false,Steel) w=0 h=0 fx=-93 fy=286.625 fz=1363 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=0,0 hole=24,0 hole=0,12 hole=24,12
+face	column/driveSeat#seat4	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-93 fy=286.625 fz=1363 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=12,186
+face	column/liftLeft#seat1	role=Receiving(M5,27.15,28.75,false,Steel) w=0 h=0 fx=173.9 fy=398.125 fz=1397 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,41.7 hole=0,55.6 hole=0,69.5 hole=0,83.4 hole=0,97.3 hole=0,111.2 hole=13.9,0 hole=13.9,55.6 hole=13.9,69.5 hole=13.9,83.4 hole=13.9,97.3 hole=27.8,0 hole=27.8,41.7 hole=27.8,55.6 hole=27.8,69.5 hole=27.8,83.4 hole=27.8,97.3 hole=27.8,111.2
+face	column/liftLeft#seat2	role=Receiving(M12,23.5,27,false,Steel) w=0 h=0 fx=160 fy=371.625 fz=1427 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,-100
+face	column/liftRight#seat1	role=Receiving(M5,27.15,28.75,false,Steel) w=0 h=0 fx=-146.1 fy=398.125 fz=1397 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0 hole=0,41.7 hole=0,55.6 hole=0,69.5 hole=0,83.4 hole=0,97.3 hole=0,111.2 hole=13.9,0 hole=13.9,55.6 hole=13.9,69.5 hole=13.9,83.4 hole=13.9,97.3 hole=27.8,0 hole=27.8,41.7 hole=27.8,55.6 hole=27.8,69.5 hole=27.8,83.4 hole=27.8,97.3 hole=27.8,111.2
+face	column/liftRight#seat2	role=Receiving(M12,23.5,27,false,Steel) w=0 h=0 fx=-160 fy=371.625 fz=1427 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,-100
+face	column/railLeft#seat1	role=Receiving(M5,17.15,18.75,false,Steel) w=0 h=0 fx=145 fy=241.625 fz=1297.1 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 hole=0,0 hole=0,13.9 hole=0,152.9 hole=0,180.7 hole=0,194.6 hole=0,208.5 hole=0,236.3 hole=0,250.2 hole=0,27.8 hole=0,55.6 hole=0,69.5 hole=0,83.4
+face	column/railLeft#seat2	role=Receiving(M3,18.25,19.25,false,Steel) w=0 h=0 fx=133 fy=221.625 fz=1384.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=0,0 hole=0,-8 hole=24,0 hole=24,-8
+face	column/railLeft#seat3	role=Receiving(M4,17.6,19,false,Steel) w=0 h=0 fx=133 fy=221.625 fz=1384.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=12,432.7 hole=12,372.7 hole=12,312.7 hole=12,252.7 hole=12,192.7 hole=12,132.7 hole=12,72.7 hole=12,12.7
+face	column/railLeft#seat4	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=133 fy=221.625 fz=1384.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=12,222.7
+face	column/railRight#seat1	role=Receiving(M5,17.15,18.75,false,Steel) w=0 h=0 fx=-145 fy=241.625 fz=1297.1 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 hole=0,0 hole=0,13.9 hole=0,152.9 hole=0,180.7 hole=0,194.6 hole=0,208.5 hole=0,236.3 hole=0,250.2 hole=0,27.8 hole=0,55.6 hole=0,69.5 hole=0,83.4
+face	column/railRight#seat2	role=Receiving(M3,18.25,19.25,false,Steel) w=0 h=0 fx=-157 fy=221.625 fz=1384.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=0,0 hole=0,-8 hole=24,0 hole=24,-8
+face	column/railRight#seat3	role=Receiving(M4,17.6,19,false,Steel) w=0 h=0 fx=-157 fy=221.625 fz=1384.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=12,432.7 hole=12,372.7 hole=12,312.7 hole=12,252.7 hole=12,192.7 hole=12,132.7 hole=12,72.7 hole=12,12.7
+face	column/railRight#seat4	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-157 fy=221.625 fz=1384.7 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=12,222.7
+face	column/soleFrontLeft#seat1	role=Receiving(M5,17.15,18.75,false,Steel) w=0 h=0 fx=182.5 fy=264.225 fz=937 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,13.9 hole=0,27.8 hole=0,41.7 hole=13.9,0 hole=13.9,13.9 hole=13.9,27.8 hole=13.9,41.7 hole=27.8,41.7 hole=41.7,41.7
+face	column/soleFrontLeft#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=157.5 fy=281.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	column/soleFrontLeft#seat3	role=Receiving(M8,15.5,18,false,Steel) w=0 h=0 fx=157.5 fy=281.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=7.5,10 hole=7.5,-10
+face	column/soleFrontRight#seat1	role=Receiving(M5,17.15,18.75,false,Steel) w=0 h=0 fx=-140.8 fy=257.325 fz=937 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,16.2 hole=0,32.4 hole=0,48.6 hole=13.9,0 hole=13.9,48.6 hole=27.8,0 hole=27.8,48.6 hole=41.7,0 hole=41.7,48.6
+face	column/soleFrontRight#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-160 fy=281.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	column/soleFrontRight#seat3	role=Receiving(M8,15.5,18,false,Steel) w=0 h=0 fx=-160 fy=281.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=15,10 hole=15,-10
+face	column/soleRearLeft#seat1	role=Receiving(M5,17.15,18.75,false,Steel) w=0 h=0 fx=157.4 fy=357.325 fz=937 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,48.6 hole=13.9,0 hole=13.9,48.6 hole=27.8,0 hole=27.8,24.3 hole=27.8,48.6 hole=41.7,0 hole=41.7,24.3 hole=41.7,48.6
+face	column/soleRearLeft#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=145 fy=381.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	column/soleRearLeft#seat3	role=Receiving(M8,15.5,18,false,Steel) w=0 h=0 fx=145 fy=381.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=-5,10 hole=-5,-10
+face	column/soleRearRight#seat1	role=Receiving(M5,17.15,18.75,false,Steel) w=0 h=0 fx=-132.6 fy=357.325 fz=937 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=1 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,0 hole=0,16.2 hole=0,32.4 hole=0,48.6 hole=13.9,0 hole=13.9,48.6 hole=27.8,0 hole=27.8,48.6 hole=41.7,0 hole=41.7,48.6
+face	column/soleRearRight#seat2	role=Receiving(M6,16.5,18.5,false,Steel) w=0 h=0 fx=-145 fy=381.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=0,0
+face	column/soleRearRight#seat3	role=Receiving(M8,15.5,18,false,Steel) w=0 h=0 fx=-145 fy=381.625 fz=917 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=22.5,10 hole=22.5,-10
+face	motorCradle#floorFront	role=Clamped(M8,9,8,null) w=0 h=0 fx=-135 fy=45.625 fz=1058 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-30,0 hole=30,0
+face	motorCradle#floorRear	role=Clamped(M8,9,9,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=-232 fy=45.625 fz=1058 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-30,0 hole=30,0
+face	motorCradle#motor	role=Through(M6,6.5,8) w=0 h=0 fx=-239 fy=37.625 fz=1124.743737 fr0=0 fr1=0 fr2=-1 fr3=1 fr4=0 fr5=0 fr6=0 fr7=-1 fr8=0 hole=31.819805,-31.819805 hole=-31.819805,-31.819805 hole=-31.819805,31.819805 hole=31.819805,31.819805
+face	outboardCarrier#housing	role=Clamped(M4,4.5,9.5,$anon:{depth:Float,diameter:Float}) w=0 h=0 fx=100 fy=75.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=1 fr8=0 hole=-8,-22 hole=-8,22 hole=8,-22 hole=8,22
+face	outboardCarrier#saddle	role=Receiving(null,10,15,false,Steel) w=30 h=110 fx=-30 fy=90.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	spindleSeat#back	role=Receiving(null,16,93,false,Steel) w=150 h=108 fx=-147 fy=90.625 fz=1004 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 holes=-
+face	spindleSeat#topFront	role=Receiving(null,16,108,false,Steel) w=93 h=125 fx=-132.5 fy=44.125 fz=1058 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 holes=-
+face	spindleSeat#topRear	role=Receiving(null,14,14,true,Steel) w=90 h=56 fx=-223 fy=42.625 fz=1058 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 holes=-
+hole	Xbridge#J1	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=237.5,130.125,897 dir=0,0,1
+hole	Xbridge#J10	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=237.5,328.125,907 dir=0,0,1
+hole	Xbridge#J11	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=237.5,363.125,897 dir=0,0,1
+hole	Xbridge#J12	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=237.5,363.125,907 dir=0,0,1
+hole	Xbridge#J13	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=202.5,328.125,897 dir=0,0,1
+hole	Xbridge#J14	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=202.5,328.125,907 dir=0,0,1
+hole	Xbridge#J15	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=202.5,363.125,897 dir=0,0,1
+hole	Xbridge#J16	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=202.5,363.125,907 dir=0,0,1
+hole	Xbridge#J17	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-202.5,130.125,897 dir=0,0,1
+hole	Xbridge#J18	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-202.5,130.125,907 dir=0,0,1
+hole	Xbridge#J19	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-202.5,165.125,897 dir=0,0,1
+hole	Xbridge#J2	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=237.5,130.125,907 dir=0,0,1
+hole	Xbridge#J20	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-202.5,165.125,907 dir=0,0,1
+hole	Xbridge#J21	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-237.5,130.125,897 dir=0,0,1
+hole	Xbridge#J22	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-237.5,130.125,907 dir=0,0,1
+hole	Xbridge#J23	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-237.5,165.125,897 dir=0,0,1
+hole	Xbridge#J24	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-237.5,165.125,907 dir=0,0,1
+hole	Xbridge#J25	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-202.5,328.125,897 dir=0,0,1
+hole	Xbridge#J26	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-202.5,328.125,907 dir=0,0,1
+hole	Xbridge#J27	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-202.5,363.125,897 dir=0,0,1
+hole	Xbridge#J28	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-202.5,363.125,907 dir=0,0,1
+hole	Xbridge#J29	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-237.5,328.125,897 dir=0,0,1
+hole	Xbridge#J3	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=237.5,165.125,897 dir=0,0,1
+hole	Xbridge#J30	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-237.5,328.125,907 dir=0,0,1
+hole	Xbridge#J31	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-237.5,363.125,897 dir=0,0,1
+hole	Xbridge#J32	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=-237.5,363.125,907 dir=0,0,1
+hole	Xbridge#J33	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=150,271.625,917 dir=0,0,-1
+hole	Xbridge#J34	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=150,271.625,906 dir=0,0,-1
+hole	Xbridge#J35	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=150,291.625,917 dir=0,0,-1
+hole	Xbridge#J36	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=150,291.625,906 dir=0,0,-1
+hole	Xbridge#J37	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=-175,271.625,917 dir=0,0,-1
+hole	Xbridge#J38	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=-175,271.625,906 dir=0,0,-1
+hole	Xbridge#J39	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=-175,291.625,917 dir=0,0,-1
+hole	Xbridge#J4	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=237.5,165.125,907 dir=0,0,1
+hole	Xbridge#J40	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=-175,291.625,906 dir=0,0,-1
+hole	Xbridge#J41	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=150,371.625,917 dir=0,0,-1
+hole	Xbridge#J42	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=150,371.625,906 dir=0,0,-1
+hole	Xbridge#J43	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=150,391.625,917 dir=0,0,-1
+hole	Xbridge#J44	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=150,391.625,906 dir=0,0,-1
+hole	Xbridge#J45	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=-167.5,371.625,917 dir=0,0,-1
+hole	Xbridge#J46	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=-167.5,371.625,906 dir=0,0,-1
+hole	Xbridge#J47	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=20 at=-167.5,391.625,917 dir=0,0,-1
+hole	Xbridge#J48	kind=bore thread=- d=15 nominal=15 fit=- depth=9 at=-167.5,391.625,906 dir=0,0,-1
+hole	Xbridge#J49	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=20,286.125,897 dir=0,0,1
+hole	Xbridge#J5	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=202.5,130.125,897 dir=0,0,1
+hole	Xbridge#J50	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=-20,286.125,897 dir=0,0,1
+hole	Xbridge#J51	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=170,200.625,897 dir=0,0,1
+hole	Xbridge#J52	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=170,240.625,897 dir=0,0,1
+hole	Xbridge#J53	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=170,280.625,897 dir=0,0,1
+hole	Xbridge#J54	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=170,320.625,897 dir=0,0,1
+hole	Xbridge#J55	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=170,360.625,897 dir=0,0,1
+hole	Xbridge#J56	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=170,410.625,897 dir=0,0,1
+hole	Xbridge#J57	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=130,200.625,897 dir=0,0,1
+hole	Xbridge#J58	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=130,240.625,897 dir=0,0,1
+hole	Xbridge#J59	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=130,280.625,897 dir=0,0,1
+hole	Xbridge#J6	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=202.5,130.125,907 dir=0,0,1
+hole	Xbridge#J60	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=130,320.625,897 dir=0,0,1
+hole	Xbridge#J61	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=130,360.625,897 dir=0,0,1
+hole	Xbridge#J62	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=130,410.625,897 dir=0,0,1
+hole	Xbridge#J63	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=-130,200.625,897 dir=0,0,1
+hole	Xbridge#J64	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=-130,240.625,897 dir=0,0,1
+hole	Xbridge#J65	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=-130,280.625,897 dir=0,0,1
+hole	Xbridge#J66	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=-130,320.625,897 dir=0,0,1
+hole	Xbridge#J67	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=-130,360.625,897 dir=0,0,1
+hole	Xbridge#J68	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=11.3 at=-130,410.625,897 dir=0,0,1
+hole	Xbridge#J69	kind=tapped thread=M5 d=4.2 nominal=4.2 fit=- depth=12.6 at=-150.2,200.625,897 dir=0,0,1
+hole	Xbridge#J7	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=202.5,165.125,897 dir=0,0,1
+hole	Xbridge#J70	kind=tapped thread=M5 d=4.2 nominal=4.2 fit=- depth=12.6 at=-150.2,240.625,897 dir=0,0,1
+hole	Xbridge#J71	kind=tapped thread=M5 d=4.2 nominal=4.2 fit=- depth=12.6 at=-150.2,265.625,897 dir=0,0,1
+hole	Xbridge#J72	kind=tapped thread=M5 d=4.2 nominal=4.2 fit=- depth=12.6 at=-150.2,320.625,897 dir=0,0,1
+hole	Xbridge#J73	kind=tapped thread=M5 d=4.2 nominal=4.2 fit=- depth=12.6 at=-150.2,370.625,897 dir=0,0,1
+hole	Xbridge#J74	kind=tapped thread=M5 d=4.2 nominal=4.2 fit=- depth=12.6 at=-150.2,410.625,897 dir=0,0,1
+hole	Xbridge#J75	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=100,215.625,897 dir=0,0,1
+hole	Xbridge#J76	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-100,215.625,897 dir=0,0,1
+hole	Xbridge#J77	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=100,395.625,897 dir=0,0,1
+hole	Xbridge#J78	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-100,395.625,897 dir=0,0,1
+hole	Xbridge#J79	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=171.75,213.925,917 dir=0,0,-1
+hole	Xbridge#J8	kind=bore thread=- d=12 nominal=12 fit=- depth=10 at=202.5,165.125,907 dir=0,0,1
+hole	Xbridge#J80	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=171.75,202.125,917 dir=0,0,-1
+hole	Xbridge#J81	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=118.25,213.925,917 dir=0,0,-1
+hole	Xbridge#J82	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=118.25,202.125,917 dir=0,0,-1
+hole	Xbridge#J83	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=-118.25,213.925,917 dir=0,0,-1
+hole	Xbridge#J84	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=-118.25,202.125,917 dir=0,0,-1
+hole	Xbridge#J85	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=-171.75,213.925,917 dir=0,0,-1
+hole	Xbridge#J86	kind=tapped thread=M3 d=2.5 nominal=2.5 fit=- depth=5.4 at=-171.75,202.125,917 dir=0,0,-1
+hole	Xbridge#J87	kind=dowel thread=- d=6 nominal=6 fit=H7 depth=8 at=10,286.125,897 dir=0,0,1
+hole	Xbridge#J88	kind=dowel thread=- d=6 nominal=6 fit=H7 depth=8 at=-10,286.125,897 dir=0,0,1
+hole	Xbridge#J89	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=170,220.625,897 dir=0,0,1
+hole	Xbridge#J9	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=20 at=237.5,328.125,897 dir=0,0,1
+hole	Xbridge#J90	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=170,390.625,897 dir=0,0,1
+hole	Xbridge#J91	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=130,220.625,897 dir=0,0,1
+hole	Xbridge#J92	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=130,390.625,897 dir=0,0,1
+hole	Xbridge#J93	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-130,220.625,897 dir=0,0,1
+hole	Xbridge#J94	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-130,390.625,897 dir=0,0,1
+hole	Xbridge#J95	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-150.2,220.625,897 dir=0,0,1
+hole	Xbridge#J96	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-150.2,390.625,897 dir=0,0,1
+hole	XcoverFrontLeft#J1	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=42,204,777 dir=0,0,1
+hole	XcoverFrontLeft#J2	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=59.5,242,859 dir=0,0,-1
+hole	XcoverFrontRight#J1	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-42,204,777 dir=0,0,1
+hole	XcoverFrontRight#J2	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-59.5,242,859 dir=0,0,-1
+hole	XcoverRearLeft#J1	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=42,453,777 dir=0,0,1
+hole	XcoverRearLeft#J2	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=59.5,505,869 dir=0,0,-1
+hole	XcoverRearLeft#J3	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=59.5,560,869 dir=0,0,-1
+hole	XcoverRearRight#J1	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-42,453,777 dir=0,0,1
+hole	XcoverRearRight#J2	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-59.5,505,869 dir=0,0,-1
+hole	XcoverRearRight#J3	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-59.5,560,869 dir=0,0,-1
+hole	XdriveFixedBar#J1	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=-12,446,777 dir=0,0,1
+hole	XdriveFixedBar#J10	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=-23,420,792 dir=0,0,-1
+hole	XdriveFixedBar#J11	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=-23,407,792 dir=0,0,-1
+hole	XdriveFixedBar#J12	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=25,460,792 dir=0,0,-1
+hole	XdriveFixedBar#J13	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=23,420,792 dir=0,0,-1
+hole	XdriveFixedBar#J14	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=23,407,792 dir=0,0,-1
+hole	XdriveFixedBar#J15	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=-18.287206,452.587956,792 dir=0,0,-1
+hole	XdriveFixedBar#J16	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=16.287206,414.412044,792 dir=0,0,-1
+hole	XdriveFixedBar#J2	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=-12,446,787.5 dir=0,0,1
+hole	XdriveFixedBar#J3	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=12,446,777 dir=0,0,1
+hole	XdriveFixedBar#J4	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=12,446,787.5 dir=0,0,1
+hole	XdriveFixedBar#J5	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=-12,434,777 dir=0,0,1
+hole	XdriveFixedBar#J6	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=-12,434,787.5 dir=0,0,1
+hole	XdriveFixedBar#J7	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=12,434,777 dir=0,0,1
+hole	XdriveFixedBar#J8	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=12,434,787.5 dir=0,0,1
+hole	XdriveFixedBar#J9	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=-25,460,792 dir=0,0,-1
+hole	XdriveFloatingBar#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=15 at=-5,197,777 dir=0,0,1
+hole	XdriveFloatingBar#J2	kind=bore thread=- d=7.5 nominal=7.5 fit=- depth=3.5 at=-5,197,788.5 dir=0,0,1
+hole	XdriveFloatingBar#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=15 at=5,197,777 dir=0,0,1
+hole	XdriveFloatingBar#J4	kind=bore thread=- d=7.5 nominal=7.5 fit=- depth=3.5 at=5,197,788.5 dir=0,0,1
+hole	XdriveFloatingBar#J5	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=-23,197,792 dir=0,0,-1
+hole	XdriveFloatingBar#J6	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=16 at=23,197,792 dir=0,0,-1
+hole	XdriveFloatingBar#J7	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=-13,197,792 dir=0,0,-1
+hole	XdriveFloatingBar#J8	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=13,197,792 dir=0,0,-1
+hole	XfrontCover#J1	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=59.5,242,859 dir=0,0,1
+hole	XfrontCover#J2	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-59.5,242,859 dir=0,0,1
+hole	XrearCover#J1	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=59.5,505,869 dir=0,0,1
+hole	XrearCover#J2	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=59.5,560,869 dir=0,0,1
+hole	XrearCover#J3	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-59.5,505,869 dir=0,0,1
+hole	XrearCover#J4	kind=clearance thread=M3 d=4 nominal=4 fit=- depth=2 at=-59.5,560,869 dir=0,0,1
+hole	Xrib-leftInner#J1	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=130,200.625,897 dir=0,0,-1
+hole	Xrib-leftInner#J10	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=130,360.625,863.5 dir=0,0,-1
+hole	Xrib-leftInner#J11	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=130,410.625,897 dir=0,0,-1
+hole	Xrib-leftInner#J12	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=130,410.625,863.5 dir=0,0,-1
+hole	Xrib-leftInner#J13	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=130,220.625,897 dir=0,0,-1
+hole	Xrib-leftInner#J14	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=130,390.625,897 dir=0,0,-1
+hole	Xrib-leftInner#J2	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=130,200.625,863.5 dir=0,0,-1
+hole	Xrib-leftInner#J3	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=130,240.625,897 dir=0,0,-1
+hole	Xrib-leftInner#J4	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=130,240.625,863.5 dir=0,0,-1
+hole	Xrib-leftInner#J5	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=130,280.625,897 dir=0,0,-1
+hole	Xrib-leftInner#J6	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=130,280.625,863.5 dir=0,0,-1
+hole	Xrib-leftInner#J7	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=130,320.625,897 dir=0,0,-1
+hole	Xrib-leftInner#J8	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=130,320.625,863.5 dir=0,0,-1
+hole	Xrib-leftInner#J9	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=130,360.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J1	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=170,200.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J10	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=170,360.625,863.5 dir=0,0,-1
+hole	Xrib-leftOuter#J11	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=170,410.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J12	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=170,410.625,863.5 dir=0,0,-1
+hole	Xrib-leftOuter#J13	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=170,220.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J14	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=170,390.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J2	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=170,200.625,863.5 dir=0,0,-1
+hole	Xrib-leftOuter#J3	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=170,240.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J4	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=170,240.625,863.5 dir=0,0,-1
+hole	Xrib-leftOuter#J5	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=170,280.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J6	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=170,280.625,863.5 dir=0,0,-1
+hole	Xrib-leftOuter#J7	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=170,320.625,897 dir=0,0,-1
+hole	Xrib-leftOuter#J8	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=170,320.625,863.5 dir=0,0,-1
+hole	Xrib-leftOuter#J9	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=170,360.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J1	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=-130,200.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J10	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-130,360.625,863.5 dir=0,0,-1
+hole	Xrib-rightInner#J11	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=-130,410.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J12	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-130,410.625,863.5 dir=0,0,-1
+hole	Xrib-rightInner#J13	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-130,220.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J14	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-130,390.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J2	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-130,200.625,863.5 dir=0,0,-1
+hole	Xrib-rightInner#J3	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=-130,240.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J4	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-130,240.625,863.5 dir=0,0,-1
+hole	Xrib-rightInner#J5	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=-130,280.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J6	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-130,280.625,863.5 dir=0,0,-1
+hole	Xrib-rightInner#J7	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=-130,320.625,897 dir=0,0,-1
+hole	Xrib-rightInner#J8	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-130,320.625,863.5 dir=0,0,-1
+hole	Xrib-rightInner#J9	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=40 at=-130,360.625,897 dir=0,0,-1
+hole	Xrib-scale#J1	kind=clearance thread=M5 d=5.5 nominal=5.5 fit=- depth=17 at=-150.2,200.625,897 dir=0,0,-1
+hole	Xrib-scale#J10	kind=bore thread=- d=10.5 nominal=10.5 fit=- depth=5.5 at=-150.2,370.625,885.5 dir=0,0,-1
+hole	Xrib-scale#J11	kind=clearance thread=M5 d=5.5 nominal=5.5 fit=- depth=17 at=-150.2,410.625,897 dir=0,0,-1
+hole	Xrib-scale#J12	kind=bore thread=- d=10.5 nominal=10.5 fit=- depth=5.5 at=-150.2,410.625,885.5 dir=0,0,-1
+hole	Xrib-scale#J13	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=10.6 at=-151.3,290.125,880 dir=0,0,1
+hole	Xrib-scale#J14	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=10.6 at=-151.3,346.125,880 dir=0,0,1
+hole	Xrib-scale#J15	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-150.2,220.625,897 dir=0,0,-1
+hole	Xrib-scale#J16	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=8 at=-150.2,390.625,897 dir=0,0,-1
+hole	Xrib-scale#J2	kind=bore thread=- d=10.5 nominal=10.5 fit=- depth=5.5 at=-150.2,200.625,885.5 dir=0,0,-1
+hole	Xrib-scale#J3	kind=clearance thread=M5 d=5.5 nominal=5.5 fit=- depth=17 at=-150.2,240.625,897 dir=0,0,-1
+hole	Xrib-scale#J4	kind=bore thread=- d=10.5 nominal=10.5 fit=- depth=5.5 at=-150.2,240.625,885.5 dir=0,0,-1
+hole	Xrib-scale#J5	kind=clearance thread=M5 d=5.5 nominal=5.5 fit=- depth=17 at=-150.2,265.625,897 dir=0,0,-1
+hole	Xrib-scale#J6	kind=bore thread=- d=10.5 nominal=10.5 fit=- depth=5.5 at=-150.2,265.625,885.5 dir=0,0,-1
+hole	Xrib-scale#J7	kind=clearance thread=M5 d=5.5 nominal=5.5 fit=- depth=17 at=-150.2,320.625,897 dir=0,0,-1
+hole	Xrib-scale#J8	kind=bore thread=- d=10.5 nominal=10.5 fit=- depth=5.5 at=-150.2,320.625,885.5 dir=0,0,-1
+hole	Xrib-scale#J9	kind=clearance thread=M5 d=5.5 nominal=5.5 fit=- depth=17 at=-150.2,370.625,897 dir=0,0,-1
+hole	Xskirt#J1	kind=clearance thread=M4 d=5 nominal=5 fit=- depth=2 at=100,215.625,897 dir=0,0,-1
+hole	Xskirt#J2	kind=clearance thread=M4 d=5 nominal=5 fit=- depth=2 at=-100,215.625,897 dir=0,0,-1
+hole	Xskirt#J3	kind=clearance thread=M4 d=5 nominal=5 fit=- depth=2 at=100,395.625,897 dir=0,0,-1
+hole	Xskirt#J4	kind=clearance thread=M4 d=5 nominal=5 fit=- depth=2 at=-100,395.625,897 dir=0,0,-1
+hole	Ymodule/base#J1	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=38.5,169.625,1000 dir=0,-1,0
+hole	Ymodule/base#J10	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=-19.25,164.625,966.658022 dir=0,-1,0
+hole	Ymodule/base#J11	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=-33.341978,169.625,980.75 dir=0,-1,0
+hole	Ymodule/base#J12	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=-33.341978,164.625,980.75 dir=0,-1,0
+hole	Ymodule/base#J13	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=-38.5,169.625,1000 dir=0,-1,0
+hole	Ymodule/base#J14	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=-38.5,164.625,1000 dir=0,-1,0
+hole	Ymodule/base#J15	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=-33.341978,169.625,1019.25 dir=0,-1,0
+hole	Ymodule/base#J16	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=-33.341978,164.625,1019.25 dir=0,-1,0
+hole	Ymodule/base#J17	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=-19.25,169.625,1033.341978 dir=0,-1,0
+hole	Ymodule/base#J18	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=-19.25,164.625,1033.341978 dir=0,-1,0
+hole	Ymodule/base#J19	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=0,169.625,1038.5 dir=0,-1,0
+hole	Ymodule/base#J2	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=38.5,164.625,1000 dir=0,-1,0
+hole	Ymodule/base#J20	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=0,164.625,1038.5 dir=0,-1,0
+hole	Ymodule/base#J21	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=19.25,169.625,1033.341978 dir=0,-1,0
+hole	Ymodule/base#J22	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=19.25,164.625,1033.341978 dir=0,-1,0
+hole	Ymodule/base#J23	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=33.341978,169.625,1019.25 dir=0,-1,0
+hole	Ymodule/base#J24	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=33.341978,164.625,1019.25 dir=0,-1,0
+hole	Ymodule/base#J25	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-120,160.625,1070 dir=0,1,0
+hole	Ymodule/base#J26	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-60,160.625,1070 dir=0,1,0
+hole	Ymodule/base#J27	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=0,160.625,1070 dir=0,1,0
+hole	Ymodule/base#J28	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-120,160.625,1220 dir=0,1,0
+hole	Ymodule/base#J29	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-60,160.625,1220 dir=0,1,0
+hole	Ymodule/base#J3	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=33.341978,169.625,980.75 dir=0,-1,0
+hole	Ymodule/base#J30	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=0,160.625,1220 dir=0,1,0
+hole	Ymodule/base#J31	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=46,160.625,1170 dir=0,1,0
+hole	Ymodule/base#J32	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=6,160.625,1168 dir=0,1,0
+hole	Ymodule/base#J33	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-7,160.625,1168 dir=0,1,0
+hole	Ymodule/base#J34	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=46,160.625,1120 dir=0,1,0
+hole	Ymodule/base#J35	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=6,160.625,1122 dir=0,1,0
+hole	Ymodule/base#J36	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-7,160.625,1122 dir=0,1,0
+hole	Ymodule/base#J37	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-137,160.625,1168 dir=0,1,0
+hole	Ymodule/base#J38	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-137,160.625,1122 dir=0,1,0
+hole	Ymodule/base#J39	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-151,160.625,1187 dir=0,1,0
+hole	Ymodule/base#J4	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=33.341978,164.625,980.75 dir=0,-1,0
+hole	Ymodule/base#J40	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-131,160.625,1187 dir=0,1,0
+hole	Ymodule/base#J41	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-55,160.625,1187 dir=0,1,0
+hole	Ymodule/base#J42	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13 at=-35,160.625,1187 dir=0,1,0
+hole	Ymodule/base#J43	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=12 at=0,160.625,1153 dir=0,1,0
+hole	Ymodule/base#J44	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=12 at=0,160.625,1137 dir=0,1,0
+hole	Ymodule/base#J45	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=12 at=-137,160.625,1155.5 dir=0,1,0
+hole	Ymodule/base#J46	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=12 at=-137,160.625,1134.5 dir=0,1,0
+hole	Ymodule/base#J47	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-141,160.625,1191 dir=0,1,0
+hole	Ymodule/base#J48	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-141,160.625,1183 dir=0,1,0
+hole	Ymodule/base#J49	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-45,160.625,1191 dir=0,1,0
+hole	Ymodule/base#J5	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=19.25,169.625,966.658022 dir=0,-1,0
+hole	Ymodule/base#J50	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-45,160.625,1183 dir=0,1,0
+hole	Ymodule/base#J51	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-135,160.625,1070 dir=0,1,0
+hole	Ymodule/base#J52	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=15,160.625,1070 dir=0,1,0
+hole	Ymodule/base#J53	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-135,160.625,1220 dir=0,1,0
+hole	Ymodule/base#J54	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=15,160.625,1220 dir=0,1,0
+hole	Ymodule/base#J6	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=19.25,164.625,966.658022 dir=0,-1,0
+hole	Ymodule/base#J7	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=0,169.625,961.5 dir=0,-1,0
+hole	Ymodule/base#J8	kind=bore thread=- d=8 nominal=8 fit=- depth=4 at=0,164.625,961.5 dir=0,-1,0
+hole	Ymodule/base#J9	kind=clearance thread=M4 d=4.6 nominal=4.6 fit=- depth=9 at=-19.25,169.625,966.658022 dir=0,-1,0
+hole	Ymodule/carriage#J1	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-105,100.625,1062 dir=0,-1,0
+hole	Ymodule/carriage#J10	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-41,94.825,1062 dir=0,-1,0
+hole	Ymodule/carriage#J11	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-41,100.625,1088 dir=0,-1,0
+hole	Ymodule/carriage#J12	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-41,94.825,1088 dir=0,-1,0
+hole	Ymodule/carriage#J13	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-15,100.625,1062 dir=0,-1,0
+hole	Ymodule/carriage#J14	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-15,94.825,1062 dir=0,-1,0
+hole	Ymodule/carriage#J15	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-15,100.625,1088 dir=0,-1,0
+hole	Ymodule/carriage#J16	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-15,94.825,1088 dir=0,-1,0
+hole	Ymodule/carriage#J17	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-105,100.625,1202 dir=0,-1,0
+hole	Ymodule/carriage#J18	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-105,94.825,1202 dir=0,-1,0
+hole	Ymodule/carriage#J19	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-105,100.625,1228 dir=0,-1,0
+hole	Ymodule/carriage#J2	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-105,94.825,1062 dir=0,-1,0
+hole	Ymodule/carriage#J20	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-105,94.825,1228 dir=0,-1,0
+hole	Ymodule/carriage#J21	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-79,100.625,1202 dir=0,-1,0
+hole	Ymodule/carriage#J22	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-79,94.825,1202 dir=0,-1,0
+hole	Ymodule/carriage#J23	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-79,100.625,1228 dir=0,-1,0
+hole	Ymodule/carriage#J24	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-79,94.825,1228 dir=0,-1,0
+hole	Ymodule/carriage#J25	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-41,100.625,1202 dir=0,-1,0
+hole	Ymodule/carriage#J26	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-41,94.825,1202 dir=0,-1,0
+hole	Ymodule/carriage#J27	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-41,100.625,1228 dir=0,-1,0
+hole	Ymodule/carriage#J28	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-41,94.825,1228 dir=0,-1,0
+hole	Ymodule/carriage#J29	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-15,100.625,1202 dir=0,-1,0
+hole	Ymodule/carriage#J3	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-105,100.625,1088 dir=0,-1,0
+hole	Ymodule/carriage#J30	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-15,94.825,1202 dir=0,-1,0
+hole	Ymodule/carriage#J31	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-15,100.625,1228 dir=0,-1,0
+hole	Ymodule/carriage#J32	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-15,94.825,1228 dir=0,-1,0
+hole	Ymodule/carriage#J33	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=10 at=-93,100.625,1112 dir=0,-1,0
+hole	Ymodule/carriage#J34	kind=bore thread=- d=11 nominal=11 fit=- depth=6.4 at=-93,97.025,1112 dir=0,-1,0
+hole	Ymodule/carriage#J35	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=10 at=-93,100.625,1178 dir=0,-1,0
+hole	Ymodule/carriage#J36	kind=bore thread=- d=11 nominal=11 fit=- depth=6.4 at=-93,97.025,1178 dir=0,-1,0
+hole	Ymodule/carriage#J37	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-78,100.625,1027 dir=0,-1,0
+hole	Ymodule/carriage#J38	kind=bore thread=- d=8 nominal=8 fit=- depth=4.4 at=-78,95.025,1027 dir=0,-1,0
+hole	Ymodule/carriage#J39	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-78,100.625,1047 dir=0,-1,0
+hole	Ymodule/carriage#J4	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-105,94.825,1088 dir=0,-1,0
+hole	Ymodule/carriage#J40	kind=bore thread=- d=8 nominal=8 fit=- depth=4.4 at=-78,95.025,1047 dir=0,-1,0
+hole	Ymodule/carriage#J41	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-22,90.625,955 dir=0,1,0
+hole	Ymodule/carriage#J42	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-22,90.625,1045 dir=0,1,0
+hole	Ymodule/carriage#J43	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-38,90.625,955 dir=0,1,0
+hole	Ymodule/carriage#J44	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-38,90.625,1045 dir=0,1,0
+hole	Ymodule/carriage#J45	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=10 at=-95,90.625,962 dir=0,1,0
+hole	Ymodule/carriage#J46	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=10 at=-95,90.625,1046 dir=0,1,0
+hole	Ymodule/carriage#J47	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=10 at=-115,90.625,962 dir=0,1,0
+hole	Ymodule/carriage#J48	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=10 at=-115,90.625,1046 dir=0,1,0
+hole	Ymodule/carriage#J49	kind=dowel thread=- d=6 nominal=6 fit=H7 depth=8 at=-93,100.625,1125 dir=0,-1,0
+hole	Ymodule/carriage#J5	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-79,100.625,1062 dir=0,-1,0
+hole	Ymodule/carriage#J50	kind=dowel thread=- d=6 nominal=6 fit=H7 depth=8 at=-93,100.625,1165 dir=0,-1,0
+hole	Ymodule/carriage#J51	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-30,90.625,955 dir=0,1,0
+hole	Ymodule/carriage#J52	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-30,90.625,1045 dir=0,1,0
+hole	Ymodule/carriage#J53	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=10 at=-80,90.625,965 dir=0,1,0
+hole	Ymodule/carriage#J54	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=10 at=-80,90.625,1035 dir=0,1,0
+hole	Ymodule/carriage#J6	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-79,94.825,1062 dir=0,-1,0
+hole	Ymodule/carriage#J7	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-79,100.625,1088 dir=0,-1,0
+hole	Ymodule/carriage#J8	kind=bore thread=- d=8 nominal=8 fit=- depth=4.2 at=-79,94.825,1088 dir=0,-1,0
+hole	Ymodule/carriage#J9	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=10 at=-41,100.625,1062 dir=0,-1,0
+hole	ZbellowsLeftLower-fixed#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,213.925,917 dir=0,0,1
+hole	ZbellowsLeftLower-fixed#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,202.125,917 dir=0,0,1
+hole	ZbellowsLeftLower-fixed#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,213.925,917 dir=0,0,1
+hole	ZbellowsLeftLower-fixed#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,202.125,917 dir=0,0,1
+hole	ZbellowsLeftLower-moving#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,213.925,962 dir=0,0,-1
+hole	ZbellowsLeftLower-moving#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,202.125,962 dir=0,0,-1
+hole	ZbellowsLeftLower-moving#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,213.925,962 dir=0,0,-1
+hole	ZbellowsLeftLower-moving#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,202.125,962 dir=0,0,-1
+hole	ZbellowsLeftUpper-fixed#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,213.925,1370.7 dir=0,0,-1
+hole	ZbellowsLeftUpper-fixed#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,202.125,1370.7 dir=0,0,-1
+hole	ZbellowsLeftUpper-fixed#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,213.925,1370.7 dir=0,0,-1
+hole	ZbellowsLeftUpper-fixed#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,202.125,1370.7 dir=0,0,-1
+hole	ZbellowsLeftUpper-moving#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,213.925,1145.7 dir=0,0,1
+hole	ZbellowsLeftUpper-moving#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=171.75,202.125,1145.7 dir=0,0,1
+hole	ZbellowsLeftUpper-moving#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,213.925,1145.7 dir=0,0,1
+hole	ZbellowsLeftUpper-moving#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=118.25,202.125,1145.7 dir=0,0,1
+hole	ZbellowsRightLower-fixed#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,213.925,917 dir=0,0,1
+hole	ZbellowsRightLower-fixed#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,202.125,917 dir=0,0,1
+hole	ZbellowsRightLower-fixed#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,213.925,917 dir=0,0,1
+hole	ZbellowsRightLower-fixed#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,202.125,917 dir=0,0,1
+hole	ZbellowsRightLower-moving#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,213.925,962 dir=0,0,-1
+hole	ZbellowsRightLower-moving#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,202.125,962 dir=0,0,-1
+hole	ZbellowsRightLower-moving#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,213.925,962 dir=0,0,-1
+hole	ZbellowsRightLower-moving#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,202.125,962 dir=0,0,-1
+hole	ZbellowsRightUpper-fixed#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,213.925,1370.7 dir=0,0,-1
+hole	ZbellowsRightUpper-fixed#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,202.125,1370.7 dir=0,0,-1
+hole	ZbellowsRightUpper-fixed#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,213.925,1370.7 dir=0,0,-1
+hole	ZbellowsRightUpper-fixed#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,202.125,1370.7 dir=0,0,-1
+hole	ZbellowsRightUpper-moving#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,213.925,1145.7 dir=0,0,1
+hole	ZbellowsRightUpper-moving#J2	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-118.25,202.125,1145.7 dir=0,0,1
+hole	ZbellowsRightUpper-moving#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,213.925,1145.7 dir=0,0,1
+hole	ZbellowsRightUpper-moving#J4	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=3 at=-171.75,202.125,1145.7 dir=0,0,1
+hole	ZdriveFixedBar#J1	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=40 at=-93,286.625,1363 dir=0,-1,0
+hole	ZdriveFixedBar#J10	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=10.8 at=-104,246.625,1337 dir=0,1,0
+hole	ZdriveFixedBar#J11	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=10.8 at=-104,246.625,1324 dir=0,1,0
+hole	ZdriveFixedBar#J12	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=10.8 at=-56,246.625,1377 dir=0,1,0
+hole	ZdriveFixedBar#J13	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=10.8 at=-58,246.625,1337 dir=0,1,0
+hole	ZdriveFixedBar#J14	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=10.8 at=-58,246.625,1324 dir=0,1,0
+hole	ZdriveFixedBar#J15	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=-99.287206,246.625,1369.587956 dir=0,1,0
+hole	ZdriveFixedBar#J16	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=-64.712794,246.625,1331.412044 dir=0,1,0
+hole	ZdriveFixedBar#J2	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=-93,251.125,1363 dir=0,-1,0
+hole	ZdriveFixedBar#J3	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=40 at=-69,286.625,1363 dir=0,-1,0
+hole	ZdriveFixedBar#J4	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=-69,251.125,1363 dir=0,-1,0
+hole	ZdriveFixedBar#J5	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=40 at=-93,286.625,1351 dir=0,-1,0
+hole	ZdriveFixedBar#J6	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=-93,251.125,1351 dir=0,-1,0
+hole	ZdriveFixedBar#J7	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=40 at=-69,286.625,1351 dir=0,-1,0
+hole	ZdriveFixedBar#J8	kind=bore thread=- d=9 nominal=9 fit=- depth=4.5 at=-69,251.125,1351 dir=0,-1,0
+hole	ZdriveFixedBar#J9	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=10.8 at=-106,246.625,1377 dir=0,1,0
+hole	ZdriveFloatingBar#J1	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=40 at=-86,286.625,954 dir=0,-1,0
+hole	ZdriveFloatingBar#J2	kind=bore thread=- d=7.5 nominal=7.5 fit=- depth=3.5 at=-86,250.125,954 dir=0,-1,0
+hole	ZdriveFloatingBar#J3	kind=clearance thread=M3 d=3.4 nominal=3.4 fit=- depth=40 at=-76,286.625,954 dir=0,-1,0
+hole	ZdriveFloatingBar#J4	kind=bore thread=- d=7.5 nominal=7.5 fit=- depth=3.5 at=-76,250.125,954 dir=0,-1,0
+hole	ZdriveFloatingBar#J5	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13.8 at=-104,246.625,954 dir=0,1,0
+hole	ZdriveFloatingBar#J6	kind=tapped thread=M6 d=5 nominal=5 fit=- depth=13.8 at=-58,246.625,954 dir=0,1,0
+hole	ZdriveFloatingBar#J7	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=-94,246.625,954 dir=0,1,0
+hole	ZdriveFloatingBar#J8	kind=dowel thread=- d=5 nominal=5 fit=H7 depth=10 at=-68,246.625,954 dir=0,1,0
+hole	Zplate#J1	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=158,193.625,987 dir=0,-1,0
+hole	Zplate#J10	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=158,187.625,1097 dir=0,-1,0
+hole	Zplate#J11	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=158,193.625,1123 dir=0,-1,0
+hole	Zplate#J12	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=158,187.625,1123 dir=0,-1,0
+hole	Zplate#J13	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=132,193.625,1097 dir=0,-1,0
+hole	Zplate#J14	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=132,187.625,1097 dir=0,-1,0
+hole	Zplate#J15	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=132,193.625,1123 dir=0,-1,0
+hole	Zplate#J16	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=132,187.625,1123 dir=0,-1,0
+hole	Zplate#J17	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-132,193.625,987 dir=0,-1,0
+hole	Zplate#J18	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-132,187.625,987 dir=0,-1,0
+hole	Zplate#J19	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-132,193.625,1013 dir=0,-1,0
+hole	Zplate#J2	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=158,187.625,987 dir=0,-1,0
+hole	Zplate#J20	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-132,187.625,1013 dir=0,-1,0
+hole	Zplate#J21	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-158,193.625,987 dir=0,-1,0
+hole	Zplate#J22	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-158,187.625,987 dir=0,-1,0
+hole	Zplate#J23	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-158,193.625,1013 dir=0,-1,0
+hole	Zplate#J24	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-158,187.625,1013 dir=0,-1,0
+hole	Zplate#J25	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-132,193.625,1097 dir=0,-1,0
+hole	Zplate#J26	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-132,187.625,1097 dir=0,-1,0
+hole	Zplate#J27	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-132,193.625,1123 dir=0,-1,0
+hole	Zplate#J28	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-132,187.625,1123 dir=0,-1,0
+hole	Zplate#J29	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-158,193.625,1097 dir=0,-1,0
+hole	Zplate#J3	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=158,193.625,1013 dir=0,-1,0
+hole	Zplate#J30	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-158,187.625,1097 dir=0,-1,0
+hole	Zplate#J31	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=-158,193.625,1123 dir=0,-1,0
+hole	Zplate#J32	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=-158,187.625,1123 dir=0,-1,0
+hole	Zplate#J33	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=13 at=-101,193.625,1045.5 dir=0,-1,0
+hole	Zplate#J34	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-101,187.125,1045.5 dir=0,-1,0
+hole	Zplate#J35	kind=clearance thread=M6 d=6.6 nominal=6.6 fit=- depth=13 at=-61,193.625,1045.5 dir=0,-1,0
+hole	Zplate#J36	kind=bore thread=- d=12 nominal=12 fit=- depth=6.5 at=-61,187.125,1045.5 dir=0,-1,0
+hole	Zplate#J37	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=-51,185.625,1000 dir=0,-1,0
+hole	Zplate#J38	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=-47.117856,185.625,980.483145 dir=0,-1,0
+hole	Zplate#J39	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=-36.062446,185.625,963.937554 dir=0,-1,0
+hole	Zplate#J4	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=158,187.625,1013 dir=0,-1,0
+hole	Zplate#J40	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=-19.516855,185.625,952.882144 dir=0,-1,0
+hole	Zplate#J41	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=0,185.625,949 dir=0,-1,0
+hole	Zplate#J42	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=19.516855,185.625,952.882144 dir=0,-1,0
+hole	Zplate#J43	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=36.062446,185.625,963.937554 dir=0,-1,0
+hole	Zplate#J44	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=47.117856,185.625,980.483145 dir=0,-1,0
+hole	Zplate#J45	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=51,185.625,1000 dir=0,-1,0
+hole	Zplate#J46	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=47.117856,185.625,1019.516855 dir=0,-1,0
+hole	Zplate#J47	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=36.062446,185.625,1036.062446 dir=0,-1,0
+hole	Zplate#J48	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=19.516855,185.625,1047.117856 dir=0,-1,0
+hole	Zplate#J49	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=0,185.625,1051 dir=0,-1,0
+hole	Zplate#J5	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=132,193.625,987 dir=0,-1,0
+hole	Zplate#J50	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=-19.516855,185.625,1047.117856 dir=0,-1,0
+hole	Zplate#J51	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=-36.062446,185.625,1036.062446 dir=0,-1,0
+hole	Zplate#J52	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=5 at=-47.117856,185.625,1019.516855 dir=0,-1,0
+hole	Zplate#J53	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=119,193.625,976 dir=0,-1,0
+hole	Zplate#J54	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=171,193.625,976 dir=0,-1,0
+hole	Zplate#J55	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=171,193.625,1131.7 dir=0,-1,0
+hole	Zplate#J56	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=119,193.625,1131.7 dir=0,-1,0
+hole	Zplate#J57	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-171,193.625,976 dir=0,-1,0
+hole	Zplate#J58	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-119,193.625,976 dir=0,-1,0
+hole	Zplate#J59	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-119,193.625,1131.7 dir=0,-1,0
+hole	Zplate#J6	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=132,187.625,987 dir=0,-1,0
+hole	Zplate#J60	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-171,193.625,1131.7 dir=0,-1,0
+hole	Zplate#J61	kind=dowel thread=- d=6 nominal=6 fit=H7 depth=8 at=-91,193.625,1045.5 dir=0,-1,0
+hole	Zplate#J62	kind=dowel thread=- d=6 nominal=6 fit=H7 depth=8 at=-71,193.625,1045.5 dir=0,-1,0
+hole	Zplate#J7	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=132,193.625,1013 dir=0,-1,0
+hole	Zplate#J8	kind=bore thread=- d=9 nominal=9 fit=- depth=7 at=132,187.625,1013 dir=0,-1,0
+hole	Zplate#J9	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=13 at=158,193.625,1097 dir=0,-1,0
+hole	ZscaleArm#J1	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=10.6 at=87,274.325,1032.5 dir=-1,0,0
+hole	ZscaleArm#J2	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=10.6 at=87,274.325,1088.5 dir=-1,0,0
+hole	motorCradle#J1	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=8 at=-135,15.625,1058 dir=0,0,1
+hole	motorCradle#J2	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=8 at=-135,75.625,1058 dir=0,0,1
+hole	motorCradle#J3	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=18 at=-232,15.625,1058 dir=0,0,1
+hole	motorCradle#J4	kind=bore thread=- d=14 nominal=14 fit=- depth=9 at=-232,15.625,1067 dir=0,0,1
+hole	motorCradle#J5	kind=clearance thread=M8 d=9 nominal=9 fit=- depth=18 at=-232,75.625,1058 dir=0,0,1
+hole	motorCradle#J6	kind=bore thread=- d=14 nominal=14 fit=- depth=9 at=-232,75.625,1067 dir=0,0,1
+hole	motorCradle#J7	kind=dowel thread=- d=8 nominal=8 fit=H7 depth=8 at=-190,5.625,1058 dir=0,0,1
+hole	motorCradle#J8	kind=dowel thread=- d=8 nominal=8 fit=H7 depth=8 at=-190,69.625,1058 dir=0,0,1
+hole	outboardCarrier#J1	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-22,90.625,955 dir=0,-1,0
+hole	outboardCarrier#J10	kind=bore thread=- d=9.5 nominal=9.5 fit=- depth=5.5 at=92,85.125,978 dir=0,1,0
+hole	outboardCarrier#J11	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=92,75.625,1022 dir=0,1,0
+hole	outboardCarrier#J12	kind=bore thread=- d=9.5 nominal=9.5 fit=- depth=5.5 at=92,85.125,1022 dir=0,1,0
+hole	outboardCarrier#J13	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-30,90.625,955 dir=0,-1,0
+hole	outboardCarrier#J14	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-30,90.625,1045 dir=0,-1,0
+hole	outboardCarrier#J15	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=100,75.625,978 dir=0,1,0
+hole	outboardCarrier#J16	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=100,75.625,1022 dir=0,1,0
+hole	outboardCarrier#J2	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-22,90.625,1045 dir=0,-1,0
+hole	outboardCarrier#J3	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-38,90.625,955 dir=0,-1,0
+hole	outboardCarrier#J4	kind=tapped thread=M4 d=3.3 nominal=3.3 fit=- depth=8.6 at=-38,90.625,1045 dir=0,-1,0
+hole	outboardCarrier#J5	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=108,75.625,978 dir=0,1,0
+hole	outboardCarrier#J6	kind=bore thread=- d=9.5 nominal=9.5 fit=- depth=5.5 at=108,85.125,978 dir=0,1,0
+hole	outboardCarrier#J7	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=108,75.625,1022 dir=0,1,0
+hole	outboardCarrier#J8	kind=bore thread=- d=9.5 nominal=9.5 fit=- depth=5.5 at=108,85.125,1022 dir=0,1,0
+hole	outboardCarrier#J9	kind=clearance thread=M4 d=4.5 nominal=4.5 fit=- depth=15 at=92,75.625,978 dir=0,1,0
+hole	spindleSeat#J1	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=14.9 at=-95,90.625,962 dir=0,-1,0
+hole	spindleSeat#J10	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-80,90.625,1035 dir=0,-1,0
+hole	spindleSeat#J11	kind=dowel thread=- d=8 nominal=8 fit=H7 depth=12 at=-190,5.625,1058 dir=0,0,-1
+hole	spindleSeat#J12	kind=dowel thread=- d=8 nominal=8 fit=H7 depth=12 at=-190,69.625,1058 dir=0,0,-1
+hole	spindleSeat#J2	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=14.9 at=-95,90.625,1046 dir=0,-1,0
+hole	spindleSeat#J3	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=14.9 at=-115,90.625,962 dir=0,-1,0
+hole	spindleSeat#J4	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=14.9 at=-115,90.625,1046 dir=0,-1,0
+hole	spindleSeat#J5	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=14.4 at=-135,15.625,1058 dir=0,0,-1
+hole	spindleSeat#J6	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=14.4 at=-135,75.625,1058 dir=0,0,-1
+hole	spindleSeat#J7	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=15 at=-232,15.625,1058 dir=0,0,-1
+hole	spindleSeat#J8	kind=tapped thread=M8 d=6.8 nominal=6.8 fit=- depth=15 at=-232,75.625,1058 dir=0,0,-1
+hole	spindleSeat#J9	kind=dowel thread=- d=4 nominal=4 fit=H7 depth=6 at=-80,90.625,965 dir=0,-1,0
+part	Xbridge	kind=made pn=HOBBER-GE-X-CARRIAGE material=steel mass=21.429999 source=Computed(Preview) volume=2729936.207791 area=334044.600088 cx=0.044578 cy=289.935298 cz=907.003881 ixx=19792226998.6875 ixy=-5351944.744202 ixz=50062.879538 iyy=62651962911.42297 iyz=-5078177.81781 izz=82262243144.35544 lo=-250 lo=105.625 lo=897 hi=250 hi=431.625 hi=917 faces=176
+part	XcoverFrontLeft	kind=chip-cover pn=HOBBER-GUARD-XLEFTFRONT material=steel mass=0.180371 source=Computed(Preview) volume=22977.167906 area=23887.982056 cx=51.776051 cy=229.013126 cz=822.293822 ixx=38854798.162045 ixy=8666.086022 ixz=-2891303.608092 iyy=20628517.558727 iyz=39496.752999 izz=20112755.802422 lo=37 lo=179 lo=777 hi=70 hi=279 hi=865 faces=32
+part	XcoverFrontRight	kind=chip-cover pn=HOBBER-GUARD-XRIGHTFRONT material=steel mass=0.180371 source=Computed(Preview) volume=22977.167906 area=23887.982056 cx=-51.776051 cy=229.013126 cz=822.293822 ixx=38854798.162045 ixy=-8666.086022 ixz=2891303.608092 iyy=20628517.558727 iyz=39496.752999 izz=20112755.802422 lo=-70 lo=179 lo=777 hi=-37 hi=279 hi=865 faces=32
+part	XcoverRearLeft	kind=chip-cover pn=HOBBER-GUARD-XLEFTREAR material=steel mass=0.315185 source=Computed(Preview) volume=40150.972994 area=42262.919885 cx=56.413282 cy=433.693907 cz=843.782651 ixx=297449433.223528 ixy=-1774258.825592 ixz=-8620699.368628 iyy=47040139.270347 iyz=-6147551.387972 izz=256181443.373249 lo=37 lo=250 lo=777 hi=70 hi=630 hi=879 faces=35
+part	XcoverRearRight	kind=chip-cover pn=HOBBER-GUARD-XRIGHTREAR material=steel mass=0.315185 source=Computed(Preview) volume=40150.972994 area=42262.919885 cx=-56.413282 cy=433.693907 cz=843.782651 ixx=297449433.22353 ixy=1774258.825592 ixz=8620699.368628 iyy=47040139.27035 iyz=-6147551.387974 izz=256181443.373251 lo=-70 lo=250 lo=777 hi=-37 hi=630 hi=879 faces=35
+part	XdriveFixedBar	kind=made pn=HOBBER-GE-X-FIXED-DRIVE-BAR material=steel mass=0.587 source=Computed(Preview) volume=74777.06339 area=17317.721029 cx=0.005252 cy=433.448742 cz=784.426573 ixx=37078506.755276 ixy=-129601.961166 ixz=-1010.582236 iyy=32170312.065632 iyz=29589.111867 izz=66460248.256561 lo=-35 lo=396 lo=777 hi=35 hi=471 hi=792 faces=28
+part	XdriveFloatingBar	kind=made pn=HOBBER-GE-X-FLOATING-DRIVE-BAR material=steel mass=0.256108 source=Computed(Preview) volume=32625.180105 area=8631.147696 cx=0 cy=197 cz=784.426606 ixx=4090236.976976 ixy=0 ixz=0 iyy=12230562.306078 iyz=0 izz=15101968.702455 lo=-32.5 lo=179.5 lo=777 hi=32.5 hi=214.5 hi=792 faces=18
+part	XfrontCover	kind=chip-cover pn=HOBBER-GUARD-XFRONT material=steel mass=0.171058 source=Computed(Preview) volume=21790.796387 area=22827.575132 cx=0 cy=207.126967 cz=859.614562 ixx=12934389.391124 ixy=0 ixz=0 iyy=30515604.349166 iyz=-303063.291531 izz=43354371.746752 lo=-65 lo=170 lo=852 hi=65 hi=249.5 hi=861 faces=18
+part	XrearCover	kind=chip-cover pn=HOBBER-GUARD-XREAR material=steel mass=0.534548 source=Computed(Preview) volume=68095.30977 area=69895.504441 cx=0 cy=498.408198 cz=870 ixx=395582001.135815 ixy=0 ixz=0 iyy=95595469.38425 iyz=0.000002 izz=491132073.646885 lo=-65 lo=366.5 lo=869 hi=65 hi=630 hi=871 faces=12
+part	Xrib-leftInner	kind=rib pn=HOBBER-X-RIB-LEFTINNER material=steel mass=1.454696 source=Computed(Preview) volume=185311.541241 area=36548.420778 cx=130 cy=309.014021 cz=877.260723 ixx=958080835.988979 ixy=-0.000004 ixz=-0.000011 iyy=30707466.081472 iyz=335513.10804 izz=940376130.363075 lo=120 lo=185.625 lo=857 hi=140 hi=431.625 hi=897 faces=28
+part	Xrib-leftOuter	kind=rib pn=HOBBER-X-RIB-LEFTOUTER material=steel mass=1.454696 source=Computed(Preview) volume=185311.541241 area=36548.420778 cx=170 cy=309.014021 cz=877.260723 ixx=958080835.988979 ixy=-0.00001 ixz=-0.000012 iyy=30707466.081476 iyz=335513.108044 izz=940376130.363083 lo=160 lo=185.625 lo=857 hi=180 hi=431.625 hi=897 faces=28
+part	Xrib-rightInner	kind=rib pn=HOBBER-X-RIB-RIGHTINNER material=steel mass=1.454696 source=Computed(Preview) volume=185311.541241 area=36548.420778 cx=-130 cy=309.014021 cz=877.260723 ixx=958080835.988983 ixy=0.000004 ixz=0.00001 iyy=30707466.08147 iyz=335513.108042 izz=940376130.363077 lo=-140 lo=185.625 lo=857 hi=-120 hi=431.625 hi=897 faces=28
+part	Xrib-scale	kind=rib pn=HOBBER-X-RIB-SCALE material=steel mass=0.546049 source=Computed(Preview) volume=69560.417582 area=20143.344485 cx=-150.197133 cy=309.072203 cz=888.66673 ixx=351019466.975903 ixy=-1805.631269 ixz=671.513241 iyy=3592099.063188 iyz=82403.478268 izz=351311607.897252 lo=-159.1 lo=185.625 lo=880 hi=-141.3 hi=431.625 hi=897 faces=32
+part	XscaleSeat	kind=made pn=HOBBER-GE-X-SCALE-SEAT material=steel mass=0.963591 source=Computed(Preview) volume=122750.495668 area=25707.617657 cx=-178.486686 cy=382 cz=854.5 ixx=674196933.938912 ixy=-0.000002 ixz=-0.000002 iyy=12863629.983593 iyz=0 izz=682457420.334969 lo=-194.5 lo=253 lo=847 hi=-162.5 hi=511 hi=862 faces=8
+part	Xskirt	kind=chip-cover pn=HOBBER-GUARD-XSKIRT material=steel mass=0.917229 source=Computed(Preview) volume=116844.50516 area=120519.960295 cx=0 cy=298.793173 cz=880.802304 ixx=746646074.654066 ixy=0 ixz=0 iyy=402073414.933179 iyz=-1212466.040794 izz=1131991899.19549 lo=-110 lo=165.625 lo=853 hi=110 hi=431.625 hi=897 faces=162
+part	Ymodule/base	kind=y-part pn=HOBBER-Y-MODULE-BASE material=steel mass=5.002411 source=Computed(Preview) volume=637249.833818 area=130700.266249 cx=-53.279997 cy=166.446509 cz=1128.009281 ixx=3511728048.273033 ixy=6198664.284827 ixz=572020909.339637 iyy=6286894805.723041 iyz=-14860561.739086 izz=2789914871.119851 lo=-175 lo=160.625 lo=945 hi=55 hi=172.625 hi=1248.5 faces=88
+part	Ymodule/carriage	kind=y-part pn=HOBBER-Y-MODULE-CARRIAGE material=aluminium_6061 mass=0.939056 source=Computed(Preview) volume=347798.646608 area=89176.879857 cx=-63.448388 cy=95.719718 cz=1102.143507 ixx=2317840976.415585 ixy=-776420.507108 ixz=-132540475.5345 iyy=2893377996.053483 iyz=2225000.394457 izz=581337907.540138 lo=-130 lo=90.625 lo=945 hi=10 hi=100.625 hi=1235 faces=88
+part	ZbellowsLeftLower-fixed	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R material=steel mass=0.020018 source=Computed(Preview) volume=2550.105567 area=5942.623358 cx=145 cy=205.271287 cz=920.405357 ixx=160073.185982 ixy=0 ixz=0 iyy=1231026.437856 iyz=3522.428259 izz=1248363.062159 lo=113.25 lo=197.625 lo=917 hi=176.75 hi=218.425 hi=942.8 faces=22
+part	ZbellowsLeftLower-moving	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-M material=steel mass=0.019523 source=Computed(Preview) volume=2486.946567 area=5304.203358 cx=145 cy=205.623423 cz=958.876959 ixx=144647.64312 ixy=0 ixz=0 iyy=1167532.841402 iyz=6337.785624 izz=1190805.556086 lo=113.25 lo=197.625 lo=936.2 hi=176.75 hi=218.425 hi=962 faces=25
+part	ZbellowsLeftLower-s1	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S13 material=polyurethane_PU mass=0.000471 source=Computed(Preview) volume=392.85 area=3724.99 cx=145 cy=205.31063 cz=932.56215 ixx=30058.952733 ixy=0 ixz=0 iyy=152064.260855 iyz=-17.570746 izz=150498.532228 lo=121.45 lo=200.875 lo=922.271429 hi=168.55 hi=220.125 hi=943.871429 faces=17
+part	ZbellowsLeftLower-s10	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S4 material=polyurethane_PU mass=0.000422 source=Computed(Preview) volume=351.27 area=3331.69 cx=145 cy=207.004548 cz=942.204678 ixx=23988.806814 ixy=0 ixz=0 iyy=113047.528398 iyz=-15.731599 izz=108758.365866 lo=123.7 lo=203.125 lo=931.914286 hi=166.3 hi=220.125 hi=953.514286 faces=17
+part	ZbellowsLeftLower-s11	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S3 material=polyurethane_PU mass=0.000416 source=Computed(Preview) volume=346.65 area=3287.99 cx=145 cy=207.192856 cz=943.276065 ixx=23379.149674 ixy=0 ixz=0 iyy=109191.655897 iyz=-15.527353 izz=104664.693126 lo=123.95 lo=203.375 lo=932.985714 hi=166.05 hi=220.125 hi=954.585714 faces=17
+part	ZbellowsLeftLower-s12	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S2 material=polyurethane_PU mass=0.00041 source=Computed(Preview) volume=342.03 area=3244.29 cx=145 cy=207.381186 cz=944.347451 ixx=22781.791458 ixy=0 ixz=0 iyy=105427.412396 iyz=-15.323131 izz=100674.948312 lo=124.2 lo=203.625 lo=934.057143 hi=165.8 hi=220.125 hi=955.657143 faces=17
+part	ZbellowsLeftLower-s13	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S1 material=polyurethane_PU mass=0.000405 source=Computed(Preview) volume=337.41 area=3200.59 cx=145 cy=207.569539 cz=945.418835 ixx=22196.551678 ixy=0 ixz=0 iyy=101753.642892 iyz=-15.118934 izz=96787.795936 lo=124.45 lo=203.875 lo=935.128571 hi=165.55 hi=220.125 hi=956.728571 faces=17
+part	ZbellowsLeftLower-s2	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S12 material=polyurethane_PU mass=0.000466 source=Computed(Preview) volume=388.23 area=3681.29 cx=145 cy=205.498775 cz=933.633546 ixx=29330.483463 ixy=0 ixz=0 iyy=147331.752364 iyz=-17.366322 izz=145409.411349 lo=121.7 lo=201.125 lo=923.342857 hi=168.3 hi=220.125 hi=944.942857 faces=17
+part	ZbellowsLeftLower-s3	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S11 material=polyurethane_PU mass=0.00046 source=Computed(Preview) volume=383.61 area=3637.59 cx=145 cy=205.686936 cz=934.70494 ixx=28615.93747 ixy=0 ixz=0 iyy=142701.267872 iyz=-17.161915 izz=140436.237748 lo=121.95 lo=201.375 lo=924.414286 hi=168.05 hi=220.125 hi=946.014286 faces=17
+part	ZbellowsLeftLower-s4	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S10 material=polyurethane_PU mass=0.000455 source=Computed(Preview) volume=378.99 area=3593.89 cx=145 cy=205.875113 cz=935.776334 ixx=27915.134274 ixy=0 ixz=0 iyy=138171.652378 iyz=-16.957526 izz=135577.675945 lo=122.2 lo=201.625 lo=925.485714 hi=167.8 hi=220.125 hi=947.085714 faces=17
+part	ZbellowsLeftLower-s5	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S9 material=polyurethane_PU mass=0.000449 source=Computed(Preview) volume=374.37 area=3550.19 cx=145 cy=206.063306 cz=936.847727 ixx=27227.893392 ixy=0 ixz=0 iyy=133741.750884 iyz=-16.753155 izz=130832.390458 lo=122.45 lo=201.875 lo=926.557143 hi=167.55 hi=220.125 hi=948.157143 faces=17
+part	ZbellowsLeftLower-s6	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S8 material=polyurethane_PU mass=0.000444 source=Computed(Preview) volume=369.75 area=3506.49 cx=145 cy=206.251517 cz=937.919119 ixx=26554.034344 ixy=0 ixz=0 iyy=129410.408389 iyz=-16.548803 izz=126199.045805 lo=122.7 lo=202.125 lo=927.628571 hi=167.3 hi=220.125 hi=949.228571 faces=17
+part	ZbellowsLeftLower-s7	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S7 material=polyurethane_PU mass=0.000438 source=Computed(Preview) volume=365.13 area=3462.79 cx=145 cy=206.439746 cz=938.99051 ixx=25893.376646 ixy=0 ixz=0 iyy=125176.469893 iyz=-16.34447 izz=121676.306503 lo=122.95 lo=202.375 lo=928.7 hi=167.05 hi=220.125 hi=950.3 faces=17
+part	ZbellowsLeftLower-s8	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S6 material=polyurethane_PU mass=0.000433 source=Computed(Preview) volume=360.51 area=3419.09 cx=145 cy=206.627994 cz=940.0619 ixx=25245.739815 ixy=0 ixz=0 iyy=121038.780396 iyz=-16.140158 izz=117262.837069 lo=123.2 lo=202.625 lo=929.771429 hi=166.8 hi=220.125 hi=951.371429 faces=17
+part	ZbellowsLeftLower-s9	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S5 material=polyurethane_PU mass=0.000427 source=Computed(Preview) volume=355.89 area=3375.39 cx=145 cy=206.816261 cz=941.13329 ixx=24610.943366 ixy=0 ixz=0 iyy=116996.184897 iyz=-15.935867 izz=112957.302018 lo=123.45 lo=202.875 lo=930.842857 hi=166.55 hi=220.125 hi=952.442857 faces=17
+part	ZbellowsLeftUpper-fixed	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R material=steel mass=0.020018 source=Computed(Preview) volume=2550.105567 area=5942.623358 cx=145 cy=205.271287 cz=1367.294643 ixx=160073.185982 ixy=0 ixz=0 iyy=1231026.437856 iyz=-3522.428259 izz=1248363.062159 lo=113.25 lo=197.625 lo=1344.9 hi=176.75 hi=218.425 hi=1370.7 faces=22
+part	ZbellowsLeftUpper-moving	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-M material=steel mass=0.019523 source=Computed(Preview) volume=2486.946567 area=5304.203358 cx=145 cy=205.623423 cz=1148.823041 ixx=144647.64312 ixy=0 ixz=0 iyy=1167532.841402 iyz=-6337.785624 izz=1190805.556086 lo=113.25 lo=197.625 lo=1145.7 hi=176.75 hi=218.425 hi=1171.5 faces=25
+part	ZbellowsLeftUpper-s1	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S13 material=polyurethane_PU mass=0.000471 source=Computed(Preview) volume=392.85 area=3724.99 cx=145 cy=205.31063 cz=1342.280707 ixx=30058.952733 ixy=0 ixz=0 iyy=152064.260855 iyz=17.570746 izz=150498.532228 lo=121.45 lo=200.875 lo=1330.971429 hi=168.55 hi=220.125 hi=1352.571429 faces=17
+part	ZbellowsLeftUpper-s10	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S4 material=polyurethane_PU mass=0.000422 source=Computed(Preview) volume=351.27 area=3331.69 cx=145 cy=207.004548 cz=1216.923894 ixx=23988.806814 ixy=0 ixz=0 iyy=113047.528398 iyz=15.731599 izz=108758.365866 lo=123.7 lo=203.125 lo=1205.614286 hi=166.3 hi=220.125 hi=1227.214286 faces=17
+part	ZbellowsLeftUpper-s11	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S3 material=polyurethane_PU mass=0.000416 source=Computed(Preview) volume=346.65 area=3287.99 cx=145 cy=207.192856 cz=1202.995364 ixx=23379.149674 ixy=0 ixz=0 iyy=109191.655897 iyz=15.527353 izz=104664.693126 lo=123.95 lo=203.375 lo=1191.685714 hi=166.05 hi=220.125 hi=1213.285714 faces=17
+part	ZbellowsLeftUpper-s12	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S2 material=polyurethane_PU mass=0.00041 source=Computed(Preview) volume=342.03 area=3244.29 cx=145 cy=207.381186 cz=1189.066835 ixx=22781.791458 ixy=0 ixz=0 iyy=105427.412396 iyz=15.323131 izz=100674.948312 lo=124.2 lo=203.625 lo=1177.757143 hi=165.8 hi=220.125 hi=1199.357143 faces=17
+part	ZbellowsLeftUpper-s13	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S1 material=polyurethane_PU mass=0.000405 source=Computed(Preview) volume=337.41 area=3200.59 cx=145 cy=207.569539 cz=1175.138307 ixx=22196.551678 ixy=0 ixz=0 iyy=101753.642892 iyz=15.118934 izz=96787.795936 lo=124.45 lo=203.875 lo=1163.828571 hi=165.55 hi=220.125 hi=1185.428571 faces=17
+part	ZbellowsLeftUpper-s2	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S12 material=polyurethane_PU mass=0.000466 source=Computed(Preview) volume=388.23 area=3681.29 cx=145 cy=205.498775 cz=1328.352169 ixx=29330.483463 ixy=0 ixz=0 iyy=147331.752364 iyz=17.366322 izz=145409.411349 lo=121.7 lo=201.125 lo=1317.042857 hi=168.3 hi=220.125 hi=1338.642857 faces=17
+part	ZbellowsLeftUpper-s3	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S11 material=polyurethane_PU mass=0.00046 source=Computed(Preview) volume=383.61 area=3637.59 cx=145 cy=205.686936 cz=1314.423631 ixx=28615.93747 ixy=0 ixz=0 iyy=142701.267872 iyz=17.161915 izz=140436.237748 lo=121.95 lo=201.375 lo=1303.114286 hi=168.05 hi=220.125 hi=1324.714286 faces=17
+part	ZbellowsLeftUpper-s4	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S10 material=polyurethane_PU mass=0.000455 source=Computed(Preview) volume=378.99 area=3593.89 cx=145 cy=205.875113 cz=1300.495094 ixx=27915.134274 ixy=0 ixz=0 iyy=138171.652378 iyz=16.957526 izz=135577.675945 lo=122.2 lo=201.625 lo=1289.185714 hi=167.8 hi=220.125 hi=1310.785714 faces=17
+part	ZbellowsLeftUpper-s5	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S9 material=polyurethane_PU mass=0.000449 source=Computed(Preview) volume=374.37 area=3550.19 cx=145 cy=206.063306 cz=1286.566559 ixx=27227.893392 ixy=0 ixz=0 iyy=133741.750884 iyz=16.753155 izz=130832.390458 lo=122.45 lo=201.875 lo=1275.257143 hi=167.55 hi=220.125 hi=1296.857143 faces=17
+part	ZbellowsLeftUpper-s6	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S8 material=polyurethane_PU mass=0.000444 source=Computed(Preview) volume=369.75 area=3506.49 cx=145 cy=206.251517 cz=1272.638024 ixx=26554.034344 ixy=0 ixz=0 iyy=129410.408389 iyz=16.548803 izz=126199.045805 lo=122.7 lo=202.125 lo=1261.328571 hi=167.3 hi=220.125 hi=1282.928571 faces=17
+part	ZbellowsLeftUpper-s7	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S7 material=polyurethane_PU mass=0.000438 source=Computed(Preview) volume=365.13 area=3462.79 cx=145 cy=206.439746 cz=1258.70949 ixx=25893.376646 ixy=0 ixz=0 iyy=125176.469893 iyz=16.34447 izz=121676.306503 lo=122.95 lo=202.375 lo=1247.4 hi=167.05 hi=220.125 hi=1269 faces=17
+part	ZbellowsLeftUpper-s8	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S6 material=polyurethane_PU mass=0.000433 source=Computed(Preview) volume=360.51 area=3419.09 cx=145 cy=206.627994 cz=1244.780957 ixx=25245.739815 ixy=0 ixz=0 iyy=121038.780396 iyz=16.140158 izz=117262.837069 lo=123.2 lo=202.625 lo=1233.471429 hi=166.8 hi=220.125 hi=1255.071429 faces=17
+part	ZbellowsLeftUpper-s9	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S5 material=polyurethane_PU mass=0.000427 source=Computed(Preview) volume=355.89 area=3375.39 cx=145 cy=206.816261 cz=1230.852425 ixx=24610.943366 ixy=0 ixz=0 iyy=116996.184897 iyz=15.935867 izz=112957.302018 lo=123.45 lo=202.875 lo=1219.542857 hi=166.55 hi=220.125 hi=1241.142857 faces=17
+part	ZbellowsRightLower-fixed	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R material=steel mass=0.020018 source=Computed(Preview) volume=2550.105567 area=5942.623358 cx=-145 cy=205.271287 cz=920.405357 ixx=160073.185982 ixy=0 ixz=0 iyy=1231026.437856 iyz=3522.428259 izz=1248363.062159 lo=-176.75 lo=197.625 lo=917 hi=-113.25 hi=218.425 hi=942.8 faces=22
+part	ZbellowsRightLower-moving	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-M material=steel mass=0.019523 source=Computed(Preview) volume=2486.946567 area=5304.203358 cx=-145 cy=205.623423 cz=958.876959 ixx=144647.64312 ixy=0 ixz=0 iyy=1167532.841402 iyz=6337.785624 izz=1190805.556086 lo=-176.75 lo=197.625 lo=936.2 hi=-113.25 hi=218.425 hi=962 faces=25
+part	ZbellowsRightLower-s1	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S13 material=polyurethane_PU mass=0.000471 source=Computed(Preview) volume=392.85 area=3724.99 cx=-145 cy=205.31063 cz=932.56215 ixx=30058.952733 ixy=0 ixz=0 iyy=152064.260855 iyz=-17.570746 izz=150498.532228 lo=-168.55 lo=200.875 lo=922.271429 hi=-121.45 hi=220.125 hi=943.871429 faces=17
+part	ZbellowsRightLower-s10	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S4 material=polyurethane_PU mass=0.000422 source=Computed(Preview) volume=351.27 area=3331.69 cx=-145 cy=207.004548 cz=942.204678 ixx=23988.806814 ixy=0 ixz=0 iyy=113047.528398 iyz=-15.731599 izz=108758.365866 lo=-166.3 lo=203.125 lo=931.914286 hi=-123.7 hi=220.125 hi=953.514286 faces=17
+part	ZbellowsRightLower-s11	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S3 material=polyurethane_PU mass=0.000416 source=Computed(Preview) volume=346.65 area=3287.99 cx=-145 cy=207.192856 cz=943.276065 ixx=23379.149674 ixy=0 ixz=0 iyy=109191.655897 iyz=-15.527353 izz=104664.693126 lo=-166.05 lo=203.375 lo=932.985714 hi=-123.95 hi=220.125 hi=954.585714 faces=17
+part	ZbellowsRightLower-s12	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S2 material=polyurethane_PU mass=0.00041 source=Computed(Preview) volume=342.03 area=3244.29 cx=-145 cy=207.381186 cz=944.347451 ixx=22781.791458 ixy=0 ixz=0 iyy=105427.412396 iyz=-15.323131 izz=100674.948312 lo=-165.8 lo=203.625 lo=934.057143 hi=-124.2 hi=220.125 hi=955.657143 faces=17
+part	ZbellowsRightLower-s13	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S1 material=polyurethane_PU mass=0.000405 source=Computed(Preview) volume=337.41 area=3200.59 cx=-145 cy=207.569539 cz=945.418835 ixx=22196.551678 ixy=0 ixz=0 iyy=101753.642892 iyz=-15.118934 izz=96787.795936 lo=-165.55 lo=203.875 lo=935.128571 hi=-124.45 hi=220.125 hi=956.728571 faces=17
+part	ZbellowsRightLower-s2	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S12 material=polyurethane_PU mass=0.000466 source=Computed(Preview) volume=388.23 area=3681.29 cx=-145 cy=205.498775 cz=933.633546 ixx=29330.483463 ixy=0 ixz=0 iyy=147331.752364 iyz=-17.366322 izz=145409.411349 lo=-168.3 lo=201.125 lo=923.342857 hi=-121.7 hi=220.125 hi=944.942857 faces=17
+part	ZbellowsRightLower-s3	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S11 material=polyurethane_PU mass=0.00046 source=Computed(Preview) volume=383.61 area=3637.59 cx=-145 cy=205.686936 cz=934.70494 ixx=28615.93747 ixy=0 ixz=0 iyy=142701.267872 iyz=-17.161915 izz=140436.237748 lo=-168.05 lo=201.375 lo=924.414286 hi=-121.95 hi=220.125 hi=946.014286 faces=17
+part	ZbellowsRightLower-s4	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S10 material=polyurethane_PU mass=0.000455 source=Computed(Preview) volume=378.99 area=3593.89 cx=-145 cy=205.875113 cz=935.776334 ixx=27915.134274 ixy=0 ixz=0 iyy=138171.652378 iyz=-16.957526 izz=135577.675945 lo=-167.8 lo=201.625 lo=925.485714 hi=-122.2 hi=220.125 hi=947.085714 faces=17
+part	ZbellowsRightLower-s5	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S9 material=polyurethane_PU mass=0.000449 source=Computed(Preview) volume=374.37 area=3550.19 cx=-145 cy=206.063306 cz=936.847727 ixx=27227.893392 ixy=0 ixz=0 iyy=133741.750884 iyz=-16.753155 izz=130832.390458 lo=-167.55 lo=201.875 lo=926.557143 hi=-122.45 hi=220.125 hi=948.157143 faces=17
+part	ZbellowsRightLower-s6	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S8 material=polyurethane_PU mass=0.000444 source=Computed(Preview) volume=369.75 area=3506.49 cx=-145 cy=206.251517 cz=937.919119 ixx=26554.034344 ixy=0 ixz=0 iyy=129410.408389 iyz=-16.548803 izz=126199.045805 lo=-167.3 lo=202.125 lo=927.628571 hi=-122.7 hi=220.125 hi=949.228571 faces=17
+part	ZbellowsRightLower-s7	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S7 material=polyurethane_PU mass=0.000438 source=Computed(Preview) volume=365.13 area=3462.79 cx=-145 cy=206.439746 cz=938.99051 ixx=25893.376646 ixy=0 ixz=0 iyy=125176.469893 iyz=-16.34447 izz=121676.306503 lo=-167.05 lo=202.375 lo=928.7 hi=-122.95 hi=220.125 hi=950.3 faces=17
+part	ZbellowsRightLower-s8	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S6 material=polyurethane_PU mass=0.000433 source=Computed(Preview) volume=360.51 area=3419.09 cx=-145 cy=206.627994 cz=940.0619 ixx=25245.739815 ixy=0 ixz=0 iyy=121038.780396 iyz=-16.140158 izz=117262.837069 lo=-166.8 lo=202.625 lo=929.771429 hi=-123.2 hi=220.125 hi=951.371429 faces=17
+part	ZbellowsRightLower-s9	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S5 material=polyurethane_PU mass=0.000427 source=Computed(Preview) volume=355.89 area=3375.39 cx=-145 cy=206.816261 cz=941.13329 ixx=24610.943366 ixy=0 ixz=0 iyy=116996.184897 iyz=-15.935867 izz=112957.302018 lo=-166.55 lo=202.875 lo=930.842857 hi=-123.45 hi=220.125 hi=952.442857 faces=17
+part	ZbellowsRightUpper-fixed	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R material=steel mass=0.020018 source=Computed(Preview) volume=2550.105567 area=5942.623358 cx=-145 cy=205.271287 cz=1367.294643 ixx=160073.185982 ixy=0 ixz=0 iyy=1231026.437856 iyz=-3522.428259 izz=1248363.062159 lo=-176.75 lo=197.625 lo=1344.9 hi=-113.25 hi=218.425 hi=1370.7 faces=22
+part	ZbellowsRightUpper-moving	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-M material=steel mass=0.019523 source=Computed(Preview) volume=2486.946567 area=5304.203358 cx=-145 cy=205.623423 cz=1148.823041 ixx=144647.64312 ixy=0 ixz=0 iyy=1167532.841402 iyz=-6337.785624 izz=1190805.556086 lo=-176.75 lo=197.625 lo=1145.7 hi=-113.25 hi=218.425 hi=1171.5 faces=25
+part	ZbellowsRightUpper-s1	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S13 material=polyurethane_PU mass=0.000471 source=Computed(Preview) volume=392.85 area=3724.99 cx=-145 cy=205.31063 cz=1342.280707 ixx=30058.952733 ixy=0 ixz=0 iyy=152064.260855 iyz=17.570746 izz=150498.532228 lo=-168.55 lo=200.875 lo=1330.971429 hi=-121.45 hi=220.125 hi=1352.571429 faces=17
+part	ZbellowsRightUpper-s10	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S4 material=polyurethane_PU mass=0.000422 source=Computed(Preview) volume=351.27 area=3331.69 cx=-145 cy=207.004548 cz=1216.923894 ixx=23988.806814 ixy=0 ixz=0 iyy=113047.528398 iyz=15.731599 izz=108758.365866 lo=-166.3 lo=203.125 lo=1205.614286 hi=-123.7 hi=220.125 hi=1227.214286 faces=17
+part	ZbellowsRightUpper-s11	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S3 material=polyurethane_PU mass=0.000416 source=Computed(Preview) volume=346.65 area=3287.99 cx=-145 cy=207.192856 cz=1202.995364 ixx=23379.149674 ixy=0 ixz=0 iyy=109191.655897 iyz=15.527353 izz=104664.693126 lo=-166.05 lo=203.375 lo=1191.685714 hi=-123.95 hi=220.125 hi=1213.285714 faces=17
+part	ZbellowsRightUpper-s12	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S2 material=polyurethane_PU mass=0.00041 source=Computed(Preview) volume=342.03 area=3244.29 cx=-145 cy=207.381186 cz=1189.066835 ixx=22781.791458 ixy=0 ixz=0 iyy=105427.412396 iyz=15.323131 izz=100674.948312 lo=-165.8 lo=203.625 lo=1177.757143 hi=-124.2 hi=220.125 hi=1199.357143 faces=17
+part	ZbellowsRightUpper-s13	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S1 material=polyurethane_PU mass=0.000405 source=Computed(Preview) volume=337.41 area=3200.59 cx=-145 cy=207.569539 cz=1175.138307 ixx=22196.551678 ixy=0 ixz=0 iyy=101753.642892 iyz=15.118934 izz=96787.795936 lo=-165.55 lo=203.875 lo=1163.828571 hi=-124.45 hi=220.125 hi=1185.428571 faces=17
+part	ZbellowsRightUpper-s2	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S12 material=polyurethane_PU mass=0.000466 source=Computed(Preview) volume=388.23 area=3681.29 cx=-145 cy=205.498775 cz=1328.352169 ixx=29330.483463 ixy=0 ixz=0 iyy=147331.752364 iyz=17.366322 izz=145409.411349 lo=-168.3 lo=201.125 lo=1317.042857 hi=-121.7 hi=220.125 hi=1338.642857 faces=17
+part	ZbellowsRightUpper-s3	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S11 material=polyurethane_PU mass=0.00046 source=Computed(Preview) volume=383.61 area=3637.59 cx=-145 cy=205.686936 cz=1314.423631 ixx=28615.93747 ixy=0 ixz=0 iyy=142701.267872 iyz=17.161915 izz=140436.237748 lo=-168.05 lo=201.375 lo=1303.114286 hi=-121.95 hi=220.125 hi=1324.714286 faces=17
+part	ZbellowsRightUpper-s4	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S10 material=polyurethane_PU mass=0.000455 source=Computed(Preview) volume=378.99 area=3593.89 cx=-145 cy=205.875113 cz=1300.495094 ixx=27915.134274 ixy=0 ixz=0 iyy=138171.652378 iyz=16.957526 izz=135577.675945 lo=-167.8 lo=201.625 lo=1289.185714 hi=-122.2 hi=220.125 hi=1310.785714 faces=17
+part	ZbellowsRightUpper-s5	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S9 material=polyurethane_PU mass=0.000449 source=Computed(Preview) volume=374.37 area=3550.19 cx=-145 cy=206.063306 cz=1286.566559 ixx=27227.893392 ixy=0 ixz=0 iyy=133741.750884 iyz=16.753155 izz=130832.390458 lo=-167.55 lo=201.875 lo=1275.257143 hi=-122.45 hi=220.125 hi=1296.857143 faces=17
+part	ZbellowsRightUpper-s6	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S8 material=polyurethane_PU mass=0.000444 source=Computed(Preview) volume=369.75 area=3506.49 cx=-145 cy=206.251517 cz=1272.638024 ixx=26554.034344 ixy=0 ixz=0 iyy=129410.408389 iyz=16.548803 izz=126199.045805 lo=-167.3 lo=202.125 lo=1261.328571 hi=-122.7 hi=220.125 hi=1282.928571 faces=17
+part	ZbellowsRightUpper-s7	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S7 material=polyurethane_PU mass=0.000438 source=Computed(Preview) volume=365.13 area=3462.79 cx=-145 cy=206.439746 cz=1258.70949 ixx=25893.376646 ixy=0 ixz=0 iyy=125176.469893 iyz=16.34447 izz=121676.306503 lo=-167.05 lo=202.375 lo=1247.4 hi=-122.95 hi=220.125 hi=1269 faces=17
+part	ZbellowsRightUpper-s8	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S6 material=polyurethane_PU mass=0.000433 source=Computed(Preview) volume=360.51 area=3419.09 cx=-145 cy=206.627994 cz=1244.780957 ixx=25245.739815 ixy=0 ixz=0 iyy=121038.780396 iyz=16.140158 izz=117262.837069 lo=-166.8 lo=202.625 lo=1233.471429 hi=-123.2 hi=220.125 hi=1255.071429 faces=17
+part	ZbellowsRightUpper-s9	kind=z-bellows pn=WAYCOVER-RFQ-P8x10-THIN-40x17.2-S210-L30-B-R-S5 material=polyurethane_PU mass=0.000427 source=Computed(Preview) volume=355.89 area=3375.39 cx=-145 cy=206.816261 cz=1230.852425 ixx=24610.943366 ixy=0 ixz=0 iyy=116996.184897 iyz=15.935867 izz=112957.302018 lo=-166.55 lo=202.875 lo=1219.542857 hi=-123.45 hi=220.125 hi=1241.142857 faces=17
+part	ZdriveFixedBar	kind=made pn=HOBBER-GE-Z-FIXED-DRIVE-BAR material=steel mass=1.608712 source=Computed(Preview) volume=204931.432953 area=25821.216498 cx=-80.998084 cy=266.818777 cz=1350.419986 ixx=124348328.378387 ixy=5966.582294 ixz=-129613.253475 iyy=181759660.328293 iyz=-18672.206097 izz=111422867.046904 lo=-116 lo=246.625 lo=1313 hi=-46 hi=286.625 hi=1388 faces=34
+part	ZdriveFloatingBar	kind=made pn=HOBBER-GE-Z-FLOATING-DRIVE-BAR material=steel mass=0.698771 source=Computed(Preview) volume=89015.461019 area=14199.549929 cx=-81.026271 cy=266.838273 cz=953.989805 ixx=21002553.138172 ixy=-45866.757001 ixz=27037.318696 iyy=40863459.466576 iyz=-17798.55569 izz=43316517.264436 lo=-113.5 lo=246.625 lo=936.5 hi=-48.5 hi=286.625 hi=971.5 faces=22
+part	Zplate	kind=made pn=HOBBER-GE-Z-SADDLE material=steel mass=7.444205 source=Computed(Preview) volume=948306.317535 area=177610.976284 cx=0.202213 cy=187.078473 cz=1058.546866 ixx=4490924781.404446 ixy=169434.621423 ixz=2501869.762948 iyy=15104368619.971733 iyz=-3495417.721781 izz=10640289057.13079 lo=-175 lo=180.625 lo=935 hi=175 hi=193.625 hi=1170 faces=99
+part	ZscaleArm	kind=made pn=HOBBER-GE-Z-SCALE-ARM material=steel mass=0.967799 source=Computed(Preview) volume=123286.496697 area=25448.005822 cx=79.042679 cy=240.190774 cz=1052.738602 ixx=210318286.551918 ixy=-1054754.900208 ixz=3734.214524 iyy=124851877.481987 iyz=47967.311852 izz=88741534.503971 lo=72.8 lo=193.625 lo=998 hi=87 hi=284.325 hi=1107.5 faces=18
+part	ZscaleSeat	kind=made pn=HOBBER-GE-Z-SCALE-SEAT material=steel mass=1.340391 source=Computed(Preview) volume=170750.495668 area=35107.617657 cx=112.5 cy=247.134571 cz=1192.5 ixx=1819395989.716576 ixy=0 ixz=0.000006 iyy=1807939497.204109 iyz=0.000004 izz=17859636.100006 lo=105 lo=231.125 lo=1013.5 hi=120 hi=263.125 hi=1371.5 faces=8
+part	bed/casting	kind=casting pn=MINERAL-930x800x800 material=mineral_cast mass=1171.168177 source=Computed(Preview) volume=487986740.603084 area=6954886.210713 cx=0.707202 cy=188.979265 cz=432.954444 ixx=59525256930107.91 ixy=6626445744.176283 ixz=-48587859330.481766 iyy=55309216527405.5 iyz=-1156153715531.1572 izz=64593237624984.52 lo=-400 lo=-300 lo=47 hi=400 hi=630 hi=847 faces=2258
+part	bed/driveSeat	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-DRIVESEAT material=steel_C45 mass=4.630535 source=Computed(Preview) volume=589877.04056 area=79299.82488 cx=0 cy=335.352602 cz=767.00186 ixx=4337879054.016921 ixy=0 ixz=0 iyy=513307322.905084 iyz=-12885.136302 izz=4811830021.844142 lo=-50 lo=187 lo=757 hi=50 hi=484 hi=777 faces=42
+part	bed/enclosureSeat00	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-ENCLOSURESEAT00 material=steel_C45 mass=0.996246 source=Computed(Preview) volume=126910.260048 area=20071.791961 cx=390.002147 cy=-200 cz=767 ixx=136329735.401921 ixy=0 ixz=0 iyy=72499936.759567 iyz=0 izz=72299744.265504 lo=380 lo=-240 lo=727 hi=400 hi=-160 hi=807 faces=12
+part	bed/enclosureSeat02	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-ENCLOSURESEAT02 material=steel_C45 mass=0.996246 source=Computed(Preview) volume=126910.260048 area=20071.791961 cx=-390.002147 cy=-200 cz=767 ixx=136329735.401921 ixy=0 ixz=0 iyy=72499936.759567 iyz=0 izz=72299744.265504 lo=-400 lo=-240 lo=727 hi=-380 hi=-160 hi=807 faces=12
+part	bed/enclosureSeat20	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-ENCLOSURESEAT20 material=steel_C45 mass=0.996246 source=Computed(Preview) volume=126910.260048 area=20071.791961 cx=390.002147 cy=530 cz=767 ixx=136329735.401921 ixy=0 ixz=0 iyy=72499936.759567 iyz=0 izz=72299744.265504 lo=380 lo=490 lo=727 hi=400 hi=570 hi=807 faces=12
+part	bed/enclosureSeat22	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-ENCLOSURESEAT22 material=steel_C45 mass=0.996246 source=Computed(Preview) volume=126910.260048 area=20071.791961 cx=-390.002147 cy=530 cz=767 ixx=136329735.401921 ixy=0 ixz=0 iyy=72499936.759567 iyz=0 izz=72299744.265504 lo=-400 lo=490 lo=727 hi=-380 hi=570 hi=807 faces=12
+part	bed/liftAdditional1	kind=cast-insert pn=CAST-INSERT-HOBBER-LIFT-ONE material=steel_C45 mass=0.795338 source=Computed(Preview) volume=101316.984196 area=19806.610242 cx=310 cy=343.989783 cz=832.000476 ixx=18989721.21956 ixy=0 ixz=0 iyy=92930719.883685 iyz=0 izz=96609507.22053 lo=260 lo=325.989783 lo=817 hi=360 hi=361.989783 hi=847 faces=24
+part	bed/liftAdditional2	kind=cast-insert pn=CAST-INSERT-HOBBER-LIFT-ONE material=steel_C45 mass=0.795338 source=Computed(Preview) volume=101316.984196 area=19806.610242 cx=-310 cy=343.989783 cz=832.000476 ixx=18989721.21956 ixy=0 ixz=0 iyy=92930719.883685 iyz=0 izz=96609507.22053 lo=-360 lo=325.989783 lo=817 hi=-260 hi=361.989783 hi=847 faces=24
+part	bed/liftLeft	kind=cast-insert pn=CAST-INSERT-HOBBER-LIFT-ONE material=steel_C45 mass=0.795338 source=Computed(Preview) volume=101316.984196 area=19806.610242 cx=310 cy=-150 cz=832.000476 ixx=18989721.21956 ixy=0 ixz=0 iyy=92930719.883685 iyz=0 izz=96609507.22053 lo=260 lo=-168 lo=817 hi=360 hi=-132 hi=847 faces=24
+part	bed/liftRight	kind=cast-insert pn=CAST-INSERT-HOBBER-LIFT-ONE material=steel_C45 mass=0.795338 source=Computed(Preview) volume=101316.984196 area=19806.610242 cx=-310 cy=-150 cz=832.000476 ixx=18989721.21956 ixy=0 ixz=0 iyy=92930719.883685 iyz=0 izz=96609507.22053 lo=-360 lo=-168 lo=817 hi=-260 hi=-132 hi=847 faces=24
+part	bed/railLeft	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-RAILLEFT material=steel_C45 mass=3.23997 source=Computed(Preview) volume=412735.066989 area=66611.946409 cx=220.086601 cy=269.464549 cz=847.00264 ixx=6103022349.995452 ixy=-1980263.941504 ixz=26901.975912 iyy=100981165.301435 iyz=-193576.44742 izz=6176426097.988173 lo=195 lo=60 lo=837 hi=245 hi=480 hi=857 faces=46
+part	bed/railRight	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-RAILRIGHT material=steel_C45 mass=3.23997 source=Computed(Preview) volume=412735.066989 area=66611.946409 cx=-219.913399 cy=269.464549 cz=847.00264 ixx=6103022349.995451 ixy=-1980263.941504 ixz=26901.975912 iyy=100981165.301435 iyz=-193576.44742 izz=6176426097.988173 lo=-245 lo=60 lo=837 hi=-195 hi=480 hi=857 faces=46
+part	bed/tablePlate	kind=cast-insert pn=CAST-INSERT-HOBBER-BED-TABLEPLATE material=steel_C45 mass=12.102954 source=Computed(Preview) volume=1541777.51882 area=180071.791961 cx=0 cy=0.039204 cz=645.000177 ixx=10279794867.213991 ixy=0 ixz=0 iyy=10282122015.449291 iyz=88933.460671 izz=20459122452.048664 lo=-140 lo=-140 lo=635 hi=140 hi=140 hi=655 faces=13
+part	bed/trayClampSeat0	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=361.066553 cy=-200 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=357 lo=-205.5 lo=807 hi=365 hi=-194.5 hi=847 faces=128
+part	bed/trayClampSeat1	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=361.066553 cy=165 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=357 lo=159.5 lo=807 hi=365 hi=170.5 hi=847 faces=128
+part	bed/trayClampSeat2	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=361.066553 cy=530 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=357 lo=524.5 lo=807 hi=365 hi=535.5 hi=847 faces=128
+part	bed/trayClampSeat3	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=-360.933447 cy=-200 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=-365 lo=-205.5 lo=807 hi=-357 hi=-194.5 hi=847 faces=128
+part	bed/trayClampSeat4	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=-360.933447 cy=165 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=-365 lo=159.5 lo=807 hi=-357 hi=170.5 hi=847 faces=128
+part	bed/trayClampSeat5	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=-360.933447 cy=530 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=-365 lo=524.5 lo=807 hi=-357 hi=535.5 hi=847 faces=128
+part	bed/trayClampSeat6	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=150.066553 cy=-259.5 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=146 lo=-265 lo=807 hi=154 hi=-254 hi=847 faces=128
+part	bed/trayClampSeat7	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=-149.933447 cy=-259.5 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=-154 lo=-265 lo=807 hi=-146 hi=-254 hi=847 faces=128
+part	bed/trayClampSeat8	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=150.066553 cy=589.5 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=146 lo=584 lo=807 hi=154 hi=595 hi=847 faces=128
+part	bed/trayClampSeat9	kind=cast-insert pn=CAST-INSERT-CATALOGUE-FIXING-SOCKET material=Stainless_sheet mass=0.00749 source=Computed(Preview) volume=948.164499 area=1553.753377 cx=-149.933447 cy=589.5 cz=827.663604 ixx=132206.934002 ixy=0 ixz=44.696999 iyy=130725.366484 iyz=0 izz=9900.139702 lo=-154 lo=584 lo=807 hi=-146 hi=595 hi=847 faces=128
+part	chipTray	kind=made pn=HOBBER-GE-CHIP-TRAY material=steel mass=5.04956 source=Computed(Preview) volume=643256.071273 area=517505.166585 cx=0 cy=-48.948751 cz=767.584564 ixx=9960064618.563679 ixy=0.000002 ixz=-0.000002 iyy=9983100066.407772 iyz=273080613.118284 izz=16962928393.786194 lo=-174 lo=-239 lo=655 hi=174 hi=147 hi=862 faces=29
+part	column/casting	kind=casting pn=MINERAL-400x200x500 material=mineral_cast mass=72.826816 source=Computed(Preview) volume=30344506.565642 area=940605.550155 cx=-0.765105 cy=350.169895 cz=1174.292548 ixx=682817277851.4626 ixy=-43465033.702462 ixz=-59512319.224479 iyy=1061299932292.8186 iyz=-1207739952.106933 izz=536951105895.06744 lo=-200 lo=231.625 lo=927 hi=200 hi=431.625 hi=1427 faces=1257
+part	column/driveSeat	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-DRIVESEAT material=steel_C45 mass=5.609448 source=Computed(Preview) volume=714579.346883 area=96392.690001 cx=-80.971027 cy=296.624345 cz=1176.895238 ixx=12646715419.031204 ixy=-12953.3798 ixz=-2168.964722 iyy=12986127222.6522 iyz=-42649.386505 izz=387071547.069773 lo=-120 lo=286.625 lo=947 hi=-42 hi=306.625 hi=1407 faces=34
+part	column/liftLeft	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-LIFT-TWO material=steel_C45 mass=2.308053 source=Computed(Preview) volume=294019.528562 area=43137.988179 cx=160 cy=336.924216 cz=1411.993576 ixx=737988057.507399 ixy=0 ixz=0 iyy=112833307.395767 iyz=-86228.843087 izz=806525843.639331 lo=130 lo=251.625 lo=1397 hi=190 hi=421.625 hi=1427 faces=48
+part	column/liftRight	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-LIFT-TWO material=steel_C45 mass=2.308053 source=Computed(Preview) volume=294019.528562 area=43137.988179 cx=-160 cy=336.924216 cz=1411.993576 ixx=737988057.507399 ixy=0 ixz=0 iyy=112833307.395766 iyz=-86228.843087 izz=806525843.639331 lo=-190 lo=251.625 lo=1397 hi=-130 hi=421.625 hi=1427 faces=48
+part	column/railLeft	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-RAILLEFT material=steel_C45 mass=2.173206 source=Computed(Preview) volume=276841.481301 area=53639.981839 cx=145 cy=231.621807 cz=1171.738134 ixx=5134289710.422045 ixy=0 ixz=0 iyy=5146134515.966213 iyz=-16745.379883 izz=30336264.609058 lo=130 lo=221.625 lo=937 hi=160 hi=241.625 hi=1407 faces=56
+part	column/railRight	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-RAILRIGHT material=steel_C45 mass=2.173206 source=Computed(Preview) volume=276841.481301 area=53639.981839 cx=-145 cy=231.621807 cz=1171.738134 ixx=5134289710.422044 ixy=0 ixz=0 iyy=5146134515.966212 iyz=-16745.379883 izz=30336264.609058 lo=-160 lo=221.625 lo=937 hi=-130 hi=241.625 hi=1407 faces=56
+part	column/soleFrontLeft	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-SOLEFRONTLEFT material=steel_C45 mass=0.782893 source=Computed(Preview) volume=99731.643725 area=19733.663417 cx=157.272993 cy=281.426522 cz=926.999562 ixx=57833741.452862 ixy=10813.708277 ixz=30093.795064 iyy=39021215.966852 iyz=12380.245779 izz=90170206.362952 lo=125 lo=241.625 lo=917 hi=190 hi=321.625 hi=937 faces=32
+part	column/soleFrontRight	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-SOLEFRONTRIGHT material=steel_C45 mass=0.720093 source=Computed(Preview) volume=91731.643725 area=18733.663417 cx=-159.857575 cy=281.625 cz=926.999523 ixx=52876536.530715 ixy=0 ixz=23696.234914 iyy=30873388.162396 iyz=0 izz=77598506.973025 lo=-190 lo=241.625 lo=917 hi=-130 hi=321.625 hi=937 faces=32
+part	column/soleRearLeft	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-SOLEREARLEFT material=steel_C45 mass=1.096893 source=Computed(Preview) volume=139731.643725 area=24733.663417 cx=145.16199 cy=381.625 cz=926.999687 ixx=80110623.615345 ixy=0 ixz=-24776.746976 iyy=100897241.078749 iyz=0 izz=171656446.959689 lo=100 lo=341.625 lo=917 hi=190 hi=421.625 hi=937 faces=32
+part	column/soleRearRight	kind=cast-insert pn=CAST-INSERT-HOBBER-COLUMN-SOLEREARRIGHT material=steel_C45 mass=1.096893 source=Computed(Preview) volume=139731.643725 area=24733.663417 cx=-144.70991 cy=381.625 cz=926.999687 ixx=80076536.537874 ixy=0 ixz=22455.073413 iyy=100464693.142377 iyz=0 izz=171189811.945846 lo=-190 lo=341.625 lo=917 hi=-100 hi=421.625 hi=937 faces=32
+part	coolantPort	kind=made pn=HOBBER-GE-COOLANT material=steel mass=0.022102 source=Computed(Preview) volume=2815.603553 area=1443.263706 cx=-64.35 cy=84.625 cz=1072 ixx=176023.646184 ixy=0 ixz=0 iyy=168311.055105 iyz=0 izz=59861.894184 lo=-69.5 lo=78.625 lo=1060 hi=-59.2 hi=90.625 hi=1084 faces=7
+part	electricalPanel	kind=made pn=HOBBER-ELECTRICAL-PANEL material=steel mass=40.770002 source=Computed(Preview) volume=5193630.769231 area=911502.552982 cx=-650 cy=78.02086 cz=257.466959 ixx=355797209098.0267 ixy=0 ixz=-0.000015 iyy=431374409881.02954 iyz=-21536740520.4561 izz=93031125206.74048 lo=-880 lo=-50 lo=0 hi=-420 hi=150 hi=790 faces=20
+part	motorCradle	kind=made pn=HOBBER-GE-MOTOR-CRADLE material=steel mass=1.929679 source=Computed(Preview) volume=245818.926333 area=63468.05894 cx=-202.936661 cy=32.174616 cz=1083.376684 ixx=431135890.021217 ixy=-51582375.7644 ixz=123409583.733507 iyy=529179122.376694 iyz=55177340.973967 izz=513109596.616873 lo=-247 lo=-15.375 lo=1058 hi=-125 hi=83.625 hi=1171.743737 faces=114
+part	outboardCarrier	kind=made pn=HOBBER-GE-OUTBOARD-CARRIER material=steel mass=2.074287 source=Computed(Preview) volume=264240.412447 area=51724.797199 cx=76.60408 cy=56.277529 cz=1000 ixx=670391234.312709 ixy=165764410.806489 ixz=0 iyy=896493296.410546 iyz=0 izz=715697486.108336 lo=-45 lo=0.625 lo=945 hi=115 hi=90.625 hi=1055 faces=52
+part	spindleSeat	kind=made pn=HOBBER-GE-SPINDLE-SEAT material=steel mass=5.988327 source=Computed(Preview) volume=762844.165819 area=125174.286232 cx=-150.415027 cy=42.572146 cz=1009.90654 ixx=1934463519.260349 ixy=3596169.00537 ixz=160399587.256257 iyy=2766724515.080399 iyz=-13188087.383028 izz=2409456696.220383 lo=-251 lo=-2.375 lo=950 hi=-72 hi=90.625 hi=1058 faces=52
+pin	Xbridge#nut-block-pins	d=6 depth=8 through=false fit=H7 fx=0 fy=286.125 fz=897 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=-1 fr5=0 fr6=0 fr7=0 fr8=1 hole=-10,0 hole=10,0
+pin	Xbridge#rib-leftInner	d=4 depth=8 through=false fit=H7 fx=130 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-88,0 hole=82,0
+pin	Xbridge#rib-leftOuter	d=4 depth=8 through=false fit=H7 fx=170 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-88,0 hole=82,0
+pin	Xbridge#rib-rightInner	d=4 depth=8 through=false fit=H7 fx=-130 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-88,0 hole=82,0
+pin	Xbridge#rib-scale	d=4 depth=8 through=false fit=H7 fx=-150.2 fy=308.625 fz=897 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-88,0 hole=82,0
+pin	XdriveFixedBar#pins-fixed	d=5 depth=10 through=false fit=H7 fx=0 fy=433.5 fz=792 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=19.087956,-18.287206 hole=-19.087956,16.287206
+pin	XdriveFloatingBar#pins-floating	d=5 depth=10 through=false fit=H7 fx=0 fy=197 fz=792 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=0,-13 hole=0,13
+pin	Xrib-leftInner#plate-pins	d=4 depth=8 through=false fit=H7 fx=130 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-88,0 hole=82,0
+pin	Xrib-leftOuter#plate-pins	d=4 depth=8 through=false fit=H7 fx=170 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-88,0 hole=82,0
+pin	Xrib-rightInner#plate-pins	d=4 depth=8 through=false fit=H7 fx=-130 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-88,0 hole=82,0
+pin	Xrib-scale#plate-pins	d=4 depth=8 through=false fit=H7 fx=-150.2 fy=308.625 fz=897 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-88,0 hole=82,0
+pin	Ymodule/base#fixed	d=5 depth=12 through=true fit=H7 fx=-144 fy=160.625 fz=1145 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=144,-8 hole=144,8
+pin	Ymodule/base#floating	d=5 depth=12 through=true fit=H7 fx=-144 fy=160.625 fz=1145 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=7,-10.5 hole=7,10.5
+pin	Ymodule/base#stopFront	d=4 depth=6 through=false fit=H7 fx=-141 fy=160.625 fz=1187 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=0,-4 hole=0,4
+pin	Ymodule/base#stopRear	d=4 depth=6 through=false fit=H7 fx=-45 fy=160.625 fz=1187 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=0,-4 hole=0,4
+pin	Ymodule/base#wall-1	d=4 depth=6 through=false fit=H7 fx=-60 fy=160.625 fz=1070 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=-75,0 hole=75,0
+pin	Ymodule/base#wall1	d=4 depth=6 through=false fit=H7 fx=-60 fy=160.625 fz=1220 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=-1 fr8=0 hole=-75,0 hole=75,0
+pin	Ymodule/carriage#carrier	d=6 depth=8 through=false fit=H7 fx=-93 fy=100.625 fz=1145 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=0,-20 hole=0,20
+pin	Ymodule/carriage#outboard-pins	d=4 depth=6 through=false fit=H7 fx=-30 fy=90.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=1 fr8=0 hole=0,-45 hole=0,45
+pin	Ymodule/carriage#seat-pins	d=4 depth=10 through=true fit=H7 fx=0 fy=90.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=1 fr8=0 hole=80,-35 hole=80,35
+pin	ZdriveFixedBar#pins-fixed	d=5 depth=10 through=false fit=H7 fx=-81 fy=246.625 fz=1350.5 fr0=0 fr1=1 fr2=0 fr3=0 fr4=0 fr5=1 fr6=1 fr7=0 fr8=0 hole=19.087956,-18.287206 hole=-19.087956,16.287206
+pin	ZdriveFloatingBar#pins-floating	d=5 depth=10 through=false fit=H7 fx=-81 fy=246.625 fz=954 fr0=0 fr1=1 fr2=0 fr3=0 fr4=0 fr5=1 fr6=1 fr7=0 fr8=0 hole=0,-13 hole=0,13
+pin	Zplate#nut-block-pins	d=6 depth=8 through=false fit=H7 fx=-81 fy=193.625 fz=1045.5 fr0=1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=1 fr8=0 hole=-10,0 hole=10,0
+pin	motorCradle#floor-pins	d=8 depth=8 through=true fit=H7 fx=-190 fy=45.625 fz=1058 fr0=0 fr1=-1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=1 hole=-40,0 hole=24,0
+pin	outboardCarrier#housing-pins	d=4 depth=6 through=false fit=H7 fx=100 fy=75.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=1 fr6=0 fr7=1 fr8=0 hole=0,-22 hole=0,22
+pin	outboardCarrier#outboard-pins	d=4 depth=6 through=false fit=H7 fx=-30 fy=90.625 fz=1000 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 hole=0,45 hole=0,-45
+pin	spindleSeat#back-pins	d=4 depth=6 through=false fit=H7 fx=-147 fy=90.625 fz=1004 fr0=-1 fr1=0 fr2=0 fr3=0 fr4=0 fr5=-1 fr6=0 fr7=-1 fr8=0 hole=-67,39 hole=-67,-31
+pin	spindleSeat#top-pins	d=8 depth=12 through=false fit=H7 fx=-190 fy=45.625 fz=1058 fr0=0 fr1=1 fr2=0 fr3=1 fr4=0 fr5=0 fr6=0 fr7=0 fr8=-1 hole=-40,0 hole=24,0
+pose	Xbridge	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xcoupling	x=0 y=468 z=817 r0=0.707107 r1=-0.707107 r2=0 r3=0 r4=0 r5=-1 r6=0.707107 r7=0.707107 r8=0
+pose	XcoverFrontLeft	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XcoverFrontRight	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XcoverRearLeft	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XcoverRearRight	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xdrive-driver	x=-790 y=90 z=300 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	XdriveFixedBar	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XdriveFloatingBar	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xfixed	x=0 y=484 z=792 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Xfloating	x=0 y=197 z=817 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	XfloatingRing	x=0 y=193 z=817 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	XfrontCover	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XfrontPlugLeft	x=42 y=204 z=861 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XfrontPlugRight	x=-42 y=204 z=861 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xmotor	x=0 y=484 z=817 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Xmotor-shaft	x=0 y=484 z=817 r0=0.707107 r1=-0.707107 r2=0 r3=0 r4=0 r5=-1 r6=0.707107 r7=0.707107 r8=0
+pose	Xnut	x=0 y=259.125 z=817 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	XnutBlock	x=0 y=294.125 z=817 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=-1 r8=0
+pose	XrearCover	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XrearPlugLeft	x=42 y=453 z=871 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	XrearPlugRight	x=-42 y=453 z=871 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xrib-leftInner	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xrib-leftOuter	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xrib-rightInner	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xrib-scale	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xscale	x=-180 y=253 z=880 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	XscaleHead	x=-180 y=307.625 z=880 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	XscaleSeat	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Xscrew	x=0 y=450 z=817 r0=0.707107 r1=-0.707107 r2=0 r3=0 r4=0 r5=-1 r6=0.707107 r7=0.707107 r8=0
+pose	Xskirt	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Ydrive-driver	x=-510 y=90 z=300 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/base	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/blockLeftFront	x=-92 y=113.625 z=1075 r0=0 r1=0 r2=1 r3=0 r4=-1 r5=0 r6=1 r7=0 r8=0
+pose	Ymodule/blockLeftRear	x=-28 y=113.625 z=1075 r0=0 r1=0 r2=1 r3=0 r4=-1 r5=0 r6=1 r7=0 r8=0
+pose	Ymodule/blockRightFront	x=-92 y=113.625 z=1215 r0=0 r1=0 r2=1 r3=0 r4=-1 r5=0 r6=1 r7=0 r8=0
+pose	Ymodule/blockRightRear	x=-28 y=113.625 z=1215 r0=0 r1=0 r2=1 r3=0 r4=-1 r5=0 r6=1 r7=0 r8=0
+pose	Ymodule/carriage	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/coupling	x=54 y=133.625 z=1145 r0=0 r1=0 r2=-1 r3=0 r4=-1 r5=0 r6=-1 r7=0 r8=0
+pose	Ymodule/fixedPad	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/floatingBearing	x=-137 y=133.625 z=1145 r0=0 r1=0 r2=-1 r3=0 r4=-1 r5=0 r6=-1 r7=0 r8=0
+pose	Ymodule/floatingPad	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/floatingRing	x=-141 y=133.625 z=1145 r0=0 r1=0 r2=-1 r3=0 r4=-1 r5=0 r6=-1 r7=0 r8=0
+pose	Ymodule/motor	x=70 y=133.625 z=1145 r0=0 r1=0 r2=-1 r3=0 r4=-1 r5=0 r6=-1 r7=0 r8=0
+pose	Ymodule/motorMount	x=70 y=158.625 z=1145 r0=0 r1=0 r2=-1 r3=0 r4=-1 r5=0 r6=-1 r7=0 r8=0
+pose	Ymodule/motorShaft	x=70 y=133.625 z=1145 r0=0 r1=0 r2=-1 r3=0 r4=-1 r5=0 r6=-1 r7=0 r8=0
+pose	Ymodule/nut	x=-40 y=133.625 z=1145 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	Ymodule/nutCarrier	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/railLeft	x=-170 y=113.625 z=1075 r0=0 r1=0 r2=1 r3=0 r4=-1 r5=0 r6=1 r7=0 r8=0
+pose	Ymodule/railRight	x=-170 y=113.625 z=1215 r0=0 r1=0 r2=1 r3=0 r4=-1 r5=0 r6=1 r7=0 r8=0
+pose	Ymodule/scaleHead	x=-7.5 y=144.625 z=1032.5 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	Ymodule/scaleHeadCarrier	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/scaleHousing	x=44 y=144.625 z=1032.5 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	Ymodule/scaleSpacerFront	x=32.5 y=144.625 z=1057.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	Ymodule/scaleSpacerRear	x=-152.5 y=144.625 z=1057.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	Ymodule/screw	x=36 y=133.625 z=1145 r0=0 r1=0 r2=-1 r3=0 r4=-1 r5=0 r6=-1 r7=0 r8=0
+pose	Ymodule/stopFront	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/stopRear	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/wallLeft	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	Ymodule/wallRight	x=-144 y=172.625 z=1145 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	ZbellowsLeftLower-fixed	x=145 y=221.625 z=917 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-moving	x=145 y=221.625 z=962 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftLower-s1	x=145 y=221.625 z=922.271429 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s10	x=145 y=221.625 z=931.914286 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s11	x=145 y=221.625 z=932.985714 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s12	x=145 y=221.625 z=934.057143 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s13	x=145 y=221.625 z=935.128571 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s2	x=145 y=221.625 z=923.342857 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s3	x=145 y=221.625 z=924.414286 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s4	x=145 y=221.625 z=925.485714 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s5	x=145 y=221.625 z=926.557143 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s6	x=145 y=221.625 z=927.628571 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s7	x=145 y=221.625 z=928.7 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s8	x=145 y=221.625 z=929.771429 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLower-s9	x=145 y=221.625 z=930.842857 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftLowerMovingMount	x=145 y=221.625 z=962 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-fixed	x=145 y=221.625 z=1370.7 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-moving	x=145 y=221.625 z=1145.7 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsLeftUpper-s1	x=145 y=221.625 z=1352.571429 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s10	x=145 y=221.625 z=1227.214286 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s11	x=145 y=221.625 z=1213.285714 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s12	x=145 y=221.625 z=1199.357143 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s13	x=145 y=221.625 z=1185.428571 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s2	x=145 y=221.625 z=1338.642857 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s3	x=145 y=221.625 z=1324.714286 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s4	x=145 y=221.625 z=1310.785714 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s5	x=145 y=221.625 z=1296.857143 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s6	x=145 y=221.625 z=1282.928571 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s7	x=145 y=221.625 z=1269 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s8	x=145 y=221.625 z=1255.071429 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpper-s9	x=145 y=221.625 z=1241.142857 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpperFixedMount	x=145 y=221.625 z=1370.7 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsLeftUpperMovingMount	x=145 y=221.625 z=1145.7 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-fixed	x=-145 y=221.625 z=917 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-moving	x=-145 y=221.625 z=962 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightLower-s1	x=-145 y=221.625 z=922.271429 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s10	x=-145 y=221.625 z=931.914286 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s11	x=-145 y=221.625 z=932.985714 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s12	x=-145 y=221.625 z=934.057143 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s13	x=-145 y=221.625 z=935.128571 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s2	x=-145 y=221.625 z=923.342857 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s3	x=-145 y=221.625 z=924.414286 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s4	x=-145 y=221.625 z=925.485714 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s5	x=-145 y=221.625 z=926.557143 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s6	x=-145 y=221.625 z=927.628571 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s7	x=-145 y=221.625 z=928.7 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s8	x=-145 y=221.625 z=929.771429 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLower-s9	x=-145 y=221.625 z=930.842857 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightLowerMovingMount	x=-145 y=221.625 z=962 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-fixed	x=-145 y=221.625 z=1370.7 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-moving	x=-145 y=221.625 z=1145.7 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	ZbellowsRightUpper-s1	x=-145 y=221.625 z=1352.571429 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s10	x=-145 y=221.625 z=1227.214286 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s11	x=-145 y=221.625 z=1213.285714 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s12	x=-145 y=221.625 z=1199.357143 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s13	x=-145 y=221.625 z=1185.428571 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s2	x=-145 y=221.625 z=1338.642857 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s3	x=-145 y=221.625 z=1324.714286 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s4	x=-145 y=221.625 z=1310.785714 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s5	x=-145 y=221.625 z=1296.857143 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s6	x=-145 y=221.625 z=1282.928571 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s7	x=-145 y=221.625 z=1269 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s8	x=-145 y=221.625 z=1255.071429 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpper-s9	x=-145 y=221.625 z=1241.142857 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpperFixedMount	x=-145 y=221.625 z=1370.7 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZbellowsRightUpperMovingMount	x=-145 y=221.625 z=1145.7 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	Zcoupling	x=-81 y=221.625 z=1385 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	Zdrive-driver	x=-650 y=90 z=300 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	ZdriveFixedBar	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	ZdriveFloatingBar	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Zfixed	x=-81 y=246.625 z=1401 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	Zfloating	x=-81 y=221.625 z=954 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZfloatingRing	x=-81 y=221.625 z=950 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	Zmotor	x=-81 y=221.625 z=1401 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	Zmotor-shaft	x=-81 y=221.625 z=1401 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	Znut	x=-81 y=221.625 z=1072.5 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	ZnutBlock	x=-81 y=221.625 z=1037.5 r0=1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=1
+pose	Zplate	x=0 y=45.625 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Zscale	x=87 y=245.625 z=1013.5 r0=0 r1=1 r2=0 r3=-1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	ZscaleArm	x=0 y=45.625 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	ZscaleHead	x=87 y=245.625 z=1050 r0=0 r1=1 r2=0 r3=-1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	ZscaleSeat	x=0 y=45.625 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	Zscrew	x=-81 y=221.625 z=1367 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/casting	x=0 y=165 z=47 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/driveSeat	x=0 y=335.5 z=757 r0=1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=1
+pose	bed/driveSeat-bolt1	x=-16.6 y=203.8 z=754.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/driveSeat-bolt2	x=-16.6 y=335.5 z=754.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/driveSeat-bolt3	x=-16.6 y=467.2 z=754.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/driveSeat-bolt4	x=0 y=467.2 z=754.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/driveSeat-bolt5	x=16.6 y=203.8 z=754.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/driveSeat-bolt6	x=16.6 y=335.5 z=754.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/driveSeat-bolt7	x=16.6 y=467.2 z=754.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/enclosureSeat00	x=380 y=-200 z=767 r0=0 r1=0 r2=1 r3=1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	bed/enclosureSeat00-bolt1	x=377.8 y=-216.6 z=767 r0=0 r1=0 r2=-1 r3=1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	bed/enclosureSeat00-bolt2	x=377.8 y=-183.4 z=767 r0=0 r1=0 r2=-1 r3=1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	bed/enclosureSeat02	x=-380 y=-200 z=767 r0=0 r1=0 r2=-1 r3=1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	bed/enclosureSeat02-bolt1	x=-377.8 y=-216.6 z=767 r0=0 r1=0 r2=1 r3=1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	bed/enclosureSeat02-bolt2	x=-377.8 y=-183.4 z=767 r0=0 r1=0 r2=1 r3=1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	bed/enclosureSeat20	x=380 y=530 z=767 r0=0 r1=0 r2=1 r3=1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	bed/enclosureSeat20-bolt1	x=377.8 y=513.4 z=767 r0=0 r1=0 r2=-1 r3=1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	bed/enclosureSeat20-bolt2	x=377.8 y=546.6 z=767 r0=0 r1=0 r2=-1 r3=1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	bed/enclosureSeat22	x=-380 y=530 z=767 r0=0 r1=0 r2=-1 r3=1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	bed/enclosureSeat22-bolt1	x=-377.8 y=513.4 z=767 r0=0 r1=0 r2=1 r3=1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	bed/enclosureSeat22-bolt2	x=-377.8 y=546.6 z=767 r0=0 r1=0 r2=1 r3=1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	bed/liftAdditional1	x=310 y=343.989783 z=817 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/liftAdditional1-bolt1	x=351 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional1-bolt2	x=330.5 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional1-bolt3	x=289.5 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional1-bolt4	x=269 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional1-bolt5	x=351 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional1-bolt6	x=330.5 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional1-bolt7	x=289.5 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional1-bolt8	x=269 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2	x=-310 y=343.989783 z=817 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/liftAdditional2-bolt1	x=-269 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2-bolt2	x=-289.5 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2-bolt3	x=-330.5 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2-bolt4	x=-351 y=335.689783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2-bolt5	x=-269 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2-bolt6	x=-289.5 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2-bolt7	x=-330.5 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftAdditional2-bolt8	x=-351 y=352.289783 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft	x=310 y=-150 z=817 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/liftLeft-bolt1	x=351 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft-bolt2	x=330.5 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft-bolt3	x=289.5 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft-bolt4	x=269 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft-bolt5	x=351 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft-bolt6	x=330.5 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft-bolt7	x=289.5 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftLeft-bolt8	x=269 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight	x=-310 y=-150 z=817 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/liftRight-bolt1	x=-269 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight-bolt2	x=-289.5 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight-bolt3	x=-330.5 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight-bolt4	x=-351 y=-158.3 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight-bolt5	x=-269 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight-bolt6	x=-289.5 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight-bolt7	x=-330.5 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/liftRight-bolt8	x=-351 y=-141.7 z=814.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft	x=220 y=270 z=837 r0=1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=1
+pose	bed/railLeft-bolt1	x=211.8 y=181 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt10	x=211.8 y=247.4 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt11	x=211.8 y=280.6 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt12	x=211.8 y=330.4 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt2	x=211.8 y=347 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt3	x=211.8 y=363.6 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt4	x=211.8 y=396.8 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt5	x=211.8 y=413.4 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt6	x=211.8 y=430 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt7	x=211.8 y=463.2 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt8	x=211.8 y=214.2 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railLeft-bolt9	x=211.8 y=230.8 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight	x=-220 y=270 z=837 r0=1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=1
+pose	bed/railRight-bolt1	x=-228.2 y=181 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt10	x=-228.2 y=247.4 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt11	x=-228.2 y=280.6 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt12	x=-228.2 y=330.4 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt2	x=-228.2 y=347 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt3	x=-228.2 y=363.6 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt4	x=-228.2 y=396.8 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt5	x=-228.2 y=413.4 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt6	x=-228.2 y=430 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt7	x=-228.2 y=463.2 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt8	x=-228.2 y=214.2 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/railRight-bolt9	x=-228.2 y=230.8 z=834.8 r0=1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=-1
+pose	bed/tablePlate	x=0 y=0 z=635 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/tablePlate-bolt1	x=123.2 y=-123.2 z=632.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/tablePlate-bolt2	x=-123.2 y=-123.2 z=632.8 r0=0 r1=1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=-1
+pose	bed/trayClampSeat0	x=361 y=-200 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat1	x=361 y=165 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat2	x=361 y=530 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat3	x=-361 y=-200 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat4	x=-361 y=165 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat5	x=-361 y=530 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat6	x=150 y=-259.5 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat7	x=-150 y=-259.5 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat8	x=150 y=589.5 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bed/trayClampSeat9	x=-150 y=589.5 z=807 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	bissMaster	x=-540 y=90 z=670 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	blank	x=0 y=0 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	blockXLeft	x=220 y=147.625 z=879 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	blockXLeftFront	x=220 y=345.625 z=879 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	blockXRight	x=-220 y=147.625 z=879 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	blockXRightFront	x=-220 y=345.625 z=879 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	blockZLeft	x=145 y=206.625 z=1000 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	blockZLeftUpper	x=145 y=206.625 z=1110 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	blockZRight	x=-145 y=206.625 z=1000 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	blockZRightUpper	x=-145 y=206.625 z=1110 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	chipTray	x=0 y=0 z=637 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	column/casting	x=0 y=331.625 z=927 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/driveSeat	x=-81 y=306.625 z=1177 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	column/driveSeat-bolt1	x=-104.3 y=310.125 z=1163.1 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	column/driveSeat-bolt2	x=-104.3 y=310.125 z=1177 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	column/driveSeat-bolt3	x=-104.3 y=310.125 z=1190.9 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	column/driveSeat-bolt4	x=-90.4 y=310.125 z=1163.1 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	column/driveSeat-bolt5	x=-90.4 y=310.125 z=1190.9 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	column/driveSeat-bolt6	x=-76.5 y=310.125 z=1163.1 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	column/driveSeat-bolt7	x=-76.5 y=310.125 z=1190.9 r0=1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=-1 r8=0
+pose	column/liftLeft	x=160 y=336.625 z=1397 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/liftLeft-bolt1	x=173.9 y=398.125 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt10	x=160 y=328.625 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt11	x=160 y=314.725 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt12	x=160 y=300.825 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt13	x=146.1 y=398.125 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt14	x=146.1 y=356.425 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt15	x=146.1 y=342.525 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt16	x=146.1 y=328.625 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt17	x=146.1 y=314.725 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt18	x=146.1 y=300.825 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt19	x=146.1 y=286.925 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt2	x=173.9 y=356.425 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt3	x=173.9 y=342.525 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt4	x=173.9 y=328.625 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt5	x=173.9 y=314.725 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt6	x=173.9 y=300.825 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt7	x=173.9 y=286.925 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt8	x=160 y=398.125 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftLeft-bolt9	x=160 y=342.525 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight	x=-160 y=336.625 z=1397 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/liftRight-bolt1	x=-146.1 y=398.125 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt10	x=-160 y=328.625 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt11	x=-160 y=314.725 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt12	x=-160 y=300.825 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt13	x=-173.9 y=398.125 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt14	x=-173.9 y=356.425 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt15	x=-173.9 y=342.525 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt16	x=-173.9 y=328.625 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt17	x=-173.9 y=314.725 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt18	x=-173.9 y=300.825 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt19	x=-173.9 y=286.925 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt2	x=-146.1 y=356.425 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt3	x=-146.1 y=342.525 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt4	x=-146.1 y=328.625 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt5	x=-146.1 y=314.725 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt6	x=-146.1 y=300.825 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt7	x=-146.1 y=286.925 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt8	x=-160 y=398.125 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/liftRight-bolt9	x=-160 y=342.525 z=1393.5 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/railLeft	x=145 y=241.625 z=1172 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=-1 r8=0
+pose	column/railLeft-bolt1	x=145 y=245.125 z=1297.1 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt10	x=145 y=245.125 z=1241.5 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt11	x=145 y=245.125 z=1227.6 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt12	x=145 y=245.125 z=1213.7 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt2	x=145 y=245.125 z=1283.2 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt3	x=145 y=245.125 z=1144.2 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt4	x=145 y=245.125 z=1116.4 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt5	x=145 y=245.125 z=1102.5 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt6	x=145 y=245.125 z=1088.6 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt7	x=145 y=245.125 z=1060.8 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt8	x=145 y=245.125 z=1046.9 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railLeft-bolt9	x=145 y=245.125 z=1269.3 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight	x=-145 y=241.625 z=1172 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=-1 r8=0
+pose	column/railRight-bolt1	x=-145 y=245.125 z=1297.1 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt10	x=-145 y=245.125 z=1241.5 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt11	x=-145 y=245.125 z=1227.6 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt12	x=-145 y=245.125 z=1213.7 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt2	x=-145 y=245.125 z=1283.2 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt3	x=-145 y=245.125 z=1144.2 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt4	x=-145 y=245.125 z=1116.4 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt5	x=-145 y=245.125 z=1102.5 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt6	x=-145 y=245.125 z=1088.6 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt7	x=-145 y=245.125 z=1060.8 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt8	x=-145 y=245.125 z=1046.9 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/railRight-bolt9	x=-145 y=245.125 z=1269.3 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	column/soleFrontLeft	x=157.5 y=281.625 z=937 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/soleFrontLeft-bolt1	x=182.5 y=264.225 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt10	x=140.8 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt2	x=182.5 y=278.125 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt3	x=182.5 y=292.025 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt4	x=182.5 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt5	x=168.6 y=264.225 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt6	x=168.6 y=278.125 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt7	x=168.6 y=292.025 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt8	x=168.6 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontLeft-bolt9	x=154.7 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight	x=-160 y=281.625 z=937 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/soleFrontRight-bolt1	x=-140.8 y=257.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt10	x=-182.5 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt2	x=-140.8 y=273.525 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt3	x=-140.8 y=289.725 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt4	x=-140.8 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt5	x=-154.7 y=257.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt6	x=-154.7 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt7	x=-168.6 y=257.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt8	x=-168.6 y=305.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleFrontRight-bolt9	x=-182.5 y=257.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft	x=145 y=381.625 z=937 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/soleRearLeft-bolt1	x=157.4 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt10	x=115.7 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt2	x=157.4 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt3	x=143.5 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt4	x=143.5 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt5	x=129.6 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt6	x=129.6 y=381.625 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt7	x=129.6 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt8	x=115.7 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearLeft-bolt9	x=115.7 y=381.625 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight	x=-145 y=381.625 z=937 r0=-1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=-1
+pose	column/soleRearRight-bolt1	x=-132.6 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt10	x=-174.3 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt2	x=-132.6 y=373.525 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt3	x=-132.6 y=389.725 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt4	x=-132.6 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt5	x=-146.5 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt6	x=-146.5 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt7	x=-160.4 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt8	x=-160.4 y=405.925 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	column/soleRearRight-bolt9	x=-174.3 y=357.325 z=940.5 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	coolantPort	x=0 y=45.625 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	electricalPanel	x=-650 y=100 z=0 r0=1 r1=0 r2=0 r3=0 r4=1 r5=0 r6=0 r7=0 r8=1
+pose	foot0	x=330 y=-180 z=0 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	foot1	x=-330 y=-180 z=0 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	foot2	x=0 y=510 z=0 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footLocknut0	x=330 y=-180 z=154 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footLocknut1	x=-330 y=-180 z=154 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footLocknut2	x=0 y=510 z=154 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footNut0	x=330 y=-180 z=173 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footNut1	x=-330 y=-180 z=173 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footNut2	x=0 y=510 z=173 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footSeat0	x=330 y=-180 z=192 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footSeat1	x=-330 y=-180 z=192 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	footSeat2	x=0 y=510 z=192 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	hob	x=-20 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	hob-drive-driver	x=-650 y=90 z=550 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	mandrel	x=0 y=0 z=865 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	mandrelSleeve	x=0 y=0 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	motorCradle	x=0 y=45.625 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	outboard	x=85 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	outboardBearingFront	x=91 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	outboardBearingRear	x=109 y=45.625 z=1000 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	outboardCap	x=85 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	outboardCarrier	x=0 y=45.625 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	outboardGland	x=85 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	outboardInnerSpacer	x=85 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	outboardLocknut	x=114 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	outboardSleeve	x=85 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	powerSupply	x=-650 y=90 z=130 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	railXLeft	x=220 y=60 z=879 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	railXRight	x=-220 y=60 z=879 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=1 r6=0 r7=1 r8=0
+pose	railZLeft	x=145 y=206.625 z=932 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	railZRight	x=-145 y=206.625 z=932 r0=-1 r1=0 r2=0 r3=0 r4=-1 r5=0 r6=0 r7=0 r8=1
+pose	spindle/arbor	x=-60 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	spindle/belt	x=-257.5 y=45.625 z=1000 r0=0 r1=0 r2=-1 r3=-0.064 r4=0.99795 r5=0 r6=0.99795 r7=0.064 r8=0
+pose	spindle/encoder	x=-240 y=45.625 z=1000 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	spindle/hobLocknut	x=20 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	spindle/housing	x=-240 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	spindle/motor	x=-239 y=37.625 z=1124.743737 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	spindle/motorEncoder	x=-135.1 y=37.625 z=1124.743737 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	spindle/motorPulley	x=-256 y=37.625 z=1124.743737 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	spindle/motorShaft	x=-239 y=37.625 z=1124.743737 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	spindle/pullStud	x=-60 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	spindle/shaft	x=-240 y=45.625 z=1000 r0=0 r1=0 r2=1 r3=-1 r4=0 r5=0 r6=0 r7=-1 r8=0
+pose	spindle/spindlePulley	x=-256 y=45.625 z=1000 r0=0 r1=0 r2=-1 r3=-1 r4=0 r5=0 r6=0 r7=1 r8=0
+pose	spindleSeat	x=0 y=45.625 z=1000 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	supply48	x=-755 y=90 z=670 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	swivel/housing	x=0 y=169.625 z=1000 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=-1 r8=0
+pose	swivel/output	x=0 y=169.625 z=1000 r0=-1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=-1 r8=0
+pose	table-drive-driver	x=-790 y=90 z=550 r0=1 r1=0 r2=0 r3=0 r4=0 r5=-1 r6=0 r7=1 r8=0
+pose	table/housing	x=0 y=0 z=655 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1
+pose	table/platen	x=0 y=0 z=845 r0=0 r1=-1 r2=0 r3=1 r4=0 r5=0 r6=0 r7=0 r8=1

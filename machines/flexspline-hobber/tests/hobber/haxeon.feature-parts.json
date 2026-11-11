@@ -1,0 +1,7 @@
+{
+  "version": 1, "package": {"name": "machinekit-hobber-feature-parts"},
+  "entry": "FeaturePartEquivalence",
+  "sourceRoots": ["src", "../../machine", "../../scenes", "../../checks", "../../studies"],
+  "dependencies": {"toolpathkit-motion": {"path": "../../../../toolpathkit/motion"}, "machinekit": {"path": "../../../../machinekit"}, "stockkit": {"path": "../../../../stockkit"}, "camkit": {"path": "../../../../camkit"}},
+  "target": "host", "outputDir": "build/feature-parts"
+}

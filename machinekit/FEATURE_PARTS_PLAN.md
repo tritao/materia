@@ -106,27 +106,97 @@ coordinate boxes rather than intent. Hence: one explicit recording API.
 
 **Gate:** equivalence test green on today's code; gap list written into this file.
 
-### FP1 — CadKit builder gaps
+**Results (2026-11-11, branch `feature-parts`, from main 0fa7f2c16):**
 
-Close the gaps in `DocumentBuilder` (each a serializable feature with codec
-and recompute tests in CadKit, no MachineKit knowledge). From the 2026-11-11
-count of hobber operations against the builder:
+- `tests/hobber/haxeon.feature-parts.json` → `FeaturePartEquivalence`;
+  fixture `tests/hobber/fixtures/feature-parts-baseline.tsv` (`--write` to
+  regenerate). 1188 records: 421 member poses, 121 designed parts (15 made,
+  2 castings, 31 cast inserts, 4 ribs, 7 chip covers, 2 Y parts, 60 Z bellows
+  sections), 462 route holes, 156 fastening faces, 28 pinned faces. All in
+  the machine frame. Compare mode is repeatable (0 differences, 0 topology
+  notes). Spot checks: X carriage 21.43 kg, bed casting 1171.17 kg, column
+  72.83 kg (match the casting package).
+- Budget: `new FlexsplineHobber()` 23–39 s depending on machine load (open-time
+  cache warm), snapshot 4–10 s, whole compare run ~51 s incl. compile.
+  Hobber check suite at the start: 3303 assertions pass, 18m55s wall incl.
+  compile under shared load. Editor open time is not measured here; FP1f adds the per-part timing line
+  that the suite checks.
+- Gap audit (detail in FP1):
+  - builder: box from bounds, cylinder on an axis, frame placement, n-ary
+    booleans (kernel already has `cad_cut_many`), holes by frame with fit;
+  - `DocumentCodec` has a closed list of feature types: domain features
+    (castings, joint holes) need a registry (FP1a);
+  - castings already have a named, serialised feature model
+    (`materia.casting.CastingFeature`: lightening, service opening,
+    interface/insert recess, clearance; Cut box/cylinder, Prism, Insert):
+    one registered step each, not boxes (D3);
+  - holes have three descriptions (`RouteHole`, `BoltedFace`/`PinnedFace`,
+    `HoleFeature`) (FP1d); parameters have two systems (FP1c);
+  - size of the full migration: about 2,600 immediate-API calls in about 420
+    files outside CadKit (MachineKit library ~1,950 / 304 files, MachineKit
+    examples ~457 / 70, machines ~185 / 44). FP8/FP9 are a long tail.
 
-| Hobber uses | ~Count | Builder today | FP1 adds |
+### FP1 — Foundations
+
+Make the base layers right before any part moves, because every later part is
+written against them. Order: FP1a → FP1b → FP1c; FP1d–FP1g in parallel after
+FP1a. Not CadKit-only: FP1c and FP1d change MachineKit (`ComponentType`,
+`BoltedFace`, `ManufacturingRoute`).
+
+**FP1a — Open feature-type registry.** `DocumentCodec` hard-codes every feature
+type (sheet metal lives inside CadKit for that reason). Add
+`FeatureTypeRegistry`: a type id with decode, encode, evaluate and timeline
+label, modelled on `DefinitionEvaluatorRegistry`. Unknown types are rejected
+on decode, never skipped. Proof: move the sheet-metal features onto it
+(cadkit/plans/SHEET_METAL.md) and register one MachineKit feature in a test.
+Unblocks castings (each `materia.casting.CastingFeature` becomes one recorded
+step evaluated by the existing casting geometry) and FP1d holes.
+
+**FP1b — Frames in documents.** A frame parameter type (origin + rotation,
+canonical mm, unit quaternion) and named **datum frame** elements that
+features attach to. Replaces translation-only `TransformFeature` plus
+single-axis rotation for placement; `PosedParts.moved` maps 1:1. A part's own
+frame and the skeleton's mount datums (FP3) are named frames.
+
+**FP1c — One parameter system.** `ComponentType` recipes
+(`ComponentParameter`/`ComponentValues`) and documents (`NamedParameter`) are
+two systems bridged by `MachineKitRecipes`. A recorded part's recipe inputs
+*are* its document's named parameters. Each is tagged **editable**,
+**derived** (with its rule as text) or **fixed** (stock, catalog) and carries
+its `ValueBasis`. FP7 reads only these tags.
+
+**FP1d — One hole description.** Today holes are `RouteHole`
+(manufacturing), `BoltedFace`/`PinnedFace` (joints) and `HoleFeature`
+(geometry). Make one hole spec: frame, kind (clearance, tapped, dowel, bore,
+slot), thread, fit, depth, counterbore/countersink, slot axis/length. Joints
+produce specs; a registered hole feature (FP1a) cuts a set of specs in one
+step; the route, drawings and `MachinedPackageExport` read them back from the
+document. `derivedRouteHoles()` becomes a view of the document.
+
+**FP1e — Placed primitives and n-ary booleans.** From the hobber count:
+
+| Hobber uses | ~Count | Builder today | FP1e adds |
 |---|---|---|---|
-| `box(x0,x1,y0,y1,z0,z1)`, `Part.box` | 45 | `box(w,d,h)` + `translate` | **placed box from bounds**, one feature, named extents |
-| `cylinderSpan`, `cylinderAlong*`, `boreX/Y` | 18 | `cylinder` + `translate`/`rotate` | **cylinder between two stations along an axis** |
-| `PosedParts.moved(part, frame)` | 18 | translation, or one axis-angle rotation | **frame placement** (origin + rotation stored in the document) |
-| `Solids.cut(body,[tools])`, `Solids.union([...])` | 33 | binary booleans only; `ToolCollectionFeature` in the codec but not the builder | **n-ary cut/union over a labelled tool collection**, one step and one OCCT boolean |
-| `withHoles`/`holeTool` from `RouteHole` | most holes | `HoleFeature` on a selected face at 2D x/y; has thread | **hole at origin + axis** (plain/tapped/counterbore/dowel) resolving its mouth face by a **face-by-plane selection recipe**; **fit/tolerance** on the hole or a reference to the route hole id |
+| `box(x0,x1,y0,y1,z0,z1)`, `Part.box` | 45 | `box(w,d,h)` + `translate` | **box from bounds**, one feature, named extents |
+| `cylinderSpan`, `cylinderAlong*`, `boreX/Y` | 18 | `cylinder` + `translate`/`rotate` | **cylinder between two stations on an axis** |
+| `Solids.cut(body,[tools])`, `Solids.union([...])` | 33 | binary booleans; `ToolCollectionFeature` in codec only | **cut/union over a labelled tool collection**, one step, one `cad_cut_many` |
 | `prism`/`radialPlate`, `revolve` | 4 | `polyline`+`extrude`, `revolve` | nothing |
 
-Not yet sized (FP0 decides): casting operations in `MineralFoundation`
-(`CastingFeature`, inserts, pockets) and the shared bases (`WayCoverSection`,
-`NutBlock`, `PanelSolid`, …) that hobber parts extend.
+**FP1f — Evaluation cost.** A recorded part's result cached in the open-time
+cache keyed by its encoded document; per-feature results reused within a
+recompute when inputs are unchanged; one timing line per part, so the FP0
+open-time budget is checked by the suite, not by hand.
 
-**Gate:** CadKit tests; each new feature round-trips through `DocumentCodec`
-and recomputes after a dimension change.
+**FP1g — Face-naming contract.** Every feature type (built-in and registered)
+declares stable names for the faces it creates (`front-window.floor`,
+`blockL1.h3.bore`). Recorded parts fail the naming audit on unnamed faces
+(today 34 weak recipes). This is what drawings, CAM setups and inspection
+points reference.
+
+**Gate:** CadKit and MachineKit suites; every new feature and registered type
+round-trips through `DocumentCodec` and recomputes after a dimension change;
+sheet metal unchanged on the registry; pendant and hobber equivalence (FP0)
+unchanged.
 
 ### FP2 — `RecordedPart` in MachineKit
 
@@ -137,10 +207,8 @@ Generalise the pendant pattern into **the** way MachineKit parts are modelled
   implements `record(builder)`; `geometry()` is the document's output,
   collision pieces and route holes come from the same recording, so faces
   match the history the scene carries.
-- Holes come from the part's own `fasteningFaces()`/`pinnedFaces()` through
-  one helper (`RecordedHoles.cut(builder, body, faces)`), grouped under
-  "Fasteners" in the tree. Today's `derivedRouteHoles()` stays the single
-  hole derivation.
+- Holes: the part's joints produce FP1d hole specs, cut by the registered
+  hole feature, grouped under "Fasteners" in the tree.
 - Generic scene export: `MachineAssembly` scene generation emits `histories`
   and `SceneSourceMap` rows for every `RecordedPart` occurrence. The pendant
   moves onto it and `PendantDocuments.histories()/sources()` go.
@@ -156,7 +224,7 @@ Replace `HobberLayout` with `HobberSkeleton`:
 - **Inputs**: today's constructor constants, grouped (travels, rail centres,
   table, Z column, swivel/spindle) with a doc line each.
 - **Derived**: the `heights()` stack and the other derived values.
-- **Datums**: one named `AssemblyFrame` per part mount (`xCarriage.seat`,
+- **Datums**: one named frame (FP1b) per part mount (`xCarriage.seat`,
   `zSaddle.seat`, …), replacing `partAt(0,0,PART_DATUM_Z)` and
   `sourcePose(...)` call sites.
 - Passed explicitly: `FlexsplineHobber` builds one and hands it to each
@@ -200,10 +268,10 @@ In order, simplest first, one commit per part, each gated by FP0 equivalence:
 2. chip tray, chip covers, enclosure panel, electrical panel;
 3. spindle seat, motor cradle, outboard carrier, Y parts, Z bellows parts;
 4. Z saddle;
-5. mineral bed and column: their casting features (`CastingFeature`, inserts,
-   pockets) become recorded steps in `MineralFoundation`, so this is a
-   MachineKit change shared with other castings. Scope it separately if FP0
-   shows the casting pipeline needs its own feature types.
+5. mineral bed and column: each `CastingFeature` (lightening, service
+   opening, interface/insert recess, clearance) becomes one registered step
+   (FP1a) evaluated by the existing casting geometry, in `MineralFoundation`,
+   so every casting in MachineKit gains a tree at once.
 
 ### FP6 — Delete the hobber native frame; freeze the immediate API
 
@@ -255,11 +323,15 @@ feature evaluators call. Update the CadKit docs and examples.
   Recommendation: do FP0–FP6, then decide.
 - **D2. Where skeleton inputs live:** Haxe constants (recommended; derivation
   next to them) or a data file the editor writes.
-- **D3. Castings in scope for FP5** or a separate plan after FP0 shows the
-  size.
+- **D3. Castings:** settled by FP0: castings already have a named feature
+  model (`materia.casting.CastingFeature`); each becomes one registered
+  recorded step (FP1a), not re-expressed as boxes. In scope for FP5.
 
 ## Status
 
 - 2026-11-11: plan written; reframed the same day to one recording API
   (FP1 gap table, FP2 as the MachineKit standard, FP6 freeze, FP8 library,
   FP9 deletion). Nothing started.
+- 2026-11-11: FP1 rewritten as foundations FP1a–FP1g; D3 settled.
+- 2026-11-11: FP0 done on branch `feature-parts` (worktree
+  /media/joao/DATA1/materia-feature-parts): equivalence test + fixture.
