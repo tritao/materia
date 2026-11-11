@@ -952,6 +952,11 @@ typedef SceneArtifactHeater = {
 class SceneArtifact {
   public static inline var VERSION:Int = 47;
   public static inline var MAX_BYTES:Int = 150000000;
+  /**
+   * Assembly definition and state records grow with the assembly, about 1.8 kB per occurrence (a 2000-part sheet router
+   * is 3.6 MB): room for about 17 000 occurrences, well inside the whole artifact's limit.
+   */
+  public static inline var MAX_ASSEMBLY_BYTES:Int = 32000000;
   static inline var MAX_VERTICES:Int = 2000000;
   static inline var MAX_TRIANGLES:Int = 4000000;
   static inline var MAX_FACE_RANGES:Int = 100000;
@@ -992,8 +997,8 @@ class SceneArtifact {
     var recipeDocument = data.recipeDocument == null ? Bytes.alloc(0) : Bytes.ofString(data.recipeDocument);
     var recipeDiagnostics = data.recipeDiagnostics
       == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.recipeDiagnostics));
-    if (assemblyDefinition.length > 2000000
-      || assemblyState.length > 2000000) throw "Scene artifact assembly metadata is too large";
+    if (assemblyDefinition.length > MAX_ASSEMBLY_BYTES
+      || assemblyState.length > MAX_ASSEMBLY_BYTES) throw "Scene artifact assembly metadata is too large";
     if (recipeDocument.length > 2000000) throw "Scene artifact recipe document is too large";
     if (recipeDiagnostics.length > 2000000) throw "Scene artifact recipe diagnostics are too large";
     var machining = data.machining == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machining));
@@ -4005,10 +4010,10 @@ private class SceneArtifactReader {
     }
     var assemblyDefinition:Null<AssemblyDefinition> = null, assemblyState:Null<AssemblyStateRecord> = null;
     var definitionLength = readInt();
-    if (definitionLength < 0 || definitionLength > 2000000) throw "Scene artifact assembly definition is too large";
+    if (definitionLength < 0 || definitionLength > SceneArtifact.MAX_ASSEMBLY_BYTES) throw "Scene artifact assembly definition is too large";
     if (definitionLength > 0) assemblyDefinition = AssemblyDefinitionCodec.decode(readString(definitionLength));
     var stateLength = readInt();
-    if (stateLength < 0 || stateLength > 2000000) throw "Scene artifact assembly state is too large";
+    if (stateLength < 0 || stateLength > SceneArtifact.MAX_ASSEMBLY_BYTES) throw "Scene artifact assembly state is too large";
     if (stateLength > 0) {
       if (assemblyDefinition == null) throw "Scene artifact assembly state has no definition";
       assemblyState = AssemblyDefinitionCodec.decodeState(assemblyDefinition, readString(stateLength));
