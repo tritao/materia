@@ -322,10 +322,12 @@ class EnclosureRuntimeTests {
         true
       );
       closeup.selectPresentationView("cutting");
+      closeup.preparePresentationFrame();
       var beforeVisibility = editor.session.scene.records().map(r -> r.visible).join(","),
         beforeHistory = editor.session.document.history.undoCount;
       var filtered = new nativekit.scene.SceneView();
       @:privateAccess closeup.applyPresentation(filtered);
+
       check(filtered.visibilityOverrideCount() > 0, "Inspection camera applies its own enclosure visibility overrides");
       check(
         new nativekit.scene.SceneView().visibilityOverrideCount() == 0,
@@ -348,25 +350,25 @@ class EnclosureRuntimeTests {
       }
       var sceneId = "project:" + anchor;
       closeup.setSimulationState(true, [{id: sceneId, position: [0.1, 0.2, 1.0], rotation: [0, 0, 0, 1]}], 1);
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       var camera = @:privateAccess closeup.camera;
       var target = [camera.targetX, camera.targetY, camera.targetZ], angle = [camera.yaw, camera.pitch];
       closeup.setSimulationState(true, [{id: sceneId, position: [0.1, 0.2, 1.0], rotation: [0, 0, 1, 0]}], 2);
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       check(
         camera.targetX == target[0] && camera.targetY == target[1]
         && camera.targetZ == target[2] && camera.yaw == angle[0] && camera.pitch == angle[1],
         "Rotating the workpiece never spins or moves the inspection camera"
       );
       closeup.setSimulationState(true, [{id: sceneId, position: [0.15, 0.2, 1.02], rotation: [0, 0, 1, 0]}], 3);
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       check(
         Math.abs(camera.targetX - target[0] - 0.05) < 1e-9 && Math.abs(camera.targetZ - target[2] - 0.02) < 1e-9,
         "Inspection target follows live translation"
       );
       var distance = camera.distance;
       closeup.setPresentationZoom(0.5);
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       check(
         camera.distance == distance,
         "Optical zoom keeps the camera outside the cutter instead of moving it into the geometry"
@@ -395,7 +397,7 @@ class EnclosureRuntimeTests {
       check(scroll.defaultPrevented && scroll.propagationStopped, "Wheel is consumed even at the zoom limit");
       wheel(-1000000);
       check(lens == 0.2, "Wheel zoom in respects the button limit");
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       check(
         camera.distance == distance && camera.yaw == angle[0] && camera.pitch == angle[1],
         "Wheel zoom preserves camera position and orientation"
@@ -412,7 +414,7 @@ class EnclosureRuntimeTests {
       check(camera.yaw != oldYaw, "Inspection uses regular viewport orbit navigation");
       var orbited = camera.yaw;
       closeup.setPresentationZoom(0.2);
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       check(camera.yaw == orbited, "Rebuilding the inspection pane preserves a user orbit");
       var beforePan = [camera.targetX, camera.targetY, camera.targetZ];
       pointer(haxeon.ui.core.UiEventKind.PointerDown, 200, 150, haxeon.ui.core.UiModifier.Shift);
@@ -424,7 +426,7 @@ class EnclosureRuntimeTests {
       );
       var panned = [camera.targetX, camera.targetY, camera.targetZ];
       closeup.setSimulationState(true, [{id: sceneId, position: [0.25, 0.2, 1.02], rotation: [0, 0, 0, 1]}], 4);
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       check(
         Math.abs(camera.targetX - panned[0] - 0.1) < 1e-9 && camera.yaw == orbited,
         "Live target motion preserves the user's pan and orbit"
@@ -438,7 +440,7 @@ class EnclosureRuntimeTests {
         "Inspection navigation cannot select or edit the scene"
       );
       closeup.resetPresentation();
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       var closeupController = closeup.presentation;
       if (closeupController == null) throw "Missing controller";
       check(
@@ -446,7 +448,7 @@ class EnclosureRuntimeTests {
         "Reset restores the default view and cursor"
       );
       closeup.selectPresentationView("cutting");
-      @:privateAccess closeup.updatePresentationCamera();
+      closeup.preparePresentationFrame();
       check(
         camera.yaw == yaw && camera.pitch == pitch && Math.abs(camera.targetX - 0.25 - offset[0]) < 1e-9,
         "Selecting a view restores framing at the current target position"
@@ -479,6 +481,7 @@ class EnclosureRuntimeTests {
         editor.session.assemblyUnitMetres()
       );
       mainCamera.selectPresentationView("enclosure-hidden");
+      mainCamera.preparePresentationFrame();
       var hiddenView = new nativekit.scene.SceneView();
       @:privateAccess mainCamera.applyPresentation(hiddenView);
       check(
@@ -486,6 +489,7 @@ class EnclosureRuntimeTests {
         "Enclosure hiding applies only view overrides for authored enclosure parts"
       );
       mainCamera.selectPresentationView("enclosure-transparent");
+      mainCamera.preparePresentationFrame();
       var ghostView = new nativekit.scene.SceneView();
       @:privateAccess mainCamera.applyPresentation(ghostView);
       check(
@@ -493,6 +497,7 @@ class EnclosureRuntimeTests {
         "Transparent enclosure keeps every part in the view with translucent material overrides"
       );
       mainCamera.selectPresentationView("assembled");
+      mainCamera.preparePresentationFrame();
       var restoredView = new nativekit.scene.SceneView();
       @:privateAccess mainCamera.applyPresentation(restoredView);
       check(
