@@ -12,6 +12,13 @@ class NamedParameter {
   public final unit:String;
   public var expression(default, null):Null<ParameterExpression>;
   public var value(get, never):Float;
+  /** `ParameterRole`: editable, derived or fixed. An expression parameter reports derived. */
+  public var role(get, never):String;
+  /** Where the value comes from, as a token the owning package defines (MachineKit: a `ValueBasis` name); empty if unset. */
+  public var basis(default, null):String = "";
+  /** The derivation rule of a derived value, or the source of a fixed one; empty if unset. */
+  public var note(default, null):String = "";
+  private var declaredRole:String = ParameterRole.Editable;
 
   private var storedValue:Float;
   private final targets:Array<Parameter>;
@@ -32,6 +39,29 @@ class NamedParameter {
     storedValue = canonicalValue;
     targets = [];
   }
+
+  function get_role():String return expression != null ? ParameterRole.Derived : declaredRole;
+
+  /** Set role, basis and note together. An expression parameter can only be derived. Returns this parameter. */
+  public function describe(role:String, basis:String = "", note:String = ""):NamedParameter {
+    ParameterRole.validate(role);
+    if (expression != null && role != ParameterRole.Derived)
+      throw new ParametricError('expression parameter "$name" is derived, not $role');
+    if (basis == null || note == null) throw new ParametricError("parameter basis and note must not be null");
+    declaredRole = role;
+    this.basis = basis;
+    this.note = note;
+    return this;
+  }
+
+  /** An input a person may change. */
+  public function editable(basis:String = "", note:String = ""):NamedParameter return describe(ParameterRole.Editable, basis, note);
+
+  /** Computed by `rule`; shown with it and never edited directly. */
+  public function derivedBy(rule:String, basis:String = "Derived"):NamedParameter return describe(ParameterRole.Derived, basis, rule);
+
+  /** Set from outside the design (`source`: the stock, catalogue row or standard). */
+  public function fixedBy(source:String, basis:String = "Catalog"):NamedParameter return describe(ParameterRole.Fixed, basis, source);
 
   function get_value():Float {
     if (document.isClosed()) throw new ParametricError("document is closed");

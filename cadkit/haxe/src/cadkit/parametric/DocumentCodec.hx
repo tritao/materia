@@ -89,14 +89,19 @@ class DocumentCodec {
         feature: binding.ownerFeature().id.toInt(),
         parameter: binding.name
       });
-      encodedParameters.push({
+      var encodedParameter:Dynamic = {
         name: parameter.name,
         value: parameter.valueIn(parameter.unit),
         kind: parameter.kind,
         unit: parameter.unit,
         expression: parameter.expression == null ? null : parameter.expression.source,
         bindings : bindings
-      });
+      };
+      // Role metadata only when it says something: editable is the default, an expression is always derived.
+      if (parameter.expression == null && parameter.role != ParameterRole.Editable) Reflect.setField(encodedParameter, "role", parameter.role);
+      if (parameter.basis != "") Reflect.setField(encodedParameter, "basis", parameter.basis);
+      if (parameter.note != "") Reflect.setField(encodedParameter, "note", parameter.note);
+      encodedParameters.push(encodedParameter);
     }
     var encodedElements:Array<Dynamic> = [];
     for (element in document.allElements()) {
@@ -475,6 +480,13 @@ class DocumentCodec {
           if (!Std.isOfType(rawExpression,
             String)) throw new ParametricError("document field is not a string: expression");
           document.installExpression(stringField(record, "name"), cast rawExpression);
+        }
+      }
+      for (record in parameterRecords) {
+        var role = optionalString(record, "role"), basis = optionalString(record, "basis"), note = optionalString(record, "note");
+        if (role != null || basis != null || note != null) {
+          var described = document.parameter(stringField(record, "name"));
+          described.describe(role == null ? described.role : role, basis == null ? "" : basis, note == null ? "" : note);
         }
       }
       for (record in parameterRecords) {
