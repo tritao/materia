@@ -73,10 +73,12 @@ cat > "$contract" <<JSON
 JSON
 # The compiler runs as HashLink bytecode; rebuild it when its sources change.
 compiler="$build_dir/haxeon-compiler.hl"
-if [[ ! -f "$compiler" ]] || [[ -n $(find "$haxeon_dir/src" -name '*.hx' -newer "$compiler" -print -quit) ]]; then
-	"$haxeon_dir/.tools/haxe/haxe" --cwd "$haxeon_dir" -cp src -hl "$compiler" -main compiler.tools.HaxeonCompiler
+if [[ ! -f "$compiler" ]] || [[ -n $(find "$haxeon_dir/src" "$haxeon_dir/lib" -name '*.hx' -newer "$compiler" -print -quit) ]]; then
+	"$haxeon_dir/.tools/haxe/haxe" --cwd "$haxeon_dir" common.hxml -hl "$compiler" -main compiler.tools.HaxeonCompiler
 fi
-python3 "$app_dir/web/tools/guest-arguments.py" "$app_dir/haxeon.json" "$build_dir/hxi" > "$build_dir/guest-arguments.txt"
+# The pendant's firmware core is Rust with no wasm32 build yet; Main registers its drivers only off wasm.
+python3 "$app_dir/web/tools/guest-arguments.py" "$app_dir/haxeon.json" "$build_dir/hxi" \
+	--omit=machinekit-pendant-native > "$build_dir/guest-arguments.txt"
 guest_arguments=()
 while IFS= read -r argument; do
   [[ "$argument" == "$app_dir/src/PreparationWorkerMain.hx" ]] || guest_arguments+=("$argument")

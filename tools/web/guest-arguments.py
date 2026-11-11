@@ -6,6 +6,10 @@ package graph. Native providers cannot target wasm32 yet, so the browser build w
 the same manifests here: every package's source roots and sources, the package roots
 of scoped packages, and its FFI projections, with each FFI interface replaced by the wasm32
 (portable-abi32) copy generated into HXI_DIR.
+
+--omit=PACKAGE leaves a package out of the guest: its sources, its interfaces and its own
+dependencies (unless something else reaches them). It is for native packages the browser build
+cannot provide yet; the application must keep their uses behind `#if !wasm`.
 """
 
 import json
@@ -14,10 +18,14 @@ import sys
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        print("usage: guest-arguments.py APP_MANIFEST HXI_DIR", file=sys.stderr)
+    options = [argument for argument in sys.argv[1:] if argument.startswith("--")]
+    positional = [argument for argument in sys.argv[1:] if not argument.startswith("--")]
+    omitted = {option[len("--omit="):] for option in options if option.startswith("--omit=")}
+    if len(positional) != 2 or len(omitted) != len(options):
+        print("usage: guest-arguments.py APP_MANIFEST HXI_DIR [--omit=PACKAGE ...]", file=sys.stderr)
         return 2
-    manifest_path, hxi_dir = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
+    manifest_path, hxi_dir = os.path.abspath(positional[0]), os.path.abspath(positional[1])
+    unused_omissions = set(omitted)
     arguments: list[str] = []
     sources: list[str] = []
     visited: set[str] = set()
@@ -30,6 +38,9 @@ def main() -> int:
         with open(os.path.join(directory, "haxeon.json"), encoding="utf-8") as handle:
             manifest = json.load(handle)
         name = manifest["package"]["name"]
+        if name in omitted:
+            unused_omissions.discard(name)
+            return
         roots = [os.path.join(directory, root) for root in manifest.get("sourceRoots", ["src"])]
         arguments.extend("--root=" + root for root in roots)
         # Like the package resolver: every .hx file below the roots, unless the manifest lists sources.
@@ -62,6 +73,10 @@ def main() -> int:
             visit(os.path.join(directory, dependency["path"]))
 
     visit(os.path.dirname(manifest_path))
+    if unused_omissions:
+        print(f"guest-arguments: --omit names packages outside the graph: {', '.join(sorted(unused_omissions))}",
+              file=sys.stderr)
+        return 1
     print("\n".join(arguments + sorted(set(sources))))
     return 0
 

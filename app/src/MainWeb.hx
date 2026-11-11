@@ -210,7 +210,8 @@ class MainWeb {
     if (semantics != null) {
       label = semantics.label;
       value = semantics.value;
-      role = semantics.role;
+      // The page reports NativeKit's role code, which the browser tests look up (tools/tour.py ROLES).
+      role = haxeon.ui.NativeEnums.accessibilityRole(semantics.role).rawValue();
     }
     if (resolved != null && (node.styleKey != null || label != null)) {
       var bounds = resolved.clippedViewportBounds();
