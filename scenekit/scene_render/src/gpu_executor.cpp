@@ -1871,6 +1871,8 @@ bool screen_edges_requested() noexcept {
 struct EdgeUniformData {
     std::array<float, 4> color{};
     std::array<float, 4> view{};
+    /** x: half width in pixels, matching surface-edge strokes. */
+    std::array<float, 4> style{0.85f, 0.0f, 0.0f, 0.0f};
 };
 
 template <class StateT>
@@ -1899,7 +1901,7 @@ bool ensure_edge_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t
             (result = nkgpu_shader_attribute(shader_builder, 0, "position", "TEXCOORD", 0)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(EdgeUniformData))) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "edge_params", NKGPU_UNIFORMTYPE_FLOAT4, 2)) !=
+            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "edge_params", NKGPU_UNIFORMTYPE_FLOAT4, 3)) !=
                 NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "pick_ids_texture_image_edge_sampler")) != NKGPU_OK ||

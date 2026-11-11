@@ -12,6 +12,9 @@ uniform sampler2D surface_position_texture;
 in vec2 vertex_uv;
 out vec4 fragment_color;
 
+// x: the line's half width in pixels (strokes use 0.85).
+uniform vec4 edge_style;
+
 vec2 texel_uv(ivec2 p) {
     return (vec2(p) + 0.5) * edge_view.xy;
 }
@@ -20,55 +23,72 @@ float decode(vec4 c) {
     return floor(c.r * 255.0 + 0.5) + 256.0 * floor(c.g * 255.0 + 0.5) + 65536.0 * floor(c.b * 255.0 + 0.5);
 }
 
-float instance_at(ivec2 p) {
-    return decode(texture(pick_ids_texture, texel_uv(p)));
+// A 5 x 5 window around this pixel, fetched once: index (x + 2) + 5 (y + 2).
+vec4 window_position[25];
+float window_instance[25];
+
+int slot(ivec2 o) {
+    return (o.x + 2) + 5 * (o.y + 2);
 }
 
-vec4 position_at(ivec2 p) {
-    return texture(surface_position_texture, texel_uv(p));
+bool same_instance(ivec2 a, ivec2 b) {
+    return window_position[slot(b)].w > 0.5 && window_instance[slot(b)] == window_instance[slot(a)];
 }
 
-bool same_instance(ivec2 p, ivec2 q) {
-    return position_at(q).w > 0.5 && instance_at(q) == instance_at(p);
-}
-
-// One step along `axis` on p's own surface: of the two neighbours, the nearer in space, so the step does not
-// straddle a crease or an occlusion. Zero when neither neighbour shows the same part.
-vec3 surface_step(ivec2 p, ivec2 axis) {
-    vec3 here = position_at(p).xyz;
-    bool forward = same_instance(p, p + axis), backward = same_instance(p, p - axis);
-    vec3 ahead = forward ? position_at(p + axis).xyz - here : vec3(0.0);
-    vec3 behind = backward ? here - position_at(p - axis).xyz : vec3(0.0);
+// One step along `axis` on a's own surface: the nearer of the two neighbours, so it does not straddle a crease or
+// an occlusion. Zero when neither neighbour shows the same part.
+vec3 surface_step(ivec2 a, ivec2 axis) {
+    vec3 here = window_position[slot(a)].xyz;
+    bool forward = same_instance(a, a + axis), backward = same_instance(a, a - axis);
+    vec3 ahead = forward ? window_position[slot(a + axis)].xyz - here : vec3(0.0);
+    vec3 behind = backward ? here - window_position[slot(a - axis)].xyz : vec3(0.0);
     if (forward && backward) return dot(ahead, ahead) <= dot(behind, behind) ? ahead : behind;
     return forward ? ahead : behind;
 }
 
-// The surface normal at p and its world size of one pixel; zero when p has no neighbour on its part.
-vec4 surface_frame(ivec2 p) {
-    vec3 n = cross(surface_step(p, ivec2(1, 0)), surface_step(p, ivec2(0, 1)));
+// Normal and world size of one pixel at each of the 3 x 3 pixels around this one: index (x + 1) + 3 (y + 1).
+vec4 frame[9];
+
+vec4 surface_frame(ivec2 a) {
+    vec3 n = cross(surface_step(a, ivec2(1, 0)), surface_step(a, ivec2(0, 1)));
     float area = length(n);
     if (area <= 0.0) return vec4(0.0);
     return vec4(n / area, sqrt(area));
 }
 
-bool edge_between(ivec2 p, ivec2 q) {
-    vec4 a = position_at(p), b = position_at(q);
-    bool covered_p = a.w > 0.5, covered_q = b.w > 0.5;
-    if (covered_p != covered_q) return true;
-    if (!covered_p) return false;
+bool edge_between(ivec2 a, ivec2 b) {
+    vec4 pa = window_position[slot(a)], pb = window_position[slot(b)];
+    bool covered_a = pa.w > 0.5, covered_b = pb.w > 0.5;
+    if (covered_a != covered_b) return true;
+    if (!covered_a) return false;
     // Different parts meet: an outline or a contact line.
-    if (instance_at(p) != instance_at(q)) return true;
+    if (window_instance[slot(a)] != window_instance[slot(b)]) return true;
     // One part: face ids may be triangles, so judge the shape. A line where it creases or occludes itself.
-    vec4 np = surface_frame(p), nq = surface_frame(q);
-    if (np.w <= 0.0 || nq.w <= 0.0) return false;
-    if (dot(np.xyz, nq.xyz) < edge_view.z) return true;
-    return abs(dot(np.xyz, b.xyz - a.xyz)) > edge_view.w * np.w;
+    vec4 na = frame[(a.x + 1) + 3 * (a.y + 1)], nb = frame[(b.x + 1) + 3 * (b.y + 1)];
+    if (na.w <= 0.0 || nb.w <= 0.0) return false;
+    if (dot(na.xyz, nb.xyz) < edge_view.z) return true;
+    return abs(dot(na.xyz, pb.xyz - pa.xyz)) > edge_view.w * na.w;
 }
 
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
-    bool edge = edge_between(p, p + ivec2(1, 0)) || edge_between(p, p - ivec2(1, 0))
-             || edge_between(p, p + ivec2(0, 1)) || edge_between(p, p - ivec2(0, 1));
-    if (!edge) discard;
-    fragment_color = vec4(edge_color.rgb * edge_color.a, edge_color.a);
+    for (int y = -2; y <= 2; ++y) for (int x = -2; x <= 2; ++x) {
+        vec2 uv = texel_uv(p + ivec2(x, y));
+        window_position[slot(ivec2(x, y))] = texture(surface_position_texture, uv);
+        window_instance[slot(ivec2(x, y))] = decode(texture(pick_ids_texture, uv));
+    }
+    for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x)
+        frame[(x + 1) + 3 * (y + 1)] = window_position[slot(ivec2(x, y))].w > 0.5 ? surface_frame(ivec2(x, y)) : vec4(0.0);
+    // A boundary lies midway between two pixels that differ. Coverage falls off with the distance from this pixel's
+    // centre to the nearest one: a line of the strokes' width with a one-pixel soft edge.
+    float nearest = 4.0;
+    for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 0; ++x) {
+        if (edge_between(ivec2(x, y), ivec2(x + 1, y))) nearest = min(nearest, length(vec2(float(x) + 0.5, float(y))));
+    }
+    for (int y = -1; y <= 0; ++y) for (int x = -1; x <= 1; ++x) {
+        if (edge_between(ivec2(x, y), ivec2(x, y + 1))) nearest = min(nearest, length(vec2(float(x), float(y) + 0.5)));
+    }
+    float coverage = clamp(edge_style.x + 0.5 - nearest, 0.0, 1.0);
+    if (coverage <= 0.0) discard;
+    fragment_color = vec4(edge_color.rgb * edge_color.a * coverage, edge_color.a * coverage);
 }
