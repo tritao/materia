@@ -1,7 +1,7 @@
 package cadkit.drawing;
 
 /** Manufacturing layers shared by drawing formats. */
-enum DrawingLayer {
+enum DrawingLayer implements Equatable {
   Outline;
   BendUp;
   BendDown;

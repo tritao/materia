@@ -2,6 +2,7 @@ import CadKit;
 import cadkit.Shape;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.RecomputeError;
+import cadkit.parametric.recording.Dimension;
 import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.sheetmetal.CornerJoin;
 import cadkit.sheetmetal.CornerRelief;
@@ -86,7 +87,7 @@ class SheetCornerFeatureSmoke {
       sideB.close();
       var gap = builder.length("corner.gap", 0.5);
       var size = builder.length("corner.relief", 8);
-      var overlap = join == Gap ? null : builder.length("corner.overlap", 2);
+      var overlap:Null<Dimension> = join == Gap ? null : builder.length("corner.overlap", 2);
       var corner = builder.sheetCorner(second, targetA, targetB, gap, relief, size, join, overlap);
       builder.output(corner);
       var document = builder.finish();
