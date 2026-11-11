@@ -180,7 +180,8 @@ class FeaturePartEquivalence {
       "Xrib-rightInner" => ["Stock · Bright bar"],
       "Xrib-scale" => ["Stock · Bright bar"],
       "chipTray" => ["Chip tray"],
-      "electricalPanel" => ["Welded panel"]
+      "electricalPanel" => ["Welded panel"],
+      "outboardCarrier" => ["Carrier"]
     ];
     for (id => steps in expected) {
       var found = [for (member in machine.components()) if (member.id == id) member.component];
