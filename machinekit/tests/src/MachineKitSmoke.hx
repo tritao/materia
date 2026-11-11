@@ -3104,7 +3104,7 @@ class MachineKitSmoke {
    * run can pick a few: `-- --only BomExampleTests,Pendant*`, `-- --list`, `-- --keep-going` (see `haxeon.test.Shards`).
    */
   static function main():Void {
-    var everything = Shards.run([{name: "BomDocumentTests", run: BomDocumentTests.run, weight: 0.01}, {name: "BomExampleTests", run: BomExampleTests.run, weight: 0.01}, {name: "PartNumberKeyTests", run: PartNumberKeyTests.run, weight: 0.01}, {name: "ProcurementTests", run: ProcurementTests.run, weight: 0.01}, {name: "ControllerWiringTests", run: ControllerWiringTests.run, weight: 0.01}, {
+    var everything = Shards.run([{name: "PartRecordingTests", run: PartRecordingTests.run, weight: 0.01}, {name: "BomDocumentTests", run: BomDocumentTests.run, weight: 0.01}, {name: "BomExampleTests", run: BomExampleTests.run, weight: 0.01}, {name: "PartNumberKeyTests", run: PartNumberKeyTests.run, weight: 0.01}, {name: "ProcurementTests", run: ProcurementTests.run, weight: 0.01}, {name: "ControllerWiringTests", run: ControllerWiringTests.run, weight: 0.01}, {
       name: "OperatorProfileTests",
       run: OperatorProfileTests.run,
       weight: 0.05

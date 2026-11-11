@@ -51,7 +51,7 @@ class MachineComponent {
 	 * `machined(...)`. A part that lacks it cannot be a drilled-to-suit host (nor a clamped face with undrawn holes);
 	 * deriving such a joint is refused rather than leaving the solid without the hole.
 	 */
-  public function machinable():Bool return false;
+  public function machinable():Bool return isRecorded();
 
   /** Records the holes derived for this part, once; they are cut by `machined`. */
   public function machine(cuts:Array<cadkit.parametric.HoleSpec>):Void {
@@ -273,6 +273,7 @@ class MachineComponent {
   public function presentationView():Null<ComponentView> return null;
 
   public function hasGeometry():Bool {
+    if (isRecorded()) return true;
     try {
       var part = geometry(Preview);
       part.close();
@@ -280,7 +281,41 @@ class MachineComponent {
     } catch (_:NoGeometry) return false;
   }
 
-  public function geometry(detail:ComponentDetail = Preview):Part throw new NoGeometry(designation);
+  /**
+   * The part's geometry as recorded steps: write them with `builder`, in the part's own frame, and return the body (without the
+   * derived holes, which are added as a last step). A part that records gets its solid, its hole cuts and its scene history
+   * from this, so it does not also override `geometry`. Null (the default) means the part does not record yet.
+   */
+  public function recordGeometry(builder:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature>
+    return null;
+
+  /** The part's recording at `detail`, derived holes included, or null when it does not record; the caller closes it. */
+  public function recording(detail:ComponentDetail = Preview):Null<cadkit.parametric.Document> return PartRecordings.document(this, detail);
+
+  var recordsGeometry:Null<Bool> = null;
+
+  /** Whether `recordGeometry` writes this part's geometry (asked once). */
+  public function isRecorded():Bool {
+    var known = recordsGeometry;
+    if (known != null) return known;
+    var probe = new cadkit.parametric.recording.DocumentBuilder();
+    try {
+      var records = recordGeometry(probe, Preview) != null;
+      probe.close();
+      recordsGeometry = records;
+      return records;
+    } catch (error:Dynamic) {
+      probe.close();
+      throw error;
+    }
+  }
+
+  /** The part's solid: from its recording when it records. */
+  public function geometry(detail:ComponentDetail = Preview):Part {
+    var document = recording(detail);
+    if (document == null) throw new NoGeometry(designation);
+    return PartRecordings.solid(document);
+  }
 
   /**
 	 * Names the geometry `geometry(detail)` builds, for a cache of it: the same for every component made from the same recipe

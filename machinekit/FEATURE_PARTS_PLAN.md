@@ -222,24 +222,25 @@ round-trips through `DocumentCodec` and recomputes after a dimension change;
 sheet metal unchanged on the registry; pendant and hobber equivalence (FP0)
 unchanged.
 
-### FP2 — `RecordedPart` in MachineKit
+### FP2 — Recording on `MachineComponent`
 
-Generalise the pendant pattern into **the** way MachineKit parts are modelled
-(not a hobber pattern):
+Done (first half, 2026-11-11): recording is part of the component contract,
+not a subclass or a facet. `MachineComponent.record(builder, detail)`
+returns the part's body (null = not recorded yet); `geometry()`,
+`machinable()` and `hasGeometry()` come from it, the derived holes are a
+last `Fasteners` step (`PartRecordings`), and the recipe's numeric inputs
+must be the document's editable named parameters (and the other way round).
+`AssemblyPreview.scene` attaches every recorded part's history and one
+source row per top-level step with its faces. Any existing class
+(`HobberMadePart`, castings, catalogue parts) adopts it by overriding one
+method. `PartRecordingTests` covers it.
 
-- `machinekit.component.RecordedPart` (a `MachineComponent`): the subclass
-  implements `record(builder)`; `geometry()` is the document's output,
-  collision pieces and route holes come from the same recording, so faces
-  match the history the scene carries.
-- Holes: the part's joints produce FP1d hole specs, cut by the registered
-  hole feature, grouped under "Fasteners" in the tree.
-- Generic scene export: `MachineAssembly` scene generation emits `histories`
-  and `SceneSourceMap` rows for every `RecordedPart` occurrence. The pendant
-  moves onto it and `PendantDocuments.histories()/sources()` go.
-- Open-time cache keys the recorded part by its encoded document.
-
-**Gate:** pendant scene unchanged (same histories rows and face highlights);
-open time within the FP0 budget.
+Left: the pendant moves onto it (its plate, shell and board record; the
+hand-made `PendantDocuments.histories()/sources()` go); one history per
+shared definition rather than per first occurrence; caching (FP1f).
+Until FP9 a component either records or overrides `geometry()`; at FP9 the
+`geometry()` override point goes and `record` is the only way to make
+geometry (enforcement needs that rename, not reflection).
 
 ### FP3 — Hobber skeleton
 

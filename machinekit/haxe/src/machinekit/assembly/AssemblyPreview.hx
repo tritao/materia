@@ -39,6 +39,8 @@ class AssemblyPreview {
     var definition = model.definition(assemblyId);
     var definitions:Map<String, AssemblyComponentDefinition> = [for (item in definition.definitions) item.id => item];
     var definitionByDesignation = new Map<String, Array<String>>();
+    var histories:Array<materia.project.SceneArtifact.SceneArtifactHistory> = [];
+    var steps:Array<materia.project.SceneSourceMap.SceneSourceFeature> = [];
     for (entry in assembly.components()) {
       if (Sys.getEnv("MACHINEKIT_PREVIEW_TRACE") == "1") {
         Sys.println("Assembly preview mass: " + entry.id);
@@ -121,6 +123,7 @@ class AssemblyPreview {
         var display = machinekit.component.ComponentDisplayMesh.of(entry.component);
         if (display != null) displayMesh(rendered, display.build());
         parts.push(rendered);
+        if (entry.component.isRecorded()) recordedHistory(entry.id, entry.component, histories, steps);
       }
       definitionByOccurrence.set(entry.id, definitionId);
       // Accumulate connector names while choosing candidates: a later occurrence must also agree with
@@ -146,7 +149,33 @@ class AssemblyPreview {
       result.controllers = cell.controllers;
       result.signals = cell.signals;
     }
+    if (histories.length > 0) result.project = {dynamicParts: [], motions: [], sources: {features: steps, members: []}, histories: histories};
     return result;
+  }
+
+  /**
+   * A recorded part's saved steps for the viewer, and one source row per top-level step with the faces it made. The scene's
+   * solid comes from the same recording, so a step's face numbers are the scene part's face numbers. A tool, sketch or
+   * placement is part of the step that applies it; the group leads the label (`Fasteners · Derived holes`).
+   */
+  static function recordedHistory(occurrence:String, part:machinekit.component.MachineComponent,
+      histories:Array<materia.project.SceneArtifact.SceneArtifactHistory>, steps:Array<materia.project.SceneSourceMap.SceneSourceFeature>):Void {
+    var document = part.recording();
+    if (document == null) return;
+    try {
+      histories.push({occurrence: occurrence, document: cadkit.parametric.DocumentCodec.encode(document)});
+      for (row in cadkit.parametric.TimelineModel.of(document)) if (row.parent < 0) steps.push({
+        id: occurrence + "#" + row.id,
+        label: row.group == "" ? row.label : row.group + " · " + row.label,
+        occurrence: occurrence,
+        faces: row.faces,
+        whole: false
+      });
+      document.close();
+    } catch (error:Dynamic) {
+      document.close();
+      throw error;
+    }
   }
 
   static function displayBelt(part:SceneArtifactPart, belt:machinekit.transmission.TimingBelt, side:Int):Void {
