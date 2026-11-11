@@ -2297,151 +2297,11 @@ void NKS_CALL nkscene_material_destroy(nkscene_scene scene, nkscene_material_id 
 
 nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_geometry_id geometry,
                                                   const nkscene_geometry_data *data) {
-    constexpr auto minimum_size =
-        offsetof(nkscene_geometry_data, subelement_count) + sizeof(data->subelement_count);
-    if (!data || data->struct_size < minimum_size)
-        return NKS_ERROR_INVALID_ARGUMENT;
-    if (data->struct_size >=
-            offsetof(nkscene_geometry_data, stream_count) + sizeof(data->stream_count) &&
-        data->primitive_type == NKS_PRIMITIVE_BOX) {
-        nkscene::PreparedGeometryData prepared;
-        const auto result = nkscene::prepare_geometry_data(data, prepared);
-        if (result != NKS_OK)
-            return result;
-        auto &state = nkscene::registry();
-        std::lock_guard lock(state.mutex);
-        auto owner = state.scenes.get(nkscene::unpack_handle(scene));
-        if (!owner)
-            return NKS_ERROR_INVALID_HANDLE;
-        if (!owner->geometry_store().find({geometry.value}))
-            return NKS_ERROR_STALE_ID;
-        auto &resource = owner->geometry_store().create({geometry.value});
-        resource.replace_data(std::move(prepared.payload), prepared.bounds,
-                              std::move(prepared.subelements));
-        owner->publish();
-        return NKS_OK;
-    }
-    const auto has_stream_fields = data->struct_size >=
-        offsetof(nkscene_geometry_data, stream_count) + sizeof(data->stream_count);
-    const auto has_stroke_fields = data->struct_size >=
-        offsetof(nkscene_geometry_data, stroke_segment_count) + sizeof(data->stroke_segment_count);
-    const auto stream_count = has_stream_fields ? data->stream_count : 0;
-    const auto stroke_segment_count = has_stroke_fields ? data->stroke_segment_count : 0;
-    auto primitive = NKS_PRIMITIVE_TRIANGLES;
-    if (has_stream_fields && data->primitive_type != 0)
-        primitive = data->primitive_type;
-    const auto width = nkscene::primitive_width(primitive);
-    if (!width || (stream_count != 0 && !data->streams) ||
-        (stroke_segment_count != 0 && !data->stroke_segments) ||
-        (stream_count == 0 && data->vertex_count != 0 && !data->vertices) ||
-        (data->index_count != 0 && !data->indices) ||
-        (data->subelement_count != 0 && !data->subelements))
-        return NKS_ERROR_INVALID_ARGUMENT;
-
-    std::vector<nkscene::GeometryVertexStream> streams;
-    std::vector<nkscene::GeometryVertex> vertices;
-    std::uint32_t vertex_count = data->vertex_count;
-    if (stream_count != 0) {
-        std::unordered_set<nkscene_vertex_semantic> semantics;
-        streams.reserve(stream_count - 1);
-        vertex_count = 0;
-        const nkscene_vertex_stream *position_input = nullptr;
-        std::size_t position_stride = 0;
-        for (uint32_t index = 0; index < stream_count; ++index) {
-            const auto &input = data->streams[index];
-            if (input.struct_size < sizeof(nkscene_vertex_stream) ||
-                !nkscene::valid_vertex_semantic(input.semantic))
-                return NKS_ERROR_INVALID_ARGUMENT;
-            const auto element_size = nkscene::vertex_format_size(input.format);
-            if (!element_size || !semantics.insert(input.semantic).second)
-                return NKS_ERROR_INVALID_ARGUMENT;
-            const auto stride = input.stride == 0 ? element_size : input.stride;
-            if (stride < element_size || (input.count != 0 && !input.data) ||
-                input.count > std::numeric_limits<std::size_t>::max() / stride)
-                return NKS_ERROR_INVALID_ARGUMENT;
-            if (input.semantic == NKS_VERTEX_SEMANTIC_POSITION) {
-                if (input.format != NKS_VERTEX_FORMAT_FLOAT32X3)
-                    return NKS_ERROR_INVALID_ARGUMENT;
-                vertex_count = input.count;
-                position_input = &input;
-                position_stride = stride;
-                continue;
-            }
-            nkscene::GeometryVertexStream output;
-            output.semantic = static_cast<nkscene::VertexSemantic>(input.semantic);
-            output.format = static_cast<nkscene::VertexFormat>(input.format);
-            output.stride = stride;
-            output.count = input.count;
-            output.data.resize(static_cast<std::size_t>(stride) * input.count);
-            if (!output.data.empty())
-                std::memcpy(output.data.data(), input.data, output.data.size());
-            streams.push_back(std::move(output));
-        }
-        if (!position_input)
-            return NKS_ERROR_INVALID_ARGUMENT;
-        for (const auto &stream : streams)
-            if (stream.count != vertex_count)
-                return NKS_ERROR_INVALID_ARGUMENT;
-
-        vertices.resize(vertex_count);
-        const auto *position_bytes =
-            static_cast<const std::byte *>(position_input->data);
-        for (std::uint32_t index = 0; index < vertex_count; ++index) {
-            std::memcpy(vertices[index].position.data(),
-                        position_bytes + static_cast<std::size_t>(index) * position_stride,
-                        sizeof(vertices[index].position));
-        }
-    } else {
-        vertices.resize(vertex_count);
-        for (uint32_t index = 0; index < vertex_count; ++index)
-            std::copy(std::begin(data->vertices[index].position),
-                      std::end(data->vertices[index].position), vertices[index].position.begin());
-        nkscene::GeometryVertexStream position;
-        position.semantic = nkscene::VertexSemantic::Position;
-        position.format = nkscene::VertexFormat::Float32x3;
-        position.stride = sizeof(nkscene::GeometryVertex);
-        position.count = vertex_count;
-        position.data.resize(static_cast<std::size_t>(position.stride) * vertex_count);
-        if (!position.data.empty())
-            std::memcpy(position.data.data(), vertices.data(), position.data.size());
-        streams.push_back(std::move(position));
-    }
-
-    const auto element_count = data->index_count != 0 ? data->index_count : vertex_count;
-    if (element_count % width != 0)
-        return NKS_ERROR_INVALID_ARGUMENT;
-    const auto *indices = static_cast<const uint32_t *>(data->indices);
-    if (data->index_count != 0) {
-        for (uint32_t index = 0; index < data->index_count; ++index)
-            if (indices[index] >= vertex_count)
-                return NKS_ERROR_INVALID_ARGUMENT;
-    }
-    const auto primitive_count = element_count / width;
-    for (uint32_t index = 0; index < data->subelement_count; ++index) {
-        const auto &range = data->subelements[index];
-        if (static_cast<uint64_t>(range.first_primitive) + range.primitive_count > primitive_count)
-            return NKS_ERROR_INVALID_ARGUMENT;
-    }
-    std::vector<nkscene::GeometryPayload::StrokeSegment> stroke_segments;
-    stroke_segments.reserve(stroke_segment_count);
-    for (std::uint32_t index = 0; index < stroke_segment_count; ++index) {
-        const auto &segment = data->stroke_segments[index];
-        nkscene::GeometryPayload::StrokeSegment copied;
-        std::copy(std::begin(segment.start), std::end(segment.start), copied.start.begin());
-        std::copy(std::begin(segment.end), std::end(segment.end), copied.end.begin());
-        copied.subelement = segment.subelement;
-        copied.step = segment.step;
-        if (!std::isfinite(copied.step) || copied.step < 0.0f)
-            return NKS_ERROR_INVALID_ARGUMENT;
-        for (const auto coordinate : copied.start)
-            if (!std::isfinite(coordinate))
-                return NKS_ERROR_INVALID_ARGUMENT;
-        for (const auto coordinate : copied.end)
-            if (!std::isfinite(coordinate))
-                return NKS_ERROR_INVALID_ARGUMENT;
-        stroke_segments.push_back(copied);
-    }
-
+    // The same validation and payload as creation, so replacing data cannot drift from creating it.
+    nkscene::PreparedGeometryData prepared;
+    const auto result = nkscene::prepare_geometry_data(data, prepared);
+    if (result != NKS_OK)
+        return result;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     auto owner = state.scenes.get(nkscene::unpack_handle(scene));
@@ -2450,30 +2310,7 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
     if (!owner->geometry_store().find({geometry.value}))
         return NKS_ERROR_STALE_ID;
     auto &resource = owner->geometry_store().create({geometry.value});
-    nkscene::GeometryPayload payload;
-    payload.vertices = std::move(vertices);
-    payload.streams = std::move(streams);
-    payload.stroke_segments = std::move(stroke_segments);
-    payload.primitive_type = static_cast<nkscene::PrimitiveType>(primitive);
-    payload.closed = data->struct_size >= sizeof(nkscene_geometry_data) && data->closed != 0;
-    if (data->index_count != 0)
-        payload.indices.assign(indices, indices + data->index_count);
-    nkscene::Bounds bounds;
-    bounds.valid = data->bounds.valid != 0;
-    std::copy(std::begin(data->bounds.minimum), std::end(data->bounds.minimum),
-              bounds.minimum.begin());
-    std::copy(std::begin(data->bounds.maximum), std::end(data->bounds.maximum),
-              bounds.maximum.begin());
-    nkscene::SubelementTable subelements;
-    if (data->subelement_count != 0) {
-        subelements.ranges.reserve(data->subelement_count);
-        for (uint32_t index = 0; index < data->subelement_count; ++index) {
-            const auto &range = data->subelements[index];
-            subelements.ranges.push_back(
-                {range.first_primitive, range.primitive_count, range.subelement});
-        }
-    }
-    resource.replace_data(std::move(payload), bounds, std::move(subelements));
+    resource.replace_data(std::move(prepared.payload), prepared.bounds, std::move(prepared.subelements));
     owner->publish();
     return NKS_OK;
 }

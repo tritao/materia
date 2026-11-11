@@ -769,6 +769,65 @@ void screen_edges_regression(nkgpu_renderer renderer) {
     std::puts("screen edges passed");
 }
 
+// Replacing a geometry's data with the same bytes renders as creating it did (both go through one validation and
+// payload builder; replacement used to parse streams separately and kept the position stream out of the payload).
+void geometry_replacement_regression(nkgpu_renderer renderer) {
+    nkscene_scene scene{};
+    assert(nkscene_scene_create(&scene)==NKS_OK);
+    const float positions[]={-0.8f,-0.8f,0, 0.8f,-0.8f,0, 0.8f,0.8f,0, -0.8f,0.8f,0};
+    const float normals[]={0,0,1, 0,0,1, 0,0,1, 0,0,1};
+    const std::uint32_t indices[]={0,1,2,0,2,3};
+    nkscene_vertex_stream streams[2]{};
+    for(auto &stream:streams){stream.struct_size=sizeof(stream);stream.format=NKS_VERTEX_FORMAT_FLOAT32X3;stream.count=4;}
+    streams[0].semantic=NKS_VERTEX_SEMANTIC_POSITION;streams[0].data=positions;
+    streams[1].semantic=NKS_VERTEX_SEMANTIC_NORMAL;streams[1].data=normals;
+    nkscene_geometry_data data{};
+    data.struct_size=sizeof(data);data.primitive_type=NKS_PRIMITIVE_TRIANGLES;
+    data.streams=streams;data.stream_count=2;data.indices=indices;data.index_count=6;
+    data.bounds.valid=1;data.bounds.minimum[0]=data.bounds.minimum[1]=-0.8f;data.bounds.maximum[0]=data.bounds.maximum[1]=0.8f;
+    nkscene_geometry_id geometry{};
+    assert(nkscene_geometry_create_batch(scene,&data,1,&geometry)==NKS_OK);
+    nkscene_material_id material{};
+    assert(nkscene_material_create(scene,&material)==NKS_OK);
+    nkscene_material_data white{};
+    white.struct_size=sizeof(white);white.base_color[0]=white.base_color[1]=white.base_color[2]=white.base_color[3]=1;
+    white.opacity=1;white.roughness=1;white.flags=NKS_MATERIAL_OPAQUE;
+    assert(nkscene_material_set_data(scene,material,&white)==NKS_OK);
+    nkscene_transaction transaction{};
+    assert(nkscene_transaction_begin(scene,&transaction)==NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction,&node)==NKS_OK);
+    assert(nkscene_tx_set_geometry(transaction,node,geometry)==NKS_OK);
+    assert(nkscene_tx_set_material(transaction,node,material)==NKS_OK);
+    assert(nkscene_transaction_commit(transaction)==NKS_OK);
+    // Lit from the front, no ambient: only the normals light the quad.
+    nkscene_render_view view{};
+    view.struct_size=sizeof(view);
+    view.camera.enabled=1;
+    for(int axis=0;axis<4;++axis)view.camera.view_projection.matrix[axis*5]=1;
+    view.camera_view_pose_enabled=1;view.camera_world_position[2]=2;view.camera_view_direction[2]=1;
+    view.studio_lighting_enabled=1;view.studio_light_directions[2]=1;view.studio_light_directions[3]=1;
+    view.studio_light_colors[0]=view.studio_light_colors[1]=view.studio_light_colors[2]=1;
+    nkscene_render_executor executor=0;
+    assert(nkscene_render_executor_create(renderer,&executor)==NKS_OK);
+    auto capture=[&]{
+        nkscene_snapshot snapshot{};nkscene_render_plan plan{};
+        assert(nkscene_scene_snapshot(scene,&snapshot)==NKS_OK);
+        assert(nkscene_render_plan_compile(snapshot,&view,&plan)==NKS_OK);
+        std::vector<std::uint8_t> pixels(16*16*4);
+        assert(nkscene_render_executor_capture_rgba8(executor,plan,snapshot,16,16,0,0,0,1,pixels.data(),pixels.size())==NKS_OK);
+        nkscene_render_plan_destroy(plan);nkscene_snapshot_destroy(snapshot);
+        return pixels;
+    };
+    const auto created=capture();
+    assert(created[(8*16+8)*4]>100&&"the lit quad is bright");
+    assert(nkscene_geometry_set_data(scene,geometry,&data)==NKS_OK);
+    assert(capture()==created&&"replaced data renders as created");
+    nkscene_render_executor_destroy(executor);
+    nkscene_scene_destroy(scene);
+    std::puts("geometry replacement passed");
+}
+
 int main() {
     nk_init_options init{};
     init.struct_size = sizeof(init);
@@ -812,6 +871,7 @@ int main() {
     sidedness_regression(renderer);
     contact_edge_regression(renderer);
     screen_edges_regression(renderer);
+    geometry_replacement_regression(renderer);
 
     {
         auto scene = std::make_shared<Scene>();
