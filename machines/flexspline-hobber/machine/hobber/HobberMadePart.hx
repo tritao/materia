@@ -76,10 +76,14 @@ class HobberMadePart extends MachineComponent {
     case "GE-Z-floating-drive-bar": new HobberDriveBar("Z", "floating", values);
     default: throw "Unknown hobber made part: "+design;
   };
-  public function new(design:String, ?values:ComponentValues) {
+  /**
+   * `ownRecipe`: the part has a recipe of its own (its `componentType`) with no inputs, so it carries no values of the shared
+   * made-part recipe.
+   */
+  public function new(design:String, ?values:ComponentValues, ownRecipe:Bool = false) {
     var supplied = values == null ? new ComponentValues() : values.copy();
     supplied.setToken("design", design);
-    var v = P.resolve(parameters(), supplied);
+    var v = ownRecipe ? new ComponentValues() : P.resolve(parameters(), supplied);
     super(
       "HOBBER-" + design,
       "Designed steel " + design + "; machined seats, assumed structural adequacy",
@@ -112,5 +116,7 @@ class HobberMadePart extends MachineComponent {
   public function manufacturingRoute():Null<ManufacturingRoute> return null;
   public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return [];
   public function pieces():Array<Part> throw "Concrete made part must declare its stock pieces";
-  override public function geometry(detail:ComponentDetail = Preview):Part return machined(Solids.union(pieces()));
+  /** A part that records its geometry (`record`) takes it from the recording; the others still build from `pieces()`. */
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return isRecorded() ? super.geometry(detail) : machined(Solids.union(pieces()));
 }

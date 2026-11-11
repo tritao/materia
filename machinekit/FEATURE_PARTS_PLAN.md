@@ -260,23 +260,26 @@ construction.
 
 ### FP4 — Pilot: `HobberXCarriage`
 
-- Own frame: origin at the plate underside, centred between the X rails at the
-  carriage's mid-length, +Z up through the plate, +X towards the motor
-  (pinned down in the part's doc comment).
-- Recorded features with names: `stock plate` (thickness = ground-stock 20,
-  half-width = derived from the block bolt rule), `front window`,
-  `guide block lands` (4 × `blockFace`), `column sole` holes, `nut block`,
-  `rib joints`, `chip cover / bellows receivers`.
-- `HobberXAxis` places it at `skeleton.xCarriage.seat`; the guide-block and
-  rib poses read the same skeleton datums.
-
-**Gate:**
-- machine-frame symmetric difference against the baseline ≤ 1e-3 mm³; route
-  holes, fastening faces, mass and BOM line identical;
-- editor: the carriage shows the named rows, each highlights its faces, and
-  rollback works (checked by hand in the running editor, screenshots in the
-  commit or plan);
-- open time within budget.
+Done 2026-11-11 (waits for the review point below):
+- Records in its own frame, `HobberSkeleton.xCarriageSeat()` (deck
+  underside, centred between the rails and along the deck); the skeleton
+  gained `xDeckFront` (the bare 60). Steps: Stock group (plate.length
+  derived from the skeleton, plate.halfWidth derived from the block bolt
+  rule, plate.thickness fixed by 20 mm ground stock, front/rear/right as
+  expressions; "Ground plate"), "Front window" (one cut-many step), and
+  "Fasteners · Derived holes" from the joints.
+- Its own recipe (`machinekit.hobbing.x-carriage`, no inputs: every
+  dimension is skeleton or stock), part number unchanged; `HobberMadePart`
+  takes `ownRecipe` so it carries none of the shared recipe's values, and
+  defers to the recording for geometry.
+- Its bolted and pinned faces are still worked out by the shared helpers in
+  the part datum frame and moved into its own frame (`movedBy`); those
+  helpers become skeleton-frame functions in FP5.
+- Equivalence: only the carriage's own pose changed (its origin moved to the
+  seat); its solid, mass, holes, faces and BOM line, and every other part,
+  match in the machine frame (inertia round-off ~1e-12 on parts placed
+  through it).
+- Not yet seen in the editor (the review step below).
 
 **Review point:** you look at the new `HobberXCarriage.hx` and the editor tree
 and decide go/no-go for FP5. If it doesn't read better, stop here and keep only

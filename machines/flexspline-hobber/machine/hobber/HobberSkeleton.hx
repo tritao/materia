@@ -130,6 +130,7 @@ class HobberSkeleton {
     xBlockRear = 300.0;
     nutBlockFront = 232.5;
     columnRear = 386.0;
+    xDeckFront = 60.0;
     bedFront = -300.0;
     footFront = -180.0;
     frontLift = 35.0;
@@ -750,6 +751,15 @@ class HobberSkeleton {
   public final nutBlockFront:Float;
 
   public final columnRear:Float;
+  /** Front edge of the X carriage deck (part datum x), mm; the deck runs from here to `columnRear`. */
+  public final xDeckFront:Float;
+
+  /**
+   * Where the X carriage's own frame sits in the part datum frame: on the deck's underside (the guide-block lands), centred
+   * between the X rails and along the deck, axes as the datum frame (+X along X travel, +Z up).
+   */
+  public function xCarriageSeat():AssemblyFrame
+    return F.translation((xDeckFront + columnRear) / 2, 0, heights().xCarriageBottomZ - HobberFrame.PART_DATUM_Z);
 
   public final bedFront:Float;
 
