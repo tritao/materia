@@ -242,9 +242,10 @@ class ComparisonReview {
     for (id in IDS) task(id);
     for (mounting in ["floor", "wall", "ceiling"]) {
       var scene = ComparisonProject.scene(mounting);
+      var occurrences = (cast scene.assemblyDefinition:AssemblyDefinition).occurrences.length;
       check(
-        scene.parts.length == 82 && (cast scene.assemblyDefinition:AssemblyDefinition).occurrences.length == 137,
-        "Unexpected combined geometry count"
+        scene.parts.length == 82 && occurrences == 137,
+        'Unexpected combined geometry count: ${scene.parts.length} parts and $occurrences occurrences, expected 82 and 137'
       );
       check(
         [for (j in (cast scene.assemblyDefinition:AssemblyDefinition).joints) if (j.type != "fixed") j].length == 18,
