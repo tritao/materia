@@ -12,7 +12,7 @@ class OpenProtocolTcp implements OpenProtocolTransport {
   public function send(bytes:Bytes):Void {
     if (closed) throw "Open Protocol TCP transport is closed";
     var status = TransportInterop.sendStatus(transport.borrow(), bytes);
-    if (status != 0) throw 'Open Protocol TCP send failed: $status';
+    if (status != Result.Ok) throw 'Open Protocol TCP send failed: $status';
   }
   public function receive():Bytes {
     if (closed) throw "Open Protocol TCP transport is closed";

@@ -103,7 +103,7 @@ class ModbusTcpClient {
           deadline = now + timeout;
           var encoded = new ModbusFrame(transaction, unit, request.pdu).encode();
           var status = TransportInterop.sendStatus(transport.borrow(), encoded);
-          if (status != 0) throw 'Modbus transport send failed: $status';
+          if (status != Result.Ok) throw 'Modbus transport send failed: $status';
           sentBytes += encoded.length;
         }
       }
