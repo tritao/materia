@@ -63,7 +63,7 @@ class LinearMountReplication extends MachineComponent {
     }
     super(numberFor(v),
       "Unqualified replication study layer", "replication compound (assumed)", false, v);
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
+    addFacet(EngineeringMetadata.assumed(""));
     lockManufacturingMaterial("replication compound (assumed)");
     addFacet(new InterfaceLayer(thickness));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));

@@ -189,8 +189,7 @@ class TimingBelt extends MachineComponent {
       "rubber",
       pair == null
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     if (pair == null) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
       machinekit.component.Procurement.ProcurementCodec.choice("profile", name),
       machinekit.component.Procurement.ProcurementCodec.requirement("teeth", "1", null, null, count),

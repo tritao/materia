@@ -16,8 +16,7 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new() {
     super("HYDRAULIC-VALVE-CLOSED-CENTRE", "Assumed closed-centre hydraulic valve block", "steel", true);
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "P", kind: Hydraulic, role: Consumer, iface: Thread("G1/2"), required: true});
     addPort({name: "T", kind: Hydraulic, role: Supply, iface: Thread("G1/2"), required: false});

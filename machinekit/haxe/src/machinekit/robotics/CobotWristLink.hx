@@ -48,8 +48,7 @@ class CobotWristLink extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("inputModuleSize", "1", null, null, input.size),
       machinekit.component.Procurement.ProcurementCodec.requirement("outputModuleSize", "1", null, null, output.size)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.input = input;
     this.output = output;
     radius = Math.min(input.diameter, output.diameter) * 0.42;

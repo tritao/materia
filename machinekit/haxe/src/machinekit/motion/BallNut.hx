@@ -30,8 +30,7 @@ class BallNut extends LeadScrewNut {
         mountScrew : "M5"
       }
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.preloaded = preloaded;
     setMaterial("steel");
     addConnector(

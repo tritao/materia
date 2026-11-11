@@ -27,8 +27,7 @@ class SfuNut extends LeadScrewNut {
         mountScrew: s.mount
       }
     );
-    addFacet(new EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(EngineeringMetadata.assumed(""));
     spec = s;
     setMaterial("steel");
   }

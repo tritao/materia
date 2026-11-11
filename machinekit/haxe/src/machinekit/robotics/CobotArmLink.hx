@@ -56,8 +56,7 @@ class CobotArmLink extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("inputModuleSize", "1", null, null, previous.size),
       machinekit.component.Procurement.ProcurementCodec.requirement("outputModuleSize", "1", null, null, next.size)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     span = -a;
     input = previous;
     output = next;

@@ -58,8 +58,7 @@ class Fan extends MachineComponent {
       '${row.blower ? "Blower" : "Fan"}, ${Std.string(Math.round(row.width))} x ${Std.string(Math.round(row.height))} mm, ${Std.string(Math.round(row.volts))} V',
       "plastic"
     );
-    if (Std.isExactType(this, Fan)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, Fan)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     if (row.blower) addConnector("outlet", Face, Solids.axial(row.width / 2, 0, row.height / 2));

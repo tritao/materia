@@ -69,8 +69,7 @@ class HeatedBed extends MachineComponent {
       'Heated bed, ${Std.string(Math.round(row.width))} mm, ${Std.string(Math.round(row.volts))} V, ${Std.string(Math.round(row.watts))} W',
       "aluminium 6061"
     );
-    if (Std.isExactType(this, HeatedBed)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, HeatedBed)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("surface", Face, Solids.axial(0, 0, 0));
     addConnector("mount", Mount, Solids.axial(0, 0, -row.plateThickness - row.padThickness));

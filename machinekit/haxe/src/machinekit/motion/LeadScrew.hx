@@ -108,8 +108,7 @@ class LeadScrew extends MachineComponent {
       "steel"
     );
     if (Std.isExactType(this, LeadScrew)) {
-      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-        .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+      addFacet(machinekit.component.EngineeringMetadata.assumed(""));
       if (designation != null) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
         machinekit.component.Procurement.ProcurementCodec.choice("family", Std.string(thread.family)),
         machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, thread.screwDiameter),

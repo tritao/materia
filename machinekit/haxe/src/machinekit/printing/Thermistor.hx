@@ -60,8 +60,7 @@ class Thermistor extends MachineComponent {
       'NTC thermistor, ${Std.string(Math.round(row.ohmsAt25 / 1000))}k beta ${Std.string(Math.round(row.beta))}',
       "plastic"
     );
-    if (Std.isExactType(this, Thermistor)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, Thermistor)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("sense", Face, Solids.axial(0, 0, row.length));

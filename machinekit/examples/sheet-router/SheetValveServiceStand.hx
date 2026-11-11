@@ -17,7 +17,7 @@ class SheetValveServiceStand extends MachineComponent {
       ProcurementCodec.requirement("length", "mm", null, null, ys[ys.length - 1] - ys[0] + 200),
       ProcurementCodec.requirement("height", "mm", null, null, 470)
     ]));
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
+    addFacet(EngineeringMetadata.assumed(""));
     stations = ys.copy();
     frame = new FrameAssembly();
     var tube = new RectTube(25, 25, 2);

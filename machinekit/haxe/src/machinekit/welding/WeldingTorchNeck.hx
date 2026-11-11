@@ -29,8 +29,7 @@ class WeldingTorchNeck extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.choice("process", "MIG"),
       machinekit.component.Procurement.ProcurementCodec.requirement("neckBend", "deg", null, null, bendDegrees)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.bendDegrees = bendDegrees;
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     addConnector("nozzle", Mount, Solids.axial(0, 0, WeldingTorch.NECK_LENGTH));

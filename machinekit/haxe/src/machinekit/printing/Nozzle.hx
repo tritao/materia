@@ -47,8 +47,7 @@ class Nozzle extends MachineComponent {
   public function new(designation:String = "BRASS-M6-0.4") {
     var row = catalog().get(designation);
     super(designation, 'Nozzle, ${Std.string(row.orifice)} mm', "brass");
-    if (Std.isExactType(this, Nozzle)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, Nozzle)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("tip", Face, Solids.axial(0, 0, 0));
     addConnector("mount", Mount, Solids.axial(0, 0, row.coneHeight + row.hexHeight));

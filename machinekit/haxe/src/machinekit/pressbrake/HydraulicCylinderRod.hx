@@ -24,8 +24,7 @@ class HydraulicCylinderRod extends MachineComponent {
       "steel",
       true
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.diameter = diameter;
     this.length = length;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));

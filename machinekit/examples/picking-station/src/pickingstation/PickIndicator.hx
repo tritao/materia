@@ -25,8 +25,7 @@ class PickIndicator extends MachineComponent {
     this.height = height;
     this.confirmationDiameter = confirmationDiameter;
     super('PICK-INDICATOR-${fmt(width)}', 'Pick indicator housing with light, quantity display, and confirm target');
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("mount", ConnectorRole.Mount, Solids.axial(0, 0, 0));
     addConnector("confirmation", ConnectorRole.Face, Solids.axial(0, -depth / 2, height * 0.25));
   }

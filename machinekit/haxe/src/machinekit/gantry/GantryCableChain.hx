@@ -34,7 +34,7 @@ class GantryCableChain extends MachineComponent {
         positionOffset
       )
     );
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
+    addFacet(EngineeringMetadata.assumed(""));
     chain.movingFrame(positionOffset);
     this.positionOffset = positionOffset;
     this.chain = chain;

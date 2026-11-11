@@ -18,8 +18,7 @@ class AdjustableFoot extends MachineComponent {
     this.diameter = diameter;
     this.height = height;
     super('ADJUSTABLE-FOOT-${fmt(diameter)}', 'Simplified adjustable machine foot', "steel");
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
   }
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union([

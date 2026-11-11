@@ -21,8 +21,7 @@ class ControllerCabinet extends MachineComponent {
       '$kind controller cabinet',
       "device housing"
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.kind = kind;
     this.axes = axes;
     this.inputs = inputs;

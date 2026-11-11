@@ -23,8 +23,7 @@ class FinePitchNut extends MachineComponent {
       "Fine-pitch retaining nut (explicit dimensions)",
       "steel 8"
     );
-    addFacet(new EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(EngineeringMetadata.assumed(""));
     this.diameter = diameter;
     this.pitch = pitch;
     this.acrossFlats = acrossFlats;

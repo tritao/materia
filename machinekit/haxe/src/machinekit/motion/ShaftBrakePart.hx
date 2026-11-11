@@ -38,8 +38,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
     super('SHAFT-BRAKE-4NM-$bore-$role-$sector', role == "hub" ? "Assumed spring-applied shaft brake"
       : "Assumed spring-applied shaft brake " + role, "steel");
     if (role != "hub") addFacet(new IncludedInPurchase(purchaseNumber(bore)));
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.bore = bore;
     this.role = role;
     this.sector = sector;

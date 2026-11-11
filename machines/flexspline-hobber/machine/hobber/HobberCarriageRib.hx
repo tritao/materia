@@ -32,8 +32,7 @@ class HobberCarriageRib extends MachineComponent {
     addConnector("datum", Mount, F.identity());
     // Blast-clean the dry steel lands; no bond or dowel credit in rib slip.
     addFacet(routeFor(role));
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues().setToken("ratingsBasis", "Assumed")
-      .setToken("errorsBasis", "Assumed").setToken("source", "Bright drawn bar and dry bolted joint remain unqualified")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed("Bright drawn bar and dry bolted joint remain unqualified"));
   }
   override public function componentType():Null<ComponentType> return recipeType();
 

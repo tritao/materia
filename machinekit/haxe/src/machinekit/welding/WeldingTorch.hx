@@ -61,8 +61,7 @@ class WeldingTorch extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("neckBend", "deg", null, null, bendDegrees),
       machinekit.component.Procurement.ProcurementCodec.choice("mount", "breakaway")
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.bendDegrees = bendDegrees;
     addConnector("robot", Mount, Solids.axial(0, 0, 0));
     var bend = bendRadians(), reach = tipEnd() + STICKOUT;

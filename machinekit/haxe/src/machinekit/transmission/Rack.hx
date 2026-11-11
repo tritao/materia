@@ -77,8 +77,7 @@ class Rack extends MachineComponent {
     var designation = 'RACK-M$moduleText-${teethCount}T${backlash == 0 ? "" : "-B" + Dimension.format(backlash)}';
     var description = 'Rack module $moduleText, ${teethCount} teeth';
     super(designation, description, "steel");
-    if (Std.isExactType(this, Rack)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, Rack)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.moduleSize = moduleSize;
     this.teethCount = teethCount;
     this.faceWidth = faceWidth;

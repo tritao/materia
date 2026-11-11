@@ -35,8 +35,7 @@ class SlideInSlotNut extends MachineComponent {
       "Dimension-driven slide-in slot nut; fit requires review",
       "steel"
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.width = width;
     this.length = length;
     this.height = height;

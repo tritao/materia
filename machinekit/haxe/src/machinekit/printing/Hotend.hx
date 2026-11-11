@@ -72,8 +72,7 @@ class Hotend extends MachineComponent {
   public function new(designation:String = "GENERIC-V6-STYLE") {
     var row = catalog().get(designation);
     super(designation, "Hotend heatsink and heater block", "aluminium 6061");
-    if (Std.isExactType(this, Hotend)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, Hotend)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("nozzleSeat", Mount, Solids.axial(0, 0, 0));
     addConnector("filamentEntry", Axis, Solids.axial(0, 0, row.blockHeight + row.heatsinkLength));

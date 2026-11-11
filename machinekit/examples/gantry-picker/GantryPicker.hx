@@ -100,8 +100,7 @@ class PickerTable extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, height),
       machinekit.component.Procurement.ProcurementCodec.choice("material", "steel")
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.width = width;
     this.depth = depth;
     this.height = height;

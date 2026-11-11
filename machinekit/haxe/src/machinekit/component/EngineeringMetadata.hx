@@ -16,6 +16,11 @@ class EngineeringMetadata implements ComponentFacet {
     if ((ratingsBasis == Catalog
       || errorsBasis == Catalog) && StringTools.trim(source).length == 0) throw "Catalog basis requires a source";
   }
+  /** Ratings and errors both assumed, with what the assumption rests on (or what is still unqualified). */
+  public static function assumed(source:String):EngineeringMetadata
+    return new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed")
+      .setToken("source", source));
+
   public static function parameters():Array<ComponentParameter> return [
     P.choice("ratingsBasis", ["Assumed", "Catalog", "Stated", "Derived"], "Assumed"),
     P.choice("errorsBasis", ["Assumed", "Catalog", "Stated", "Derived"], "Assumed"),

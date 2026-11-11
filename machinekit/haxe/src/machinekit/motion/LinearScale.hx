@@ -36,8 +36,7 @@ class LinearScale extends MachineComponent implements EncoderPart {
       + (hasIndex ? " with reference mark" : ""),
       "aluminium 6061"
     );
-    if (Std.isExactType(this, LinearScale)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, LinearScale)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.length = length;
     this.countsPerMillimetre = countsPerMillimetre;
     this.absolute = absolute;

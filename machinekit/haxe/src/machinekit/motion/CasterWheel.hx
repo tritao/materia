@@ -46,8 +46,7 @@ class CasterWheel extends MachineComponent {
       "painted steel",
       true
     );
-    if (Std.isExactType(this, CasterWheel)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, CasterWheel)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.wheelDiameter = wheelDiameter;
     this.wheelWidth = wheelWidth;
     this.height = height;

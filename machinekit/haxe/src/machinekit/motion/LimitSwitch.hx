@@ -58,8 +58,7 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
   public function new(designation:String = "GENERIC-ROLLER-MICROSWITCH") {
     var row = catalog().get(designation);
     super(designation, "Assumed generic roller micro-switch", "plastic");
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("trip", Face, Solids.axial(row.width * 0.4, 0, row.depth + row.rollerDiameter - row.pretravel));

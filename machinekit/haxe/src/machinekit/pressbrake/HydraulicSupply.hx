@@ -18,8 +18,7 @@ class HydraulicSupply extends MachineComponent implements PressureSource {
   public function new(pressurePa:Float) {
     if (!Math.isFinite(pressurePa) || pressurePa < 0) throw "Hydraulic supply pressure must be finite and nonnegative";
     super('HYDRAULIC-SUPPLY-$pressurePa', "Assumed regulated hydraulic service", "steel", true);
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.pressurePa = pressurePa;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "P", kind: Hydraulic, role: Supply, iface: Thread("G1/2"), required: false});

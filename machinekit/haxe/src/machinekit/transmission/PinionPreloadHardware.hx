@@ -52,7 +52,7 @@ class PinionDiscSpringPack extends MachineComponent {
       ProcurementCodec.requirement("innerDiameter", "mm", null, null, 10),
       ProcurementCodec.requirement("loadedHeight", "mm", null, null, loadedHeight)
     ]));
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
+    addFacet(EngineeringMetadata.assumed(""));
   }
   override function get_bom():BomItem {
     var item = super.get_bom();

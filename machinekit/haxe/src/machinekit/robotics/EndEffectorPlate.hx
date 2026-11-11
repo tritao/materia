@@ -72,8 +72,7 @@ class EndEffectorPlate extends MachineComponent {
       + '$boltCircleText PCD',
       "aluminium 6061"
     );
-    if (Std.isExactType(this, EndEffectorPlate)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, EndEffectorPlate)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.flange = flange;
     this.thickness = actualThickness;
     this.toolBoltCircleDiameter = actualBoltCircle;

@@ -26,8 +26,7 @@ class ScrewdriverHousing extends MachineComponent {
     if (strokeMm != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("stroke", "mm", null, null, strokeMm));
     if (springRate != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("springRate", "N/mm", springRate));
     addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), terms));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.length = length;
     this.radius = radius;
     this.powered = powered;

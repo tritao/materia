@@ -31,8 +31,7 @@ class BallScrew extends LeadScrew {
   public final ground:Bool;
   public function new(length:Float, inputJournalLength:Float = INPUT_JOURNAL_LENGTH, ground:Bool = false, outputJournalLength:Float = JOURNAL_LENGTH) {
     super(race(), length);
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.inputJournalLength = inputJournalLength;
     this.ground = ground;
     this.outputJournalLength = outputJournalLength;

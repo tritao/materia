@@ -30,7 +30,7 @@ class HobberYPart extends MachineComponent {
     var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberSkeleton.reference().moduleSpec();
     super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,role=="base"?"steel":"aluminium 6061",false,v);
     addFacet(routeFor(role));
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed").setToken("source","Bought ground stock acceptance and small-face finishing remain unqualified")));
+    addFacet(EngineeringMetadata.assumed("Bought ground stock acceptance and small-face finishing remain unqualified"));
     addConnector("mount",Mount,F.identity());addConnector("interface",Mount,F.translation(spec.carriageCentre,0,spec.carriageBottom()+spec.carriageThickness));
   }
   override public function componentType():Null<ComponentType> return recipeType();

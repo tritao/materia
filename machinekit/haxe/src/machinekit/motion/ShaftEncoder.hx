@@ -53,8 +53,7 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
     this.bodyDiameter = bodyDiameter;
     this.bodyLength = bodyLength;
     this.boreDiameter = bore;
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("axis", Axis, Solids.axial(0, 0, 0));
   }

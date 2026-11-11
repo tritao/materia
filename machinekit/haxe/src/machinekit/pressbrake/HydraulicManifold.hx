@@ -14,8 +14,7 @@ class HydraulicManifold extends MachineComponent {
   public function new(outlets:Int) {
     if (outlets < 1 || outlets > 64) throw "Hydraulic manifold needs 1 to 64 outlets";
     super('HYDRAULIC-MANIFOLD-$outlets', 'Assumed $outlets-outlet hydraulic distribution block', "steel", true);
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.outlets = outlets;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "input", kind: Hydraulic, role: Consumer, iface: Thread("G1/2"), required: true});

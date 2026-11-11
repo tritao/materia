@@ -53,7 +53,7 @@ class EmergencyStop extends HmiPart {
       inputs(),
       ControlCatalogs.withModel(ControlCatalogs.eStops(), ControlCatalogs.XB2, v)
     );
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
+    addFacet(EngineeringMetadata.assumed(""));
     positive([
       "headDiameter",
       "collarDiameter",

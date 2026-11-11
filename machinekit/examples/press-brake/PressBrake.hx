@@ -57,8 +57,7 @@ class PressBlock extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, depth),
       machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, height)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -102,8 +101,7 @@ class PressSideFrame extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("bedHeight", "mm", null, null, bedHeight),
       machinekit.component.Procurement.ProcurementCodec.requirement("openHeight", "mm", null, null, openHeight)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.thickness = thickness;
     this.throat = throat;
     this.bedHeight = bedHeight;
@@ -147,8 +145,7 @@ class PressLightCurtain extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, 600),
       machinekit.component.Procurement.ProcurementCodec.choice("signal", "clear")
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "clear", kind: Signal, role: Supply, iface: Plug("generic", 3), required: false});
   }

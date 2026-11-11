@@ -33,8 +33,7 @@ class GasCylinder extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("cylinderCapacity", "l", null, null, 50),
       machinekit.component.Procurement.ProcurementCodec.choice("regulator", "included")
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.mixture = mixture;
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     addPort({name: "gas", kind: Gas, role: Supply, iface: WeldingInterfaces.gas(), required: false});

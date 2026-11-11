@@ -63,8 +63,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
       Assumed
     );
     super(diameters[size], lengths[size], pockets[size], pocketLengths[size], null, servo);
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     motor = servo;
     // Assumed bulk mass allocation for the generic module, not vendor casing metallurgy.
     // Sizes 2/4 allocate more package mass to the housing; size 2 uses a lighter gearhead shell.

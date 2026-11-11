@@ -20,8 +20,7 @@ class CobotWristRotor extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("moduleSize", "1", null, null, module.size),
       machinekit.component.Procurement.ProcurementCodec.requirement("clocking", "rad", null, null, clocking)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.module = module;
     this.clocking = clocking;
     addConnector("face", Mount, Solids.axial(0, 0, 0));

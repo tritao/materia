@@ -27,8 +27,7 @@ class BissMaster extends MachineComponent {
     if (channels < 1 || channels > 16) throw "A BiSS master needs 1 to 16 channels";
     for (value in [clockMHz, width, height, depth]) if (!(value > 0) || !Math.isFinite(value)) throw "A BiSS master needs finite positive ratings and dimensions";
     super('BISS-MASTER-$channels', "Controller BiSS-C master module (assumed ratings and envelope)", "device housing");
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.channels = channels;
     this.clockMHz = clockMHz;
     this.width = width;

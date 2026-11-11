@@ -49,8 +49,7 @@ class WeldingPowerSource extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("inputVoltage", "V", null, null, 230),
       machinekit.component.Procurement.ProcurementCodec.choice("inputPhase", "single")
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.maxCurrentA = maxCurrentA;
     this.efficiency = efficiency;
     this.width = width;

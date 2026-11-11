@@ -16,8 +16,7 @@ class PneumaticCylinderRod extends MachineComponent {
   public function new(diameter:Float, length:Float) {
     if (!(diameter > 0) || !(length > 0) || !Math.isFinite(diameter + length)) throw "Invalid cylinder rod dimensions";
     super('CYLINDER-ROD-${diameter}x$length', "Reference pneumatic cylinder rod", "steel");
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.diameter = diameter;
     this.length = length;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));

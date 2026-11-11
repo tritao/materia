@@ -17,8 +17,7 @@ class ScrewdriverCarrier extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("maxSpeed", "rad/s", maxSpeed),
       machinekit.component.Procurement.ProcurementCodec.requirement("stroke", "mm", null, null, strokeMm)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.bit = bit;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("bit", Mount, Solids.axial(0, 0, 15));

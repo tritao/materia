@@ -54,8 +54,7 @@ class Extruder extends MachineComponent {
   public function new(designation:String = "GEARED-HOB-7.3") {
     var row = catalog().get(designation);
     super(designation, 'Geared extruder, ${Std.string(row.hobDiameter)} mm hob', "aluminium 6061");
-    if (Std.isExactType(this, Extruder)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, Extruder)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("filamentGrip", Axis, Solids.axial(0, 0, 0));
     addConnector("driveShaft", Axis, Solids.axial(row.hobDiameter / 2, 0, 0));

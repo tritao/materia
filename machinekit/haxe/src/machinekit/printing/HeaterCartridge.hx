@@ -57,8 +57,7 @@ class HeaterCartridge extends MachineComponent {
       'Heater cartridge, ${Std.string(Math.round(row.volts))} V, ${Std.string(Math.round(row.watts))} W',
       "steel"
     );
-    if (Std.isExactType(this, HeaterCartridge)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, HeaterCartridge)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "power", kind: ElectricalPower, role: Consumer, iface: Unspecified, required: false});

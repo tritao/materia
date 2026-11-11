@@ -28,8 +28,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
       "aluminium 6061",
       true
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.doubleSolenoid = doubleSolenoid;
     this.normallyToA = normallyToA;
     bodyWidth = doubleSolenoid ? 100 : 80;

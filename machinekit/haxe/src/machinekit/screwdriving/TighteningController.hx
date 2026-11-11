@@ -14,8 +14,7 @@ class TighteningController extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("inputVoltage", "V", null, null, 230),
       machinekit.component.Procurement.ProcurementCodec.requirement("programs", "1", programs == null ? 4 : programs.length)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     addPort({
       name: "mains",

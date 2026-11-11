@@ -98,8 +98,7 @@ class LeadScrewNut extends MachineComponent {
       "bronze"
     );
     if (Std.isExactType(this, LeadScrewNut)) {
-      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-        .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+      addFacet(machinekit.component.EngineeringMetadata.assumed(""));
       if (dimensions != null) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
         machinekit.component.Procurement.ProcurementCodec.choice("family", Std.string(thread.family)),
         machinekit.component.Procurement.ProcurementCodec.requirement("screwDiameter", "mm", null, null, screwDiameter),

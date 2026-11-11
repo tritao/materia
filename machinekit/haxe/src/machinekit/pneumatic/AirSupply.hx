@@ -16,8 +16,7 @@ class AirSupply extends MachineComponent implements PressureSource {
   public function new(pressurePa:Float = 600000) {
     if (!(pressurePa > 0) || !Math.isFinite(pressurePa)) throw "Air supply needs finite positive pressure";
     super('AIR-FRL-$pressurePa', "Reference regulated air supply", "aluminium 6061", true);
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.pressurePa = pressurePa;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "air", kind: Pneumatic, role: Supply, iface: PushIn(6), required: false});

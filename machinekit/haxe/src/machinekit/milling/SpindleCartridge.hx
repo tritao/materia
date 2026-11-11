@@ -17,8 +17,7 @@ class SpindleCartridge extends MachineComponent {
 
   public function new() {
     super("SPINDLE-ER20-D70", "ER20 spindle cartridge (assumed envelope)", "steel");
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("gaugeLine", Axis, Solids.axial(0, 0, 0));
     addConnector("nose", Mount, Solids.axial(0, 0, 0));
     addConnector("mount", Mount, Solids.axial(0, 0, 30));
@@ -58,8 +57,7 @@ class Er20Holder extends MachineComponent {
   public static inline var BORE_DIAMETER:Float = 6;
   public function new() {
     super("HOLDER-ER20-D6", "ER20 holder, 6 mm collet (assumed envelope)", "steel");
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("gaugeLine", Mount, Solids.axial(0, 0, 0));
     addConnector("tool", Axis, Solids.axial(0, 0, 0));
   }

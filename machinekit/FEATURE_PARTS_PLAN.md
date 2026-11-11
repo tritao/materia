@@ -210,7 +210,8 @@ collection, imported STEP) are `SolidFeatureTypes` codecs, so `DocumentCodec`
 has no type branches and no notion of built-in types: every type, CadKit's
 own included, is one class and one registered codec. Done.
 - BOM: one helper for the "Assumed made part" engineering metadata the
-  hobber parts repeat; `ScrewLinearModulePart`'s stock and route as a
+  hobber parts repeat (done: `EngineeringMetadata.assumed(source)`, 88 uses
+  across MachineKit, its examples and the hobber); `ScrewLinearModulePart`'s stock and route as a
   function of its recipe values, so its requirements do not build a part.
 
 **FP1e — Placed primitives and n-ary booleans.** From the hobber count:

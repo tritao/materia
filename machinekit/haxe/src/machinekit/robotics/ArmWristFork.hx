@@ -33,8 +33,7 @@ class ArmWristFork extends MachineComponent {
       "aluminium 6061",
       true
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.length = length;
     this.span = span;
     this.wall = wall;

@@ -274,8 +274,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
         .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
         .setToken("source", variantCatalog().metadata(variant.designation).source)));
     } else {
-      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-        .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+      addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     }
     this.spec = spec;
     this.variant = variant;

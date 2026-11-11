@@ -115,8 +115,7 @@ class RobotFlange extends MachineComponent {
       : 'Robot flange $size (non-standard ISO 9409-1 bolt count)',
       "steel"
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.spec = spec;
     this.boltCount = count;
     mountScrew = spec.screw;

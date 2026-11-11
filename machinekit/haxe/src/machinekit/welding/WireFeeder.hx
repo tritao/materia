@@ -51,8 +51,7 @@ class WireFeeder extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("wireSpeed", "m/min", maxSpeedMPerMin),
       machinekit.component.Procurement.ProcurementCodec.requirement("driveRolls", "1", null, null, 4)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.width = width;
     this.length = length;
     this.height = height;

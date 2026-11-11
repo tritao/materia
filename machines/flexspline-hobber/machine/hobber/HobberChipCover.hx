@@ -36,8 +36,7 @@ class HobberChipCover extends MachineComponent {
     var v=machinekit.component.ComponentRecipeSupport.resolve(parameters(),overrides),r=v.token("role");
     super("HOBBER-GUARD-"+r.toUpperCase(),"Chip shield: "+r,"steel",false,v);role=r;
     addFacet(routeFor(r));
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed")
-      .setToken("source","Sheet guard sized to clear the X drive; no load or deflection check")));
+    addFacet(EngineeringMetadata.assumed("Sheet guard sized to clear the X drive; no load or deflection check"));
     addConnector("mount",Mount,Solids.axial(0,0,0));
   }
   static function routeFor(role:String):ManufacturingRoute {

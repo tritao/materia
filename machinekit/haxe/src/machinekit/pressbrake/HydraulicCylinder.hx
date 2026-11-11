@@ -37,8 +37,7 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
       "steel",
       true
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.bore = bore;
     this.rod = rod;
     this.stroke = stroke;

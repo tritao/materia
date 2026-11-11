@@ -17,8 +17,7 @@ class PneumaticManifold extends MachineComponent {
   public function new(outlets:Int) {
     if (outlets < 1) throw "Pneumatic manifold needs at least one outlet";
     super('MANIFOLD-$outlets', 'Generic $outlets-outlet pneumatic manifold', "aluminium 6061", true);
-    if (Std.isExactType(this, PneumaticManifold)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, PneumaticManifold)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.outlets = outlets;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "input", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});

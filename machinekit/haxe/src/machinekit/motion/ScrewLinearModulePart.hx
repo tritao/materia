@@ -40,7 +40,7 @@ class ScrewLinearModulePart extends MachineComponent {
       :role=="nutCarrier"?GroundStock.bar(spec.carrierWidth,spec.carrierThickness)
       :GroundStock.plate(GroundStock.STEEL,role=="carriage"?spec.carriageThickness:spec.baseThickness);
     addFacet(ManufacturingRoute.groundStock(stock,[{name:isScaleSpacer()?"finish scale-housing packing to 7 mm from 8 mm ground stock; ASSUMED supplier capability":isPad()?"finish matched support packing to 2 mm from 3 mm ground stock; ASSUMED supplier capability":"joint interfaces; inspect stock before assembly, supplier-finish failing small faces",tolerance:0.01,roughnessRa:0.8}]));
-    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis","Assumed").setToken("ratingsBasis","Assumed").setToken("source","Stock tolerances and process acceptance unqualified")));
+    addFacet(EngineeringMetadata.assumed("Stock tolerances and process acceptance unqualified"));
     addConnector("mount",Mount,F.identity());
     addConnector("interface",Mount,isScaleSpacer()?F.translation(0,0,ScrewLinearModuleSpec.SCALE_PACKING):F.translation(spec.carriageCentre,0,spec.carriageBottom()+spec.carriageThickness));
   }

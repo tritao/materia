@@ -35,8 +35,7 @@ class ThermistorInput extends MachineComponent {
       "Controller thermistor ADC front end (assumed ideal reference and envelope)",
       "plastic"
     );
-    if (Std.isExactType(this, ThermistorInput)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, ThermistorInput)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.pullupOhm = pullupOhm;
     this.reference = reference;
     this.channels = channels;

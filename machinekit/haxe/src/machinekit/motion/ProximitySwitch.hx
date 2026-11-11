@@ -62,8 +62,7 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   public function new(designation:String = "GENERIC-INDUCTIVE-M8") {
     var row = catalog().get(designation);
     super(designation, "Assumed generic inductive proximity switch", "steel");
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("face", Face, Solids.axial(0, 0, row.length));

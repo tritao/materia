@@ -93,8 +93,7 @@ class HobberMadePart extends MachineComponent {
       false,
       v
     );
-    addFacet(new EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(EngineeringMetadata.assumed(""));
     designId = design;
     addConnector("datum", Mount, F.identity());
   }

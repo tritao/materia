@@ -25,8 +25,7 @@ class DsgNutHousing extends MachineComponent {
       "DSG SFU nut housing " + model,
       "unspecified"
     );
-    addFacet(new EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(EngineeringMetadata.assumed(""));
     spec = s;
     this.baseThreadDepth = baseThreadDepth;
     this.flangeThreadDepth = flangeThreadDepth;

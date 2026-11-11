@@ -197,8 +197,7 @@ class MotorDriver extends MachineComponent {
       '$designation motor driver, ${Dimension.format(row.maximumCurrent)} A rms maximum',
       "aluminium 6061"
     );
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.rating = row;
     this.current = current;
     this.microsteps = microsteps;

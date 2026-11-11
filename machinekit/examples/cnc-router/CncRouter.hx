@@ -447,8 +447,7 @@ class RouterSpindle extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, 52),
       machinekit.component.Procurement.ProcurementCodec.choice("collet", "ER11")
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("nose", Mount, Solids.axial(0, 0, 0));
   }
 

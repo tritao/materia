@@ -172,8 +172,7 @@ class LidarPuck extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, DIAMETER),
       machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, HEIGHT)
     ]));
-    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     addConnector("scan", Mount, AssemblyFrames.translation(0, 0, SCAN_HEIGHT));
     addFacet(new machinekit.sensing.PlanarScannerFacet("scan", RAYS, RANGE, RATE));

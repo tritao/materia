@@ -128,8 +128,7 @@ class Pedestal extends MachineComponent {
       + (hasDetails ? ", detailed base and services" : ""),
       "steel"
     );
-    if (Std.isExactType(this, Pedestal)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (Std.isExactType(this, Pedestal)) addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.flange = flange;
     this.height = height;
     this.columnDiameter = column;

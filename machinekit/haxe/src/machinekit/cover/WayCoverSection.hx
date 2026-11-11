@@ -57,8 +57,7 @@ class WayCoverSection extends MachineComponent {
     addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), selectionRequirements(
       row.id, width, height, stroke, space, plan.shape.open, plan.shape.reversed
     )));
-    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
-      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", row.basis)));
+    addFacet(machinekit.component.EngineeringMetadata.assumed(row.basis));
     if (role != Fixed) includedInPurchase(purchaseNumber(row, width, height, stroke, space, plan.shape));
   }
 
