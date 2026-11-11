@@ -381,10 +381,15 @@ class ProjectDocumentSession implements Observable {
     var histories = generated.histories, definition = generated.assemblyDefinition;
     if (histories == null || definition == null) return;
     var flat = materia.assembly.AssemblyDefinitionFlattener.flattenView(definition);
-    for (history in histories) for (occurrence in flat.occurrences) {
-      if (occurrence.id != history.occurrence) continue;
+    // A history is recorded once per part definition (on its first occurrence); every occurrence of that definition shows it.
+    var byDefinition = new Map<String, String>();
+    for (history in histories) for (occurrence in flat.occurrences) if (occurrence.id == history.occurrence)
+      byDefinition.set(occurrence.definition, history.document);
+    for (occurrence in flat.occurrences) {
+      var document = byDefinition.get(occurrence.definition);
+      if (document == null) continue;
       var centre = generated.localCentersByDefinition.get(occurrence.definition);
-      if (centre != null) scene.histories.register("project:" + occurrence.id, history.document, centre, generated.metresPerUnit);
+      if (centre != null) scene.histories.register("project:" + occurrence.id, document, centre, generated.metresPerUnit);
     }
   }
 

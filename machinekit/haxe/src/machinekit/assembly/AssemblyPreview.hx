@@ -41,6 +41,7 @@ class AssemblyPreview {
     var definitionByDesignation = new Map<String, Array<String>>();
     var histories:Array<materia.project.SceneArtifact.SceneArtifactHistory> = [];
     var steps:Array<materia.project.SceneSourceMap.SceneSourceFeature> = [];
+    var historyOf = new Map<String, machinekit.component.PartRecordings.RecordedHistory>();
     for (entry in assembly.components()) {
       if (Sys.getEnv("MACHINEKIT_PREVIEW_TRACE") == "1") {
         Sys.println("Assembly preview mass: " + entry.id);
@@ -123,9 +124,17 @@ class AssemblyPreview {
         var display = machinekit.component.ComponentDisplayMesh.of(entry.component);
         if (display != null) displayMesh(rendered, display.build());
         parts.push(rendered);
-        if (entry.component.isRecorded()) recordedHistory(entry.id, entry.component, histories, steps);
+        var history = entry.component.recordedHistory();
+        if (history != null) {
+          histories.push({occurrence: entry.id, document: history.document});
+          historyOf.set(definitionId, history);
+        }
       }
       definitionByOccurrence.set(entry.id, definitionId);
+      // The history is saved once per definition; every occurrence of it lists the steps, with the faces each made.
+      var shared = historyOf.get(definitionId);
+      if (shared != null) for (step in shared.steps)
+        steps.push({id: entry.id + "#" + step.id, label: step.label, occurrence: entry.id, faces: step.faces, whole: false});
       // Accumulate connector names while choosing candidates: a later occurrence must also agree with
       // connectors contributed by an earlier sharer, not just those of the original component.
       var owner = definitions.get(definitionId);
@@ -151,19 +160,6 @@ class AssemblyPreview {
     }
     if (histories.length > 0) result.project = {dynamicParts: [], motions: [], sources: {features: steps, members: []}, histories: histories};
     return result;
-  }
-
-  /**
-   * A recorded part's saved steps for the viewer, and one source row per top-level step with the faces it made. The scene's
-   * solid comes from the same recording, so a step's face numbers are the scene part's face numbers. A tool, sketch or
-   * placement is part of the step that applies it; the group leads the label (`Fasteners · Derived holes`).
-   */
-  static function recordedHistory(occurrence:String, part:machinekit.component.MachineComponent,
-      histories:Array<materia.project.SceneArtifact.SceneArtifactHistory>, steps:Array<materia.project.SceneSourceMap.SceneSourceFeature>):Void {
-    var history = part.recordedHistory();
-    if (history == null) return;
-    histories.push({occurrence: occurrence, document: history.document});
-    for (step in history.steps) steps.push({id: occurrence + "#" + step.id, label: step.label, occurrence: occurrence, faces: step.faces, whole: false});
   }
 
   static function displayBelt(part:SceneArtifactPart, belt:machinekit.transmission.TimingBelt, side:Int):Void {

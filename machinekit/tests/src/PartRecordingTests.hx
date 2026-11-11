@@ -99,6 +99,18 @@ class PartRecordingTests {
     for (label in ["Stock plate", "Front window", "Fasteners · Derived holes"])
       check(labels.indexOf(label) >= 0, 'source row "$label" in ${labels.join(", ")}');
     for (row in sources.features) check(row.faces.length > 0, 'step "${row.label}" names the faces it made');
+    // Two identical plates share one definition: the history is saved once, and both occurrences list its steps.
+    var pair = new MachineAssembly();
+    pair.addComponent("left", new RecordedTestPlate(), F.identity());
+    pair.addComponent("right", new RecordedTestPlate(), F.translation(200, 0, 0));
+    var pairProject = AssemblyPreview.scene(pair, "pair").project;
+    if (pairProject == null) throw "PartRecordingTests: the pair has no project";
+    var pairHistories = pairProject.histories, pairSources = pairProject.sources;
+    if (pairHistories == null || pairSources == null) throw "PartRecordingTests: the pair has no histories or sources";
+    check(pairHistories.length == 1, 'one saved history for the shared definition, not ${pairHistories.length}');
+    for (occurrence in ["left", "right"])
+      check(pairSources.features.filter(row -> row.occurrence == occurrence).length > 0, '$occurrence lists the steps');
+
     Sys.println("PartRecordingTests: recorded geometry, parameter rules, derived holes and scene histories pass");
   }
 
