@@ -5,6 +5,13 @@ MachineKit is a Haxe-only layer of machine components above CadKit. A
 BOM line. `addTo(model, id)` registers an instance and its connectors on a
 CadKit `AssemblyModel`, so components mate through the existing assembly API.
 
+Parts a machine designs record their geometry as CadKit documents
+(`MachineComponent.record`): a feature history, named dimensions, datums and
+stable face names, with the joints' holes added as a last step. See
+[Writing a part](../docs/concepts/modelling/writing-a-part.md). The immediate
+`Part`/`Solids`/`PosedParts` API is frozen for new parts
+(`tools/check-immediate-geometry.py`).
+
 `machinekit.motion.LeadshineServo` models 55 ELM1/ELM2 variants from 50 W
 to 7.5 kW with published mounting dimensions, brake-dependent envelopes and keyed
 shafts. See the [servo gallery](examples/leadshine-servos/README.md) for the

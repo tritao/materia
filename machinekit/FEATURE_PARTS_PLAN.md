@@ -399,6 +399,14 @@ In order, simplest first, one commit per part, each gated by FP0 equivalence:
   and `machine-components.md` ("In Materia" tables) and add a short
   "writing a part" guide.
 
+Done 2026-11-11 (freeze and docs): `tools/check-immediate-geometry.py`
+counts immediate-API call sites per Haxe file outside CadKit against
+`tools/immediate-geometry-baseline.json` (3785 sites in 511 files); a file may
+lose sites, never gain them, and `--write` tightens the baseline. Docs:
+`docs/concepts/modelling/writing-a-part.md`, the two "In Materia" tables and
+the MachineKit README. Left: deleting the hobber native-frame helpers, which
+waits for the layout to move onto skeleton frames.
+
 ### FP7 — Editor parameter overrides
 
 - A recorded dimension is **editable** (an input with a range), **derived**

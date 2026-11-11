@@ -150,7 +150,7 @@ meshes never enter the file, and a file of another schema version is rejected.
 |---|---|
 | Core C ABI over OCCT | `cadkit/core/include/cadkit.h`, `cadkit/core/src` |
 | Haxe wrappers | `cadkit.Shape`, `Operation`, `Face`, `Edge`, `ElementNames` |
-| Immediate modelling | `cadkit.modeling`: `Part`, `Sketch`, `Plane`, `BuildPart`, `Selection` |
+| Immediate modelling | `cadkit.modeling`: `Part`, `Sketch`, `Plane`, `BuildPart`, `Selection` (the kernel features evaluate with; frozen for new parts, `tools/check-immediate-geometry.py`) |
 | Document graph | `cadkit.parametric`: `Document`, `Feature`, `Parameter`, `NamedParameter`, `ParameterExpression` |
 | Features | `cadkit.parametric.features`: `ExtrudeFeature`, `PocketFeature`, `HoleFeature`, `FilletFeature`, `BooleanFeature`, `ConstrainedSketchFeature`, `ImportedShapeFeature`, … |
 | Recompute and undo | `Document.recompute`, `RecomputeError`, `Transaction`, `EvaluationContext` |
@@ -160,6 +160,7 @@ meshes never enter the file, and a file of another schema version is rejected.
 | Building in code | `cadkit.parametric.recording.DocumentBuilder` |
 | Sketches | `cadkit.sketch`: `ConstrainedSketch`, `SketchConstraint`, `SketchSolver`, `SketchSession`, `SolvedSketch`, `SketchProfile` |
 | Diagnosis | `cadkit.solve.ConstraintDiagnosis` |
+| Feature types | `FeatureTypeRegistry`, `FeatureCodec`: every type, CadKit's own included (`CadKitFeatureTypes`), is one class and one codec |
 | Saving | `DocumentCodec` |
 | Editor | `CadDocumentSession`, `CadSketchEditSession` (`app/src`) |
 

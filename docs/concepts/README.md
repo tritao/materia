@@ -31,6 +31,7 @@ what you are working on. Every page links back to its step in
 - [CAD documents](modelling/cad-documents.md)
 - [Assemblies and mates](modelling/assemblies-and-mates.md)
 - [Machine components](modelling/machine-components.md)
+- [Writing a part](modelling/writing-a-part.md)
 - [Mechanical truth](modelling/mechanical-truth.md)
 - [Transmissions](modelling/transmissions.md)
 - [Collision model](modelling/collision.md)

@@ -25,7 +25,8 @@ A **machine component** (`MachineComponent`) is one machine part with four
 things attached:
 
 1. **A geometry generator.** `geometry(detail)` builds the part's solid at one
-   of two levels of detail: `Envelope`, the outer envelope for clearance and
+   of two levels of detail (a part the machine designs records it as a CadKit
+   document, see [Writing a part](writing-a-part.md)): `Envelope`, the outer envelope for clearance and
    packaging, and `Preview`, recognizable exterior features with simplified
    internals. Threads are described (size, pitch, length), not modelled.
 2. **Named connectors.** A connector is a frame on the part with a name and a
@@ -79,6 +80,7 @@ assembly connects or re-exposes them.
 | Piece | Where |
 |---|---|
 | Components, detail levels, connectors, BOM lines | `machinekit.component`: `MachineComponent`, `ComponentDetail`, `Connector`, `BomItem` |
+| Recorded geometry | `MachineComponent.record`, `PartRecordings`, `recordedDatum`, `recordedHistory` |
 | Catalogs and their provenance | `machinekit.catalog`: `Catalog`, `CatalogMetadata` |
 | Value provenance | `machinekit.transmission.ValueBasis`, `EngineeringMetadata`, `AssumedCatalogComponent` |
 | Bill of materials | `MachineAssembly.billOfMaterials()`, `AssemblyInventory`, `Bom` |
