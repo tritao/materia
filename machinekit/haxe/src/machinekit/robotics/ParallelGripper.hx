@@ -22,12 +22,16 @@ class ParallelGripper extends MachineAssembly {
     var right = new ParallelGripperJaw(spec, 1);
     var cylinder:PneumaticCylinder = spec.cylinder();
     var cushion = cylinder.endStopCompliance;
-    addComponent("body", body);
-    addComponent("jawLeft", left);
-    addComponent("jawRight", right);
-    addComponent("rod", cylinder.movingRod());
-    addComponent(FINGER_LEFT, new ParallelGripperFinger(spec, -1));
-    addComponent(FINGER_RIGHT, new ParallelGripperFinger(spec, 1));
+    withGroup("Guide and jaws", () -> {
+      addComponent("body", body);
+      addComponent("jawLeft", left);
+      addComponent("jawRight", right);
+      addComponent("rod", cylinder.movingRod());
+    });
+    withGroup("Fingers", () -> {
+      addComponent(FINGER_LEFT, new ParallelGripperFinger(spec, -1));
+      addComponent(FINGER_RIGHT, new ParallelGripperFinger(spec, 1));
+    });
     addMateOnAxis(
       "jaw-left-slide",
       "prismatic",
@@ -57,7 +61,7 @@ class ParallelGripper extends MachineAssembly {
       AssemblyFrames.translation(spec.cylinderStartX(), 0, spec.cylinderAxisZ()),
       AssemblyFrames.turnY(Math.PI / 2)
     );
-    addComponent("cylinder", cylinder, cylinderPose);
+    withGroup("Actuator", () -> addComponent("cylinder", cylinder, cylinderPose));
     // A side bracket carries the barrel without blocking its underside air ports.
     var supportZ = spec.cylinderAxisZ() - cylinder.bodyWidth / 2;
     var outsideY = spec.supportSideReach();
@@ -78,7 +82,7 @@ class ParallelGripper extends MachineAssembly {
         }
       ]
     );
-    addComponent("cylinderBracket", bracket);
+    withGroup("Actuator", () -> addComponent("cylinderBracket", bracket));
     var bracketSeat = Solids.axial(
       -spec.bodyWidth / 2 + ParallelGripperSpec.CYLINDER_BRACKET_LAP / 2,
       spec.bodyDepth / 2,
