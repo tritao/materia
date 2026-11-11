@@ -90,10 +90,9 @@ opaque-only stroke machinery (support strips, tie bias, step fading) can go.
   nearer one, which moves that crease line by up to a pixel toward the oblique
   face; choosing the flatter continuation (second differences) fixes that but
   needs a wider window. Not worth it so far.
-- Open, not about edges: in the capture tool, any presentation rebuild (an
-  edge-mode switch, for one) makes the hobber shade much darker than its first
-  frame (mean 117 against 146; metal plates nearly black). Depth and surface ids
-  are unchanged, with or without an assembly presentation, and it persists
-  after the editor ticks. So some scene state changes after load without being
-  published, and the first frame shows the stale snapshot; which of the two
-  looks is right needs a check in the live editor.
+- Fixed, not about edges: captures after a scene rebuild (an edge-mode switch,
+  for one) rendered metal parts black. The live paint applied the camera pose,
+  grid and studio look to the view after prepareRenderView, so frame and depth
+  captures only had them while a live frame's view was retained; any rebuild
+  dropped the studio environment, which metals live on. prepareRenderView now
+  configures the whole view for every path (`ViewportSelectionTests`).

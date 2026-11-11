@@ -45,6 +45,7 @@ import haxeon.ui.widgets.collections.TreeView;
       tree.selectKey("scene");
       var baseView = viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600));
       check(baseView.selectionOverrideCount() == 0, "rendering starts without selection overrides");
+      check(baseView.studioEnvironmentEnabled(), "a prepared view carries the studio look without a live paint");
       viewport.camera.orbit(5, 2);
       check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)) == baseView,
         "camera motion retains scene presentation overrides");
@@ -55,8 +56,9 @@ import haxeon.ui.widgets.collections.TreeView;
       check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).selectionOverrideCount() == 0,
         "clearing selection removes its retained tint");
       viewport.setSimulationState(true, [{id: "project:tool", position: [2, 3, 4], rotation: [0, 0, 0, 1]}], 1);
-      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).poseOverrideCount() == 1,
-        "runtime poses reach the retained rendering view");
+      var posed = viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600));
+      check(posed.poseOverrideCount() == 1, "runtime poses reach the retained rendering view");
+      check(posed.studioEnvironmentEnabled(), "a rebuilt view keeps the studio look");
       viewport.setSimulationState(false, [], 2);
       check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).poseOverrideCount() == 0,
         "leaving simulation removes retained poses");

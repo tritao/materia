@@ -488,6 +488,9 @@ class SceneView {
 
   public function clipPlaneCount():Int return clipPlanes.length;
 
+  /** Whether the view carries a studio environment (setStudioEnvironment). */
+  public function studioEnvironmentEnabled():Bool return value.get_studio_environment_enabled() != 0;
+
   @:allow(SceneRenderer, SpatialIndex) function nativeValue():nkscene_render_view return value;
 
   function setMaterialOverride(overrides:Array<nkscene_render_material_override>, node:NodeId, material:Material):Void {

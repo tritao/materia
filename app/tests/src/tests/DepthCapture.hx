@@ -18,9 +18,7 @@ import nativekit.scene.DepthPrecision;
  *                dark line where neighbours differ. Subelements are B-rep faces when the mesh
  *                carries face ids, otherwise triangles, so plain meshes show their tessellation.
  *   frame.png    the rendered frame as the viewport draws it (lighting, edges, samples)
- *   frame-shaded.png  the same frame without edges (strokes or screen-space). Switching the edge mode republishes
- *                the scene, and a republished hobber currently shades darker than the first frame (open; see
- *                app/plans/SCREEN_EDGES.md), so compare its edges with frame.png, not its shading.
+ *   frame-shaded.png  the same frame without edges (strokes or screen-space)
  *
  * --presentation-camera keeps the presentation view's own framing instead of the
  * recorded camera, and state.json then records that framing: a way to start a

@@ -809,36 +809,6 @@ class EditorPerspectiveViewport implements View implements Observable {
           !readOnly ? 0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))
       ));
 
-      view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
-      if (gridVisible && gridStep > 0.0) {
-        var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
-        view.setWorkplaneGrid(
-          camera.eyePosition(),
-          camera.studioDirection(0.0, 0.0, -1.0),
-          camera.studioDirection(scale * aspect(), 0.0, 0.0),
-          camera.studioDirection(0.0, scale, 0.0),
-          gridStep,
-          camera.distance
-        );
-      }
-      var look = ViewportLook.preset(lightingPreset);
-      var directions:Array<Float> = [], colors:Array<Float> = [];
-      for (light in look.lights) {
-        // Look directions point from each light into the scene; the shader needs the reverse.
-        var direction = camera.studioDirection(-light.direction[0], -light.direction[1], -light.direction[2]);
-        directions.push(direction[0]);
-        directions.push(direction[1]);
-        directions.push(direction[2]);
-        directions.push(light.intensity);
-        for (channel in light.color) colors.push(channel);
-        colors.push(0.0);
-      }
-      view.setStudioLighting(directions, look.sky, look.ground, colors);
-      view.setStudioEnvironment([for (light in look.lights) light.radius], look.reflection, look.exposure);
-      view.setStudioEdges(ViewportLook.edgeOnLight(), ViewportLook.edgeOnDark(), ViewportLook.EdgeContrastLuminance);
-      view.setStudioDetail(look.occlusionRadius, look.occlusionStrength, look.occlusionBias, look.roughnessFloor);
-      // Screen edges stand in for feature-edge strokes only: All shows every mesh edge, Shaded none.
-      view.setScreenEdges(screenEdges && scene.cadEdgeMode == CadEdgeMode.Feature);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
       if (sampleCountApplied != sampleCountRequested) {
@@ -1064,7 +1034,46 @@ class EditorPerspectiveViewport implements View implements Observable {
       // Creating derived overlays can publish a new visual revision; retain the resulting state.
       retainedRenderViewKey = renderViewKey();
     } else retainedRenderView.setViewProjection(projection);
+    configureView(retainedRenderView);
     return retainedRenderView;
+  }
+
+  /**
+   * The viewport's camera pose, grid and studio look on `view`. Every render path (the live paint, frame and depth
+   * captures) goes through prepareRenderView, so they all draw the same view, not only while a live frame's
+   * configuration happens to be retained.
+   */
+  function configureView(view:SceneView):Void {
+    view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
+    if (gridVisible && gridStep > 0.0) {
+      var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
+      view.setWorkplaneGrid(
+        camera.eyePosition(),
+        camera.studioDirection(0.0, 0.0, -1.0),
+        camera.studioDirection(scale * aspect(), 0.0, 0.0),
+        camera.studioDirection(0.0, scale, 0.0),
+        gridStep,
+        camera.distance
+      );
+    }
+    var look = ViewportLook.preset(lightingPreset);
+    var directions:Array<Float> = [], colors:Array<Float> = [];
+    for (light in look.lights) {
+      // Look directions point from each light into the scene; the shader needs the reverse.
+      var direction = camera.studioDirection(-light.direction[0], -light.direction[1], -light.direction[2]);
+      directions.push(direction[0]);
+      directions.push(direction[1]);
+      directions.push(direction[2]);
+      directions.push(light.intensity);
+      for (channel in light.color) colors.push(channel);
+      colors.push(0.0);
+    }
+    view.setStudioLighting(directions, look.sky, look.ground, colors);
+    view.setStudioEnvironment([for (light in look.lights) light.radius], look.reflection, look.exposure);
+    view.setStudioEdges(ViewportLook.edgeOnLight(), ViewportLook.edgeOnDark(), ViewportLook.EdgeContrastLuminance);
+    view.setStudioDetail(look.occlusionRadius, look.occlusionStrength, look.occlusionBias, look.roughnessFloor);
+    // Screen edges stand in for feature-edge strokes only: All shows every mesh edge, Shaded none.
+    view.setScreenEdges(screenEdges && scene.cadEdgeMode == CadEdgeMode.Feature);
   }
 
   public function frameSelected():Void {
