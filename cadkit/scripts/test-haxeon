@@ -6,7 +6,11 @@ haxeon_root="${HAXEON_ROOT:-$repo_root/../haxeon}"
 build_root="${CADKIT_BUILD_ROOT:-$repo_root/build/debug}"
 
 haxe="$haxeon_root/.tools/haxe/haxe"
-hashlink="$haxeon_root/.tools/hashlink/hl"
+# The checkout-built HashLink matches the bytecode the compiler writes; the bootstrapped one can be older.
+hashlink="$haxeon_root/out/cmake/release/hashlink-runtime/hl"
+if [[ ! -x "$hashlink" ]]; then
+	hashlink="$haxeon_root/.tools/hashlink/hl"
+fi
 entry="${CADKIT_SMOKE_ENTRY:-HaxeonSmoke}"
 output="$repo_root/build/haxeon/${entry}.hl"
 
@@ -32,9 +36,10 @@ mkdir -p "$(dirname -- "$output")"
 	"--ffi-projection=$repo_root/haxe/abi/CadKit.hxmap" \
 	"$repo_root/haxe/tests/$entry.hx"
 
-native_paths="$build_root:$build_root/core:$build_root/lin64/gcc/libd:$haxeon_root/out:$haxeon_root/.tools/hashlink"
+native_paths="$build_root:$build_root/core:$build_root/lin64/gcc/libd:$haxeon_root/out:$haxeon_root/out/cmake/release/hashlink-runtime:$haxeon_root/.tools/hashlink"
 if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
 	native_paths="$native_paths:$LD_LIBRARY_PATH"
 fi
 
-LD_LIBRARY_PATH="$native_paths" "$hashlink" "$output"
+# Arguments go to the test program: "--only NamingSmoke", "--list", "--keep-going" (haxeon.test.Shards).
+LD_LIBRARY_PATH="$native_paths" "$hashlink" "$output" "$@"

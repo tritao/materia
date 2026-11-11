@@ -6,6 +6,8 @@ import cadkit.sheetmetal.SheetDiagnosis;
 import cadkit.sheetmetal.SheetMaterial;
 
 /** Sheet graph and development checks; core dimension checks do not allocate native geometry. */
+import haxeon.test.Shards;
+
 class SheetMetalSmoke {
   static var assertions:Int = 0;
 
@@ -128,32 +130,35 @@ class SheetMetalSmoke {
       var value = new SheetMaterial("bad-grain", 1, rule, null, null, null, Math.NaN);
     }
     );
-    assertions += SheetCoreSmoke.run();
-    assertions += SheetSolidSmoke.run();
-    assertions += SheetFeatureStagingSmoke.run();
-    assertions += SheetBaseSmoke.run();
-    assertions += SheetEdgeSmoke.run();
-    assertions += SheetFlangeGeometrySmoke.run();
-    assertions += SheetFlangeSmoke.run();
-    assertions += SheetOutlineBooleanSmoke.run();
-    assertions += SheetReliefSmoke.run();
-    assertions += SheetHemSmoke.run();
-    assertions += SheetRipSmoke.run();
-    assertions += SheetCutSmoke.run();
-    assertions += SheetBendCutSmoke.run();
-    assertions += SheetFlatPatternSmoke.run();
-    assertions += SheetDrawingSmoke.run();
-    assertions += SheetBoundaryOriginSmoke.run();
-    assertions += SheetChecksSmoke.run();
-    assertions += SheetBlankSmoke.run();
-    assertions += SheetAncestorSmoke.run();
-    assertions += SheetProcessSmoke.run();
-    assertions += SheetProcessRuleSmoke.run();
-    assertions += SheetStrokeSmoke.run();
-    assertions += SheetCornerGeometrySmoke.run();
-    assertions += SheetCornerReliefSmoke.run();
-    assertions += SheetCornerSmoke.run();
-    assertions += SheetCornerFeatureSmoke.run();
-    trace("Sheet metal smoke passed (" + assertions + " assertions)");
+    // Each smoke is a group: "-- --only SheetHemSmoke", "-- --list", "-- --keep-going" (haxeon.test.Shards).
+    var everything = Shards.run([
+      {name: "SheetCoreSmoke", run: () -> { assertions += SheetCoreSmoke.run(); }},
+      {name: "SheetSolidSmoke", run: () -> { assertions += SheetSolidSmoke.run(); }},
+      {name: "SheetFeatureStagingSmoke", run: () -> { assertions += SheetFeatureStagingSmoke.run(); }},
+      {name: "SheetBaseSmoke", run: () -> { assertions += SheetBaseSmoke.run(); }},
+      {name: "SheetEdgeSmoke", run: () -> { assertions += SheetEdgeSmoke.run(); }},
+      {name: "SheetFlangeGeometrySmoke", run: () -> { assertions += SheetFlangeGeometrySmoke.run(); }},
+      {name: "SheetFlangeSmoke", run: () -> { assertions += SheetFlangeSmoke.run(); }},
+      {name: "SheetOutlineBooleanSmoke", run: () -> { assertions += SheetOutlineBooleanSmoke.run(); }},
+      {name: "SheetReliefSmoke", run: () -> { assertions += SheetReliefSmoke.run(); }},
+      {name: "SheetHemSmoke", run: () -> { assertions += SheetHemSmoke.run(); }},
+      {name: "SheetRipSmoke", run: () -> { assertions += SheetRipSmoke.run(); }},
+      {name: "SheetCutSmoke", run: () -> { assertions += SheetCutSmoke.run(); }},
+      {name: "SheetBendCutSmoke", run: () -> { assertions += SheetBendCutSmoke.run(); }},
+      {name: "SheetFlatPatternSmoke", run: () -> { assertions += SheetFlatPatternSmoke.run(); }},
+      {name: "SheetDrawingSmoke", run: () -> { assertions += SheetDrawingSmoke.run(); }},
+      {name: "SheetBoundaryOriginSmoke", run: () -> { assertions += SheetBoundaryOriginSmoke.run(); }},
+      {name: "SheetChecksSmoke", run: () -> { assertions += SheetChecksSmoke.run(); }},
+      {name: "SheetBlankSmoke", run: () -> { assertions += SheetBlankSmoke.run(); }},
+      {name: "SheetAncestorSmoke", run: () -> { assertions += SheetAncestorSmoke.run(); }},
+      {name: "SheetProcessSmoke", run: () -> { assertions += SheetProcessSmoke.run(); }},
+      {name: "SheetProcessRuleSmoke", run: () -> { assertions += SheetProcessRuleSmoke.run(); }},
+      {name: "SheetStrokeSmoke", run: () -> { assertions += SheetStrokeSmoke.run(); }},
+      {name: "SheetCornerGeometrySmoke", run: () -> { assertions += SheetCornerGeometrySmoke.run(); }},
+      {name: "SheetCornerReliefSmoke", run: () -> { assertions += SheetCornerReliefSmoke.run(); }},
+      {name: "SheetCornerSmoke", run: () -> { assertions += SheetCornerSmoke.run(); }},
+      {name: "SheetCornerFeatureSmoke", run: () -> { assertions += SheetCornerFeatureSmoke.run(); }}
+    ]);
+    trace((everything ? "Sheet metal smoke passed (" : "Selected sheet metal groups passed (") + assertions + " assertions)");
   }
 }

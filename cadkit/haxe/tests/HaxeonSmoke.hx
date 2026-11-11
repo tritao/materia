@@ -25,6 +25,8 @@ import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyResolver;
 import sys.FileSystem;
 
+import haxeon.test.Shards;
+
 class HaxeonSmoke {
   static function historyRelationIsMapped(operation:Operation, relation:CadKit.HistoryRelation):Bool {
     var count = operation.historyCount(relation);
@@ -52,50 +54,54 @@ class HaxeonSmoke {
   }
 
   static function main():Int {
-    PlanarRegionSmoke.run();
-    AssemblyModelSmoke.run();
-    AssemblyNestingSmoke.run();
-    AssemblyDocumentsSmoke.run();
-    AssemblyCouplingSmoke.run();
-    AssemblyLoopSmoke.run();
-    ClosureKindsSmoke.run();
-    MateRowsSmoke.run();
-    MateSolverSmoke.run();
-    GeometricConnectorSmoke.run();
-    SketchFreedomSmoke.run();
-    SketchReferenceSmoke.run();
-    SketchDragSmoke.run();
-    ShapeBytesSmoke.run();
-    ShapeKeySmoke.run();
-    NamingSmoke.run();
-    NamingFeaturesSmoke.run();
-    NamingRepairSmoke.run();
-    NamingGoldenSmoke.run();
-    NamingRobustnessSmoke.run();
-    AssemblyDragSmoke.run();
-    PlacementFramesSmoke.run();
-    JacobianCheckSmoke.run();
-    SketchJacobianSmoke.run();
-    ConstrainedSketchSmoke.run();
-    SketchIncrementalSmoke.run();
-    ConstraintDiagnosisSmoke.run();
-    DiagnosisAgreementSmoke.run();
-    DiagnosisInvarianceSmoke.run();
-    PatternSmoke.run();
-    HoleSmoke.run();
-    ThreadSmoke.run();
-    TypedParameterSmoke.run();
-    TypedPropertySmoke.run();
-    RelationshipSmoke.run();
-    ElementSmoke.run();
-    BimKitSmoke.run();
-    ModelingSmoke.run();
-    DocumentModelingSmoke.run();
-    RecordingBuilderSmoke.run();
-    FeatureRegistrySmoke.run();
-    PlaceFeatureSmoke.run();
-    ParameterRoleSmoke.run();
-    PlacedPrimitivesSmoke.run();
+    // Each smoke is a group: "-- --only NamingSmoke", "-- --list", "-- --keep-going" (haxeon.test.Shards). The checks after
+    // the groups run only when every group ran.
+    if (!Shards.run([
+      {name: "PlanarRegionSmoke", run: PlanarRegionSmoke.run},
+      {name: "AssemblyModelSmoke", run: AssemblyModelSmoke.run},
+      {name: "AssemblyNestingSmoke", run: AssemblyNestingSmoke.run},
+      {name: "AssemblyDocumentsSmoke", run: AssemblyDocumentsSmoke.run},
+      {name: "AssemblyCouplingSmoke", run: AssemblyCouplingSmoke.run},
+      {name: "AssemblyLoopSmoke", run: AssemblyLoopSmoke.run},
+      {name: "ClosureKindsSmoke", run: ClosureKindsSmoke.run},
+      {name: "MateRowsSmoke", run: MateRowsSmoke.run},
+      {name: "MateSolverSmoke", run: MateSolverSmoke.run},
+      {name: "GeometricConnectorSmoke", run: GeometricConnectorSmoke.run},
+      {name: "SketchFreedomSmoke", run: SketchFreedomSmoke.run},
+      {name: "SketchReferenceSmoke", run: SketchReferenceSmoke.run},
+      {name: "SketchDragSmoke", run: SketchDragSmoke.run},
+      {name: "ShapeBytesSmoke", run: ShapeBytesSmoke.run},
+      {name: "ShapeKeySmoke", run: ShapeKeySmoke.run},
+      {name: "NamingSmoke", run: NamingSmoke.run},
+      {name: "NamingFeaturesSmoke", run: NamingFeaturesSmoke.run},
+      {name: "NamingRepairSmoke", run: NamingRepairSmoke.run},
+      {name: "NamingGoldenSmoke", run: NamingGoldenSmoke.run},
+      {name: "NamingRobustnessSmoke", run: NamingRobustnessSmoke.run},
+      {name: "AssemblyDragSmoke", run: AssemblyDragSmoke.run},
+      {name: "PlacementFramesSmoke", run: PlacementFramesSmoke.run},
+      {name: "JacobianCheckSmoke", run: JacobianCheckSmoke.run},
+      {name: "SketchJacobianSmoke", run: SketchJacobianSmoke.run},
+      {name: "ConstrainedSketchSmoke", run: ConstrainedSketchSmoke.run},
+      {name: "SketchIncrementalSmoke", run: SketchIncrementalSmoke.run},
+      {name: "ConstraintDiagnosisSmoke", run: ConstraintDiagnosisSmoke.run},
+      {name: "DiagnosisAgreementSmoke", run: DiagnosisAgreementSmoke.run},
+      {name: "DiagnosisInvarianceSmoke", run: DiagnosisInvarianceSmoke.run},
+      {name: "PatternSmoke", run: PatternSmoke.run},
+      {name: "HoleSmoke", run: HoleSmoke.run},
+      {name: "ThreadSmoke", run: ThreadSmoke.run},
+      {name: "TypedParameterSmoke", run: TypedParameterSmoke.run},
+      {name: "TypedPropertySmoke", run: TypedPropertySmoke.run},
+      {name: "RelationshipSmoke", run: RelationshipSmoke.run},
+      {name: "ElementSmoke", run: ElementSmoke.run},
+      {name: "BimKitSmoke", run: BimKitSmoke.run},
+      {name: "ModelingSmoke", run: ModelingSmoke.run},
+      {name: "DocumentModelingSmoke", run: DocumentModelingSmoke.run},
+      {name: "RecordingBuilderSmoke", run: RecordingBuilderSmoke.run},
+      {name: "FeatureRegistrySmoke", run: FeatureRegistrySmoke.run},
+      {name: "PlaceFeatureSmoke", run: PlaceFeatureSmoke.run},
+      {name: "ParameterRoleSmoke", run: ParameterRoleSmoke.run},
+      {name: "PlacedPrimitivesSmoke", run: PlacedPrimitivesSmoke.run}
+    ])) return 0;
     var box = Shape.box(10.0, 20.0, 30.0);
     var bounds = box.bounds();
     if (bounds.get_max().get_z() != 30.0) return 1;
