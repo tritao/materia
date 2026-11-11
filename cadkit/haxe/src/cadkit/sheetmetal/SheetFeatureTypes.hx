@@ -13,6 +13,7 @@ import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetBaseRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetCornerRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetCutRecord;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetEdgeRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetFaceRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetFlangeRecord;
 import cadkit.sheetmetal.SheetFeatureRecord.SheetHemRecord;
@@ -64,6 +65,18 @@ class SheetFeatureTypes {
       naming: face.name == null ? null : cadkit.Shape.namingScheme()
     };
   }
+
+  /** Named edges are saved only when the feature chose its edges by name. */
+  public static function encodeEdges(feature:SheetEdgeFeature):Null<Array<SheetEdgeRecord>> {
+    var named = feature.namedEdges();
+    return named.length == 0 ? null : [for (edge in named) {wall: edge.wall, identity: edge.identity}];
+  }
+
+  public static function decodeEdges(edges:Null<Array<SheetEdgeRecord>>):Null<Array<SheetEdgeFeature.SheetSelectedEdge>>
+    return edges == null ? null : [for (edge in edges) {wall: edge.wall, identity: edge.identity}];
+
+  public static function decodeFaces(faces:Array<SheetFaceRecord>, edges:Null<Array<SheetEdgeRecord>>):Null<Array<TopologyFingerprint>>
+    return edges == null ? [for (face in faces) decodeFace(face)] : null;
 
   public static function decodeFace(face:SheetFaceRecord):TopologyFingerprint {
     if (face.surface != "plane" || face.curve
@@ -201,7 +214,8 @@ private class SheetEdgeFlangeCodec extends SheetCodec {
       reliefType: flange.reliefType,
       reliefSizing: flange.reliefSizing,
       reliefWidth: flange.reliefWidth.value,
-      reliefDepth: flange.reliefDepth.value
+      reliefDepth: flange.reliefDepth.value,
+      edges: SheetFeatureTypes.encodeEdges(flange)
     };
     return SheetFeatureTypes.payload(JsonWire.encode(data));
   }
@@ -221,13 +235,14 @@ private class SheetEdgeFlangeCodec extends SheetCodec {
       data.gap2,
       data.extend1,
       data.extend2,
-      [for (face in data.faces) SheetFeatureTypes.decodeFace(face)],
+      SheetFeatureTypes.decodeFaces(data.faces, data.edges),
       data.walls,
       data.bends,
       data.reliefType,
       data.reliefSizing,
       data.reliefWidth,
-      data.reliefDepth
+      data.reliefDepth,
+      SheetFeatureTypes.decodeEdges(data.edges)
     );
   }
 }
@@ -253,7 +268,8 @@ private class SheetHemCodec extends SheetCodec {
       side: hem.side,
       walls: hem.wallIds(),
       bends: hem.bendIds(),
-      faces: [for (reference in hem.faceReferences()) SheetFeatureTypes.encodeFace(reference.fingerprintData())]
+      faces: [for (reference in hem.faceReferences()) SheetFeatureTypes.encodeFace(reference.fingerprintData())],
+      edges: SheetFeatureTypes.encodeEdges(hem)
     };
     return SheetFeatureTypes.payload(JsonWire.encode(data));
   }
@@ -266,9 +282,10 @@ private class SheetHemCodec extends SheetCodec {
       data.spec,
       data.length,
       data.side,
-      [for (face in data.faces) SheetFeatureTypes.decodeFace(face)],
+      SheetFeatureTypes.decodeFaces(data.faces, data.edges),
       data.walls,
-      data.bends
+      data.bends,
+      SheetFeatureTypes.decodeEdges(data.edges)
     );
   }
 }

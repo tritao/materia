@@ -21,9 +21,10 @@ class SheetHemFeature extends SheetEdgeFeature {
     side:SheetSide = A,
     ?savedFingerprints:Array<TopologyFingerprint>,
     ?savedWallIds:Array<Int>,
-    ?savedBendIds:Array<Int>
+    ?savedBendIds:Array<Int>,
+    ?namedEdges:Array<SheetEdgeFeature.SheetSelectedEdge>
   ) {
-    super(source, selectedFaces, savedFingerprints, savedWallIds, savedBendIds);
+    super(source, selectedFaces, savedFingerprints, savedWallIds, savedBendIds, namedEdges);
     this.side = side;
     length = new Parameter(this, "sheet.hem.length", lengthValue, 0, false, 1e300, ParameterKind.Length);
     switch (spec) {

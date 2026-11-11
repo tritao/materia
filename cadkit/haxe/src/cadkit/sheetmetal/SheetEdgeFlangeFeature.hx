@@ -43,9 +43,10 @@ class SheetEdgeFlangeFeature extends SheetEdgeFeature {
     reliefType:ReliefType = None,
     reliefSizing:ReliefSizing = Absolute,
     reliefWidthValue:Float = 0,
-    reliefDepthValue:Float = 0
+    reliefDepthValue:Float = 0,
+    ?namedEdges:Array<SheetEdgeFeature.SheetSelectedEdge>
   ) {
-    super(source, selectedFaces, savedFingerprints, savedWallIds, savedBendIds);
+    super(source, selectedFaces, savedFingerprints, savedWallIds, savedBendIds, namedEdges);
     this.lengthSpec = lengthSpec;
     this.position = position;
     this.reliefType = reliefType;

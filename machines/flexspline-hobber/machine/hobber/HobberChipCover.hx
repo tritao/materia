@@ -1,8 +1,14 @@
 package hobber;
 
 import machinekit.hobbing.*;
-import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
+import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.SheetFeature;
+import cadkit.sheetmetal.SheetMaterial;
+import materia.project.MaterialLibrary;
 import machinekit.component.*;
 import machinekit.assembly.PosedParts;
 import machinekit.hobbing.*;
@@ -39,7 +45,6 @@ class HobberChipCover extends MachineComponent {
     return role=="Xrear"?ManufacturingRoute.cutPlate():ManufacturingRoute.foldedSheet(2,bends,2);
   }
   override public function componentType():Null<ComponentType> return recipeType();
-  override public function machinable():Bool return true;
   static function plane(x:Float,y:Float,z:Float,into:Float):AssemblyFrame return BoltedFace.frameOf({x:x,y:y,z:z},{x:0,y:0,z:into},{x:1,y:0,z:0});
   public static function installations():Array<{id:String,role:String,parent:String,seat:AssemblyFrame}> {
     var rows:Array<{id:String,role:String,parent:String,seat:AssemblyFrame}>=[];
@@ -106,67 +111,90 @@ class HobberChipCover extends MachineComponent {
     return ['Chip shields: X end overlaps ${frontOverlap} / ${rearOverlap} mm over travel plus 5 mm overtravel; side flat overlap 6 mm (projected edge 10 mm). '
       +'Z rail bellows are checked separately; offset-screw ingress remains unqualified. No channel drain declared: no fall or bore is modelled.'];
   }
-  static function box(x0:Float,x1:Float,y0:Float,y1:Float,z0:Float,z1:Float):Part return Part.box(x1-x0,y1-y0,z1-z0).translated(new Vector((x0+x1)/2,(y0+y1)/2,z0));
-  static function mirrorY(p:Part):Part {
-    var mirrored = new Part(p.shape.mirror(new Vector().native(), Vector.Y().native())); p.close(); return mirrored;
-  }
-  /** Quarter of a 2 mm sheet bend, inside R2, outside R4. */
-  static function bendX(x0:Float,x1:Float,y:Float,z:Float,sy:Int,sz:Int):Part {
-    var ring = Solids.cut(Part.cylinderAlong(4,new Vector(x0,y,z),Vector.X(),x1-x0),[Part.cylinderAlong(2,new Vector(x0-0.1,y,z),Vector.X(),x1-x0+0.2)]);
-    var quadrant = box(x0-0.1,x1+0.1,y+(sy<0?-4:0),y+(sy<0?0:4),z+(sz<0?-4:0),z+(sz<0?0:4));
-    var out=ring.intersect(quadrant);ring.close();quadrant.close();return out;
-  }
-  static function bendY(y0:Float,y1:Float,x:Float,z:Float,sx:Int,sz:Int):Part {
-    var ring = Solids.cut(Part.cylinderAlongY(4,y0,y1,x,z),[Part.cylinderAlongY(2,y0-0.1,y1+0.1,x,z)]);
-    var quadrant = box(x+(sx<0?-4:0),x+(sx<0?0:4),y0-0.1,y1+0.1,z+(sz<0?-4:0),z+(sz<0?0:4));
-    var out=ring.intersect(quadrant);ring.close();quadrant.close();return out;
-  }
-  static function bendZ(z0:Float,z1:Float,x:Float,y:Float,sx:Int,sy:Int):Part {
-    var ring = Solids.cut(Part.cylinderSpan(4,z0,z1,x,y),[Part.cylinderSpan(2,z0-0.1,z1+0.1,x,y)]);
-    var quadrant = box(x+(sx<0?-4:0),x+(sx<0?0:4),y+(sy<0?-4:0),y+(sy<0?0:4),z0-0.1,z1+0.1);
-    var out=ring.intersect(quadrant);ring.close();quadrant.close();return out;
-  }
   public static function nutBounds():machinekit.assembly.PosedParts.PartBox {
     var drive=HobberDrives.x(), block=HobberDrives.nutBlock(drive,new machinekit.motion.BallNut()), cache=new PosedParts();
     var b=cache.box(block,HobberDrives.nutBlockPose(drive,new machinekit.motion.BallNut()));cache.close();return b;
   }
-  static function side(front:Bool):Part {
-    var x0=front?179.0:250.0,x1=front?279.0:REAR_END,roof=front?220.0:230.0,top=front?228.0:242.0;
-    var p=[box(x0,x1,footY()+11,66,roof,roof+2),bendX(x0,x1,66,roof+4,1,-1),box(x0,x1,OUTER_HALF_WIDTH-2,OUTER_HALF_WIDTH,roof+4,top)];
-    var xx=front?179.0:378.0;
-    p.push(box(xx,xx+100,footY()-5,footY()+5,footZ(),footZ()+2));
-    p.push(bendX(xx,xx+100,footY()+5,footZ()+4,1,-1));
-    p.push(box(xx,xx+100,footY()+7,footY()+9,footZ()+4,roof-2));
-    p.push(bendX(xx,xx+100,footY()+11,roof-2,-1,1));
-    return Solids.union(p);
+  /** 2 mm mild steel, rolled along the cover's length (machine X). */
+  static function stock():SheetMaterial return SheetMaterial.fromDefinition(MaterialLibrary.require("mild-steel"), THICKNESS, 0);
+
+  static inline final THICKNESS = 2.0;
+  static inline final RADIUS = 2.0;
+
+  /**
+   * A sheet in the plane `z = top`, material below it (`z = top - 2`), from a polygon given for the right-hand part. Mirrored,
+   * the polygon is reflected in y and reversed so it stays counter-clockwise: edge `i` of the right-hand polygon is then edge
+   * `n - 2 - i` and runs the other way, so its start and end gaps swap.
+   */
+  static function sheet(b:DocumentBuilder, points:Array<Array<Float>>, top:Float, mirrored:Bool):{base:SheetFeature, edge:Int->String} {
+    var n = points.length;
+    var corners = [for (p in points) new Vector(p[0], mirrored ? -p[1] : p[1])];
+    if (mirrored) corners.reverse();
+    var plane = new Plane(new Vector(0, 0, top), Vector.X(), Vector.Z());
+    var base = b.label(b.sheetBase(b.label(b.polygonSketch(corners, plane), "Outline"), stock()), "Blank");
+    return {base: base, edge: i -> "sketch:e" + (mirrored ? (2 * n - 2 - i) % n : i)};
   }
-  static function lid(front:Bool):Part {
-    var b=nutBounds(), end=20+b.minX-3, start=115+b.maxX+3;
-    var p=front ? Solids.union([box(174,end,-65,65,222,224),bendY(-65,65,174,220,-1,1),box(170,172,-65,65,215,220)])
-      : box(start,REAR_END,-65,65,232,234);
-    var tools=[for(y in [-footY(),footY()]) Part.cylinderSpan(machinekit.standard.PanelHolePlug.HOLE/2,front?221:231,front?225:235,footX(front),y)];
-    return Solids.cut(p,tools);
+
+  /** A flange on the right-hand polygon's edge `i`, its span cut back by `start` and `end` along that edge. */
+  static function flange(b:DocumentBuilder, from:SheetFeature, wall:Int, edge:String, leg:Float, up:Bool, start:Float = 0, end:Float = 0,
+      mirrored:Bool = false):SheetEdgeFlangeFeature
+    return b.sheetFlange(from, [{wall: wall, identity: edge}], leg, up ? Math.PI / 2 : -Math.PI / 2, RADIUS, Leg, BendOutside, 0,
+      mirrored ? end : start, mirrored ? start : end);
+
+  /** Side cover: a roof with an upstand on its outer edge, and a web down its inner edge to a foot on the drive seat. */
+  static function side(b:DocumentBuilder, front:Bool, mirrored:Bool):Feature {
+    var x0 = front ? 179.0 : 250.0, x1 = front ? 279.0 : REAR_END, roof = front ? 220.0 : 230.0, top = front ? 228.0 : 242.0;
+    var web = front ? 179.0 : 378.0, inner = footY() + 11;
+    var s = sheet(b, [[x0, inner], [x1, inner], [x1, 66], [x0, 66]], roof + THICKNESS, mirrored);
+    var upstand = b.label(flange(b, s.base, 1, s.edge(2), top - (roof + 4), true), "Upstand");
+    var down = b.label(flange(b, upstand, 1, s.edge(0), roof - 2 - (footZ() + 4), false, web - x0, x1 - (web + 100), mirrored), "Web");
+    return b.label(flange(b, down, down.wallIds()[0], "flange:tip", 10, true), "Foot");
   }
-  static function skirt():Part {
-    var p=[box(124,382,-76,76,246,248),bendY(-76,76,124,244,-1,1),bendY(-76,76,382,244,1,1),box(120,122,-76,76,238.5,244),box(384,386,-76,76,238.5,244)];
-    for (side in [-1,1]) {
-      var q:Array<Part>=[];
-      for (span in [[124.0,160.0],[180.0,340.0],[360.0,382.0]]) {
-        q.push(bendX(span[0],span[1],76,244,1,1));q.push(box(span[0],span[1],78,80,216,244));
-      }
-      for (xx in [160.0,340.0]) {
-        q.push(bendX(xx,xx+20,76,250,1,-1));q.push(box(xx,xx+20,78,80,250,256));
-        q.push(bendX(xx,xx+20,82,256,-1,1));q.push(box(xx,xx+20,82,110,258,260));
-      }
-      var piece=Solids.union(q);p.push(side<0?mirrorY(piece):piece);
+
+  static function toolPorts(b:DocumentBuilder, front:Bool):Array<Feature> return [for (y in [-footY(), footY()])
+    b.cylinderAlong(new Vector(footX(front), y, 0), Vector.Z(), machinekit.standard.PanelHolePlug.HOLE / 2, front ? 221 : 231, front ? 225 : 235)];
+
+  /** Lid: the front one turns down over the skirt end; both carry the tool ports. */
+  static function lid(b:DocumentBuilder, front:Bool):Feature {
+    var nut = nutBounds(), end = 20 + nut.minX - 3, start = 115 + nut.maxX + 3;
+    var body:Feature = if (front) {
+      var s = sheet(b, [[174, -65], [end, -65], [end, 65], [174, 65]], 224, false);
+      b.label(flange(b, s.base, 1, s.edge(3), 5, false), "Front lip");
+    } else sheet(b, [[start, -65], [REAR_END, -65], [REAR_END, 65], [start, 65]], 234, false).base;
+    return b.label(b.cutAll(body, toolPorts(b, front), ["port", "port"]), "Tool ports");
+  }
+
+  /**
+   * Skirt: a plate with lips down at both ends and, along each side, a skirt down in three spans with two tabs between them
+   * that step up and out to the carriage receivers.
+   */
+  static function skirt(b:DocumentBuilder):Feature {
+    var spans = [124.0, 160, 180, 340, 360, 382];
+    var points = [for (x in spans) [x, -76.0]].concat([for (i in 0...spans.length) [spans[spans.length - 1 - i], 76.0]]);
+    var s = sheet(b, points, 248, false), n = points.length;
+    var walls:SheetFeature = s.base;
+    walls = b.label(flange(b, walls, 1, s.edge(5), 5.5, false), "End lip");
+    walls = b.label(flange(b, walls, 1, s.edge(n - 1), 5.5, false), "End lip");
+    // Edges 0..4 run along y = -76, 6..10 along y = +76; the even ones are skirt spans, the odd ones tabs.
+    for (i in [0, 2, 4, 6, 8, 10]) walls = b.label(flange(b, walls, 1, s.edge(i), 28, false), "Skirt");
+    for (i in [1, 3, 7, 9]) {
+      var riser = b.label(flange(b, walls, 1, s.edge(i), 6, true), "Tab riser");
+      walls = b.label(flange(b, riser, riser.wallIds()[0], "flange:tip", 28, false), "Tab");
     }
-    var b=nutBounds();return Solids.cut(Solids.union(p),[box(b.minX-3,b.maxX+3,b.minY-3,b.maxY+3,245,249),box(381,387,65,73,237,245),box(381,387,-73,-65,237,245)]);
+    var nut = nutBounds();
+    var clear:Array<Feature> = [b.boxBetween(nut.minX - 3, nut.maxX + 3, nut.minY - 3, nut.maxY + 3, 245, 249), b.boxBetween(381, 387, 65, 73, 237, 245),
+      b.boxBetween(381, 387, -73, -65, 237, 245)];
+    return b.label(b.cutAll(walls, clear, ["nut clearance", "lip notch", "lip notch"]), "Clearances");
   }
-  override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail=Preview):Part return machined(switch role {
-    case "XleftFront":mirrorY(side(true)); case "XrightFront":side(true);
-    case "XleftRear":mirrorY(side(false)); case "XrightRear":side(false);
-    case "Xfront":lid(true); case "Xrear":lid(false); case "Xskirt":skirt();
-    default:throw "unknown chip cover role";
-  });
+
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> return switch role {
+    case "XleftFront": side(b, true, true);
+    case "XrightFront": side(b, true, false);
+    case "XleftRear": side(b, false, true);
+    case "XrightRear": side(b, false, false);
+    case "Xfront": lid(b, true);
+    case "Xrear": lid(b, false);
+    case "Xskirt": skirt(b);
+    default: throw "unknown chip cover role";
+  };
 }

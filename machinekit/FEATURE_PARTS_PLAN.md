@@ -311,10 +311,14 @@ Done 2026-11-11: group 1 (drive bars, scale seats, Z scale arm, coolant
 port, carriage ribs). Timeline: a union owns its parts as sub-steps.
 Group 2: chip tray (inputs = the table it fits; CadKit `polygon` profile),
 electrical panel (cut-plate route added); the unused GE-enclosure panel
-removed (shared recipe v7). The X chip covers are folded 2 mm sheet built
-today from boxes and quarter-ring "bends": they move to CadKit sheet-metal
-documents (sheet base, edge flanges, R2 bends, so they get flat patterns)
-as their own step, not recorded box for box.
+removed (shared recipe v7). The X chip covers (sides, lids, skirt) record
+as CadKit sheet metal: a mild-steel 2 mm sheet base from a fixed polygon
+sketch, edge flanges with R2 bends, then solid cuts for tool ports and
+clearances; the folded solids match the old box-and-ring solids exactly.
+CadKit gained named edge selection for flanges and hems (wall + outline
+identity, `DocumentBuilder.sheetFlange`, saved as `edges`) so recording
+code never picks faces, and `DocumentBuilder.polygonSketch`. Open: ports
+and clearances as sheet cuts so the flat pattern carries them.
 Group 3 and 4: outboard carrier, spindle seat, Y module base and carriage,
 B motor cradle, Z saddle. Along the way: CadKit `cut-all` is its own
 feature on the native multi-tool cut (a boolean against a compound of
@@ -328,7 +332,7 @@ Step 5 done: mineral castings record one step per casting feature
 (MachineKit registers casting-body, casting-cavity, casting-anchors,
 casting-receivers with CadKit), shared by every casting in MachineKit.
 
-Left in FP5: the X chip covers (sheet metal, above), the Z bellows sections
+Left in FP5: the Z bellows sections
 (bought, on MachineKit's `WayCoverSection`: they record when that base does,
 FP8),. Faces some parts still take from
 other parts' helpers in the part datum frame (the carriage's nut-block, rib,

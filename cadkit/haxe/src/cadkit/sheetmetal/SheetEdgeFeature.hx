@@ -9,12 +9,17 @@ import cadkit.parametric.ParametricError;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
 
-/** Persistent wall-side picks and authored output identities shared by flange and hem features. */
+/**
+ * Persistent edge selections and authored output identities shared by flange and hem features. An edge is chosen either by
+ * picking its wall-side face (an editor pick, saved as a face fingerprint) or by name: the wall and the edge's identity in
+ * that wall's outline, which code that records a document knows without evaluating it.
+ */
 class SheetEdgeFeature extends SheetFeature {
   public final source:SheetFeature;
   final references:Array<TopologyReference>;
   var pendingFaces:Null<Array<Shape>>;
   var pendingFingerprints:Null<Array<TopologyFingerprint>>;
+  final named:Array<SheetSelectedEdge>;
   var outputWallIds:Array<Int>;
   var outputBendIds:Array<Int>;
   final restoreIdentities:Bool;
@@ -24,17 +29,20 @@ class SheetEdgeFeature extends SheetFeature {
     selectedFaces:Null<Array<Shape>>,
     ?savedFingerprints:Array<TopologyFingerprint>,
     ?savedWallIds:Array<Int>,
-    ?savedBendIds:Array<Int>
+    ?savedBendIds:Array<Int>,
+    ?namedEdges:Array<SheetSelectedEdge>
   ) {
     super();
-    if ((selectedFaces == null) == (savedFingerprints
-      == null)) throw new ParametricError("sheet edge feature requires either live side faces or saved face fingerprints");
+    var sources = (selectedFaces == null ? 0 : 1) + (savedFingerprints == null ? 0 : 1) + (namedEdges == null ? 0 : 1);
+    if (sources != 1) throw new ParametricError("sheet edge feature requires exactly one of side faces, saved face fingerprints or named edges");
     if ((selectedFaces != null && selectedFaces.length == 0) || (savedFingerprints != null
-      && savedFingerprints.length == 0)) throw new ParametricError("sheet side-face selection must not be empty");
+      && savedFingerprints.length == 0) || (namedEdges != null && namedEdges.length == 0)) throw new ParametricError("sheet edge selection must not be empty");
     var count:Int;
     if (selectedFaces != null) count = selectedFaces.length;
     else if (savedFingerprints != null) count = savedFingerprints.length;
-    else throw new ParametricError("sheet edge feature has no side-face selection");
+    else if (namedEdges != null) count = namedEdges.length;
+    else throw new ParametricError("sheet edge feature has no edge selection");
+    named = namedEdges == null ? [] : [for (edge in namedEdges) {wall: edge.wall, identity: edge.identity}];
     if ((savedWallIds == null) != (savedBendIds
       == null)) throw new ParametricError("saved sheet edge identities must cover every selected edge");
     if (savedWallIds != null && savedWallIds.length
@@ -82,8 +90,8 @@ class SheetEdgeFeature extends SheetFeature {
       identities.claimWalls(owner, outputWallIds);
       identities.claimBends(owner, outputBendIds);
     } else {
-      outputWallIds = identities.reserveWalls(owner, references.length);
-      outputBendIds = identities.reserveBends(owner, references.length);
+      outputWallIds = identities.reserveWalls(owner, references.length + named.length);
+      outputBendIds = identities.reserveBends(owner, references.length + named.length);
     }
   }
   override public function identityLedger():SheetIdentityLedger {
@@ -98,6 +106,10 @@ class SheetEdgeFeature extends SheetFeature {
   public function faceReferences():Array<TopologyReference> {
     return references.copy();
   }
+  /** The edges chosen by name; empty when they were picked as faces. */
+  public function namedEdges():Array<SheetSelectedEdge> {
+    return [for (edge in named) {wall: edge.wall, identity: edge.identity}];
+  }
   override public function dependencies():Array<FeatureId> {
     return [source.id];
   }
@@ -105,6 +117,16 @@ class SheetEdgeFeature extends SheetFeature {
     return [source];
   }
   public function selectedEdges(context:EvaluationContext, graph:Sheet):Array<SheetSelectedEdge> {
+    if (named.length > 0) {
+      var seen:Map<String, Bool> = new Map();
+      for (edge in named) {
+        var key = edge.wall + ":" + edge.identity;
+        if (seen.exists(key)) throw new SheetDiagnosis("sheet.duplicate-edge-selection", "Sheet edge feature selects one edge more than once", [key]);
+        seen.set(key, true);
+        attachment(graph, edge);
+      }
+      return namedEdges();
+    }
     var shape = context.shape(source);
     var selected:Array<SheetSelectedEdge> = [];
     var seen:Map<String, Bool> = new Map();

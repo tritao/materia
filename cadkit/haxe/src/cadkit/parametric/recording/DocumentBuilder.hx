@@ -47,9 +47,13 @@ import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.sketch.ConstrainedSketch;
+import cadkit.sketch.SketchConstraint;
+import cadkit.sketch.SketchEntity;
+import cadkit.sketch.SketchPoint;
 import cadkit.sheetmetal.SheetBaseFeature;
 import cadkit.sheetmetal.SheetFeature;
 import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.SheetEdgeFeature.SheetSelectedEdge;
 import cadkit.sheetmetal.SheetHemFeature;
 import cadkit.sheetmetal.SheetRipFeature;
 import cadkit.sheetmetal.SheetCutFeature;
@@ -271,7 +275,34 @@ class DocumentBuilder {
     reliefSizing:ReliefSizing = Absolute,
     reliefWidth:Float = 0,
     reliefDepth:Float = 0
-  ):SheetEdgeFlangeFeature {
+  ):SheetEdgeFlangeFeature return flange(source, faces, null, length, angle, radius, lengthSpec, position, offset, gap1, gap2, extend1,
+    extend2, reliefType, reliefSizing, reliefWidth, reliefDepth);
+
+  /** An edge flange on edges named by wall and outline identity (`sketch:e1` on the base wall, `flange:tip` on a flange's wall). */
+  public function sheetFlange(
+    source:SheetFeature,
+    edges:Array<SheetSelectedEdge>,
+    length:Dimension,
+    angle:Dimension,
+    ?radius:Dimension,
+    lengthSpec:LengthSpec = Leg,
+    position:FlangePosition = BendOutside,
+    offset:Float = 0,
+    gap1:Float = 0,
+    gap2:Float = 0,
+    extend1:Float = 0,
+    extend2:Float = 0,
+    reliefType:ReliefType = None,
+    reliefSizing:ReliefSizing = Absolute,
+    reliefWidth:Float = 0,
+    reliefDepth:Float = 0
+  ):SheetEdgeFlangeFeature return flange(source, null, edges, length, angle, radius, lengthSpec, position, offset, gap1, gap2, extend1,
+    extend2, reliefType, reliefSizing, reliefWidth, reliefDepth);
+
+  function flange(source:SheetFeature, faces:Null<Array<Shape>>, edges:Null<Array<SheetSelectedEdge>>, length:Dimension,
+      angle:Dimension, radius:Null<Dimension>, lengthSpec:LengthSpec, position:FlangePosition, offset:Float, gap1:Float, gap2:Float,
+      extend1:Float, extend2:Float, reliefType:ReliefType, reliefSizing:ReliefSizing, reliefWidth:Float,
+      reliefDepth:Float):SheetEdgeFlangeFeature {
     check();
     var feature = document.add(new SheetEdgeFlangeFeature(
       source,
@@ -292,12 +323,28 @@ class DocumentBuilder {
       reliefType,
       reliefSizing,
       reliefWidth,
-      reliefDepth
+      reliefDepth,
+      edges
     ));
     bind(length, feature, "sheet.length");
     bind(angle, feature, "sheet.angle");
     if (radius != null) bind(radius, feature, "sheet.radius");
     return feature;
+  }
+
+  /**
+   * One closed polygon as a constrained sketch with every vertex fixed, in `plane` (XY when omitted). Edge `i` runs from point
+   * `i` to point `i + 1` and is the entity `e<i>`, so a sheet base made from it names that wall edge `sketch:e<i>`.
+   */
+  public function polygonSketch(points:Array<Vector>, ?plane:Plane):ConstrainedSketchFeature {
+    if (points.length < 3) throw new ParametricError("a polygon sketch needs at least three points");
+    var sketch = new ConstrainedSketch(plane);
+    for (i in 0...points.length) {
+      sketch.addPoint(new SketchPoint("p" + i, points[i].x, points[i].y));
+      sketch.addConstraint(SketchConstraint.fixed("fixed" + i, "p" + i));
+    }
+    for (i in 0...points.length) sketch.addEntity(SketchEntity.line("e" + i, "p" + i, "p" + ((i + 1) % points.length)));
+    return constrainedSketch(sketch, new Map());
   }
 
   /** Record a constrained sketch and bind dimension constraint IDs to named parameters. */

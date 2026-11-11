@@ -51,6 +51,13 @@ import cadkit.sheetmetal.process.ProcessRuleRecord;
   @:id(16) var reliefSizing:ReliefSizing;
   @:id(17) var reliefWidth:Float;
   @:id(18) var reliefDepth:Float;
+  @:id(19) var edges:Null<Array<SheetEdgeRecord>>;
+}
+
+/** An edge chosen by name: the wall and the edge's identity in that wall's outline. */
+@:wire typedef SheetEdgeRecord = {
+  @:id(1) var wall:Int;
+  @:id(2) var identity:String;
 }
 
 @:wire typedef SheetFaceRecord = {
@@ -75,6 +82,7 @@ import cadkit.sheetmetal.process.ProcessRuleRecord;
   @:id(5) var walls:Array<Int>;
   @:id(6) var bends:Array<Int>;
   @:id(7) var faces:Array<SheetFaceRecord>;
+  @:id(8) var edges:Null<Array<SheetEdgeRecord>>;
 }
 
 @:wire typedef SheetRipRecord = {
