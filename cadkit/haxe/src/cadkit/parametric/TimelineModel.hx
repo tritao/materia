@@ -79,7 +79,7 @@ class TimelineModel {
   }
 
   /**
-   * For every feature that exists only to feed a boolean's second operand, the first such boolean. The walk stops at a
+   * For every feature that exists only to feed a boolean's second operand, or a union's parts, the first such boolean or union. The walk stops at a
    * boolean: a tool that was itself built by booleans (a body made, then joined) keeps those steps of its own.
    */
   static function toolOwners(document:Document):Map<Int, Int> {
@@ -87,6 +87,14 @@ class TimelineModel {
     for (index in 0...document.featureCount()) {
       var feature = document.featureAt(index);
       if (!feature.active) continue;
+      // A union is made of its parts: they are its sub-steps, so the union's row carries their faces.
+      var union = Std.downcast(feature, cadkit.parametric.features.UnionAllFeature);
+      if (union != null) {
+        var parts = new Map<Int, Bool>();
+        for (part in union.parts) if (part.active) collectTool(part, parts);
+        for (id in parts.keys()) if (!owners.exists(id)) owners.set(id, union.id.toInt());
+        continue;
+      }
       var boolean = Std.downcast(feature, BooleanFeature);
       if (boolean == null) continue;
       var base = new Map<Int, Bool>();
