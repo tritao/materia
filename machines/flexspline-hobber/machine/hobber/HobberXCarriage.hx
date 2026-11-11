@@ -99,19 +99,38 @@ class HobberXCarriage extends HobberMadePart {
     for (pad in skeleton.columnSolePads())
       b.datum("column-sole-" + pad.id, new Plane(new Vector((pad.x0 + pad.x1) / 2 - seat.x, (pad.y0 + pad.y1) / 2, X_CARRIAGE_THICKNESS),
         Vector.X(), new Vector(0, 0, -1)));
+    // Where the other parts mate with it: the nut block, the chip covers, the Z bellows and the ribs.
+    var toOwn = fromDatum();
+    for (face in matingFaces()) HobberRecording.datum(b, "face:" + face.id, F.compose(toOwn, face.frame));
+    for (pins in matingPins()) HobberRecording.datum(b, "pins:" + pins.id, F.compose(toOwn, pins.frame));
     return body;
   }
   override public function machinable():Bool return true;
-  override public function pinnedFaces():Array<PinnedFace> return {
-    var toOwn = fromDatum();
+  /** The dowels other parts locate on the carriage (nut block, ribs), as their helpers give them in the part datum frame. */
+  function matingPins():Array<PinnedFace> {
     var pins = [HobberDriveBar.nutBlockPins(HobberDrives.x(), [0.0, 0, 0])];
     for (role in HobberCarriageRib.ROLES) {
       var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
-      pins.push(new PinnedFace("rib-" + role, rib.interfaceFrame(1),
-        [for (x in rib.pinXs()) {x: x - 263, y: 0.0}], 4, 8));
+      pins.push(new PinnedFace("rib-" + role, rib.interfaceFrame(1), [for (x in rib.pinXs()) {x: x - 263, y: 0.0}], 4, 8));
     }
-    [for (pin in pins) pin.movedBy(toOwn)];
-  };
+    return pins;
+  }
+
+  /** The faces other parts bolt to the carriage (nut block, chip covers, Z bellows, ribs), in the part datum frame. */
+  function matingFaces():Array<BoltedFace> {
+    var faces:Array<BoltedFace> = [HobberDriveBar.nutBlockFace(HobberDrives.x(), X_CARRIAGE_THICKNESS, [0.0, 0, 0])];
+    faces = faces.concat(HobberChipCover.carriageReceivers()).concat(skeleton.zBellowsDeckReceivers());
+    // The X scale head's two M4 enter from the seat side (below, before the carriage is set on the rails) and thread into the rib's underside.
+    for (role in HobberCarriageRib.ROLES) {
+      var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
+      var b = rib.band();
+      faces.push(BoltedFace.drilledToSuit("rib-" + role, rib.interfaceFrame(1), 246, b.high - b.low, 15, 20, BoltedFace.ThreadMaterial.Steel, rib.boltSize()));
+    }
+    return faces;
+  }
+
+  /** Every dowel set at its recorded datum. */
+  override public function pinnedFaces():Array<PinnedFace> return [for (pins in matingPins()) pins.at(recordedDatum("pins:" + pins.id))];
   override public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return {
     derivedRouteHoles();
   };
@@ -126,8 +145,8 @@ class HobberXCarriage extends HobberMadePart {
   function blockId(side:Int, row:Float):String return "block" + (side < 0 ? "L" : "R") + (row == skeleton.xBlockFront ? "1" : "2");
 
   /**
-   * The carriage's bolted faces: its own (block lands, sole pads) at the datums its recording declares, then the faces other
-   * parts' helpers still work out in the part datum frame, moved into this one.
+   * The carriage's bolted faces, each at a datum its recording declares: its own (block lands, sole pads), then the faces
+   * other parts bolt to it (their holes and roles from those parts' helpers).
    */
   override public function fasteningFaces():Array<BoltedFace> {
     var own:Array<BoltedFace> = [];
@@ -135,17 +154,6 @@ class HobberXCarriage extends HobberMadePart {
     for (side in [-1, 1]) for (row in [skeleton.xBlockFront, skeleton.xBlockRear])
       own.push(HobberPartGeometry.blockFaceAt(blockId(side, row), recordedDatum(blockId(side, row)), block, 20, X_BLOCK_SOLE));
     for (pad in skeleton.columnSolePads()) own.push(columnSoleFaceAt(pad, recordedDatum("column-sole-" + pad.id)));
-    var faces:Array<BoltedFace>=[];
-        faces.push(HobberDriveBar.nutBlockFace(HobberDrives.x(), X_CARRIAGE_THICKNESS, [0.0, 0, 0]));
-        faces = faces.concat(HobberChipCover.carriageReceivers()).concat(skeleton.zBellowsDeckReceivers());
-        // The X scale head's two M4 enter from the seat side (below, before the carriage is set on the rails) and thread into the rib's underside.
-        for (role in HobberCarriageRib.ROLES) {
-          var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
-          var b = rib.band();
-          faces.push(BoltedFace.drilledToSuit("rib-" + role, rib.interfaceFrame(1),
-            246, b.high - b.low, 15, 20, BoltedFace.ThreadMaterial.Steel, rib.boltSize()));
-        }
-    var toOwn = fromDatum();
-    return own.concat([for (face in faces) face.movedBy(toOwn)]);
+    return own.concat([for (face in matingFaces()) face.at(recordedDatum("face:" + face.id))]);
   }
 }

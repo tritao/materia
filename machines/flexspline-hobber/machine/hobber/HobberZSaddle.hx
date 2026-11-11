@@ -88,6 +88,9 @@ class HobberZSaddle extends HobberMadePart {
     for (side in [-1, 1]) for (row in [0.0, HobberSkeleton.reference().zBlockSpacing])
       HobberRecording.datum(b, blockId(side, row), BoltedFace.frameOf({x: 148.0, y: side * 145.0, z: row}, {x: -1.0, y: 0, z: 0}, {x: 0.0, y: 1, z: 0}));
     HobberRecording.datum(b, "erob", erobFrame());
+    // Where the other parts mate with it: the Z nut block (and its dowels) and the Z bellows' moving ends.
+    for (face in matingFaces()) HobberRecording.datum(b, "face:" + face.id, face.frame);
+    HobberRecording.datum(b, "pins:nut-block", nutPins().frame);
     return seat;
   }
 
@@ -96,7 +99,7 @@ class HobberZSaddle extends HobberMadePart {
     {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0});
   override public function machinable():Bool return true;
   override public function pinnedFaces():Array<PinnedFace> return {
-    [HobberDriveBar.nutBlockPins(HobberDrives.z(), [0.0, 0, zSaddleOriginZ()])];
+    [nutPins().at(recordedDatum("pins:nut-block"))];
   };
   override public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> return {
     derivedRouteHoles().concat(erobPilotBore());
@@ -109,14 +112,20 @@ class HobberZSaddle extends HobberMadePart {
       {name: "eRob seat: output bore, front face web and pocket", tolerance: 0.05, roughnessRa: 1.6}
     ], 350);
   };
+  static function nutPins():PinnedFace return HobberDriveBar.nutBlockPins(HobberDrives.z(), [0.0, 0, zSaddleOriginZ()]);
+
+  /** The Z nut block's base face; flush heads keep the fixed Z chip shield clear throughout saddle travel. */
+  static function nutFace():BoltedFace return HobberDriveBar.nutBlockFace(HobberDrives.z(), 6.5, [0.0, 0, zSaddleOriginZ()], {diameter: 12.0, depth: 6.5});
+
+  /** The faces other parts bolt to the saddle (the Z bellows' moving ends, then the Z nut block), in its frame. */
+  static function matingFaces():Array<BoltedFace> return HobberSkeleton.reference().zBellowsSaddleReceivers().concat([nutFace()]);
+
   override public function fasteningFaces():Array<BoltedFace> {
-    var faces:Array<BoltedFace>=[];
-    faces=faces.concat(HobberSkeleton.reference().zBellowsSaddleReceivers());
+    var faces:Array<BoltedFace>=[for (face in HobberSkeleton.reference().zBellowsSaddleReceivers()) face.at(recordedDatum("face:" + face.id))];
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
         for (side in [-1, 1]) for (row in [0.0, HobberSkeleton.reference().zBlockSpacing])
           faces.push(HobberPartGeometry.blockFaceAt(blockId(side, row), recordedDatum(blockId(side, row)), block, 13, PLATE_BLOCK_SOLE));
-        // Flush heads keep the fixed Z chip shield clear throughout saddle travel.
-        faces.push(HobberDriveBar.nutBlockFace(HobberDrives.z(), 6.5, [0.0, 0, zSaddleOriginZ()], {diameter: 12.0, depth: 6.5}));
+        faces.push(nutFace().at(recordedDatum("face:" + nutFace().id)));
         // The eRob housing's 16 M4 into its front face, passed through the 5 mm web from the front (x 135): the plane is the housing's front face.
         faces.push(BoltedFace.clamped("erob", recordedDatum("erob"),
           [for (i in 0...machinekit.motion.ErobActuatorData.FIXED_BOLT_COUNT) {
