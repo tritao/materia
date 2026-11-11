@@ -77,9 +77,9 @@ class SheetNameCodec extends CornerDrillCodec {
 }
 
 /** Tries to take a built-in name. */
-class ExtrudeCodec extends CornerDrillCodec {
+class ConstrainedSketchNameCodec extends CornerDrillCodec {
   public function new() super();
-  override public function type():String return "extrude";
+  override public function type():String return "constrained-sketch";
 }
 
 /** A feature type registered from outside CadKit saves, restores, recomputes and names its row. */
@@ -111,13 +111,12 @@ class FeatureRegistrySmoke {
     FeatureTypeRegistry.register(codec);
     check(FeatureTypeRegistry.isRegistered("test-corner-drill"), "type is registered");
     throws(() -> FeatureTypeRegistry.register(new RivalCodec()), "already registered: test-corner-drill", "a second codec");
-    throws(() -> FeatureTypeRegistry.register(new ExtrudeCodec()), "feature type is built in: extrude", "a built-in name");
+    throws(() -> FeatureTypeRegistry.register(new ConstrainedSketchNameCodec()), "feature type is already registered: constrained-sketch",
+      "a name CadKit registers itself");
 
-    // Sheet metal is not built into the document core: its six types arrive through the registry.
-    for (type in ["sheet-base", "sheet-edge-flange", "sheet-hem", "sheet-rip", "sheet-corner", "sheet-cut"]) {
-      check(!DocumentCodec.isBuiltInType(type), '$type is not built in');
-      check(FeatureTypeRegistry.isRegistered(type), '$type is registered');
-    }
+    // Every type, CadKit's own included, arrives through the registry.
+    for (type in ["extrude", "constrained-sketch", "hole", "sheet-base", "sheet-edge-flange", "sheet-hem", "sheet-rip", "sheet-corner",
+      "sheet-cut", "sheet-holes"]) check(FeatureTypeRegistry.isRegistered(type), '$type is registered');
     throws(() -> FeatureTypeRegistry.register(new SheetNameCodec()), "already registered: sheet-base", "a sheet-metal name");
 
     var document = new Document();

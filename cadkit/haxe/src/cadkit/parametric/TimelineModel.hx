@@ -72,7 +72,7 @@ class TimelineModel {
   /** A registered type's own row name; otherwise the saved type. */
   static function defaultLabel(feature:Feature):String {
     var type = feature.serializationType();
-    var codec = DocumentCodec.isBuiltInType(type) ? null : FeatureTypeRegistry.codec(type);
+    var codec = FeatureTypeRegistry.codec(type);
     return codec == null ? type : codec.defaultLabel(feature);
   }
 

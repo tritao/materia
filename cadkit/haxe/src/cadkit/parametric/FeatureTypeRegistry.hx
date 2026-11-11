@@ -29,7 +29,6 @@ class FeatureTypeRegistry {
     var type = codec.type();
     if (type == null || StringTools.trim(type) == "" || type != StringTools.trim(type))
       throw new ParametricError("feature type name must be non-empty without surrounding spaces");
-    if (DocumentCodec.isBuiltInType(type)) throw new ParametricError("feature type is built in: " + type);
     var existing = codecs.get(type);
     if (existing == codec) return;
     if (existing != null) throw new ParametricError("feature type is already registered: " + type);

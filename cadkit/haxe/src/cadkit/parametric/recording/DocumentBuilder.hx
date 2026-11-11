@@ -744,7 +744,7 @@ class DocumentBuilder {
   /** A feature of a type another package registered (`FeatureTypeRegistry`), recorded as is. */
   public function addFeature<T:Feature>(feature:T):T {
     check();
-    if (!DocumentCodec.isBuiltInType(feature.serializationType()) && !cadkit.parametric.FeatureTypeRegistry.isRegistered(feature.serializationType()))
+    if (!cadkit.parametric.FeatureTypeRegistry.isRegistered(feature.serializationType()))
       throw new ParametricError("feature type is not registered: " + feature.serializationType());
     return document.add(feature);
   }

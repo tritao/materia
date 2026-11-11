@@ -203,9 +203,12 @@ slots join `HoleSpec` when a recorded part first needs one.
   primitives), so the naming goldens hold. Built-ins onto codecs, first
 part: wire, polyline, loft, sweep, offset, shell, project, grid, linear and
 polar patterns and hole are registry codecs (`ModelingFeatureTypes`); their
-payload is under `data` like every registered type. Left on the branch
-chain: sketches, extrude/revolve/pocket, booleans, fillet/chamfer, face,
-mirror, rotation, datum/level features, definition output, tool collection.
+payload is under `data` like every registered type. Second part: the rest
+(sketches incl. constrained, extrude, pocket, revolve, fillet, chamfer, face,
+mirror, rotation, boolean, datum and level features, definition output, tool
+collection, imported STEP) are `SolidFeatureTypes` codecs, so `DocumentCodec`
+has no type branches and no notion of built-in types: every type, CadKit's
+own included, is one class and one registered codec. Done.
 - BOM: one helper for the "Assumed made part" engineering metadata the
   hobber parts repeat; `ScrewLinearModulePart`'s stock and route as a
   function of its recipe values, so its requirements do not build a part.
