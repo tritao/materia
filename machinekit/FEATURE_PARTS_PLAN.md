@@ -297,6 +297,17 @@ FP1–FP3.
 
 ### FP5 — Roll out across the hobber
 
+Pattern per part (from the pilot): its own recipe (inputs = its own design
+choices; layout- or stock-given values recorded as derived/fixed), recorded
+in its own frame at a frame the layout gives, datums for its interfaces, and
+faces whose holes and roles come from the shared helpers placed with
+`BoltedFace.at(datum)` / `PinnedFace.at(datum)`. `HobberRecording` bridges
+layout shapes still given in the part datum frame. Gate per part: only its
+own pose changes in the equivalence, and its history steps are asserted.
+
+Done 2026-11-11: group 1 (drive bars, scale seats, Z scale arm, coolant
+port, carriage ribs). Timeline: a union owns its parts as sub-steps.
+
 In order, simplest first, one commit per part, each gated by FP0 equivalence:
 
 1. drive bars, scale seats, Z scale arm, coolant port, carriage ribs;
