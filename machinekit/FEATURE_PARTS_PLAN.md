@@ -321,7 +321,10 @@ only geometry change). Everything else matches the old solids exactly.
 CadKit gained named edge selection for flanges and hems (wall + outline
 identity, `DocumentBuilder.sheetFlange`, saved as `edges`) so recording
 code never picks faces, and `DocumentBuilder.polygonSketch` /
-`circlesSketch`. Joint holes are still solid cuts after the sheet.
+`circlesSketch`. Joint holes too are cut in the blank: CadKit `sheet-holes`
+takes the same `HoleSpec`s and finds, at evaluation, each wall a hole
+crosses square (a hole stopping inside a wall is an error); the shared
+derived-holes step uses it whenever a part's body is sheet metal.
 Group 3 and 4: outboard carrier, spindle seat, Y module base and carriage,
 B motor cradle, Z saddle. Along the way: CadKit `cut-all` is its own
 feature on the native multi-tool cut (a boolean against a compound of

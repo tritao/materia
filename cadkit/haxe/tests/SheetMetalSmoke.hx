@@ -158,7 +158,8 @@ class SheetMetalSmoke {
       {name: "SheetCornerReliefSmoke", run: () -> { assertions += SheetCornerReliefSmoke.run(); }},
       {name: "SheetCornerSmoke", run: () -> { assertions += SheetCornerSmoke.run(); }},
       {name: "SheetCornerFeatureSmoke", run: () -> { assertions += SheetCornerFeatureSmoke.run(); }},
-      {name: "SheetNamedEdgeSmoke", run: () -> { assertions += SheetNamedEdgeSmoke.run(); }}
+      {name: "SheetNamedEdgeSmoke", run: () -> { assertions += SheetNamedEdgeSmoke.run(); }},
+      {name: "SheetHolesSmoke", run: () -> { assertions += SheetHolesSmoke.run(); }}
     ]);
     trace((everything ? "Sheet metal smoke passed (" : "Selected sheet metal groups passed (") + assertions + " assertions)");
   }

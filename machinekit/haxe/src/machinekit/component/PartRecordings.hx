@@ -30,7 +30,10 @@ class PartRecordings {
         return null;
       }
       var cuts = component.machinedCuts(), result = body;
-      if (cuts.length > 0) builder.group("Fasteners", () -> result = builder.label(builder.holes(body, cuts), "Derived holes"));
+      // A sheet part's holes are cut in its blank, so its flat pattern carries them.
+      var sheet = Std.downcast(body, cadkit.sheetmetal.SheetFeature);
+      if (cuts.length > 0) builder.group("Fasteners", () -> result = builder.label(sheet != null ? builder.sheetHoles(sheet, cuts)
+        : builder.holes(body, cuts), "Derived holes"));
       builder.output(result);
       document = builder.finish();
       checkParameters(component, document);

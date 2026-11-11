@@ -57,6 +57,7 @@ import cadkit.sheetmetal.SheetEdgeFeature.SheetSelectedEdge;
 import cadkit.sheetmetal.SheetHemFeature;
 import cadkit.sheetmetal.SheetRipFeature;
 import cadkit.sheetmetal.SheetCutFeature;
+import cadkit.sheetmetal.SheetHolesFeature;
 import cadkit.sheetmetal.SheetCornerFeature;
 import cadkit.sheetmetal.SheetCornerEdge;
 import cadkit.sheetmetal.CornerJoin;
@@ -210,6 +211,12 @@ class DocumentBuilder {
   }
 
   /** Cut the child-side seam of one permanent bend without deleting its allowance strip. */
+  /** Holes cut in the developed blank, on whichever walls each passes through square (see `SheetHolesFeature`). */
+  public function sheetHoles(source:SheetFeature, holes:Array<HoleSpec>):SheetHolesFeature {
+    check();
+    return document.add(new SheetHolesFeature(source, holes));
+  }
+
   public function sheetRip(source:SheetFeature, bend:Int):SheetRipFeature {
     check();
     return document.add(new SheetRipFeature(source, bend));

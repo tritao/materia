@@ -34,7 +34,8 @@ class SheetFeatureTypes {
     new SheetHemCodec(),
     new SheetRipCodec(),
     new SheetCornerCodec(),
-    new SheetCutCodec()
+    new SheetCutCodec(),
+    new SheetHolesCodec()
   ];
 
   /** A sheet feature dependency of the expected class, or a named error. */
@@ -370,4 +371,24 @@ private class SheetCutCodec extends SheetCodec {
     if (source == null || profile == null) throw new ParametricError("sheet cut requires a sheet source and constrained sketch");
     return new SheetCutFeature(source, profile, data.wall, data.side);
   }
+}
+
+private class SheetHolesCodec extends SheetCodec {
+  public function new() super();
+
+  override public function type():String return "sheet-holes";
+
+  override public function encode(feature:Feature, context:FeatureCodecContext):Dynamic {
+    var drilled = Std.downcast(feature, SheetHolesFeature);
+    if (drilled == null) throw new ParametricError("sheet-holes has the wrong feature class");
+    var specs:Array<cadkit.parametric.HoleSpec> = drilled.holes;
+    return {source: context.featureId(drilled.source), holes: Json.parse(JsonWire.encode(specs))};
+  }
+
+  override public function decode(data:Dynamic, context:FeatureCodecContext):Feature {
+    var specs:Array<cadkit.parametric.HoleSpec> = JsonWire.decode(Json.stringify(Reflect.field(data, "holes")));
+    return new SheetHolesFeature(SheetFeatureTypes.sheetSource(context, Std.int(context.number(data, "source")), "holes"), specs);
+  }
+
+  override public function defaultLabel(feature:Feature):String return "Holes";
 }
