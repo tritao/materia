@@ -23,6 +23,10 @@ struct PresentationCursor implements Equatable {
     this.step = step;
     this.progress = progress;
   }
+
+  /** The same view and procedure position with another explode amount. */
+  public function withExplode(amount:Float):PresentationCursor
+    return new PresentationCursor(view, amount, procedure, step, progress);
 }
 typedef PresentationFrame = {
   var view:String;

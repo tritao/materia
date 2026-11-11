@@ -127,8 +127,7 @@ class PanelToolingPreview {
       var kit = PanelKit.assembly(plan);
       var local = AssemblyPreview.scene(kit, pair.joint.id);
       var record = PanelKit.presentation(plan, local.assemblyDefinition);
-      var cursor = materia.presentation.PresentationEvaluator.reset(record);
-      cursor.explode = 1;
+      var cursor = materia.presentation.PresentationEvaluator.reset(record).withExplode(1);
       var poses = kit.solvedPoses();
       var frame = materia.presentation.PresentationEvaluator.evaluate(
         local.assemblyDefinition,

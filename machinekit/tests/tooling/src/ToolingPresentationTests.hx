@@ -33,7 +33,7 @@ class ToolingPresentationTests {
     var solved = new Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>();
     solved.set("base", rotation);
     solved.set("cover", F.translation(30, 0, 0));
-    cursor.explode = 1;
+    cursor = cursor.withExplode(1);
     var moved = PresentationEvaluator.evaluate(definition, solved, record, cursor, "").poses.get("cover");
     if (moved == null || Math.abs(moved.x - 40) > 1e-8
       || Math.abs(moved.y) > 1e-8) throw "Review offsets must be expressed in the rotated joint parent frame";
@@ -54,7 +54,7 @@ class ToolingPresentationTests {
     offsets.set("unit/cover", {x: 10, y: 0, z: 0});
     record = ToolingExplode.presentation(nested, "test", offsets);
     cursor = PresentationEvaluator.reset(record);
-    cursor.explode = 1;
+    cursor = cursor.withExplode(1);
     solved = new Map();
     solved.set("unit/cover", F.compose(rotation, F.translation(30, 0, 0)));
     moved = PresentationEvaluator.evaluate(nested, solved, record, cursor, "").poses.get("unit/cover");

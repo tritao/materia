@@ -131,8 +131,7 @@ class PanelNativeTests {
       near(restoredPose.z, plan.members[1].pose.z, "assembly placement survives reconstruction");
       var definition = machinekit.assembly.AssemblyPreview.scene(restored, "panel-presentation").assemblyDefinition;
       var presentation = PanelKit.presentation(plan, definition);
-      var cursor = materia.presentation.PresentationEvaluator.reset(presentation);
-      cursor.explode = 1;
+      var cursor = materia.presentation.PresentationEvaluator.reset(presentation).withExplode(1);
       var shown = materia.presentation.PresentationEvaluator.evaluate(
         definition,
         restored.solvedPoses(),

@@ -280,8 +280,7 @@ class HobberSocketFixture {
     );
     check(views.explode.length == assembly.components().length, "All fixture parts have presentation offsets");
     var engineering = assembly.encode(), bom = haxe.Json.stringify(assembly.billOfMaterials().lines());
-    var cursor = materia.presentation.PresentationEvaluator.reset(views);
-    cursor.explode = 1;
+    var cursor = materia.presentation.PresentationEvaluator.reset(views).withExplode(1);
     var shown = materia.presentation.PresentationEvaluator.evaluate(
       scene.assemblyDefinition,
       assembly.solvedPoses(),

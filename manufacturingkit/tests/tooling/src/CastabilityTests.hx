@@ -105,7 +105,7 @@ class CastabilityTests {
       );
       var rows = report.validation.filter(row -> row.rule == "process.level1.corner-radius.pocket");
       check(
-        rows.length == 1 && rows[0].status == (sample.measured >= 4 ? "pass" : "fail"),
+        rows.length == 1 && rows[0].status == (sample.measured >= 4 ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass : materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail),
         "the existing corner-radius rule tests actual curvature and detects sharp arc-to-line joints"
       );
     }
