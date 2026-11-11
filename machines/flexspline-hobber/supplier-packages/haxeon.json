@@ -6,6 +6,9 @@
   "entry": "SupplierPackageExport",
   "sourceRoots": [".", "../machine", "../scenes", "../checks", "../studies"],
   "dependencies": {
+    "machinekit": {
+      "path": "../../../machinekit"
+    },
     "gearkit": {
       "path": "../../../gearkit"
     },
