@@ -77,6 +77,18 @@ opaque-only stroke machinery (support strips, tie bias, step fading) can go.
   the bellows and detail views the weight now matches the strokes and the
   lines are smooth. Left: small dots at some band corners, and the colour rule
   (light lines on dark materials) is not yet applied.
+- Correction to the SE3 note above: fading by the distance to the nearest
+  pixel-snapped boundary softens but keeps the staircase (a shallow line's
+  centre wandered 0.29 px; strokes 0.11 px). The pass now reads a 7 x 7 window,
+  finds boundaries in the inner 5 x 5, and fits a least-squares line through
+  the midpoints of the same line (the same two parts, or one part's crease):
+  locally first, then with every point near that fit. Coverage falls off with
+  the distance to the fitted line; where the points are not collinear (corners,
+  tight curves) the nearest midpoint's distance stands, and the nearest midpoint
+  limits overshoot past a line's end. At junctions the nearest two lines are
+  fitted separately. Fitted distances match the true edge to 0.085 px RMS;
+  a shallow line's centre now wanders 0.15 px (`screen_edge_antialiasing_regression`),
+  and on the hobber slanted lines look like strokes.
 - Colour: the AO prepass writes each surface pixel's edge tone in its
   position's w (1 for a light material, 2 for a dark one, from the rule strokes
   use), and a boundary takes the tone of its nearer surface, so a part owns its

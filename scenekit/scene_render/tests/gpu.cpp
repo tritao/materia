@@ -828,6 +828,60 @@ void geometry_replacement_regression(nkgpu_renderer renderer) {
     std::puts("geometry replacement passed");
 }
 
+// Screen-space edges are antialiased at sub-pixel precision: along a shallow outline (slope 1/7) the line's centre
+// in each column follows the true edge, not a pixel staircase, and every column carries the same amount of line.
+void screen_edge_antialiasing_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    const auto material = scene->reserve_material_id();
+    auto &state = scene->material_store().create(material).edit_state();
+    state.base_color = {1,1,1,1}; state.emissive = {1,1,1};
+    state.flags = static_cast<unsigned>(nkscene::MaterialFlags::Opaque)|static_cast<unsigned>(nkscene::MaterialFlags::DoubleSided);
+    const auto geometry = scene->reserve_geometry_id();
+    auto &payload = scene->geometry_store().create(geometry).edit_payload();
+    const float slope = 1.0f/7.0f, height = 0.05f;
+    payload.vertices = {{{-1.2f,-1.2f,0}},{{1.2f,-1.2f,0}},{{1.2f,height+1.2f*slope,0}},{{-1.2f,height-1.2f*slope,0}}};
+    payload.indices = {0,1,2,0,2,3};
+    const auto node = scene->reserve_node_id();
+    Transaction create(scene);create.add_create(node);create.add_geometry(node,geometry);create.add_material(node,material);
+    ChangeSet changes;assert(scene->commit(create,changes)==NKS_OK);create.close();
+    nkscene::SceneView view;view.camera.enabled=true;view.screen_edges=true;
+    for(int axis=0;axis<4;++axis)view.camera.view_projection[axis*5]=1;
+    view.studio_lighting.enabled=true;view.studio_lighting.surface_detail={0.01f,0.05f,0,0};
+    view.studio_lighting.edges_on_light=view.studio_lighting.edges_on_dark={0,0,0};
+    const int side=128;
+    for(unsigned samples:{1u,4u}) {
+        nkscene::NativeKitGpuExecutor executor(renderer);executor.set_sample_count(samples);
+        scene->publish();auto plan=nkscene::compile(scene->snapshot(),view);
+        std::vector<std::uint8_t> pixels;
+        assert(executor.capture_rgba8(plan,scene->snapshot(),side,side,{1,1,1,1},pixels)==NKGPU_OK);
+        // Per column, the darkness-weighted centre and total of the line around the true edge.
+        std::vector<double> xs, centres, totals;
+        for(int x=16;x<side-16;++x){
+            const double edge_y=(1.0-(height+slope*((x+0.5)/side*2.0-1.0)))*0.5*side;
+            double total=0,moment=0;
+            for(int y=int(edge_y)-4;y<=int(edge_y)+4;++y){
+                const double dark=255.0-pixels[std::size_t(y*side+x)*4];
+                total+=dark;moment+=dark*(y+0.5);
+            }
+            assert(total>0&&"every column has line");
+            xs.push_back(x);centres.push_back(moment/total);totals.push_back(total);
+        }
+        // Straight-line fit of the centres. A pixel staircase deviates by about 0.29 px here; strokes, drawn from
+        // exact geometry, by 0.11 px (the sampled coverage ramp, not the line's position).
+        double n=double(xs.size()),sx=0,sy=0,sxx=0,sxy=0;
+        for(std::size_t i=0;i<xs.size();++i){sx+=xs[i];sy+=centres[i];sxx+=xs[i]*xs[i];sxy+=xs[i]*centres[i];}
+        const double b=(n*sxy-sx*sy)/(n*sxx-sx*sx),a=(sy-b*sx)/n;
+        double worst=0,low=1e9,high=0;
+        for(std::size_t i=0;i<xs.size();++i){worst=std::max(worst,std::abs(centres[i]-(a+b*xs[i])));low=std::min(low,totals[i]);high=std::max(high,totals[i]);}
+        std::printf("screen edge antialiasing (%u samples): slope %.4f, worst centre deviation %.3f px, column totals %.0f..%.0f\n",
+            samples,b,worst,low,high);
+        assert(std::abs(b+slope*1.0)<0.01&&"the line follows the edge's slope");
+        assert(worst<0.18&&"the line's centre follows the edge, not a pixel staircase");
+        assert(low>0.8*high&&"every column carries about the same amount of line");
+    }
+    std::puts("screen edge antialiasing passed");
+}
+
 int main() {
     nk_init_options init{};
     init.struct_size = sizeof(init);
@@ -871,6 +925,7 @@ int main() {
     sidedness_regression(renderer);
     contact_edge_regression(renderer);
     screen_edges_regression(renderer);
+    screen_edge_antialiasing_regression(renderer);
     geometry_replacement_regression(renderer);
 
     {
