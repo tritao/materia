@@ -109,7 +109,6 @@ class MineralCasting extends MachineComponent {
   }
 
   override public function componentType():Null<ComponentType> return recipeType();
-  override public function hasGeometry():Bool return true;
 
   override public function setMaterial(spec:String):Void {
     if (spec != "mineral cast") throw "Casting requires mineral cast";
@@ -117,33 +116,31 @@ class MineralCasting extends MachineComponent {
   }
 
   /**
-   * A casting's solid is a large boolean of its envelope, cores, pockets and embedded anchors, and one run asks for it several
-   * times (sizing its mass, fitting the enclosure around it, exporting the scene). Build it once per recipe key and hand each
-   * caller its own copy.
+   * The casting as recorded steps: its envelope, one cavity per casting feature (named and labelled by it), the embedded anchor
+   * hardware and, in service, the post-cure receivers, all cut in one step. Each is evaluated by the casting kit's own geometry
+   * (`CastingFeatureTypes`), so a casting's history lists its features.
    */
-  static final geometries = machinekit.cache.Memos.parts("mineral-casting-geometry", 8);
-
-  override public function geometry(detail:ComponentDetail = Preview):Part return geometries.get(geometryKey(detail), () -> build(detail));
-
-  function build(detail:ComponentDetail):Part {
-    var parts:Array<Part> = [];
-    try {
-      for (p in castingEnvelope()) parts.push(CastingCavityCad.prism(p));
-      var body = Solids.union(parts);
-      parts = [];
-      return Solids.building([body], owned -> {for (cavity in finishedCavities()) owned.push(Solids.named(
-        CastingCavityCad.part(cavity),
-        cavity.featureId
-      ));
-      for (part in InsertAnchorGeometry.embeddedParts(embeddedAnchors())) owned.push(part);
-      if (parameterToken("buildStage") == materia.casting.InsertStages
-        .InsertStage.Service) for (bond in postCureBonds()) owned.push(CastingCavityCad.receiver(bond.receiver));
-      return Solids.cut(owned[0], owned.slice(1));
-      });
-    } catch (error:Dynamic) {
-      for (part in parts) part.close();
-      throw error;
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    CastingFeatureTypes.register();
+    // The recipe's sizes: the envelope is built from them.
+    for (name in ["width", "depth", "height", "cornerChamfer"]) b.length(name, parameterNumber(name));
+    var body = b.label(b.addFeature(new CastingFeatureTypes.CastingBodyFeature(castingEnvelope(), features)), "Envelope");
+    var tools:Array<cadkit.parametric.Feature> = [], labels:Array<String> = [];
+    for (f in features) {
+      tools.push(b.addFeature(new CastingFeatureTypes.CastingCavityFeature(body, f.id)));
+      labels.push((f.kind : String) + ": " + f.id);
     }
+    var anchors = embeddedAnchors();
+    if (anchors.length > 0) {
+      tools.push(b.addFeature(new CastingFeatureTypes.CastingAnchorsFeature(anchors)));
+      labels.push("embedded anchors");
+    }
+    var bonds = postCureBonds();
+    if (parameterToken("buildStage") == materia.casting.InsertStages.InsertStage.Service && bonds.length > 0) {
+      tools.push(b.addFeature(new CastingFeatureTypes.CastingReceiversFeature(bonds)));
+      labels.push("post-cure receivers");
+    }
+    return tools.length == 0 ? body : b.label(b.cutAll(body, tools, labels), "Cavities");
   }
 
   /**

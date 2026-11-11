@@ -28,6 +28,8 @@ class MachineKitRecipes {
   static var watchedDocuments:Map<String, Bool> = [];
 
   public static function register():Void {
+    // Recorded parts' histories use MachineKit's own feature types.
+    machinekit.structural.CastingFeatureTypes.register();
     for (type in MachineKitComponents.defaultRegistry().all()) {
       var evaluator = evaluators.get(type.id);
       if (evaluator == null) {

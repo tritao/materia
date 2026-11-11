@@ -3,6 +3,7 @@ package cadkit.parametric.recording;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.Feature;
 import cadkit.parametric.NamedParameter;
 import cadkit.parametric.ParametricError;
@@ -685,6 +686,14 @@ class DocumentBuilder {
   public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
     check();
     return document.add(new TransformFeature(source, x, y, z));
+  }
+
+  /** A feature of a type another package registered (`FeatureTypeRegistry`), recorded as is. */
+  public function addFeature<T:Feature>(feature:T):T {
+    check();
+    if (!DocumentCodec.isBuiltInType(feature.serializationType()) && !cadkit.parametric.FeatureTypeRegistry.isRegistered(feature.serializationType()))
+      throw new ParametricError("feature type is not registered: " + feature.serializationType());
+    return document.add(feature);
   }
 
   /** A closed polygon face through `points` (the plane's own x/y), on `plane` (XY by default): a profile to revolve or extrude. */
