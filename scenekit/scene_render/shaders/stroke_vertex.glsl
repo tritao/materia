@@ -10,6 +10,8 @@ layout(location=5) in vec4 transform2;
 layout(location=6) in vec4 transform3;
 layout(location=7) in vec3 support_position;
 layout(location=8) in float stroke_step;
+// The drawn instance's pick colour: which part this stroke belongs to in the visible-surface buffer.
+layout(location=9) in vec4 pick_color;
 uniform mat4 view_projection;
 uniform vec4 stroke_view[6];
 out vec3 line_coordinate_homogeneous;
@@ -19,6 +21,7 @@ out vec3 world_position;
 out vec3 world_depth_bias;
 flat out float support_sidedness;
 out float step_coverage;
+flat out float stroke_instance;
 
 // A step edge (app/plans/EDGE_SIGNIFICANCE.md) draws in proportion to its height over one pixel at its depth `w`;
 // corners and other strokes carry no step and draw fully. The pixel's world size is 2 w / (P00 * width), where P00 is
@@ -33,6 +36,8 @@ float step_coverage_at(float w, mat4 model) {
 
 void main() {
     support_sidedness = 0.0;
+    stroke_instance = floor(pick_color.r * 255.0 + 0.5) + 256.0 * floor(pick_color.g * 255.0 + 0.5) +
+                      65536.0 * floor(pick_color.b * 255.0 + 0.5);
     mat4 model = mat4(transform0, transform1, transform2, transform3);
     vec3 world_a = (model * vec4(start_position, 1.0)).xyz;
     vec3 world_b = (model * vec4(end_position, 1.0)).xyz;

@@ -77,6 +77,8 @@ bool draw_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &sna
         if(result==NKGPU_OK)result=nkgpu_apply_uniform_data(state.renderer,3,reinterpret_cast<const std::uint8_t *>(&viewport),sizeof(viewport));
         if(result==NKGPU_OK)result=nkgpu_apply_uniform_data(state.renderer,0,reinterpret_cast<const std::uint8_t *>(color.data()),sizeof(color));
         if(result==NKGPU_OK)result=nkgpu_apply_uniform_data(state.renderer,2,reinterpret_cast<const std::uint8_t *>(&clips),sizeof(clips));
+        // Contours lie on the section caps; only the depth test decides them.
+        if(result==NKGPU_OK)result=apply_stroke_surfaces(state,plan,false);
         if(result==NKGPU_OK)result=nkgpu_apply_vertex_buffer(state.renderer,0,entry.buffer,0);
         if(result==NKGPU_OK)result=nkgpu_apply_vertex_buffer(state.renderer,1,batch.buffer,static_cast<unsigned>(cap.instance*instance_stride));
         if(result==NKGPU_OK)result=nkgpu_draw(state.renderer,0,entry.count,1);
