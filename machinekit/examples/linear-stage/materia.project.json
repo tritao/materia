@@ -17,7 +17,7 @@
 			"kind": "cad-preview",
 			"module": "LinearStagePreview",
 			"function": "stage",
-			"cache": {"inputs": []}
+			"cache": {}
 		},
 		"with-pendant": {
 			"kind": "cad-preview",
@@ -25,7 +25,7 @@
 			"reconcilesSavedRecipe": true,
 			"module": "LinearStagePreview",
 			"function": "withPendant",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

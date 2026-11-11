@@ -20,7 +20,7 @@
 			"kind": "cad-preview",
 			"module": "GantryPickerPreview",
 			"function": "picker",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

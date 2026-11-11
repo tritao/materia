@@ -9,13 +9,13 @@
 			"kind": "cad-preview",
 			"module": "FasteningPreview",
 			"function": "flange",
-			"cache": {"inputs": ["FasteningPreview.hx"]}
+			"cache": {}
 		},
 		"motor": {
 			"kind": "cad-preview",
 			"module": "FasteningPreview",
 			"function": "motor",
-			"cache": {"inputs": ["FasteningPreview.hx"]}
+			"cache": {}
 		}
 	}
 }

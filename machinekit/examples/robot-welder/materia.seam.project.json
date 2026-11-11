@@ -9,7 +9,7 @@
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
 			"function": "seamCell",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

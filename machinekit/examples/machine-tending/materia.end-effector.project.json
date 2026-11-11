@@ -12,9 +12,7 @@
 			"kind": "cad-preview",
 			"module": "TendingEndEffectorPreview",
 			"function": "preview",
-			"cache": {
-				"inputs": []
-			}
+			"cache": {}
 		}
 	}
 }

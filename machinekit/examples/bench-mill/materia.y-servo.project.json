@@ -12,17 +12,7 @@
       "kind": "cad-preview",
       "module": "MillProject",
       "function": "small",
-      "cache": {
-        "inputs": [
-          "MillProject.hx",
-          "MillFramePreview.hx",
-          "../../haxe/src/machinekit/milling/MillFrame.hx",
-          "../../haxe/src/machinekit/milling/MillXYStage.hx",
-          "../../haxe/src/machinekit/milling/MillZAxis.hx",
-          "../../haxe/src/machinekit/milling/MillZAxisLayout.hx",
-          "../../haxe/src/machinekit/milling/MillSpindleHead.hx"
-        ]
-      }
+      "cache": {}
     }
   }
 }

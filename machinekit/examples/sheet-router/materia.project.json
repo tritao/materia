@@ -12,17 +12,13 @@
       "kind": "cad-preview",
       "module": "SheetRouterPreview",
       "function": "router",
-      "cache": {
-        "inputs": []
-      }
+      "cache": {}
     },
     "long-router": {
       "kind": "cad-preview",
       "module": "SheetRouterPreview",
       "function": "longRouter",
-      "cache": {
-        "inputs": []
-      }
+      "cache": {}
     }
   }
 }

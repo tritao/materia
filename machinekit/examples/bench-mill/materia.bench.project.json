@@ -13,17 +13,13 @@
       "kind": "cad-preview",
       "module": "BenchMillPreview",
       "function": "mill",
-      "cache": {
-        "inputs": []
-      }
+      "cache": {}
     },
     "enclosed": {
       "kind": "cad-preview",
       "module": "BenchMillPreview",
       "function": "enclosed",
-      "cache": {
-        "inputs": []
-      }
+      "cache": {}
     }
   },
   "variants": [

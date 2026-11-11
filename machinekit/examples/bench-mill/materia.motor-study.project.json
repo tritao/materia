@@ -14,12 +14,7 @@
       "reconcilesSavedRecipe": true,
       "module": "MillMotorStudy",
       "function": "preview",
-      "cache": {
-        "inputs": [
-          "MillMotorStudy.hx",
-          "MillFramePreview.hx"
-        ]
-      }
+      "cache": {}
     }
   }
 }

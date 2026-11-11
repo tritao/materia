@@ -9,7 +9,7 @@
 			"kind": "cad-preview",
 			"module": "ThreadPreview",
 			"function": "preview",
-			"cache": {"inputs": ["ThreadPreview.hx"]}
+			"cache": {}
 		}
 	}
 }

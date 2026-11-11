@@ -12,7 +12,7 @@
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
 			"function": "wovenCell",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

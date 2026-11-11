@@ -6,6 +6,6 @@
   "build": {"system": "haxeon", "manifest": "haxeon.json"},
   "entrypoints": {
     "enclosure": {"kind": "cad-preview", "module": "EnclosureKitPreview", "function": "preview",
-      "cache": {"inputs": ["EnclosureKitPreview.hx"]}}
+      "cache": {}}
   }
 }

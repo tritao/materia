@@ -12,25 +12,25 @@
 			"kind": "cad-preview",
 			"module": "CobotArmPreview",
 			"function": "reach500",
-			"cache": {"inputs": []}
+			"cache": {}
 		},
 		"reach850": {
 			"kind": "cad-preview",
 			"module": "CobotArmPreview",
 			"function": "reach850",
-			"cache": {"inputs": []}
+			"cache": {}
 		},
 		"reach900": {
 			"kind": "cad-preview",
 			"module": "CobotArmPreview",
 			"function": "reach900",
-			"cache": {"inputs": []}
+			"cache": {}
 		},
 		"reach1300": {
 			"kind": "cad-preview",
 			"module": "CobotArmPreview",
 			"function": "reach1300",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

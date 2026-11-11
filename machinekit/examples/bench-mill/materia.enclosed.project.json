@@ -12,9 +12,7 @@
       "kind": "cad-preview",
       "module": "BenchMillPreview",
       "function": "enclosure",
-      "cache": {
-        "inputs": []
-      }
+      "cache": {}
     }
   }
 }

@@ -9,7 +9,7 @@
 			"kind": "cad-preview",
 			"module": "CoreXyPlotterPreview",
 			"function": "plotter",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

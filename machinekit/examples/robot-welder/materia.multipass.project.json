@@ -12,7 +12,7 @@
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
 			"function": "multipassCell",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

@@ -9,7 +9,7 @@
 			"kind": "cad-preview",
 			"module": "CoreXyPrinterPreview",
 			"function": "cubeShort",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

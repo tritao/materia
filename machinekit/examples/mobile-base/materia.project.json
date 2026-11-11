@@ -10,13 +10,13 @@
 			"kind": "cad-preview",
 			"module": "MobileBasePreview",
 			"function": "cell",
-			"cache": {"inputs": []}
+			"cache": {}
 		},
 		"base": {
 			"kind": "cad-preview",
 			"module": "MobileBasePreview",
 			"function": "base",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

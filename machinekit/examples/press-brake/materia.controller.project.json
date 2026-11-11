@@ -12,7 +12,7 @@
 			"kind": "cad-preview",
 			"module": "PressBrakePreview",
 			"function": "controlledPressBrake",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

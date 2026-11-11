@@ -9,7 +9,7 @@
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
 			"function": "postCell",
-			"cache": {"inputs": []}
+			"cache": {}
 		}
 	}
 }

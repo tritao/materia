@@ -16,13 +16,13 @@
 			"kind": "cad-preview",
 			"module": "PickingStationPreview",
 			"function": "station",
-			"cache": {"inputs": []}
+			"cache": {}
 		},
 		"layout": {
 			"kind": "cad-preview",
 			"module": "PickingStationPreview",
 			"function": "layout",
-			"cache": { "inputs": ["PickingStationDesign.hx", "PickingStationPreview.hx"] }
+			"cache": {}
 		}
 	}
 }

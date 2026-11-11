@@ -12,7 +12,7 @@
       "kind": "cad-preview",
       "module": "MobileWelderPreview",
       "function": "cell",
-      "cache": {"inputs": []}
+      "cache": {}
     }
   }
 }

@@ -7,7 +7,7 @@
   "entrypoints": {
     "tool": {
       "kind": "cad-preview", "module": "DhDualToolPreview", "function": "preview",
-      "cache": {"inputs": ["../dh-gripper/build/vendor/PGC-140-50.step"]}
+      "cache": {}
     }
   }
 }
