@@ -115,9 +115,6 @@ class MillZAxisLayout {
       180).setNumber("spindleDiameter", spindle.diameter()).setBoolean(
         "bt30Mounts",
         true
-      ).setBoolean(
-        "centeredMotor",
-        true
       ).setNumber(
         "height",
         headHeight

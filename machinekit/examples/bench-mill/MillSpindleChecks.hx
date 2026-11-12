@@ -31,15 +31,8 @@ class MillSpindleChecks {
     var compact = cylinderMember.component.geometry(), cb = PosedParts.boxOf(compact);
     near(cb.maxX - cb.minX, MillDrawbarLayout.WIDTH, "compact cylinder width");
     near(cb.maxZ - cb.minZ, MillDrawbarLayout.HEIGHT, "compact cylinder height");
-    var legacy = new MillPowerDrawbarPart(new machinekit.component.ComponentValues().setToken("role",
-      "cylinder")).geometry();
-    near(PosedParts.boxOf(legacy).maxZ, 430, "legacy cylinder recipe keeps original envelope");
-    legacy.close();
     for (role in ["piston", "pistonRod"]) {
-      var part = new MillPowerDrawbarPart(new machinekit.component.ComponentValues().setToken("role", role).setBoolean(
-        "compactCylinder",
-        true
-      )).geometry();
+      var part = new MillPowerDrawbarPart(new machinekit.component.ComponentValues().setToken("role", role)).geometry();
       for (stroke in [MillDrawbarLayout.RELEASE_STROKE, MillDrawbarLayout.STUDY_STROKE]) {
         var shifted = part.translated(new cadkit.modeling.Vector(0, 0, -stroke)), common = compact.intersect(shifted);
         near(common.volume(), 0, 'compact $role clears cylinder at $stroke mm stroke');
@@ -176,19 +169,6 @@ class MillSpindleChecks {
       check(p.solidCount() == (m.id == "spindle/springs" ? 16 : 1), 'connected spindle part ${m.id}');
       p.close();
     }
-    var guard = new MillSpindleBeltGuard(new machinekit.component.ComponentValues().setBoolean("centered",
-      true)).geometry(), faceted = false;
-    for (i in 0...guard.shape.subshapeCount(CadKit.ShapeKind.Face)) {
-      var face = guard.shape.subshape(CadKit.ShapeKind.Face, i);
-      if (face.surfaceKind() == CadKit.SurfaceKind.Plane) {
-        var n = face.faceNormal();
-        if (Math.abs(n.get_z()) < 1e-6 && Math.abs(n.get_x()) > 1e-6
-          && Math.abs(n.get_y()) > 1e-6 && Math.abs(150 * n.get_x() + 78 * n.get_y()) > 1e-5) faceted = true;
-      }
-      face.close();
-    }
-    check(!faceted, "guard bends use cylindrical faces, not polygonal side facets");
-    guard.close();
     var probe = new MachineAssembly(), fixed = new MachineAssembly(), blocked = new MachineAssembly();
     probe.addComponent(
       "probe",

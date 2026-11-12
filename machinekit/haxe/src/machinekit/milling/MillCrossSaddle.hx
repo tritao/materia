@@ -32,8 +32,7 @@ class MillCrossSaddle extends MachineComponent {
     P.length("crossRailWidth", 15),
     P.length("bore", 54),
     P.length("boreZ", 40),
-    P.flag("motorPocket", true),
-    P.flag("sidePockets", false)
+    P.flag("motorPocket", true)
   ];
 
   public static function recipeType():ComponentType {
@@ -48,13 +47,13 @@ class MillCrossSaddle extends MachineComponent {
     var v = P.resolve(parameters(), values);
     if (v.number("bore") + 20 > v.number("height")
       || v.number("bore") >= v.number("width")) throw "Saddle tunnel leaves insufficient material";
-    if ((v.boolean("sidePockets") || v.boolean("ribbed")) && (v.number("width") < 450 || v.number("depth") < 174
-      || v.number("height") < 56)) throw "Saddle side pockets need continuous chords and end webs";
+    if (v.boolean("ribbed") && (v.number("width") < 450 || v.number("depth") < 174
+      || v.number("height") < 56)) throw "Ribbed saddle needs continuous chords and end webs";
     if (v.boolean("ribbed") && (v.number("guideSpacing") < 160 || v.number("guideSpacing") > v.number("width") - 80
       || v.number("blockHolePitchC") <= 0 || v.number("blockHolePitchC") > v.number("guideSpacing") / 2
       || v.number("blockHolePitchB") <= 0 || v.number("blockSpan")
       <= v.number("blockHolePitchB") / 2 + 17)) throw "Ribbed saddle cannot retain its guide pads and bolt wells";
-    if (v.boolean("blockAccess") && (!v.boolean("ribbed") || v.boolean("sidePockets")
+    if (v.boolean("blockAccess") && (!v.boolean("ribbed")
       || v.number("blockSpan") + v.number("blockHolePitchB") / 2 + 10 >= v.number("depth") / 2
       || v.number("guideSpacing") / 2 - (v.number("blockHolePitchC") + 20) / 2 - 12
       <= 45)) throw "Block access pockets need ribbed guide pads, end clearance and retained central webs";
@@ -155,21 +154,6 @@ class MillCrossSaddle extends MachineComponent {
       }
     }
     for (x in [-32.0, 32.0]) tools.push(Part.cylinderAlongY(2.5, -d / 2 - 1, -d / 2 + 16, x, 12));
-    // Shallow side pockets retain continuous top/bottom chords, end webs and the central nut attachment.
-    if (values().boolean("sidePockets")) for (side in [-1, 1]) for (interval in [
-      [-205.0, -115.0],
-      [-105.0, -55.0],
-      [55.0, 130.0],
-      [140.0, 205.0]
-    ]) tools.push(Part.box(
-      interval[1] - interval[0],
-      13,
-      h - 28
-    ).translated(new Vector(
-      (interval[0] + interval[1]) / 2,
-      side * (d / 2 - 5.5),
-      14
-    )));
     if (values().boolean("ribbed")) {
       // Side-entry service pockets are centered on the real block pattern.
       if (values().boolean("blockAccess")) {

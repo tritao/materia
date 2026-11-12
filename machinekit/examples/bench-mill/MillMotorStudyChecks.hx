@@ -83,12 +83,6 @@ class MillMotorStudyChecks {
     var rejected = false;
     try MillMotorStudy.selection(c.frame, "ELM2M-2900LD180FT-H", 8, 18) catch (_:Dynamic) rejected = true;
     if (!rejected) throw "Pulley with insufficient material around bore must be rejected";
-    // Both old and configured assemblies must still use a 20 mm spindle pulley bore.
-    var baseline = new MillSpindleHead(c.frame.zAxis), basePulley = cast(
-      baseline.components().filter(m -> m.id == "spindlePulley")[0].component,
-      machinekit.transmission.TimingPulley
-    );
-    near(basePulley.teeth, 40, "legacy head retains 40T drive");
     Sys.println("Selectable mill drive checks passed");
   }
 }

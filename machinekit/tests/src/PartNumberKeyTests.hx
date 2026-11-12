@@ -416,25 +416,23 @@ class PartNumberKeyTests {
       throw 'Robot flange identities: $robotFlangeNumber, $nonstandardFlange';
     var millParts = [machinekit.milling.MillMotorCover.recipeType().create().bom.partNumber,
       machinekit.milling.MillZBearingPlate.recipeType().create().bom.partNumber,
-      machinekit.milling.MillYNutBridge.recipeType().create().bom.partNumber,
       machinekit.milling.MillScrewPedestal.recipeType().create().bom.partNumber,
       machinekit.milling.MillServoMount.recipeType().create().bom.partNumber,
       machinekit.milling.MillDriveHatch.recipeType().create().bom.partNumber];
-    var millPartsExpected = ["MILL-MOTOR-HOOD", "MILL-Z-BEARING-PLATE", "MILL-Y-NUT-BRIDGE",
+    var millPartsExpected = ["MILL-MOTOR-HOOD", "MILL-Z-BEARING-PLATE",
       "MILL-SCREW-PEDESTAL", "MILL-SERVO-MOUNT", "MILL-Y-DRIVE-HATCH"];
     for (i in 0...millParts.length) if (millParts[i] != millPartsExpected[i]
       || PartNumberLint.problems(millParts[i]).length != 0) throw 'Mill recipe identity: ${millParts[i]}';
     var moreMillParts = [machinekit.milling.MillZCarriage.recipeType().create().bom.partNumber,
       machinekit.milling.MillZHead.recipeType().create().bom.partNumber,
       machinekit.milling.MillCrossSaddle.recipeType().create().bom.partNumber,
-      machinekit.milling.MillSpindleBeltGuard.recipeType().create().bom.partNumber,
       machinekit.milling.MillSupportTray.recipeType().create().bom.partNumber,
       machinekit.milling.MillBallNutBracket.recipeType().create().bom.partNumber,
       machinekit.milling.MillZCouplingGuard.recipeType().create().bom.partNumber,
       machinekit.milling.MillZDriveAdapter.recipeType().create().bom.partNumber,
       machinekit.milling.MillZMotorStand.recipeType().create().bom.partNumber];
     var moreMillExpected = ["MILL-Z-CARRIAGE", "MILL-Z-RIBBED-HEAD", "MILL-CROSS-SADDLE",
-      "MILL-SPINDLE-BELT-GUARD", "MILL-SUPPORT-TRAY", "MILL-BALL-NUT-BRACKET",
+      "MILL-SUPPORT-TRAY", "MILL-BALL-NUT-BRACKET",
       "MILL-Z-COUPLING-GUARD", "MILL-Z-DRIVE-ADAPTER", "MILL-Z-MOTOR-STAND"];
     for (i in 0...moreMillParts.length) if (moreMillParts[i] != moreMillExpected[i]
       || PartNumberLint.problems(moreMillParts[i]).length != 0) throw 'Mill recipe identity: ${moreMillParts[i]}';
@@ -474,21 +472,19 @@ class PartNumberKeyTests {
       "MILL-SPINDLE-DRIVE-GUARD"];
     for (i in 0...studyParts.length) if (studyParts[i] != studyPartsExpected[i]
       || PartNumberLint.problems(studyParts[i]).length != 0) throw 'Mill study identity: ${studyParts[i]}';
-    var driveParts = [machinekit.milling.MillSpindleMotorMount.recipeType().create().bom.partNumber,
-      machinekit.milling.MillYNutMount.recipeType().create().bom.partNumber,
+    var driveParts = [machinekit.milling.MillYNutMount.recipeType().create().bom.partNumber,
       machinekit.milling.MillYDriveSeat.recipeType().create().bom.partNumber,
       machinekit.milling.MillYDriveSeat.recipeType().create(new ComponentValues().setBoolean("floating", true)).bom.partNumber,
-      machinekit.milling.MillSpindleMotorSupport.recipeType().create().bom.partNumber,
       machinekit.milling.MillBeltMotorPlate.recipeType().create().bom.partNumber,
       machinekit.milling.MillCrossTable.recipeType().create().bom.partNumber];
-    var drivePartsExpected = ["MILL-SPINDLE-MOTOR-CARRIER", "MILL-Y-NUT-MOUNT", "MILL-Y-BK12-C-SEAT",
-      "MILL-Y-BF12-SEAT", "MILL-SPINDLE-MOTOR-SUPPORT", "MILL-X-RETURN-PLATE-ELM2H-0400LA60F", "MILL-CROSS-TABLE"];
+    var drivePartsExpected = ["MILL-Y-NUT-MOUNT", "MILL-Y-BK12-C-SEAT",
+      "MILL-Y-BF12-SEAT", "MILL-X-RETURN-PLATE-ELM2H-0400LA60F", "MILL-CROSS-TABLE"];
     for (i in 0...driveParts.length) if (driveParts[i] != drivePartsExpected[i]
       || PartNumberLint.problems(driveParts[i]).length != 0) throw 'Mill drive identity: ${driveParts[i]}';
-    var bridge = machinekit.milling.MillYNutBridge.recipeType();
-    var bridgeA = bridge.create(), bridgeB = bridge.create(new ComponentValues().setNumber("rise", 130));
-    if (bridgeA.bom.partNumber != bridgeB.bom.partNumber || bridgeA.bom.valuesKey == bridgeB.bom.valuesKey)
-      throw "Changing a mill bridge dimension retains its declared identity and changes its recipe key";
+    var pedestal = machinekit.milling.MillScrewPedestal.recipeType();
+    var pedestalA = pedestal.create(), pedestalB = pedestal.create(new ComponentValues().setNumber("height", 50));
+    if (pedestalA.bom.partNumber != pedestalB.bom.partNumber || pedestalA.bom.valuesKey == pedestalB.bom.valuesKey)
+      throw "Changing a mill pedestal dimension retains its declared identity and changes its recipe key";
     var brakePart = machinekit.motion.ShaftBrakePart.recipeType().create().bom.partNumber;
     var housing = machinekit.motion.FlangeBearingHousing.recipeType().create().bom.partNumber;
     if (brakePart != "BRAKE-ASSUMED-4NM-B19-SHELL-0" || housing != "FLANGE-HOUSING-608-SLIP"

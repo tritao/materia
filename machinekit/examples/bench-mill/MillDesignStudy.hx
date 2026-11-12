@@ -145,6 +145,9 @@ class MillDesignStudy {
 
   public static function write(assembly:MachineAssembly, frame:BenchMillFrame, directory:String):Void {
     var folder = directory + "/design-review";
+    function member(id:String):machinekit.component.MachineComponent return assembly.components().filter(row -> row.id == id)[0].component;
+    var drive = cast(member("spindle/motorCarrier"), MillSpindleDrivePart), motor = drive.motor().rating;
+    var belt = cast(member("spindle/belt"), machinekit.transmission.TimingBelt);
     if (!sys.FileSystem.exists(folder)) sys.FileSystem.createDirectory(folder);
     var ids = [
       "frame/base/casting",
@@ -241,12 +244,12 @@ class MillDesignStudy {
         reference: "DAIYA BT30SP exterior diameters only",
         housingDiameterMm: 90,
         flangeDiameterMm: 125,
-        motorPowerW: 2200,
-        motorRatedRpm: 8000,
-        beltLengthMm: 440,
+        motor: motor.designation,
+        motorPowerW: Math.fround(motor.ratedTorque * motor.ratedSpeed),
+        motorRatedRpm: Math.fround(motor.ratedSpeed * 60 / (2 * Math.PI)),
+        beltLengthMm: belt.toothLength(),
         motorOffsetXmm: 0,
-        motorCentresMm: MillSpindleMotorLayout
-      .CENTRES,
+        motorCentresMm: drive.centres(),
       motorAdjustmentMm: MillSpindleMotorLayout.ADJUSTMENT,
       source: "https://daiya.co.jp/en/product/spindle/atc/",
       compatibility: "axial cartridge, motor, gripper and cylinder interfaces are explicit project assumptions",

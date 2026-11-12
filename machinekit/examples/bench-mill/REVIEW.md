@@ -83,13 +83,11 @@ negative sweep control overlaps the table at rest, so a static check would pass 
 
 ## Cleanup (no-legacy rule)
 
-- **L1. Dead or superseded code.** `MillYNutBridge` and `MillSpindleMotorSupport` registered but unused
-  (`MillingComponents.hx:15,28`); the `drive == null` branch in `MillSpindleHead.hx:38-63` is dead
-  (Bt30SpindleMotor, centred motor mount, belt guard, tension screw) because `MillFramePreview.hx:91-92`
-  always passes `MillSpindleDrivePart.installed`, yet `MillSpindleChecks.hx:107` still tests the old
-  guard; `compactCylinder=false` drawbar default; saddle `sidePockets` (`MillCrossSaddle.hx:23,88`);
-  non-flared column and non-pocket feet (`MillFrame.hx:115,142-144`); `centeredMotor=false`
-  (`MillZHead.hx:71`).
+- **L1. Dead or superseded code.** Done 2026-11-12: `MillYNutBridge`, `MillSpindleMotorSupport`, the
+  driveless spindle head (centred motor mount, old belt guard, tension screw), the non-compact drawbar
+  cylinder, saddle `sidePockets` and the Z head's off-centre motor bolts are gone; the head takes its drive.
+  Left: non-flared column and non-pocket feet (`MillFrameLayout.footPockets` defaults false; the
+  bench-mill and capacity layouts set it, `MillFrameChecks` still builds the plain variant).
 - **L2. Duplicated construction.** The layout → Z layout → XY layout → `MillFrame` sequence is
   repeated about 11 times (MillFemExport, MillFramePreview, MillFrameChecks, MillXYStageChecks,
   MillSpindleChecks, MillZAxisChecks, MillMotorStudy, MillMoldSetup, MillYServoChecks, MillProject,

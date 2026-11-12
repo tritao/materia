@@ -7,11 +7,11 @@ class MillBeltSpindle implements MillSpindlePackage {
   /** Compact VMC head block: clamps the cartridge and carries the motor carrier feet. */
   public static inline var HEAD_HEIGHT:Float = 170;
   public static inline var MAXIMUM_RPM:Float = 8000;
-  public final motorAdjustment:Null<Float>;
+  public final motorAdjustment:Float;
   public final drive:Null<MillSpindleDrivePart>;
 
   /** `drive` defaults to the installed Leadshine selection for the layout's head height. */
-  public function new(?motorAdjustment:Float, ?drive:MillSpindleDrivePart) {
+  public function new(motorAdjustment:Float = 0, ?drive:MillSpindleDrivePart) {
     this.motorAdjustment = motorAdjustment;
     this.drive = drive;
   }

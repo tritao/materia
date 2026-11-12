@@ -1,11 +1,14 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Separately itemised study hardware, in the cartridge gauge frame. Spring
+/** Separately itemised study hardware, in the cartridge gauge frame: the rotor, drawbar, disc springs, gripper and
+ * pull stud, the tool holder, and the compact release cylinder (MillDrawbarLayout) on its reaction frame. Spring
  * preload, gripper details and cylinder pressure/force remain selection inputs. */
 class MillPowerDrawbarPart extends MachineComponent {
   static final recipe = new machinekit.cache.Once<ComponentType>();
@@ -21,10 +24,7 @@ class MillPowerDrawbarPart extends MachineComponent {
     "rotor",
     "piston"
   ];
-  public static function parameters():Array<ComponentParameter> return [
-    P.text("role", "drawbar"),
-    P.flag("compactCylinder", false)
-  ];
+  public static function parameters():Array<ComponentParameter> return [P.text("role", "drawbar")];
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType(
       "machinekit.milling.power-drawbar-study-part",
@@ -47,151 +47,105 @@ class MillPowerDrawbarPart extends MachineComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
-  static function ring(r:Float, b:Float, lo:Float, hi:Float):Part return Solids.cut(
-    Part.cylinderSpan(r, lo, hi),
-    [Part.cylinderSpan(b, lo - 1, hi + 1)]
-  );
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var role = values().token("role");
-    if (values().boolean("compactCylinder") && ["reactionFrame",
-      "cylinder", "piston", "pistonRod"].indexOf(role) >= 0) return compactGeometry(role);
-    return switch (role) {
+
+  /** A cylinder of radius `r` up the Z axis through (x, y), from z = lo to hi. */
+  static function post(b:DocumentBuilder, r:Float, lo:Float, hi:Float, x:Float = 0, y:Float = 0):Feature
+    return b.cylinderAlong(new Vector(x, y, 0), Vector.Z(), r, lo, hi);
+
+  /** A tube of outer radius `r` and bore `bore` on the Z axis, from z = lo to hi. */
+  static function ring(b:DocumentBuilder, r:Float, bore:Float, lo:Float, hi:Float, name:String):Feature
+    return b.label(b.cutAll(b.label(post(b, r, lo, hi), name), [post(b, bore, lo - 1, hi + 1)], [name + " bore"]), name);
+
+  /** A plate `w` x `d` centred on the Z axis, from z = lo to hi. */
+  static function plate(b:DocumentBuilder, w:Float, d:Float, lo:Float, hi:Float):Feature
+    return b.boxBetween(-w / 2, w / 2, -d / 2, d / 2, lo, hi);
+
+  /** A solid of revolution about Z through the (radius, z) section `points`. */
+  static function turned(b:DocumentBuilder, points:Array<Array<Float>>, name:String):Feature
+    return b.label(b.revolve(b.polygon([for (p in points) new Vector(p[0], p[1], 0)], Plane.XZ()), new Vector(0, 0, 0), Vector.Z(), Math.PI * 2), name);
+
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
+    var bottom = MillDrawbarLayout.CYLINDER_BOTTOM, top = bottom + MillDrawbarLayout.HEIGHT, cap = MillDrawbarLayout.CAP;
+    var bridge = MillDrawbarLayout.BRIDGE_BOTTOM, piston = MillDrawbarLayout.PISTON_BOTTOM;
+    var mounts = [for (x in [-MillDrawbarLayout.MOUNT_X, MillDrawbarLayout.MOUNT_X]) for (y in [-MillDrawbarLayout.MOUNT_Y, MillDrawbarLayout.MOUNT_Y]) [x, y]];
+    function corner(p:Array<Float>):String return (p[1] < 0 ? "front " : "back ") + (p[0] < 0 ? "left" : "right");
+    return switch values().token("role") {
       case "drawbar":
-        Solids.union([Part.cylinderSpan(5, 62, 285), Part.cylinderSpan(11, 222, 227), Part.cylinderSpan(7, 68, 71)]);
+        b.label(b.unionAll([
+          b.label(post(b, 5, 62, 285), "Bar"),
+          b.label(post(b, 11, 222, 227), "Spring seat"),
+          b.label(post(b, 7, 68, 71), "Gripper collar")
+        ]), "Drawbar");
       case "springs":
-        var rows = [];
-        for (i in 0...16) rows.push(ring(12.5, 5.5, 181 + i * 2.6, 183 + i * 2.6));
-        Solids.union(rows);
+        b.label(b.unionAll([for (i in 0...16) ring(b, 12.5, 5.5, 181 + i * 2.6, 183 + i * 2.6, 'Disc ${i + 1}')]), "Disc spring stack");
       case "gripper":
-        Solids.union([ring(9, 4.2, 48, 51), ring(9, 5.5, 51, 68)]);
+        b.label(b.unionAll([ring(b, 9, 4.2, 48, 51, "Jaw lip"), ring(b, 9, 5.5, 51, 68, "Collet")]), "Gripper");
       case "pullStud":
-        Solids.union([Part.cylinderSpan(4, 40, 51), Part.cylinderSpan(5.4, 51, 55)]);
+        b.label(b.unionAll([b.label(post(b, 4, 40, 51), "Shank"), b.label(post(b, 5.4, 51, 55), "Knob")]), "Pull stud");
       case "holder":
-        var taper = Part.revolve([{r: 0.0, z: 0.0}, {r: 15.875, z: 0.0}, {r: 10.042, z: 40.0}, {r: 0.0, z: 40.0}]);
-        Solids.cut(
-          Solids.union([taper, Part.cylinderSpan(23, -10, 0), Part.cylinderSpan(17, -35, -10)]),
-          [
-            Part.cylinderSpan(3, -36, -5),
-            Part.box(10, 8, 11).translated(new Vector(23, 0, -10)),
-            Part.box(10, 8, 11).translated(new Vector(-23, 0, -10))
-          ]
-        );
+        var body = b.label(b.unionAll([
+          turned(b, [[0, 0], [15.875, 0], [10.042, 40], [0, 40]], "Taper"),
+          b.label(post(b, 23, -10, 0), "Flange"),
+          b.label(post(b, 17, -35, -10), "Nose")
+        ]), "Holder blank");
+        b.label(b.cutAll(body, [
+          post(b, 3, -36, -5),
+          b.boxBetween(18, 28, -4, 4, -10, 1),
+          b.boxBetween(-28, -18, -4, 4, -10, 1)
+        ], ["tool bore", "drive slot right", "drive slot left"]), "Tool bore and drive slots");
       case "reactionFrame":
-        var rows = [
-          ring(70, 22, 242, 250),
-          Solids.cut(Part.box(140, 120, 8).translated(new Vector(0, 0, 322)), [Part.cylinderSpan(12, 321, 331)])
-        ];
-        for (x in [-60.0, 60.0]) for (y in [-35.0, 35.0]) rows.push(Part.cylinderSpan(6, 249, 323, x, y));
-        var cuts = [];
-        for (x in [-50.0, 50.0]) for (y in [-50.0, 50.0]) cuts.push(Part.cylinderSpan(4.2, 321, 331, x, y));
-        for (p in [[-37.5, 0.0], [37.5, 0.0], [0.0, -37.5], [0.0, 37.5]]) {
-          cuts.push(Part.cylinderSpan(2.75, 241, 251, p[0], p[1]));
-          cuts.push(Part.cylinderSpan(5, 244.6, 251, p[0], p[1]));
+        var parts = [ring(b, 70, 22, 242, 250, "Collar flange"), b.label(plate(b, 140, 100, bridge, bridge + MillDrawbarLayout.BRIDGE_THICKNESS), "Bridge")];
+        for (x in [-60.0, 60.0]) for (y in [-35.0, 35.0]) parts.push(b.label(post(b, 6, 249, bridge + 1, x, y), "Pillar " + corner([x, y])));
+        var tools = [post(b, 12, bridge - 1, bottom + 1)], labels = ["rod bore"];
+        for (p in mounts) {
+          tools.push(post(b, 3.3, bridge - 1, bottom + 1, p[0], p[1]));
+          labels.push("cylinder screw " + corner(p));
         }
-        Solids.cut(Solids.union(rows), cuts);
+        for (p in [[-37.5, 0.0], [37.5, 0.0], [0.0, -37.5], [0.0, 37.5]]) {
+          var at = p[0] < 0 ? "left" : p[0] > 0 ? "right" : p[1] < 0 ? "front" : "back";
+          tools.push(post(b, 2.75, 241, 251, p[0], p[1]));
+          labels.push('collar screw $at');
+          tools.push(post(b, 5, 244.6, 251, p[0], p[1]));
+          labels.push('collar counterbore $at');
+        }
+        b.label(b.cutAll(b.label(b.unionAll(parts), "Frame"), tools, labels), "Rod bore and screw holes");
       case "cylinder":
-        var rows = [
-          Part.box(120, 120, 8).translated(new Vector(0, 0, 330)),
-          Part.box(120, 120, 8).translated(new Vector(0, 0, 422)),
-          ring(55, 50, 338, 422)
+        var width = MillDrawbarLayout.WIDTH;
+        var parts = [
+          b.label(plate(b, width, width, bottom, bottom + cap), "Lower cap"),
+          b.label(plate(b, width, width, top - cap, top), "Upper cap"),
+          ring(b, MillDrawbarLayout.BORE / 2 + 5, MillDrawbarLayout.BORE / 2, bottom + cap, top - cap, "Barrel")
         ];
-        for (x in [-45.0, 45.0]) for (y in [-45.0, 45.0]) rows.push(Part.cylinderSpan(3, 337, 423, x, y));
-        var cuts = [Part.cylinderSpan(10.5, 329, 431)];
-        for (x in [-50.0, 50.0]) for (y in [-50.0, 50.0]) cuts.push(Part.cylinderSpan(3.4, 329, 338, x, y));
-        for (z in [345.0, 415.0]) cuts.push(Part.cylinderAlongY(3, -56, -49, 0, z));
-        Solids.cut(Solids.union(rows), cuts);
+        for (x in [-34.0, 34.0]) for (y in [-34.0, 34.0]) parts.push(b.label(post(b, 3, bottom + cap - 1, top - cap + 1, x, y), "Tie rod " + corner([x, y])));
+        var tools = [post(b, 10.5, bottom - 1, bottom + cap + 1)], labels = ["rod bore"];
+        for (p in mounts) {
+          tools.push(post(b, 2.5, bottom - 1, bottom + cap + 1, p[0], p[1]));
+          labels.push("mount tap " + corner(p));
+        }
+        for (z in [bottom + 11, top - 11]) {
+          tools.push(b.cylinderAlong(new Vector(0, 0, z), Vector.Y(), 3, -46, -39));
+          labels.push(z < (bottom + top) / 2 ? "lower air port" : "upper air port");
+        }
+        b.label(b.cutAll(b.label(b.unionAll(parts), "Cylinder body"), tools, labels), "Rod bore, taps and air ports");
       case "piston":
-        ring(49.5, 10, 378, 386);
+        ring(b, MillDrawbarLayout.BORE / 2 - 0.5, 10, piston, piston + MillDrawbarLayout.PISTON_THICKNESS, "Piston");
       case "pistonRod":
-        Part.cylinderSpan(10, 287, 331);
+        b.label(post(b, 10, MillDrawbarLayout.ROD_TIP, piston + MillDrawbarLayout.PISTON_THICKNESS), "Piston rod");
       case "rotor":
-        var blank = Solids.union([Part.cylinderSpan(30, 0, 39), Part.cylinderSpan(25, 38, 242)]);
-        var taper = Part.revolve([{r: 0.0, z: -1.0}, {r: 16.041, z: -1.0}, {r: 9.479, z: 44.0}, {r: 0.0, z: 44.0}]);
-        var tube = Solids.cut(blank, [taper, Part.cylinderSpan(13, 43, 243)]);
-        Solids.union([tube, ring(25, 5.5, 178, 181), ring(25, 5.5, 238, 242), ring(10, 5.5, 242, 275)]);
+        var blank = b.label(b.unionAll([b.label(post(b, 30, 0, 39), "Nose"), b.label(post(b, 25, 38, 242), "Shaft")]), "Rotor blank");
+        var tube = b.label(b.cutAll(blank, [
+          turned(b, [[0, -1], [16.041, -1], [9.479, 44], [0, 44]], "Taper socket"),
+          post(b, 13, 43, 243)
+        ], ["taper socket", "drawbar bore"]), "Taper socket and drawbar bore");
+        b.label(b.unionAll([
+          tube,
+          ring(b, 25, 5.5, 178, 181, "Spring seat"),
+          ring(b, 25, 5.5, 238, 242, "Top cap"),
+          ring(b, 10, 5.5, 242, 275, "Drawbar guide")
+        ]), "Rotor");
       default:
         throw "Unknown drawbar role";
     };
-  }
-  function compactGeometry(role:String):Part {
-    var b = MillDrawbarLayout.CYLINDER_BOTTOM, top = b + MillDrawbarLayout.HEIGHT;
-    var bridge = MillDrawbarLayout.BRIDGE_BOTTOM, piston = MillDrawbarLayout.PISTON_BOTTOM;
-    var raw = switch (role) {
-      case "reactionFrame":
-        var rows = [
-          ring(70, 22, 242, 250),
-          Part.box(140, 100, MillDrawbarLayout.BRIDGE_THICKNESS).translated(new Vector(0, 0, bridge))
-        ];
-        for (x in [-60.0, 60.0]) for (y in [-35.0, 35.0]) rows.push(Part.cylinderSpan(6, 249, bridge + 1, x, y));
-        var cuts = [Part.cylinderSpan(12, bridge - 1, b + 1)];
-        for (x in [-MillDrawbarLayout.MOUNT_X, MillDrawbarLayout.MOUNT_X]) for (y in [
-          -MillDrawbarLayout.MOUNT_Y,
-          MillDrawbarLayout.MOUNT_Y
-        ]) cuts.push(Part.cylinderSpan(
-          3.3,
-          bridge - 1,
-          b + 1,
-          x,
-          y
-        ));
-        for (p in [[-37.5, 0.0], [37.5, 0.0], [0.0, -37.5], [0.0, 37.5]]) {
-          cuts.push(Part.cylinderSpan(2.75, 241, 251, p[0], p[1]));
-          cuts.push(Part.cylinderSpan(5, 244.6, 251, p[0], p[1]));
-        }
-        Solids.cut(Solids.union(rows), cuts);
-      case "cylinder":
-        var rows = [
-          Part.box(MillDrawbarLayout.WIDTH, MillDrawbarLayout.WIDTH, MillDrawbarLayout.CAP).translated(new Vector(
-            0,
-            0,
-            b
-          )),
-          Part.box(MillDrawbarLayout.WIDTH, MillDrawbarLayout.WIDTH, MillDrawbarLayout.CAP).translated(new Vector(
-            0,
-            0,
-            top - MillDrawbarLayout.CAP
-          )),
-          ring(
-            MillDrawbarLayout.BORE / 2 + 5,
-            MillDrawbarLayout.BORE / 2,
-            b + MillDrawbarLayout.CAP,
-            top - MillDrawbarLayout.CAP
-          )
-        ];
-        for (x in [-34.0, 34.0]) for (y in [-34.0, 34.0]) rows.push(Part.cylinderSpan(
-          3,
-          b + MillDrawbarLayout.CAP - 1,
-          top - MillDrawbarLayout.CAP + 1,
-          x,
-          y
-        ));
-        var cuts = [Part.cylinderSpan(10.5, b - 1, b + MillDrawbarLayout.CAP + 1)];
-        for (x in [-MillDrawbarLayout.MOUNT_X, MillDrawbarLayout.MOUNT_X]) for (y in [
-          -MillDrawbarLayout.MOUNT_Y,
-          MillDrawbarLayout.MOUNT_Y
-        ]) cuts.push(Part.cylinderSpan(
-          2.5,
-          b - 1,
-          b + MillDrawbarLayout.CAP + 1,
-          x,
-          y
-        ));
-        for (z in [b + 11, top - 11]) cuts.push(Part.cylinderAlongY(3, -46, -39, 0, z));
-        Solids.cut(Solids.union(rows), cuts);
-      case "piston":
-        ring(MillDrawbarLayout.BORE / 2 - 0.5, 10, piston, piston + MillDrawbarLayout.PISTON_THICKNESS);
-      case "pistonRod":
-        Part.cylinderSpan(10, MillDrawbarLayout.ROD_TIP, piston + MillDrawbarLayout.PISTON_THICKNESS);
-      default:
-        throw "Unknown compact release role";
-    };
-    try {
-      var result = raw.refined();
-      raw.close();
-      return result;
-    } catch (e:Dynamic) {
-      raw.close();
-      throw e;
-    }
   }
 }

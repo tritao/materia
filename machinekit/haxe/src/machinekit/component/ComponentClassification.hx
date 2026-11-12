@@ -68,8 +68,6 @@ class ComponentClassification {
     file(registry, "machinekit.milling.zpp-supplier-member", "Structure", ComponentKind.Supplier);
     file(registry, "machinekit.milling.spindle-cartridge", "Spindle", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.spindle-motor", "Spindle", ComponentKind.MachinePart);
-    file(registry, "machinekit.milling.spindle-motor-mount", "Spindle", ComponentKind.MachinePart);
-    file(registry, "machinekit.milling.spindle-motor-support", "Spindle", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.bt30-cartridge-study", "Spindle", ComponentKind.Reference);
     file(registry, "machinekit.milling.bt30-spindle-motor-study", "Spindle", ComponentKind.Reference);
     file(registry, "machinekit.milling.spindle-drive-study-part", "Spindle", ComponentKind.Reference);
@@ -80,7 +78,6 @@ class ComponentClassification {
     file(registry, "machinekit.milling.hzmotion-y-drive-seat", "Drives and mounts", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.screw-pedestal", "Drives and mounts", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.servo-mount", "Drives and mounts", ComponentKind.MachinePart);
-    file(registry, "machinekit.milling.y-nut-bridge", "Drives and mounts", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.y-nut-mount", "Drives and mounts", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.z-bearing-plate", "Drives and mounts", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.z-drive-adapter", "Drives and mounts", ComponentKind.MachinePart);
@@ -88,7 +85,6 @@ class ComponentClassification {
     file(registry, "machinekit.milling.drive-service-hatch", "Guards and covers", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.cover-outrigger", "Guards and covers", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.motor-cover", "Guards and covers", ComponentKind.MachinePart);
-    file(registry, "machinekit.milling.spindle-belt-guard", "Guards and covers", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.z-coupling-guard", "Guards and covers", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.er20-holder", "Tooling and workholding", ComponentKind.Generic);
     file(registry, "machinekit.milling.flat-end-mill", "Tooling and workholding", ComponentKind.Generic);
