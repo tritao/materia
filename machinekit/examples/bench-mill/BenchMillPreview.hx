@@ -224,10 +224,14 @@ class BenchMillChecks {
       ]) {
         var a = posed(mill, state, pair[0]), b = posed(mill, state, pair[1]);
         var common = a.intersect(b), volume = common.volume();
+        var where = volume > 1e-3 ? {
+          var box = common.shape.bounds(), lo = box.get_min(), hi = box.get_max();
+          ' within (${lo.get_x()}, ${lo.get_y()}, ${lo.get_z()})..(${hi.get_x()}, ${hi.get_y()}, ${hi.get_z()})';
+        } : "";
         common.close();
         a.close();
         b.close();
-        if (volume > 1e-3) throw '${pair[0]} overlaps ${pair[1]} at $x,$y,$z by $volume mm³';
+        if (volume > 1e-3) throw '${pair[0]} overlaps ${pair[1]} at $x,$y,$z by $volume mm³$where';
       }
       for (index in 0...3) {
         var id = "screw" + mill.specs[index].id.toUpperCase();

@@ -334,14 +334,16 @@ class MillCasting extends MachineComponent {
     // The bay for the Y screw's rear bearing: its housing and stand stand back into the column's lower front, a little wider than they are.
     if (kind == Column) tool(slab(b, 2 * COVER_BAY_HALF_WIDTH, COVER_BAY_DEPTH + 1, COVER_BAY_HEIGHT, 0, -depth / 2 + (COVER_BAY_DEPTH - 1) / 2, -1),
       "y-bearing bay");
-    // Clearance for the screw along the body; the rail pads remain above it.
-    if (kind == Saddle) tool(b.cylinderAlong(new Vector(0, 0, screwHeight), Vector.Y(), new machinekit.motion.BallNut().flangeDiameter / 2 + 1,
+    // Clearance for the screw and its nut, flange and grease fitting, along the body; the rail pads remain above it.
+    if (kind == Saddle) tool(b.cylinderAlong(new Vector(0, 0, screwHeight), Vector.Y(), new machinekit.motion.BallNut().radialReach() + 1,
       -depth / 2 - 1, depth / 2 + 1), "screw bore");
-    // The flanged X nut crosses the rail gap; recess both adjacent faces.
+    // The flanged X nut crosses the rail gap; recess both adjacent faces, 1 mm clear of the flange below and of the flange
+    // or its grease fitting, which stands up toward the table, above.
     if (kind == Saddle || kind == Table) {
       var nut = new machinekit.motion.BallNut();
       var block = machinekit.motion.LinearRailBlock.metric("HGH15CA");
-      var recess = (nut.flangeDiameter + 2) / 2 - block.spec.blockHeight / 2;
+      var reach = kind == Saddle ? nut.flangeDiameter / 2 : nut.radialReach();
+      var recess = reach + 1 - block.spec.blockHeight / 2;
       tool(slab(b, width + 2, nut.flangeDiameter + 2, recess + 1, 0, 0, kind == Saddle ? height - recess : -1), "x-nut clearance");
     }
     if (kind == Head) tool(bore(b, SpindleCartridge.DIAMETER / 2, -1, height + 1, 0, -depth / 2 + SpindleCartridge.DIAMETER / 2 + 10), "spindle bore");

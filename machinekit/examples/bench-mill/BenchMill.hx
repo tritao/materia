@@ -757,8 +757,8 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     var couplingStart = shaftLength - coupling.length / 2;
     var flange = motor.mounting();
     if (flange == null || flange.holes.length != 4) throw "Axis motor needs its declared four-hole flange";
-    var plateBore = Math.max(flange.pilotDiameter,
-      couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter);
+    // The plate's through bore passes the shaft, or the coupling when it starts inside the plate; the pilot locates in a recess.
+    var plateBore = couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter;
     var motorPlate = new MillMotorPlate("MILL-" + spec.id.toUpperCase() + "-MOTOR-PLATE", motor.rating.bodyDiameter + 20, plateThickness, plateBore, flange);
     if (spec.id == "y") {
       var footZ = start[2] + near.connector("mount").frame.y;
@@ -1147,7 +1147,14 @@ class MillDriveBox extends MachineComponent {
   }
 }
 
+/**
+ * A square plate a motor bolts to: a through bore of `bore` diameter, plus 1 mm clearance all round for what turns in it, and
+ * with a `flange`, a recess the motor's pilot locates in and the flange's tapped holes. Without one, four corner clearance holes.
+ */
 private class MillMotorPlate extends MachineComponent {
+  /** Diametral clearance of the pilot recess over the pilot, and its depth over the pilot's height (mm). */
+  static inline final PILOT_CLEARANCE = 0.1;
+  static inline final PILOT_DEPTH_CLEARANCE = 0.5;
   public final width:Float;
   public final thickness:Float;
   final bore:Float;
@@ -1178,8 +1185,7 @@ private class MillMotorPlate extends MachineComponent {
   /** The tapped face the motor flange bolts to: its holes are the flange's, tapped through the plate. */
   override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
     if (flange == null) return [];
-    var size = flange.holeDiameter == 5.5 ? "M5" : flange.holeDiameter == 6.6 ? "M6" : null;
-    if (size == null) throw "Axis motor flange has no reviewed tapped hole";
+    var size = tapSize();
     return [machinekit.component.BoltedFace.tapped(
       "motor",
       machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
@@ -1190,19 +1196,35 @@ private class MillMotorPlate extends MachineComponent {
       true
     )];
   }
-  override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = Part.box(width, width, thickness).translated(new Vector(0, 0, 0));
-    var holes = [Part.cylinderSpan(bore / 2 + (flange == null ? 1 : 0.1), -1, thickness + 1)];
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var plate = b.label(b.block(width, width, thickness), "Stock · Plate");
+    if (detail == Envelope) return plate;
+    var tools:Array<cadkit.parametric.Feature> = [b.cylinderAlong(new Vector(0, 0, 0), Vector.Z(), bore / 2 + 1, -1, thickness + 1)];
+    var labels = ["through bore"];
     if (flange == null) {
-      for (x in [-1, 1]) for (y in [-1, 1]) holes.push(Part.cylinderSpan(
-        3.3, -1, thickness + 1, x * (width / 2 - 10), y * (width / 2 - 10)));
-    } else {
-      var threadDiameter = flange.holeDiameter == 5.5 ? 5.0 : flange.holeDiameter == 6.6 ? 6.0 : 0.0;
-      if (threadDiameter == 0) throw "Axis motor flange has no reviewed tapped hole";
-      for (point in flange.holes) holes.push(Part.cylinderSpan(threadDiameter / 2, -1, thickness + 1, point.x, point.y));
+      for (x in [-1, 1]) for (y in [-1, 1]) {
+        tools.push(b.cylinderAlong(new Vector(x * (width / 2 - 10), y * (width / 2 - 10), 0), Vector.Z(), 3.3, -1, thickness + 1));
+        labels.push('corner hole ${x < 0 ? "left" : "right"} ${y < 0 ? "front" : "back"}');
+      }
+      return b.label(b.cutAll(plate, tools, labels), "Bore and corner holes");
     }
-    return Solids.cut(Solids.named(body, "plate"), holes);
+    if (flange.pilotHeight + PILOT_DEPTH_CLEARANCE >= thickness) throw "Motor plate is too thin for its pilot recess";
+    tools.push(b.cylinderAlong(new Vector(0, 0, 0), Vector.Z(), (flange.pilotDiameter + PILOT_CLEARANCE) / 2, -1,
+      flange.pilotHeight + PILOT_DEPTH_CLEARANCE));
+    labels.push("pilot recess");
+    var bored = b.label(b.cutAll(plate, tools, labels), "Bore and pilot recess");
+    var size = tapSize(), bolt = machinekit.standard.SocketHeadCapScrew.catalog().get(size), n = 0;
+    var tapped:Array<cadkit.parametric.HoleSpec> = [for (point in flange.holes) {frame: BoltedFace.frameOf({x: point.x, y: point.y, z: 0},
+      {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}), x: 0, y: 0, diameter: bolt.tapDrill, depth: thickness, through: true, kind: "tapped", thread: size,
+      fit: null, nominal: bolt.diameter, name: 'motor.h${++n}'}];
+    return b.label(b.holes(bored, tapped), "Motor flange tapped holes");
+  }
+
+  /** The thread the motor's flange bolts take, from its clearance holes. */
+  function tapSize():String {
+    var size = flange == null ? null : flange.holeDiameter == 5.5 ? "M5" : flange.holeDiameter == 6.6 ? "M6" : null;
+    if (size == null) throw "Axis motor flange has no reviewed tapped hole";
+    return size;
   }
 }
 

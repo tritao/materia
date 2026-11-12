@@ -14,6 +14,8 @@ import materia.assembly.AssemblyFrames;
  */
 class BallNut extends LeadScrewNut {
   public final preloaded:Bool;
+  /** Radius (mm) from the screw axis to the grease nipple's tip: the fitting stands on the flange's rim toward the nut's +Y. */
+  public static inline final GREASE_FITTING_TIP = 27.0;
 
   public function new(preloaded:Bool = true) {
     super(
@@ -67,13 +69,16 @@ class BallNut extends LeadScrewNut {
   }
 
   /** Assumed exterior details; bore, flange face and bolt pattern retain their catalog datums. */
+  /** The nut's furthest reach from the screw axis (mm), on its +Y side: the flange's rim or the grease fitting's tip. */
+  public function radialReach():Float return Math.max(flangeDiameter / 2, GREASE_FITTING_TIP);
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = super.geometry(detail);
     var z = bodyLength + flangeThickness / 2;
     // Radial fitting on the flange between the two upper mounting holes.
     var fitting = Solids.union([
       Solids.named(Part.cylinderAlongY(2.8, 22.5, 25, 0, z), "grease-fitting-base"),
-      Solids.named(Part.cylinderAlongY(1.6, 24.8, 27, 0, z), "grease-fitting-nipple")
+      Solids.named(Part.cylinderAlongY(1.6, 24.8, GREASE_FITTING_TIP, 0, z), "grease-fitting-nipple")
     ]);
     body = Solids.union([body, fitting]);
     if (detail == Envelope) return body;
@@ -98,7 +103,7 @@ class BallNut extends LeadScrewNut {
       Solids.named(Part.cylinderSpan(14.1, bodyLength - 0.8, bodyLength), "shoulder-relief-outer"),
       [Solids.named(Part.cylinderSpan(13.6, bodyLength - 0.9, bodyLength + 0.1), "shoulder-relief-inner")]
     ));
-    tools.push(Solids.named(Part.cylinderAlongY(0.65, 25.8, 27.1, 0, z), "nipple-mouth"));
+    tools.push(Solids.named(Part.cylinderAlongY(0.65, 25.8, GREASE_FITTING_TIP + 0.1, 0, z), "nipple-mouth"));
     return Solids.cut(body, tools);
   }
 

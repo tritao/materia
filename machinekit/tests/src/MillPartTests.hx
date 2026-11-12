@@ -80,9 +80,11 @@ class MillPartTests {
           // With the bay for the Y screw's rear bearing.
           50.6280;
         case Saddle:
-          25.4801;
+          // Its screw bore clears the Y nut's grease fitting.
+          25.0373;
         case Table:
-          11.7125;
+          // Its X-nut recess clears the nut's grease fitting.
+          11.2805;
         case Head:
           33.2253;
       };
