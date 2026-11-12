@@ -21,6 +21,8 @@ class MotorBrakeTests {
       new PowerSupply(new machinekit.power.DcVoltage(310), new machinekit.power.DcCurrent(20), 1, 120, 60, 30, 4000)
     );
     assembly.addComponent("brake", new ShaftBrakePart(19, "shell"));
+    // The shell is bought as part of the brake whose purchase line is its hub.
+    assembly.addComponent("brakeHub", new ShaftBrakePart(19, "hub"));
     assembly.connectPorts("power", "supply", "power1", "driver", "power");
     assembly.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaftAxis", {x: 0, y: 1, z: 0});
     assembly.addMotor("motor", "turn", "servo", "driver");
