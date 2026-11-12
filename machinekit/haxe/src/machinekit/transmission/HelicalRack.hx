@@ -67,7 +67,8 @@ class HelicalRack extends AssumedCatalogComponent {
       copies.push(placed);
       offset += count;
     }
-    return new Part(cadkit.Shape.compound([for (part in copies) part.shape]));
+    // One bar: the whole-pitch pieces meet on square faces, so fusing them is cheap and leaves a single solid.
+    return Part.fuseAll(copies);
     });
     // Skew a transverse rack profile, then trim ends square for whole-pitch joints.
     var p = Math.PI * transverseModule(), add = n("normalModule"),

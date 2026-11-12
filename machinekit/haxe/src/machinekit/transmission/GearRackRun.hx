@@ -69,6 +69,9 @@ class GearRackRun extends MachineComponent {
       inputs(),
       v -> new GearRackRun(v),
       false,
+      false,
+      null,
+      // Its BOM line is the catalogue section, whose material the catalogue fixes.
       false
     ));
   }

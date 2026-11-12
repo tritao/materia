@@ -11,6 +11,7 @@ class ComponentClassification {
     file(registry, "machinekit.assembly.carriage", "Axis modules", ComponentKind.MachinePart);
     file(registry, "machinekit.assembly.sfu20-axis-part", "Axis modules", ComponentKind.MachinePart);
     file(registry, "machinekit.assembly.twin-rail-screw-part", "Axis modules", ComponentKind.MachinePart);
+    file(registry, "machinekit.motion.screw-linear-module-part", "Axis modules", ComponentKind.MachinePart);
     file(registry, "machinekit.motion.motor-mount", "Mounts and couplings", ComponentKind.Supplier);
     file(registry, "machinekit.motion.motor-adapter-plate", "Mounts and couplings", ComponentKind.Supplier);
     file(registry, "machinekit.assembly.motor-plate", "Mounts and couplings", ComponentKind.Generic);
