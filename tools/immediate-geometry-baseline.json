@@ -185,7 +185,7 @@
  "machinekit/haxe/src/machinekit/milling/MillZDriveAdapter.hx": 11,
  "machinekit/haxe/src/machinekit/milling/MillZHead.hx": 20,
  "machinekit/haxe/src/machinekit/milling/MillZMotorStand.hx": 20,
- "machinekit/haxe/src/machinekit/milling/Rke92VisePart.hx": 32,
+ "machinekit/haxe/src/machinekit/milling/Rke92VisePart.hx": 1,
  "machinekit/haxe/src/machinekit/milling/SpindleCartridge.hx": 23,
  "machinekit/haxe/src/machinekit/milling/ZppComponent.hx": 4,
  "machinekit/haxe/src/machinekit/motion/AngularContactBearing.hx": 3,

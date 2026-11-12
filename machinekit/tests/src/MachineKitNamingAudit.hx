@@ -3,9 +3,9 @@ import cadkit.ElementNames;
 import machinekit.component.MachineKitComponents;
 
 /**
-	Every MachineKit component's default geometry names its faces strongly and uniquely
-	(cadkit/plans/TOPOLOGICAL_NAMING.md, TN8): a face with a weak or repeated name can only be found again by its shape,
-	so a mate picked on it does not survive edits. Components listed in `UNNAMED` are known not to yet.
+	Every MachineKit component's default geometry names its faces strongly and uniquely: a face with a weak or repeated
+	name can only be found again by its shape, so a mate picked on it does not survive edits. Components listed in
+	`UNNAMED` are known not to yet. A supplier's model is its STEP as shipped, with no feature history to name faces by.
 */
 class MachineKitNamingAudit {
   /**
@@ -45,7 +45,7 @@ class MachineKitNamingAudit {
   /** The weak or repeated face names of `id`'s default geometry, or null when it has none. */
   static function weakFaces(id:String):Null<Array<String>> {
     var component = MachineKitComponents.defaultRegistry().byId(id).create();
-    if (!component.hasGeometry()) return null;
+    if (!component.hasGeometry() || component.geometryFidelity() == machinekit.component.GeometryFidelity.Supplier) return null;
     var part = component.geometry();
     var names = part.shape.elementNames(CadKit.ShapeKind.Face);
     part.close();

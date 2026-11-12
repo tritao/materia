@@ -97,7 +97,7 @@ class Er20Holder extends MachineComponent {
       )));
       raw.close();
       owned.push(notch);
-      notches.push(Solids.named(notch, "wrench-notch"));
+      notches.push(Solids.named(notch, "wrench-notch" + (i + 1)));
     }
     return Solids.cut(body, notches);
     });

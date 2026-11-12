@@ -254,13 +254,14 @@ class OledModule extends HmiPart {
   function foam():Part {
     var pieces:Array<Part> = [];
     var top = boardCentre() + GLASS_HEIGHT / 2;
-    for (dy in [3.0, 9.0]) pieces.push(box(
+    for (k => dy in [3.0, 9.0]) pieces.push(box(
       2 * 24.0,
       3.0,
       bossHeight() - GLASS_THICKNESS,
       0.0,
       top - dy - 1.5,
-      boardFront()
+      boardFront(),
+      "strip" + (k + 1)
     ));
     return Solids.named(Solids.union(pieces), "foam");
   }
@@ -357,9 +358,13 @@ class OledModule extends HmiPart {
   }
 
   /** A box centred on (x, y) with its lower face at z0. */
-  static function box(w:Float, h:Float, d:Float, x:Float, y:Float, z0:Float):Part {
-    var raw = Part.box(w, h, d);
-    return at(raw, x, y, z0);
+  /** A `w` x `h` x `d` box centred on (x, y) from z0, its faces named under `name` when given. */
+  static function box(w:Float, h:Float, d:Float, x:Float, y:Float, z0:Float, ?name:String):Part {
+    var placed = at(Part.box(w, h, d), x, y, z0);
+    if (name == null) return placed;
+    var result = placed.named(name);
+    placed.close();
+    return result;
   }
 
   static function at(raw:Part, x:Float, y:Float, z:Float):Part {
