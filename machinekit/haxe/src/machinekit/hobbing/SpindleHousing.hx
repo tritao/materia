@@ -18,7 +18,11 @@ class SpindleHousing extends MachineComponent {
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType("machinekit.hobbing.spindle-housing", parameters(), v -> new SpindleHousing(v))
       .versioned(2).numbered(_ -> Bt30SpindleData.DESIGNATION)
-      .procured(_ -> Buy("RobotDigg", "2049 option A", "MAS BT30")));
+      .procured(_ -> Buy("RobotDigg", "2049 option A", "MAS BT30"))
+      // What a replacement cartridge must match: the MAS BT30 taper, the 80 mm housing it clamps in, at least its speed.
+      .requiring(_ -> [machinekit.component.Procurement.ProcurementCodec.choice("taper", "MAS BT30"),
+        machinekit.component.Procurement.ProcurementCodec.requirement("outsideDiameter", "mm", null, null, Bt30SpindleData.OUTSIDE),
+        machinekit.component.Procurement.ProcurementCodec.requirement("maximumSpeed", "rpm", Bt30SpindleData.MAX_RPM)]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues> return Bt30SpindleData.catalog();
   public function new(?overrides:ComponentValues) {

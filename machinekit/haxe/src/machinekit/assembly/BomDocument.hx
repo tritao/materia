@@ -103,7 +103,13 @@ class BomDocument {
     if (item.procurement == null) throw 'BOM item "${item.partNumber}" requires procurement intent';
     if (item.maturity == null || StringTools.trim(item.maturity) == "")
       throw 'BOM item "${item.partNumber}" requires engineering maturity';
-    if (item.maturity == "Assumed" && requirements.length == 0)
+    // An assumed part that is bought or made states what to select; one not supplied on its own (inside another
+    // purchase) is selected by its owner's requirements.
+    var supplied = switch item.procurement {
+      case NotSupplied: false;
+      case _: true;
+    };
+    if (item.maturity == "Assumed" && supplied && requirements.length == 0)
       throw 'Assumed BOM item "${item.partNumber}" requires structured selection requirements';
     var material = item.material;
     switch item.procurement {

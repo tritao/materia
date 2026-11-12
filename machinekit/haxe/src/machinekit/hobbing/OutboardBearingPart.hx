@@ -22,11 +22,11 @@ class OutboardBearingPart extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [P.choice("role", ["sleeve", "gland", "cap", "innerSpacer"], "sleeve")];
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType("machinekit.hobbing.outboard-bearing-part", parameters(), v -> new OutboardBearingPart(v), false, false, null, false)
-      .numbered(v -> "HOB-OUTBOARD-" + v.token("role").toUpperCase()).procured(v -> Make(v.token("role") == "cap" ? "CNC milling" : "turning and grinding")));
+      .numbered(v -> "HOB-OUTBOARD-" + v.token("role").toUpperCase()).procured(v -> Make(v.token("role") == "cap" ? "CNC milling" : "turning and grinding"))
+      .requiring(v -> routeFor(v.token("role")).requirements()));
   }
-  public function new(?overrides:ComponentValues) {
-    var v = P.resolve(parameters(), overrides), role = v.token("role");
-    super("HOB-OUTBOARD-" + role.toUpperCase(), "Outboard bearing " + role, "steel", false, v);
+  /** The cap is milled; the sleeve, gland and inner spacer are turned and ground to their working faces. */
+  static function routeFor(role:String):ManufacturingRoute {
     var faces:Array<machinekit.component.ManufacturingRoute.MachinedFace> = switch role {
       case "sleeve": [
         {name: "bearing bore D32; D40 g5 sliding register, coaxial; front D21 labyrinth", tolerance: 0.002, roughnessRa: 0.4},
@@ -36,7 +36,13 @@ class OutboardBearingPart extends MachineComponent {
       case "cap": [{name: "axial float stop face and D40 register", tolerance: 0.01, roughnessRa: 1.6}];
       default: throw "unknown outboard bearing part";
     };
-    addFacet(role == "cap" ? ManufacturingRoute.milled(2, "fine", faces, 60) : ManufacturingRoute.turned(2, "tight", faces));
+    return role == "cap" ? ManufacturingRoute.milled(2, "fine", faces, 60) : ManufacturingRoute.turned(2, "tight", faces);
+  }
+  public function new(?overrides:ComponentValues) {
+    var v = P.resolve(parameters(), overrides), role = v.token("role");
+    super("HOB-OUTBOARD-" + role.toUpperCase(), "Outboard bearing " + role, "steel", false, v);
+    addFacet(routeFor(role));
+    addFacet(machinekit.component.EngineeringMetadata.assumed("Turned and ground to the stated faces; sizes from the DB7002 bearing, fits assumed"));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
   override public function componentType():Null<ComponentType> return recipeType();

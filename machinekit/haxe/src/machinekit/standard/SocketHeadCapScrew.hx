@@ -35,6 +35,8 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
   public final propertyClass:PropertyClass;
   public final drive:ScrewDrive;
   public final thread:ThreadSpec;
+  /** A code-only screw's defining values (size spec, length, class), from which its number and revision come; null for catalogue screws. */
+  final customIdentity:Null<String>;
   public var diameter(get, never):Float;
   public var pitch(get, never):Float;
   /** Threaded length measured from the tip. */
@@ -233,6 +235,8 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
     this.spec = spec;
     this.length = length;
     this.propertyClass = propertyClass;
+    customIdentity = codeOnly ? machinekit.component.PartNumbers.exactKey({spec: spec, length: length,
+      propertyClass: PropertyClasses.token(propertyClass)}) : null;
     drive = HexSocket(spec.socketSize);
     thread = FastenerThreads.metric(spec.diameter, spec.pitch);
     addConnector("head", Face, Solids.axial(0, 0, 0));
@@ -441,6 +445,10 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
       false
     ).procured(_ -> Buy(null, null, "ISO 4762")));
   }
+
+  /** A code-only screw has no recipe: its revision is the fingerprint of the values that define it. */
+  override public function revisionFingerprint():Null<String>
+    return customIdentity == null ? null : machinekit.component.BomRevision.fingerprint("socket-head-cap-screw|" + customIdentity, 1);
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 

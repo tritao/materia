@@ -12,7 +12,10 @@ class HobSpindlePart extends MachineComponent {
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType("machinekit.hobbing.bt30-spindle-rotor", parameters(),
       v -> new HobSpindlePart(v)).numbered(v -> v.token("role") == "rotor" ? "BT30-D80-INCLUDED-ROTOR" : "BT30-M12-45-PULL-STUD-ASSUMED")
-      .procured(v -> v.token("role") == "rotor" ? NotSupplied : Buy(null, null, "MAS BT30 45 degree; head geometry assumed")));
+      .procured(v -> v.token("role") == "rotor" ? NotSupplied : Buy(null, null, "MAS BT30 45 degree; head geometry assumed"))
+      // The pull stud is bought to the standard; the rotor comes inside the cartridge purchase.
+      .requiring(v -> v.token("role") == "rotor" ? [] : [Procurement.ProcurementCodec.choice("standard", "MAS BT30 45 degree"),
+        Procurement.ProcurementCodec.choice("thread", "M12")]));
   }
   public function new(?overrides:ComponentValues) {
     var v = ComponentRecipeSupport.resolve(parameters(), overrides);

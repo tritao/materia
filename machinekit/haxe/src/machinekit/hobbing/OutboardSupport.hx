@@ -51,18 +51,20 @@ class OutboardSupport extends MachineComponent {
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType("machinekit.hobbing.outboard-support", parameters(), v -> new OutboardSupport(v), false, false, null, false)
       .versioned(2).numbered(_ -> "HOB-OUTBOARD-HOUSING-D40-DB7002")
-      .procured(_ -> Make("CNC milling and bore finishing")));
+      .procured(_ -> Make("CNC milling and bore finishing")).requiring(_ -> route().requirements()));
   }
+  /** Milled housing whose sliding bore is aligned to the spindle by indication. */
+  static function route():ManufacturingRoute return ManufacturingRoute.milled(2, "tight", [
+    {name: "sleeve sliding bore D40 H6, aligned to spindle by indication", tolerance: 0.002, roughnessRa: 0.4},
+    {name: "carrier face and pin bores (ream after alignment)", tolerance: 0.002, roughnessRa: 0.8},
+    {name: "rear cap face, square to sliding bore", tolerance: 0.01, roughnessRa: 1.6}
+  ], OutboardSupport.WIDTH);
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);
     super("HOB-OUTBOARD-HOUSING-D40-DB7002", "Indicated and pinned housing for floating DB7002 sleeve", "steel", false, v);
     addFacet(new EngineeringMetadata(v));
     addFacet(machinekit.motion.PrecisionErrors.fromValues(v, [{name: "radialRunout", unit: "mm"}]));
-    addFacet(ManufacturingRoute.milled(2, "tight", [
-      {name: "sleeve sliding bore D40 H6, aligned to spindle by indication", tolerance: 0.002, roughnessRa: 0.4},
-      {name: "carrier face and pin bores (ream after alignment)", tolerance: 0.002, roughnessRa: 0.8},
-      {name: "rear cap face, square to sliding bore", tolerance: 0.01, roughnessRa: 1.6}
-    ], OutboardSupport.WIDTH));
+    addFacet(route());
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("axis", Axis, Solids.axial(0, 0, 0));
   }
