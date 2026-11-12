@@ -20,6 +20,8 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
   public final bodyWidth:Float;
   public final bodyDepth:Float = 25;
   public final bodyHeight:Float = 30;
+  /** Outside diameter (mm) of the tube its push-in ports take. */
+  static inline final TUBE_DIAMETER = 6;
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new(doubleSolenoid:Bool = false, normallyToA:Bool = false) {
     super(
@@ -36,13 +38,13 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
     addConnector("portP", Face, Solids.axial(0, 0, 30));
     addConnector("portA", Face, Solids.axial(-25, 0, 30));
     addConnector("portB", Face, Solids.axial(25, 0, 30));
-    addPort({name: "P", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true, connector: "portP"});
+    addPort({name: "P", kind: Pneumatic, role: Consumer, iface: PushIn(TUBE_DIAMETER), required: true, connector: "portP"});
     for (name in ["A", "B"]) {
       addPort({
         name: name,
         kind: Pneumatic,
         role: Supply,
-        iface: PushIn(6),
+        iface: PushIn(TUBE_DIAMETER),
         required: false,
         connector: name == "A" ? "portA" : "portB"
       });
@@ -73,7 +75,8 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
     bodyHeight,
     60,
     bodyWidth > 80 ? 2 : 1,
-    [-25.0, 0.0, 25.0]
+    [-25.0, 0.0, 25.0],
+    TUBE_DIAMETER
   );
 
   override public function massGeometry():Null<Part> return Solids.named(
@@ -93,7 +96,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
         machinekit.component.Procurement.ProcurementCodec.choice("configuration", "5/2"),
         machinekit.component.Procurement.ProcurementCodec.choice("solenoids", v.token("solenoids")),
         machinekit.component.Procurement.ProcurementCodec.choice("normalOutlet", v.token("normalOutlet")),
-        machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, 6)
+        machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, TUBE_DIAMETER)
       ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();

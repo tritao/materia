@@ -61,7 +61,8 @@ class VacuumControlValve extends MachineComponent {
     26,
     11,
     1,
-    []
+    [],
+    0
   );
 
   override public function massGeometry():Null<Part> return Part.box(18, 16, 26);

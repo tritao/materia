@@ -14,10 +14,11 @@ import machinekit.component.Solids;
 class PneumaticBodies {
   /**
 	 * A spool valve: a chamfered body over the spool length `spool`, solenoid coil blocks beyond it at one end, or
-	 * both when `coils` is 2, and push-in ports drilled into the top at `ports` (x).
+	 * both when `coils` is 2, and ports of `portDiameter` drilled into the top at `ports` (x). A push-in port's bore is the
+	 * tube's outside diameter, so a tube started at the port's mouth sits on its rim.
 	 */
   public static function valve(width:Float,
-    depth:Float, height:Float, spool:Float, coils:Int, ports:Array<Float>):Part {
+    depth:Float, height:Float, spool:Float, coils:Int, ports:Array<Float>, portDiameter:Float):Part {
     return build(keep -> {var c = Math.min(depth, height) * 0.08, coil = (width - spool) / coils;
     var pieces = [keep(chamferedBox(spool, depth, height, c, -spool / 2), "spool-body")];
     var coilIndex = 0;
@@ -32,7 +33,7 @@ class PneumaticBodies {
       ));
     }
     var tools = [for (k => x in ports) keep(
-      Part.cylinderSpan(Math.min(depth * 0.18, 3.5), height * 0.6, height + 0.1, x, 0),
+      Part.cylinderSpan(portDiameter / 2, height * 0.6, height + 0.1, x, 0),
       "port" + (k + 1)
     )];
     return {pieces: pieces, tools: tools};
