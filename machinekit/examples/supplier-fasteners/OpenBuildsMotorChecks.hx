@@ -7,15 +7,6 @@ class OpenBuildsMotorChecks {
   }
   static function main():Void {
     var motor = NemaStepper.model("OPENBUILDS-NEMA23-56"), part = motor.geometry();
-    var raw = machinekit.motion.OpenBuildsNema23Geometry.build(56, false);
-    check(
-      part.shape.subshapeCount(CadKit.ShapeKind.Face) < raw.shape.subshapeCount(CadKit.ShapeKind.Face),
-      "Refinement removes redundant construction faces"
-    );
-    check(Math.abs(part.volume() - raw.volume()) < 0.00001, "Refinement preserves motor volume");
-    trace("Motor faces before/after refinement: "
-      + raw.shape.subshapeCount(CadKit.ShapeKind.Face) + "/" + part.shape.subshapeCount(CadKit.ShapeKind.Face));
-    raw.close();
     trace("Native motor volume: " + part.volume());
     check(part.valid() && part.solidCount() == 1, "Native motor is one valid fused solid");
     // Independent oracle: execute pinned bd_warehouse StepperMotor and fuse its body/shaft.

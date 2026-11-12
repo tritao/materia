@@ -403,81 +403,36 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 
   override public function hasGeometry():Bool return true;
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    if (variant.housingProfile == "openbuilds-nema23-v1") return OpenBuildsNema23Geometry.build(bodyLength);
-    if (variant.housingProfile == StepperOnline23Geometry.PROFILE) return StepperOnline23Geometry.build(bodyLength);
-    var ownedParts:Array<Part> = [];
-    return Solids.building(ownedParts, tracked -> {var half = variant.bodyFace / 2;
-    var parts:Array<Part> = [];
-    if (detail == Envelope) {
-      var body = Solids.named(
-        Part.prism(
-          [new Vector(-half, -half), new Vector(half, -half), new Vector(half, half), new Vector(-half, half)],
-          -bodyLength,
-          0
-        ),
-        "body"
-      );
-      tracked.push(body);
-      parts.push(body);
-    } else {
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    if (variant.housingProfile == "openbuilds-nema23-v1") return OpenBuildsNema23Geometry.record(b, bodyLength);
+    if (variant.housingProfile == StepperOnline23Geometry.PROFILE) return StepperOnline23Geometry.record(b, bodyLength);
+    var half = variant.bodyFace / 2, up = Vector.Z(), axis = new Vector(0, 0, 0);
+    // The shaft and pilot come first, so their steps (and the faces named by them) are the same in every frame size: a mate
+    // picked on the shaft follows a change of motor.
+    var parts:Array<cadkit.parametric.Feature> = [
+      b.label(b.cylinderAlong(axis, up, variant.shaftDiameter / 2, 0, variant.shaftLength), "Shaft"),
+      b.label(b.cylinderAlong(axis, up, spec.pilotDiameter / 2, 0, variant.pilotHeight), "Pilot")
+    ];
+    if (detail == Envelope) parts.push(b.label(b.boxBetween(-half, half, -half, half, -bodyLength, 0), "Envelope"));
+    else {
       var c = 0.08 * variant.bodyFace;
-      var body = Part.prism(
-        [
-          new Vector(-half + c, -half),
-          new Vector(half - c, -half),
-          new Vector(half, -half + c),
-          new Vector(half, half - c),
-          new Vector(half - c, half),
-          new Vector(-half + c, half),
-          new Vector(-half, half - c),
-          new Vector(-half, -half + c)
-        ],
-        -bodyLength,
-        0
-      );
-      body = Solids.named(body, "body");
-      tracked.push(body);
+      var outline = [new Vector(-half + c, -half), new Vector(half - c, -half), new Vector(half, -half + c), new Vector(half, half - c),
+        new Vector(half - c, half), new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)];
+      var body = b.extrude(b.polygon(outline, new cadkit.modeling.Plane(new Vector(0, 0, -bodyLength), Vector.X(), up)), bodyLength);
       var screw = mountScrew(10);
       var holeDiameter = variant.tappedMount ? screw.spec.tapDrill
         : variant.mountHoleDiameter == null ? screw.clearanceDiameter(Medium) : variant.mountHoleDiameter;
-      var tools:Array<Part> = [];
-      var bolt = 1;
+      var tools:Array<cadkit.parametric.Feature> = [];
       for (point in boltPattern()) {
-        // Bolt holes are named like the `bolt<k>` connectors: the pattern always has the same four.
-        var blank = Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y);
-        tracked.push(blank);
-        var tool = blank;
-        if (variant.tappedMount) {
-          tool = new Part(Threads.attach(
-            blank.shape,
-            "cyl.side",
-            screw.thread.mating(),
-            AxisMaximum,
-            variant.mountHoleDepth,
-            0.1
-          ));
-          blank.close();
-          tracked.push(tool);
-        }
-        tool = Solids.named(tool, "bolt" + bolt++);
-        tracked.push(tool);
-        tools.push(tool);
+        var hole:cadkit.parametric.Feature = b.cylinderAlong(new Vector(point.x, point.y, 0), up, holeDiameter / 2, -variant.mountHoleDepth, 0.1);
+        if (variant.tappedMount) hole = b.thread(hole, "cyl.side", screw.thread.mating(), AxisMaximum, variant.mountHoleDepth, 0.1);
+        tools.push(hole);
       }
-      body = Solids.cut(body, tools);
-      tracked.push(body);
-      parts.push(body);
+      // Bolt holes are named like the `bolt<k>` connectors: the pattern always has the same four.
+      parts.push(b.label(b.cutAll(body, tools, [for (k in 0...tools.length) 'bolt ${k + 1}']), "Body"));
     }
-    var pilot = Solids.named(Part.cylinderSpan(spec.pilotDiameter / 2, 0, variant.pilotHeight), "pilot");
-    var shaft = Solids.named(Part.cylinderSpan(variant.shaftDiameter / 2, 0, variant.shaftLength), "shaft");
-    tracked.push(pilot);
-    tracked.push(shaft);
-    parts.push(pilot);
-    parts.push(shaft);
-    var result = Solids.union(parts);
-    tracked.push(result);
-    return result;
-    });
+    return b.label(b.unionAll(parts), "Stepper motor");
   }
 
   public function mountScrew(length:Float):SocketHeadCapScrew return SocketHeadCapScrew.metric(

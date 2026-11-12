@@ -352,6 +352,29 @@ class DocumentBuilder {
     return constrainedSketch(sketch, new Map());
   }
 
+  /**
+   * One closed outline of straight edges and arcs, every point fixed, in `plane` (XY when omitted): consecutive edges meet end to
+   * start. Edge `i` is the entity `e<i>`, so the face the outline's edge `i` sweeps is `side(<sketch>:e<i>)`.
+   */
+  public function outlineSketch(edges:Array<OutlineEdge>, ?plane:Plane):ConstrainedSketchFeature {
+    if (edges.length < 2) throw new ParametricError("an outline sketch needs at least two edges");
+    var sketch = new ConstrainedSketch(plane);
+    function fixed(id:String, at:Vector):Void {
+      sketch.addPoint(new SketchPoint(id, at.x, at.y));
+      sketch.addConstraint(SketchConstraint.fixed("fixed-" + id, id));
+    }
+    for (i in 0...edges.length) switch edges[i] {
+      case Straight(from, to):
+        fixed('a$i', from);
+        fixed('b$i', to);
+        sketch.addEntity(SketchEntity.line('e$i', 'a$i', 'b$i'));
+      case Arc(center, radius, start, end, clockwise):
+        fixed('o$i', center);
+        sketch.addEntity(SketchEntity.arc('e$i', 'o$i', radius, start, end, clockwise));
+    }
+    return constrainedSketch(sketch, new Map());
+  }
+
   /** Circles of one radius at fixed centres, as a constrained sketch in `plane` (XY when omitted); circle `i` is the entity `c<i>`. */
   public function circlesSketch(centres:Array<Vector>, radius:Float, ?plane:Plane):ConstrainedSketchFeature {
     if (centres.length == 0) throw new ParametricError("a circles sketch needs at least one centre");
@@ -982,4 +1005,10 @@ class DocumentBuilder {
       throw error;
     }
   }
+}
+
+/** One edge of an `outlineSketch`: a straight edge between two points, or an arc about a centre between two angles (radians). */
+enum OutlineEdge {
+  Straight(from:Vector, to:Vector);
+  Arc(center:Vector, radius:Float, startAngle:Float, endAngle:Float, clockwise:Bool);
 }

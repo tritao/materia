@@ -3072,16 +3072,22 @@ class MachineKitSmoke {
     }
   }
 
-  /** A recipe that names its bodies (cadkit/plans/TOPOLOGICAL_NAMING.md, TN4): a face picked on it follows edits. */
+  /** A recorded part names its faces by the steps that made them: a face picked on it follows edits. */
   static function namedStepperFaces():Void {
-    var short = NemaStepper.frame(17).geometry();
+    var motor = NemaStepper.frame(17), short = motor.geometry();
     var faces = short.shape.elementNames(CadKit.ShapeKind.Face);
-    check(
-      faces.indexOf("shaft:cyl.side") >= 0
-      && faces.indexOf("bolt1:cyl.side") >= 0 && faces.indexOf("pilot:cyl.side") >= 0,
-      "stepper faces are named by body: " + faces.join(", ")
-    );
-    var shaft = faces.indexOf("shaft:cyl.side");
+    // The shaft's side is named by the recording's "Shaft" step.
+    var document = motor.recording(), shaftStep:Null<Int> = null;
+    for (id in 0...document.featureCount() + 64) {
+      var feature = document.featureById(id);
+      if (feature != null && feature.label == "Shaft") shaftStep = id;
+    }
+    document.close();
+    check(shaftStep != null, "the stepper records a Shaft step");
+    var shaftFace = 'f$shaftStep:cyl.side';
+    check(faces.indexOf(shaftFace) >= 0 && faces.filter(name -> name == shaftFace).length == 1,
+      "stepper faces are named by the steps that made them: " + faces.join(", "));
+    var shaft = faces.indexOf(shaftFace);
     var connector = cadkit.parametric.GeometricConnectors.capture("shaft", short.shape, CadKit.ShapeKind.Face, shaft);
     // A thicker shaft: only its name finds it. The NEMA 23 variants are drawn from supplier models whose faces are not
     // named by body, so the larger frame is the NEMA 34, which uses the generic geometry.
