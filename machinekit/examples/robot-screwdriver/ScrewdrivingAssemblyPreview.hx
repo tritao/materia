@@ -113,7 +113,7 @@ class ScrewdrivingAssemblyPreview {
     cell.configureSupplies();
     var initial = cell.work.fastenings().require();
     for (fastening in initial) {
-      var qualification = cell.work.join(fastening.screw.member, null, {minimum: 0.2, maximum: 1.0});
+      var qualification = cell.work.declareFastening(fastening.screw.member, null, {minimum: 0.2, maximum: 1.0});
     }
     ScrewdrivingChecks.check(cell);
     var found = cell.work.fastenings(), ordered = ScrewdrivingMission.order(found.require());

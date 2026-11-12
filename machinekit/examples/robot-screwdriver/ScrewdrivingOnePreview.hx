@@ -15,7 +15,7 @@ class ScrewdrivingOnePreview {
       0,
       machinekit.standard.DeepGrooveBearing.metric("6003")
     );
-    var qualification = cell.work.join("flange/screw1", null, {minimum: 0.2, maximum: 1.0});
+    var qualification = cell.work.declareFastening("flange/screw1", null, {minimum: 0.2, maximum: 1.0});
     ScrewdrivingChecks.check(cell);
     var found = [for (item in cell.work.fastenings().require()) if (item.screw.member == "flange/screw1") item];
     if (found.length != 1) throw "Drive-one cell needs its named screw1 fastening";
