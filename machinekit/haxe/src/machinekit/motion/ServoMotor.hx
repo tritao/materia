@@ -440,23 +440,21 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 
   /**
 	 * The envelope is the box behind the mounting face, square to the flange; the preview the motor body
-	 * (`MotorBody`), with bolt holes only where the mounting interface is declared. A motor that records draws its own.
+	 * (`MotorBody`), with bolt holes only where the mounting interface is declared. A family may record its own.
 	 */
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    if (isRecorded()) return super.geometry(detail);
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
     var face = rating.bodyDiameter, length = rating.bodyLength;
-    if (detail == Envelope) return Solids.named(Part.box(face, face, length, Center, Center, Max), "body");
+    if (detail == Envelope) return b.label(b.boxBetween(-face / 2, face / 2, -face / 2, face / 2, -length, 0), "Envelope");
     var declared = mounting();
-    return Solids.named(
-      MotorBody.part(
-        face,
-        length,
-        declared == null ? Math.max(6, face * 0.1) : declared.flangeThickness,
-        declared == null ? 0 : declared.holeDiameter,
-        declared == null ? [] : declared.holes,
-        declared == null ? null : reliefDiameter(declared)
-      ),
-      "body"
+    return MotorBody.record(
+      b,
+      face,
+      length,
+      declared == null ? Math.max(6, face * 0.1) : declared.flangeThickness,
+      declared == null ? 0 : declared.holeDiameter,
+      declared == null ? [] : declared.holes,
+      declared == null ? null : reliefDiameter(declared)
     );
   }
 

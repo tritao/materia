@@ -28,8 +28,20 @@ class AxisServoMotor extends ServoMotor {
     item.requirements = machinekit.component.Procurement.ProcurementCodec.copyRequirements(purchased.requirements);
     return item;
   }
-  override public function geometry(detail:ComponentDetail =
-    Preview):Part return withInterface(source.geometry(detail));
+  /** The selected motor's body with this flange and pilot added in front of its face. */
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    var motor = source.record(b, detail), face = source.mounting();
+    if (motor == null || face == null) throw 'Axis servo lost its mounting interface';
+    var flange = b.label(b.boxBetween(-face.face / 2, face.face / 2, -face.face / 2, face.face / 2, -face.flangeThickness, 0), "Mounting flange");
+    var holes:Array<cadkit.parametric.Feature> = [for (hole in face.holes)
+      b.cylinderAlong(new cadkit.modeling.Vector(hole.x, hole.y, 0), cadkit.modeling.Vector.Z(), face.holeDiameter / 2, -face.flangeThickness - 1, 1)];
+    var axis = new cadkit.modeling.Vector(0, 0, 0), up = cadkit.modeling.Vector.Z();
+    var pilot = b.label(b.cutAll(b.cylinderAlong(axis, up, face.pilotDiameter / 2, 0, face.pilotHeight),
+      [b.cylinderAlong(axis, up, (rating.shaftDiameter + 0.2) / 2, -1, face.pilotHeight + 1)], ["shaft clearance"]), "Pilot");
+    return b.label(b.unionAll([motor, b.label(b.cutAll(flange, holes, [for (k in 0...holes.length) 'mount bolt ${k + 1}']), "Mounting flange holes"),
+      pilot]), "Motor with mounting interface");
+  }
 
   /** Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail. */
   override public function massGeometry():Null<Part> return withInterface(source.massGeometry());

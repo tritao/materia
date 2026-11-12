@@ -287,79 +287,38 @@ class LeadshineServo extends ServoMotor {
     });
   }
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var owned:Array<Part> = [];
-    return Solids.building(owned, tracked -> {function keep(p: Part, name: String): Part {
-      var named = Solids.named(p, name);
-      tracked.push(named);
-      return named;
-    }
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
     var f = spec.face, l = spec.bodyLength, t = spec.flangeThickness;
-    var parts:Array<Part> = [];
-    if (detail == Envelope) parts.push(keep(box(f, f, -l, 0), "body"));
+    function block(w:Float, d:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):cadkit.parametric.Feature
+      return b.boxBetween(x - w / 2, x + w / 2, y - d / 2, y + d / 2, z0, z1);
+    var axis = new Vector(0, 0, 0), up = Vector.Z();
+    var parts:Array<cadkit.parametric.Feature> = [];
+    if (detail == Envelope) parts.push(b.label(block(f, f, -l, 0), "Envelope"));
     else {
-      var flange = keep(box(f, f, -t, 0), "flange");
-      var holes:Array<Part> = [], i = 1;
-      for (p in boltPattern()) holes.push(keep(
-        Part.cylinderSpan(spec.holeDiameter / 2, -t - 0.1, 0.1, p.x, p.y),
-        'bolt${i++}'
-      ));
-      flange = Solids.cut(flange, holes);
-      tracked.push(flange);
-      parts.push(flange);
+      var holes:Array<cadkit.parametric.Feature> = [for (p in boltPattern()) b.cylinderAlong(new Vector(p.x, p.y, 0), up, spec.holeDiameter / 2, -t - 0.1, 0.1)];
+      parts.push(b.label(b.cutAll(block(f, f, -t, 0), holes, [for (k in 0...holes.length) 'bolt ${k + 1}']), "Flange"));
       // Undimensioned cover proportions and longitudinal ribs are visual approximations.
       // Recessed extrusion corners leave the flange through-holes accessible.
       var rear = Math.min(0.22 * l, 0.3 * f), half = f / 2 - 1, c = 0.30 * f;
-      parts.push(keep(
-        Part.prism(
-          [
-            new Vector(-half + c, -half),
-            new Vector(half - c, -half),
-            new Vector(half, -half + c),
-            new Vector(half, half - c),
-            new Vector(half - c, half),
-            new Vector(-half + c, half),
-            new Vector(-half, half - c),
-            new Vector(-half, -half + c)
-          ],
-          -l + rear,
-          -t
-        ),
-        "housing"
-      ));
-      parts.push(keep(box(0.88 * f, 0.88 * f, -l, -l + rear), "encoderCover"));
+      var outline = [new Vector(-half + c, -half), new Vector(half - c, -half), new Vector(half, -half + c), new Vector(half, half - c),
+        new Vector(half - c, half), new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)];
+      parts.push(b.label(b.extrude(b.polygon(outline, new cadkit.modeling.Plane(new Vector(0, 0, -l + rear), Vector.X(), Vector.Z())), l - rear - t),
+        "Housing"));
+      parts.push(b.label(block(0.88 * f, 0.88 * f, -l, -l + rear), "Encoder cover"));
       for (side in [-1, 1]) for (i in 0...5) {
-        var offset = (i - 2) * f * 0.09;
-        parts.push(keep(
-          box(f * 0.035, f * 0.055, -l + rear, -t, side * (f / 2 - f * 0.0175), offset),
-          'ribX${side}_${i}'
-        ));
-        parts.push(keep(
-          box(f * 0.055, f * 0.035, -l + rear, -t, offset, side * (f / 2 - f * 0.0175)),
-          'ribY${side}_${i}'
-        ));
+        var offset = (i - 2) * f * 0.09, at = (side < 0 ? "-" : "+") + Std.string(i + 1);
+        parts.push(b.label(block(f * 0.035, f * 0.055, -l + rear, -t, side * (f / 2 - f * 0.0175), offset), 'Rib X$at'));
+        parts.push(b.label(block(f * 0.055, f * 0.035, -l + rear, -t, offset, side * (f / 2 - f * 0.0175)), 'Rib Y$at'));
       }
     }
-    var pilot = keep(Part.cylinderSpan(spec.pilotDiameter / 2, 0, spec.pilotHeight), "pilot");
-    if (detail == Preview) {
-      var bore = keep(Part.cylinderSpan(spec.shaftDiameter / 2 + 0.05, -0.1, spec.pilotHeight + 0.1), "shaftBore");
-      pilot = Solids.cut(pilot, [bore]);
-      tracked.push(pilot);
-    }
-    parts.push(pilot);
+    var pilot = b.cylinderAlong(axis, up, spec.pilotDiameter / 2, 0, spec.pilotHeight);
+    parts.push(detail == Preview ? b.label(b.cutAll(pilot, [b.cylinderAlong(axis, up, spec.shaftDiameter / 2 + 0.05, -0.1, spec.pilotHeight + 0.1)],
+      ["shaft bore"]), "Pilot") : b.label(pilot, "Pilot"));
     // Two connector envelopes remain within published maximum LH; their exact positions are estimated.
-    parts.push(keep(
-      box(0.28 * f, 2 * (spec.connectorHeight - f / 2), -t - 0.30 * f, -t - 0.08 * f, 0, f / 2),
-      "powerConnector"
-    ));
-    parts.push(keep(
-      box(0.24 * f, 2 * (spec.connectorHeight - f / 2), -l + 0.08 * f, -l + 0.27 * f, 0, f / 2),
-      "encoderConnector"
-    ));
-    var result = Solids.union(parts);
-    tracked.push(result);
-    return result;
-    });
+    parts.push(b.label(block(0.28 * f, 2 * (spec.connectorHeight - f / 2), -t - 0.30 * f, -t - 0.08 * f, 0, f / 2), "Power connector"));
+    parts.push(b.label(block(0.24 * f, 2 * (spec.connectorHeight - f / 2), -l + 0.08 * f, -l + 0.27 * f, 0, f / 2), "Encoder connector"));
+    return b.label(b.unionAll(parts), "Servo motor");
   }
 
   /** Tool for a plate ahead of z=0. Hole diameters follow the motor drawing. */
