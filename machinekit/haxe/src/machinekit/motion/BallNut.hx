@@ -72,39 +72,38 @@ class BallNut extends LeadScrewNut {
   /** The nut's furthest reach from the screw axis (mm), on its +Y side: the flange's rim or the grease fitting's tip. */
   public function radialReach():Float return Math.max(flangeDiameter / 2, GREASE_FITTING_TIP);
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = super.geometry(detail);
-    var z = bodyLength + flangeThickness / 2;
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var nut = super.record(b, detail), z = bodyLength + flangeThickness / 2;
+    if (nut == null) throw "A ball nut records its lead-screw nut";
+    var up = Vector.Z(), across = Vector.Y();
+    function post(r:Float, z0:Float, z1:Float):cadkit.parametric.Feature return b.cylinderAlong(new Vector(0, 0, 0), up, r, z0, z1);
+    function ring(outer:Float, inner:Float, z0:Float, z1:Float, slack:Float):cadkit.parametric.Feature
+      return b.cutAll(post(outer, z0, z1), [post(inner, z0 - slack, z1 + slack)], ["inside"]);
     // Radial fitting on the flange between the two upper mounting holes.
-    var fitting = Solids.union([
-      Solids.named(Part.cylinderAlongY(2.8, 22.5, 25, 0, z), "grease-fitting-base"),
-      Solids.named(Part.cylinderAlongY(1.6, 24.8, GREASE_FITTING_TIP, 0, z), "grease-fitting-nipple")
-    ]);
-    body = Solids.union([body, fitting]);
+    var body = b.label(b.unionAll([
+      nut,
+      b.label(b.cylinderAlong(new Vector(0, 0, z), across, 2.8, 22.5, 25), "Grease fitting base"),
+      b.label(b.cylinderAlong(new Vector(0, 0, z), across, 1.6, 24.8, GREASE_FITTING_TIP), "Grease fitting nipple")
+    ]), "Nut with grease fitting");
     if (detail == Envelope) return body;
-    var tools:Array<Part> = [];
+    var tools:Array<cadkit.parametric.Feature> = [], labels:Array<String> = [];
     // Two shallow annular seal seats; the screw bore stays at its original diameter.
     for (k => end in [0.0, bodyLength + flangeThickness - 0.45]) {
-      var ring = Solids.cut(
-        Solids.named(Part.cylinderSpan(11.2, end - 0.01, end + 0.46), "seal-seat" + (k + 1) + "-outer"),
-        [Solids.named(Part.cylinderSpan(9.2, end - 0.1, end + 0.6), "seal-seat" + (k + 1) + "-inner")]
-      );
-      tools.push(ring);
+      tools.push(ring(11.2, 9.2, end - 0.01, end + 0.46, 0.09));
+      labels.push('seal seat ${k + 1}');
     }
     // Flange flats leave all six mount holes and their face positions intact.
     for (k => side in [-1, 1]) {
-      var box = Part.box(10, 60, flangeThickness + 0.2);
-      var placed = box.translated(new Vector(side * 27.5, 0, bodyLength - 0.1));
-      box.close();
-      tools.push(Solids.named(placed, "flange-flat" + (k + 1)));
+      var x = side * 27.5;
+      tools.push(b.boxBetween(x - 5, x + 5, -30, 30, bodyLength - 0.1, bodyLength + flangeThickness + 0.1));
+      labels.push('flange flat ${k + 1}');
     }
     // Relief at the barrel/flange shoulder and a visible mouth in the grease nipple.
-    tools.push(Solids.cut(
-      Solids.named(Part.cylinderSpan(14.1, bodyLength - 0.8, bodyLength), "shoulder-relief-outer"),
-      [Solids.named(Part.cylinderSpan(13.6, bodyLength - 0.9, bodyLength + 0.1), "shoulder-relief-inner")]
-    ));
-    tools.push(Solids.named(Part.cylinderAlongY(0.65, 25.8, GREASE_FITTING_TIP + 0.1, 0, z), "nipple-mouth"));
-    return Solids.cut(body, tools);
+    tools.push(ring(14.1, 13.6, bodyLength - 0.8, bodyLength, 0.1));
+    labels.push("shoulder relief");
+    tools.push(b.cylinderAlong(new Vector(0, 0, z), across, 0.65, 25.8, GREASE_FITTING_TIP + 0.1));
+    labels.push("nipple mouth");
+    return b.label(b.cutAll(body, tools, labels), "Seal seats, flats and shoulder relief");
   }
 
   static final ballRecipe = new machinekit.cache.Once<ComponentType>();

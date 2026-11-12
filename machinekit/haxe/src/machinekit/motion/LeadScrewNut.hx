@@ -7,6 +7,7 @@ import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.Dimension;
 
 import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
 import cadkit.threads.Threads;
 import cadkit.threads.ThreadedFace.ThreadStart;
 import machinekit.component.ComponentDetail;
@@ -271,43 +272,29 @@ class LeadScrewNut extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = Solids.named(Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength), "body");
-    if (!flanged) return Solids.cut(body, [threadedBore(bodyLength)]);
-    var flange = Solids.named(
-      Part.cylinderSpan(flangeDiameter / 2, flangeOffset, flangeOffset + flangeThickness),
-      "flange"
-    );
-    var solidPart = Solids.union([body, flange]);
-    var boreTool = threadedBore(overallLength);
-    if (detail == Envelope) return Solids.cut(solidPart, [boreTool]);
-    var screw = mountScrewPart(10);
-    var tools = [boreTool];
-    var bolt = 1;
-    for (point in boltPattern()) tools.push(Solids.named(
-      Part.cylinderSpan(
-        screw.clearanceDiameter(Medium) / 2,
-        flangeOffset - 0.1,
-        flangeOffset + flangeThickness + 0.1,
-        point.x,
-        point.y
-      ),
-      "bolt" + bolt++
-    ));
-    return Solids.cut(solidPart, tools);
+  /** The barrel and its flange about the screw axis, with the threaded bore; the preview adds the flange's bolt holes. */
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    var axis = new Vector(0, 0, 0), up = Vector.Z();
+    var body = b.label(b.cylinderAlong(axis, up, bodyDiameter / 2, 0, bodyLength), "Barrel");
+    if (!flanged) return b.label(b.cutAll(body, [threadedBore(b, bodyLength)], ["threaded bore"]), "Threaded bore");
+    var nut = b.label(b.unionAll([body, b.label(b.cylinderAlong(axis, up, flangeDiameter / 2, flangeOffset, flangeOffset + flangeThickness), "Flange")]),
+      "Barrel and flange");
+    var tools = [threadedBore(b, overallLength)], labels = ["threaded bore"];
+    if (detail != Envelope) {
+      var radius = mountScrewPart(10).clearanceDiameter(Medium) / 2;
+      for (k => point in boltPattern()) {
+        tools.push(b.cylinderAlong(new Vector(point.x, point.y, 0), up, radius, flangeOffset - 0.1, flangeOffset + flangeThickness + 0.1));
+        labels.push('bolt ${k + 1}');
+      }
+    }
+    return b.label(b.cutAll(nut, tools, labels), detail == Envelope ? "Threaded bore" : "Threaded bore and bolt holes");
   }
 
-  private function threadedBore(length:Float):Part {
-    var bore = Solids.named(Part.cylinderSpan(screwDiameter / 2, -0.1, length + 0.1), "bore");
-    try {
-      var result = new Part(Threads.attach(bore.shape, "bore:cyl.side", thread.threadSpec(true), AxisMinimum));
-      bore.close();
-      return result;
-    } catch (error:Dynamic) {
-      bore.close();
-      throw error;
-    }
-  }
+  /** The bore along the axis over `length`, carrying the nut's internal thread. */
+  function threadedBore(b:cadkit.parametric.recording.DocumentBuilder, length:Float):cadkit.parametric.Feature
+    return b.thread(b.cylinderAlong(new Vector(0, 0, 0), Vector.Z(), screwDiameter / 2, -0.1, length + 0.1), "cyl.side", thread.threadSpec(true),
+      AxisMinimum);
 
   private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 

@@ -35,33 +35,26 @@ class SfuNut extends LeadScrewNut {
     x:boltCircleDiameter / 2 * Math.cos(a * Math.PI / 180), y:boltCircleDiameter / 2 * Math.sin(a * Math.PI / 180)
   }
   ];
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = super.geometry(detail), s = spec;
-    return Solids.building([body], owned -> {var tail = Solids.cut(
-      Solids.named(Part.cylinderSpan(s.pilot / 2 + 0.1, s.offset + s.thickness, s.length + 0.1), "tail-outer"),
-      [Solids.named(Part.cylinderSpan(s.barrel / 2, s.offset + s.thickness - 0.1, s.length + 0.2), "tail-inner")]
-    );
-    owned.push(tail);
-    var tools = [tail];
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    var nut = super.record(b, detail), s = spec, up = Vector.Z(), axis = new Vector(0, 0, 0);
+    if (nut == null) throw "An SFU nut records its lead-screw nut";
+    var tools:Array<cadkit.parametric.Feature> = [
+      b.cutAll(b.cylinderAlong(axis, up, s.pilot / 2 + 0.1, s.offset + s.thickness, s.length + 0.1),
+        [b.cylinderAlong(axis, up, s.barrel / 2, s.offset + s.thickness - 0.1, s.length + 0.2)], ["inside"])
+    ];
+    var labels = ["tail"];
     for (k => side in [-1, 1]) {
-      var raw = Part.box(s.flange, s.flange * 2, s.thickness + 0.2), flat = Solids.named(raw.translated(new Vector(
-        side * (s.flats / 2 + s.flange / 2),
-        0,
-        s.offset - 0.1
-      )), "flange-flat" + (k + 1));
-      raw.close();
-      owned.push(flat);
-      tools.push(flat);
+      var x = side * (s.flats / 2 + s.flange / 2);
+      tools.push(b.boxBetween(x - s.flange / 2, x + s.flange / 2, -s.flange, s.flange, s.offset - 0.1, s.offset + s.thickness + 0.1));
+      labels.push('flange flat ${k + 1}');
     }
-    var holeIndex = 0;
-    if (detail != Envelope) for (p in boltPattern()) {
-      var hole = Solids.named(Part.cylinderSpan(s.hole / 2, s.offset - 0.1, s.offset + s.thickness + 0.1, p.x, p.y), "flange-bolt" + (++holeIndex));
-      owned.push(hole);
-      tools.push(hole);
+    if (detail != Envelope) for (k => p in boltPattern()) {
+      tools.push(b.cylinderAlong(new Vector(p.x, p.y, 0), up, s.hole / 2, s.offset - 0.1, s.offset + s.thickness + 0.1));
+      labels.push('flange bolt ${k + 1}');
     }
-    return Solids.cut(body, tools);
-    });
+    return b.label(b.cutAll(nut, tools, labels), "Tail, flats and flange bolts");
   }
+
   public static function familyRecipeType():ComponentType {
     return recipe.get(() -> new ComponentType(
       "machinekit.motion.sfu-nut",
