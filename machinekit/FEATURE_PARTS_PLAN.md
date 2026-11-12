@@ -430,6 +430,13 @@ rejected with the feature named.
   router), not as a sweep. New machines and parts start recorded.
 - Each move shrinks the FP6 call-site list.
 
+Started 2026-11-12: `MillCasting` (bench mill base, column, saddle, table,
+head) records its body, pads, cores, gutters and clearances; masses are
+identical (the test's expected base and column masses were stale since the
+gutters and the Y-bearing bay). Recorded parts' Envelope detail has no derived
+holes (an envelope is the outer clearance volume). Freeze baseline 3785 ->
+3743.
+
 ### FP9 — Delete the immediate authoring API
 
 When the FP6 list is empty: remove the authoring surface of

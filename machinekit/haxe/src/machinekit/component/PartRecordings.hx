@@ -29,7 +29,8 @@ class PartRecordings {
         builder.close();
         return null;
       }
-      var cuts = component.machinedCuts(), result = body;
+      // The envelope is the part's outer clearance volume: the joints' holes are not part of it.
+      var cuts = detail == ComponentDetail.Envelope ? [] : component.machinedCuts(), result = body;
       // A sheet part's holes are cut in its blank, so its flat pattern carries them.
       var sheet = Std.downcast(body, cadkit.sheetmetal.SheetFeature);
       if (cuts.length > 0) builder.group("Fasteners", () -> result = builder.label(sheet != null ? builder.sheetHoles(sheet, cuts)

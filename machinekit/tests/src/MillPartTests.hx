@@ -74,9 +74,11 @@ class MillPartTests {
       var mass = casting.massProperties();
       var expectedMass = switch kind {
         case Base:
-          58.6401;
+          // With the chip gutters and drains the Y covers drain into.
+          58.2843;
         case Column:
-          50.9425;
+          // With the bay for the Y screw's rear bearing.
+          50.6280;
         case Saddle:
           25.4801;
         case Table:

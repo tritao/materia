@@ -1,5 +1,11 @@
 package machinekit.milling;
 
+import cadkit.modeling.Plane;
+
+import cadkit.parametric.recording.DocumentBuilder;
+
+import cadkit.parametric.Feature;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.BoltedFace;
@@ -218,16 +224,13 @@ class MillCasting extends MachineComponent {
   public static inline var BODY_PAD:Float = 4;
 
   /** The cut that makes the gutter on `side`: a wedge along the base, the sloped floor and the body top above it. */
-  function gutter(side:Int):Part {
+  /** A gutter's wedge: drawn in (y, z) on the plane at its x, extruded across its width. */
+  function gutter(b:DocumentBuilder, side:Int):Feature {
     var top = height - BODY_PAD, drop = (GUTTER_REAR - GUTTER_FRONT) * GUTTER_FALL;
-    // The wedge is drawn in (y, z) and extruded across x: local x is y, local y is z, local z is x.
-    var wedge = Part.prism([
-      new Vector(GUTTER_REAR, top + 1), new Vector(GUTTER_FRONT - 8, top + 1), new Vector(GUTTER_FRONT - 8, top - drop - GUTTER_FALL * 8), new Vector(GUTTER_REAR, top)
-    ], 0, GUTTER_WIDTH);
-    var frame = AssemblyFrames.fromRotationMatrix(side * GUTTER_CENTRE - GUTTER_WIDTH / 2, 0, 0, [0, 0, 1, 1, 0, 0, 0, 1, 0]);
-    var placed = machinekit.assembly.PosedParts.moved(wedge, frame);
-    wedge.close();
-    return placed;
+    var plane = new Plane(new Vector(side * GUTTER_CENTRE - GUTTER_WIDTH / 2, 0, 0), Vector.Y(), Vector.X());
+    var profile = b.polygon([new Vector(GUTTER_REAR, top + 1), new Vector(GUTTER_FRONT - 8, top + 1),
+      new Vector(GUTTER_FRONT - 8, top - drop - GUTTER_FALL * 8), new Vector(GUTTER_REAR, top)], plane);
+    return b.extrude(profile, GUTTER_WIDTH);
   }
 
   /** The column's bay for the Y screw's rear bearing: half its width, depth into the front face and height from the base, mm. */
@@ -283,137 +286,73 @@ class MillCasting extends MachineComponent {
     }
   }
 
-  override public function hasGeometry():Bool return true;
-  override public function machinable():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part return detail == Envelope ? drawnBody(detail) : machined(drawnBody(detail));
+  /** An axis-aligned box `w` x `d` x `h`, centred on (x, y) and rising from z (as `Part.box(...).translated(...)`). */
+  static function slab(b:DocumentBuilder, w:Float, d:Float, h:Float, x:Float = 0, y:Float = 0, z:Float = 0):Feature
+    return b.boxBetween(x - w / 2, x + w / 2, y - d / 2, y + d / 2, z, z + h);
 
-  function drawnBody(detail:ComponentDetail):Part {
-    var body:Part;
+  /** A vertical bore of radius `r` from z0 to z1 at (x, y). */
+  static function bore(b:DocumentBuilder, r:Float, z0:Float, z1:Float, x:Float, y:Float):Feature
+    return b.cylinderAlong(new Vector(x, y, 0), Vector.Z(), r, z0, z1);
+
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
     var pad = 4.0;
+    var body:Feature;
     if (kind == Base || kind == Saddle) {
-      var pieces = [Solids.named(Part.box(width, depth, height - pad), "casting")];
-      for (side in [-1, 1]) {
-        var railPad = kind == Saddle ? Part.box(width, 30, pad).translated(new Vector(
-          0,
-          side * railSpacing / 2,
-          height - pad
-        )) : Part.box(
-          30,
-          depth,
-          pad
-        ).translated(new Vector(
-          side * railSpacing / 2,
-          0,
-          height - pad
-        ));
-        pieces.push(Solids.named(railPad, side < 0 ? "rail-pad-left" : "rail-pad-right"));
-      }
+      var pieces = [b.label(slab(b, width, depth, height - pad), "Casting")];
+      for (side in [-1, 1]) pieces.push(b.label(kind == Saddle ? slab(b, width, 30, pad, 0, side * railSpacing / 2, height - pad)
+        : slab(b, 30, depth, pad, side * railSpacing / 2, 0, height - pad), side < 0 ? "Rail pad left" : "Rail pad right"));
       if (kind == Base) {
         var column = new MillColumn();
-        pieces.push(Solids.named(
-          Part.box(column.width,
-          column.depth, pad).translated(new Vector(0, depth / 2 - column.depth / 2, height - pad)),
-          "column-pad"
-        ));
-        pieces.push(Solids.named(
-          Part.box(machinekit.motion.ScrewSupportUnit.bk12().width, depth, pad).translated(new Vector(
-            0,
-            0,
-            height - pad
-          )),
-          "screw-support-pad"
-        ));
+        pieces.push(b.label(slab(b, column.width, column.depth, pad, 0, depth / 2 - column.depth / 2, height - pad), "Column pad"));
+        pieces.push(b.label(slab(b, machinekit.motion.ScrewSupportUnit.bk12().width, depth, pad, 0, 0, height - pad), "Screw support pad"));
       }
-      body = Solids.union(pieces);
+      body = b.label(b.unionAll(pieces), "Body and pads");
     } else if (kind == Column) {
-      var pieces = [Solids.named(Part.box(width,
-        depth - pad, height).translated(new Vector(0, pad / 2, 0)), "casting")];
-      for (side in [-1, 1]) pieces.push(Solids.named(
-        Part.box(30, pad, height).translated(new Vector(side * railSpacing / 2, -depth / 2 + pad / 2, 0)),
-        side < 0 ? "rail-pad-left" : "rail-pad-right"
-      ));
-      body = Solids.union(pieces);
-    } else body = Solids.named(Part.box(width, depth, height), "casting");
+      var pieces = [b.label(slab(b, width, depth - pad, height, 0, pad / 2, 0), "Casting")];
+      for (side in [-1, 1]) pieces.push(b.label(slab(b, 30, pad, height, side * railSpacing / 2, -depth / 2 + pad / 2, 0),
+        side < 0 ? "Rail pad left" : "Rail pad right"));
+      body = b.label(b.unionAll(pieces), "Body and pads");
+    } else body = b.label(slab(b, width, depth, height), "Casting");
     if (detail == Envelope) return body;
-    var tools:Array<Part> = [];
-    if (kind == Base) tools.push(Solids.named(
-      Part.box(width - 50, depth - 50, height - 20).translated(new Vector(0, 0, -1)),
-      "underside-core"
-    ));
-    if (kind == Column) tools.push(Solids.named(
-      Part.box(width - 40, depth - 40, height - 50).translated(new Vector(0, 0, 25)),
-      "column-core"
-    ));
+    var tools:Array<Feature> = [], labels:Array<String> = [];
+    function tool(feature:Feature, label:String):Void {
+      tools.push(feature);
+      labels.push(label);
+    }
+    if (kind == Base) tool(slab(b, width - 50, depth - 50, height - 20, 0, 0, -1), "underside core");
+    if (kind == Column) tool(slab(b, width - 40, depth - 40, height - 50, 0, 0, 25), "column core");
     // The pockets the cast-in steel bosses fill; the boss's face stands 1 mm proud of the wall.
     for (i in 0...bosses.length) {
       var boss = bosses[i], face = width / 2 + 1;
-      tools.push(Solids.named(
-        Part.box(face - boss.back, boss.width, boss.length).translated(new Vector((boss.back + face) / 2, boss.y, boss.z - boss.length / 2)),
-        'z-boss-pocket${i + 1}'
-      ));
+      tool(slab(b, face - boss.back, boss.width, boss.length, (boss.back + face) / 2, boss.y, boss.z - boss.length / 2), 'z-boss pocket ${i + 1}');
     }
     // The chip gutters of the Y covers: either side of the screw-support pad, the base's top falls to a drain hole at the front.
     if (kind == Base) for (side in [-1, 1]) {
-      tools.push(Solids.named(gutter(side), side < 0 ? "chip-gutter-left" : "chip-gutter-right"));
-      tools.push(Solids.named(
-        Part.cylinderSpan(DRAIN_DIAMETER / 2, height - 30, height + 1, side * GUTTER_CENTRE, GUTTER_FRONT),
-        side < 0 ? "chip-drain-left" : "chip-drain-right"
-      ));
+      tool(gutter(b, side), side < 0 ? "chip gutter left" : "chip gutter right");
+      tool(bore(b, DRAIN_DIAMETER / 2, height - 30, height + 1, side * GUTTER_CENTRE, GUTTER_FRONT), side < 0 ? "chip drain left" : "chip drain right");
     }
     // The bay for the Y screw's rear bearing: its housing and stand stand back into the column's lower front, a little wider than they are.
-    if (kind == Column) tools.push(Solids.named(
-      Part.box(2 * COVER_BAY_HALF_WIDTH, COVER_BAY_DEPTH + 1, COVER_BAY_HEIGHT).translated(new Vector(0, -depth / 2 + (COVER_BAY_DEPTH - 1) / 2, -1)),
-      "y-bearing-bay"
-    ));
+    if (kind == Column) tool(slab(b, 2 * COVER_BAY_HALF_WIDTH, COVER_BAY_DEPTH + 1, COVER_BAY_HEIGHT, 0, -depth / 2 + (COVER_BAY_DEPTH - 1) / 2, -1),
+      "y-bearing bay");
     // Clearance for the screw along the body; the rail pads remain above it.
-    if (kind == Saddle) tools.push(Solids.named(
-      Part.cylinderAlongY(
-        new machinekit.motion.BallNut().flangeDiameter / 2 + 1,
-        -depth / 2 - 1,
-        depth / 2 + 1,
-        0,
-        screwHeight
-      ),
-      "screw-bore"
-    ));
+    if (kind == Saddle) tool(b.cylinderAlong(new Vector(0, 0, screwHeight), Vector.Y(), new machinekit.motion.BallNut().flangeDiameter / 2 + 1,
+      -depth / 2 - 1, depth / 2 + 1), "screw bore");
     // The flanged X nut crosses the rail gap; recess both adjacent faces.
     if (kind == Saddle || kind == Table) {
       var nut = new machinekit.motion.BallNut();
       var block = machinekit.motion.LinearRailBlock.metric("HGH15CA");
       var recess = (nut.flangeDiameter + 2) / 2 - block.spec.blockHeight / 2;
-      tools.push(Solids.named(
-        Part.box(width + 2, nut.flangeDiameter + 2, recess + 1).translated(new Vector(
-          0,
-          0,
-          kind == Saddle ? height - recess : -1
-        )),
-        "x-nut-clearance"
-      ));
+      tool(slab(b, width + 2, nut.flangeDiameter + 2, recess + 1, 0, 0, kind == Saddle ? height - recess : -1), "x-nut clearance");
     }
-    if (kind == Head) tools.push(Solids.named(
-      Part.cylinderSpan(
-        SpindleCartridge.DIAMETER / 2,
-        -1,
-        height + 1,
-        0,
-        -depth / 2 + SpindleCartridge.DIAMETER / 2 + 10
-      ),
-      "spindle-bore"
-    ));
+    if (kind == Head) tool(bore(b, SpindleCartridge.DIAMETER / 2, -1, height + 1, 0, -depth / 2 + SpindleCartridge.DIAMETER / 2 + 10), "spindle bore");
     if (kind == Table) for (i in 0...3) {
       var y = (i - 1) * SLOT_SPACING;
-      tools.push(Solids.named(
-        Part.box(width + 2, SLOT_WIDTH, 9).translated(new Vector(0, y, height - 8)),
-        'slot${i + 1}-mouth'
-      ));
-      tools.push(Solids.named(Part.box(width + 2,
-        18, 6).translated(new Vector(0, y, height - 14)), 'slot${i + 1}-foot'));
+      tool(slab(b, width + 2, SLOT_WIDTH, 9, 0, y, height - 8), 'slot ${i + 1} mouth');
+      tool(slab(b, width + 2, 18, 6, 0, y, height - 14), 'slot ${i + 1} foot');
     }
-    for (sx in [-1, 1]) for (sy in [-1, 1]) tools.push(Solids.named(
-      Part.cylinderSpan(4.5, -1, height + 1, sx * (width / 2 - 20), sy * (depth / 2 - 20)),
-      'mount-${sx < 0 ? "left" : "right"}-${sy < 0 ? "front" : "back"}'
-    ));
-    return Solids.cut(body, tools);
+    for (sx in [-1, 1]) for (sy in [-1, 1])
+      tool(bore(b, 4.5, -1, height + 1, sx * (width / 2 - 20), sy * (depth / 2 - 20)), 'mount ${sx < 0 ? "left" : "right"} ${sy < 0 ? "front" : "back"}');
+    return b.label(b.cutAll(body, tools, labels), "Cores, pockets and clearances");
   }
 
   static function parse(value:String):MillCastingKind return switch value {
