@@ -318,6 +318,7 @@ class MachineKitSmoke {
     );
     throws(() -> new InstancePath("bad/name"), "cannot contain");
     var pathAssembly = new MachineAssembly();
+    pathAssembly.group("Test");
     throws(() -> pathAssembly.addComponent("bad/name", new MassTestBlock()), "cannot contain");
     check(
       PortInterfaces.compatible(PushIn(6),
@@ -365,6 +366,7 @@ class MachineKitSmoke {
     cup.definePort("vacuum", Vacuum, Consumer, PushIn(6), true);
 
     var tool = new MachineAssembly();
+    tool.group("Vacuum tool");
     tool.addComponent("changer", changer);
     tool.addComponent("manifold", manifold);
     tool.addComponent("generator", generator);
@@ -396,11 +398,13 @@ class MachineKitSmoke {
     tool.addTo(model, "tool");
     check(model.definition().joints.length == 0, "port connections are not CAD mates");
     var station = new MachineAssembly();
-    station.include("tool", tool);
+    station.group("Test");
+    station.includeAsGroup("Included tool", "tool", tool);
     check(station.portNames().length == 0, "included ports are not automatically public");
     throws(() -> station.port("tool/robotAir"), "Missing assembly port");
     var top = new MachineAssembly();
-    top.include("station", station);
+    top.group("Test");
+    top.includeAsGroup("Included station", "station", station);
     check(top.portNames().length == 0, "unexposed ports stay private across three levels");
     station.exposePort("airSupply", "tool/changer", "robotAir");
     check(station.port("airSupply").instanceId == "tool/changer", "port can be re-exposed under a new name");
@@ -415,6 +419,7 @@ class MachineKitSmoke {
     var vacuumSource = new PortTestComponent("VACUUM-SOURCE");
     vacuumSource.definePort("vacuum", Vacuum, Supply, PushIn(6));
     var reversed = new MachineAssembly();
+    reversed.group("Test");
     reversed.addComponent("generator", vacuumSource);
     reversed.addComponent("cup", cup);
     reversed.connectPorts("reverse", "cup", "vacuum", "generator", "vacuum");
@@ -423,6 +428,7 @@ class MachineKitSmoke {
       "consumer-first connection traces to its supply"
     );
     var unfinished = new MachineAssembly();
+    unfinished.group("Test");
     unfinished.addComponent("source", vacuumSource);
     unfinished.addComponent("cup", cup);
     unfinished.addComponent("gripper", generator);
@@ -433,20 +439,24 @@ class MachineKitSmoke {
     );
     throws(() -> unfinished.validate(), "Required consumer port");
     var incompleteTool = new MachineAssembly();
+    incompleteTool.group("Vacuum tool");
     incompleteTool.addComponent("cup", cup);
     incompleteTool.exposePort("vacuum", "cup", "vacuum");
     var parent = new MachineAssembly();
-    parent.include("tool", incompleteTool);
+    parent.group("Test");
+    parent.includeAsGroup("Tool", "tool", incompleteTool);
     check(parent.portNames().length == 0, "included required input is private until re-exposed");
     throws(() -> parent.validate(), "Required consumer port");
     parent.exposePort("tool/vacuum", "tool/cup", "vacuum");
     check(parent.validate().length == 0, "parent must explicitly re-expose an included required input");
     var connectedParent = new MachineAssembly();
-    connectedParent.include("tool", incompleteTool);
+    connectedParent.group("Test");
+    connectedParent.includeAsGroup("Included tool", "tool", incompleteTool);
     connectedParent.addComponent("source", vacuumSource);
     connectedParent.connectPorts("feed", "tool/cup", "vacuum", "source", "vacuum");
     check(connectedParent.validate().length == 0, "parent can connect an included required input directly");
     var unwired = new MachineAssembly();
+    unwired.group("Test");
     unwired.addComponent("cup", cup);
     unwired.addTo(new AssemblyModel(), "");
     unwired.massProperties();
@@ -457,6 +467,7 @@ class MachineKitSmoke {
     var power = new PortTestComponent("POWER");
     power.definePort("output", ElectricalPower, Supply, Unspecified);
     var misleading = new MachineAssembly();
+    misleading.group("Test");
     misleading.addComponent("device", unrelated);
     misleading.addComponent("power", power);
     misleading.connectPorts("feed", "power", "output", "device", "power");
@@ -466,6 +477,8 @@ class MachineKitSmoke {
     );
 
     var diagnosticsAssembly = new MachineAssembly();
+
+    diagnosticsAssembly.group("Test");
     diagnosticsAssembly.addComponent("cupA", cup);
     diagnosticsAssembly.addComponent("cupB", cup);
     var diagnosticsSource = new PortTestComponent("DIAGNOSTICS-SOURCE");
@@ -480,6 +493,7 @@ class MachineKitSmoke {
     );
     throws(() -> diagnosticsAssembly.validate(), "mismatched kinds");
     var structure = new MachineAssembly();
+    structure.group("Test");
     structure.addComponent("root", new MassTestBlock());
     structure.addComponent("child", new MassTestBlock());
     structure.addMate("first", "fixed", "root", "right", "child", "origin");
@@ -496,12 +510,17 @@ class MachineKitSmoke {
 
 
     var unconnected = new MachineAssembly();
+
+
+    unconnected.group("Test");
     unconnected.addComponent("cup", cup);
     throws(() -> unconnected.validate(), "Required consumer port");
     unconnected.exposePort("vacuum", "cup", "vacuum");
     check(unconnected.validate().length == 0, "exposed consumer can be supplied by parent assembly");
 
     var badKind = new MachineAssembly();
+
+    badKind.group("Test");
     badKind.addComponent("changer", changer);
     badKind.addComponent("cup", cup);
     badKind.connectPorts("wrong", "changer", "toolAir", "cup", "vacuum");
@@ -513,6 +532,7 @@ class MachineKitSmoke {
     var supplier = new PortTestComponent("SUPPLIER");
     supplier.definePort("air", Pneumatic, Supply, PushIn(6));
     var doubleSupply = new MachineAssembly();
+    doubleSupply.group("Test");
     doubleSupply.addComponent("a", supplier);
     doubleSupply.addComponent("b", supplier);
     doubleSupply.connectPorts("wrong", "a", "air", "b", "air");
@@ -520,6 +540,7 @@ class MachineKitSmoke {
     var consumer = new PortTestComponent("CONSUMER");
     consumer.definePort("air", Pneumatic, Consumer, PushIn(6));
     var doubleConsumer = new MachineAssembly();
+    doubleConsumer.group("Test");
     doubleConsumer.addComponent("a", consumer);
     doubleConsumer.addComponent("b", consumer);
     doubleConsumer.connectPorts("wrong", "a", "air", "b", "air");
@@ -527,12 +548,14 @@ class MachineKitSmoke {
     var threaded = new PortTestComponent("THREADED");
     threaded.definePort("air", Pneumatic, Consumer, Thread("G1/8"));
     var mismatch = new MachineAssembly();
+    mismatch.group("Test");
     mismatch.addComponent("a", supplier);
     mismatch.addComponent("b", threaded);
     mismatch.connectPorts("adapter-needed", "a", "air", "b", "air");
     mismatch.validateStructure();
     throws(() -> mismatch.validate(), "mismatched interfaces");
     var branch = new MachineAssembly();
+    branch.group("Test");
     branch.addComponent("a", supplier);
     branch.addComponent("b", consumer);
     branch.addComponent("c", consumer);

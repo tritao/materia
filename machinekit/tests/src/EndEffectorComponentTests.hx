@@ -319,8 +319,8 @@ class EndEffectorComponentTests {
       == "arm/tool/gripper/rod") || (pair.first == "arm/tool/gripper/rod" && pair.second == "arm/tool/valve")).length
       != 1) throw "A valve mounted on the cylinder body is recognized against the moving piston rod";
     var suppliedGripper = new MachineAssembly();
-    suppliedGripper.include("tool", gripperTool);
-    suppliedGripper.addComponent("airSupply", new machinekit.pneumatic.AirSupply());
+    suppliedGripper.includeAsGroup("Tool", "tool", gripperTool);
+    suppliedGripper.withGroup("Air supply", () -> suppliedGripper.addComponent("airSupply", new machinekit.pneumatic.AirSupply()));
     suppliedGripper.addMate("air-source-mount", "fixed", "tool/plate", "robot", "airSupply", "mount");
     suppliedGripper.connectPorts("tool-air", "airSupply", "air", "tool", "compressedAir");
     if (suppliedGripper.validate().length != 0) throw "Pneumatic gripper and routed hoses do not validate";

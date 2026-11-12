@@ -148,9 +148,15 @@ typedef MachineAssemblyMassProperties = {
   public function sets():Array<AssemblySets.AssemblySet> return AssemblySets.derive(definition());
 
   public function checkGroups():Diagnostics {
-    var result = new Diagnostics();
-    for (id => path in functionalGroups()) if (path.split("/").indexOf("Ungrouped") >= 0)
-      result.warning("assembly.ungrouped", id, 'Member "$id" has no authored functional group');
+    var result = new Diagnostics(), groups = functionalGroups();
+    // In member order, so the same assembly reports the same findings in the same order.
+    var ids = [for (id in groups.keys()) id];
+    ids.sort(Reflect.compare);
+    for (id in ids) {
+      var path = groups.get(id);
+      if (path != null && path.split("/").indexOf("Ungrouped") >= 0)
+        result.warning("assembly.ungrouped", id, 'Member "$id" has no authored functional group');
+    }
     return result;
   }
 

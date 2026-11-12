@@ -87,8 +87,8 @@ class EndEffectorExampleChecks {
       );
     }
     var cell = new MachineAssembly();
-    cell.include("tool", short);
-    cell.addComponent("airSource", new ExampleAirSource());
+    cell.includeAsGroup("Tool", "tool", short);
+    cell.withGroup("Air supply", () -> cell.addComponent("airSource", new ExampleAirSource()));
     cell.connectPorts("feed", "airSource", "air", "tool/robot/master", "airIn1");
     cell.exposePort("robotSignal", "tool/robot/master", "signalIn");
     cell.exposePort("lock", "tool/robot/master", "lock");

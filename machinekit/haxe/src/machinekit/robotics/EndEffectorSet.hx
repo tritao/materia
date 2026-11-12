@@ -175,8 +175,8 @@ class EndEffectorSet extends EndEffector {
     validate();
     tool.validate();
     var result = new EndEffector();
-    result.include("robot", this);
-    result.include("tool", tool);
+    result.includeAsGroup("Robot side", "robot", this);
+    result.includeAsGroup("Tool", "tool", tool);
     for (member in components()) if (collisionExcluded(member.id)) result.excludeFromCollision(MachineAssembly.join(
       "robot",
       member.id

@@ -80,6 +80,7 @@ class EndEffectorTests {
     close(inertia.yy, 1, "rotated inertia yy");
 
     var broken = new EndEffector();
+    broken.group("Tool");
     broken.addComponent("plate", new EndEffectorTestPart("BROKEN", 1));
     broken.workingFrame("bad", "absent", "tip");
     var findings = broken.check().items;

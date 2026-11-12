@@ -31,21 +31,15 @@ class ArmGripperTool implements ArmTool {
     // leaving the tool open until its controller requests a grasp.
     var valve = new SolenoidValve(true, false);
     var result = new EndEffector();
-    result.addComponent("plate", new EndEffectorPlate(flange));
-    result.include("gripper", gripper);
-    result.addComponent("valve", valve);
+    result.withGroup("Mounting", () -> result.addComponent("plate", new EndEffectorPlate(flange)));
+    result.includeAsGroup("Gripper", "gripper", gripper);
+    result.withGroup("Pneumatics", () -> result.addComponent("valve", valve));
     result.addMate("gripper-mount", "fixed", "plate", "tool", "gripper/body", "mount");
     result.addMate("valve-mount", "fixed", "gripper/body", "valveSeat", "valve", "mount");
     var poses = result.solvedPoses();
-    for (outlet in ["A", "B"]) GripperAirRouting.add(
-      result,
-      poses,
-      "gripper",
-      "valve",
-      spec,
-      outlet,
-      "airHose" + outlet
-    );
+    result.withGroup("Pneumatics", () -> {
+      for (outlet in ["A", "B"]) GripperAirRouting.add(result, poses, "gripper", "valve", spec, outlet, "airHose" + outlet);
+    });
     result.exposePort("close", "gripper/body", "close");
     result.exposePort("open", "gripper/body", "open");
     result.exposePort("compressedAir", "valve", "P");
