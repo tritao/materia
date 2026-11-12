@@ -45,8 +45,23 @@ class LinearMountSteel extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> v.token("partId") != "" ? 'LM-${v.token("partId").toUpperCase()}' : 'LM-${v.token("stock") == "C45" ? "C45" : "MILD"}-${v.token("role").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("thickness"))}')
+    ).numbered(numberFor)
       .procured(v -> Make(v.token("stock") == "C45" ? "CNC machining" : "steel fabrication and machining")));
+  }
+
+  /**
+   * `LM-<stock>-<role>-<width>x<length>x<thickness>` when those sizes print exactly and the number fits; otherwise a capped
+   * identity of the exact sizes, so two parts that differ by less than the printed precision never share a number.
+   */
+  static function numberFor(v:ComponentValues):String {
+    if (v.token("partId") != "") return 'LM-${v.token("partId").toUpperCase()}';
+    var stock = v.token("stock") == "C45" ? "C45" : "MILD", role = v.token("role").toUpperCase();
+    var sizes = [v.number("width"), v.number("length"), v.number("thickness")];
+    var readable = 'LM-$stock-$role-' + [for (size in sizes) Dimension.format(size)].join("x");
+    var exact = true;
+    for (size in sizes) if (Std.parseFloat(Dimension.format(size)) != size) exact = false;
+    if (exact && readable.length <= machinekit.component.PartNumberLint.MAX_LENGTH) return readable;
+    return machinekit.component.PartNumbers.geometry("LM-" + stock, role, machinekit.component.PartNumbers.exactKey(sizes));
   }
 
   public function new(?overrides:ComponentValues) {
