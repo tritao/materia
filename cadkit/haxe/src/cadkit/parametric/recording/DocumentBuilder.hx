@@ -76,8 +76,9 @@ class DocumentBuilder {
   private var finished:Bool;
   private final declaredDatums:Array<ReferencePlaneElement> = [];
 
-  public function new() {
-    document = new Document();
+  /** `id` names the document; a recording that is a pure function of its inputs passes one derived from them, so it saves the same bytes in any process. */
+  public function new(?id:cadkit.parametric.DocumentId) {
+    document = new Document(id);
     finished = false;
   }
 

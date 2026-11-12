@@ -21,7 +21,7 @@ class PartRecordings {
    * solid, the history and the hole table carry the same holes.
    */
   public static function document(component:MachineComponent, detail:ComponentDetail):Null<Document> {
-    var builder = new DocumentBuilder();
+    var builder = new DocumentBuilder(component.recordingDocumentId(detail));
     var document:Null<Document> = null;
     try {
       var body = component.record(builder, detail);

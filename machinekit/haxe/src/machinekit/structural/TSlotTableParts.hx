@@ -114,12 +114,22 @@ class TableTop extends MachineComponent {
     }
     ];
     super(
-      'TABLE-TOP-$width-$depth-$thickness-' + haxe.Json.stringify(this.mounts),
+      numberFor(width, depth, thickness, this.mounts),
       "Drilled steel table top",
       "steel",
       true
     );
   }
+  /** Its plate size when that is exact and short, else its geometry's identity: the plate and every drilled mount. */
+  static function numberFor(width:Float, depth:Float, thickness:Float, mounts:Array<TableTopMount>):String {
+    var sizes = [width, depth, thickness], readable = "TABLE-TOP-" + [for (size in sizes) machinekit.component.Dimension.format(size)].join("x");
+    var exact = mounts.length == 0;
+    for (size in sizes) if (Std.parseFloat(machinekit.component.Dimension.format(size)) != size) exact = false;
+    if (exact && readable.length <= machinekit.component.PartNumberLint.MAX_LENGTH) return readable;
+    return machinekit.component.PartNumbers.geometry("TABLE-TOP", "drilled",
+      machinekit.component.PartNumbers.exactKey(sizes) + machinekit.component.PartNumbers.exactKey(mounts));
+  }
+
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
     owned -> {var body = Part.box(

@@ -323,6 +323,16 @@ class MachineComponent {
 
   function recordingKey(detail:ComponentDetail):String return geometryKey(detail) + "|recorded:" + recordingContext();
 
+  /**
+   * The id of this part's recording at `detail`, from what the part is (its recipe values, or its number when it has no
+   * recipe, with material, detail, derived holes and context) rather than from the process: the same part records the
+   * same document, and a scene that carries it the same bytes, in any program.
+   */
+  public function recordingDocumentId(detail:ComponentDetail):cadkit.parametric.DocumentId {
+    var identity = type == null ? "part|" + designation + "|" + materialId + "|" + Std.string(detail) + machinedSuffix(true) : geometryKey(detail);
+    return new cadkit.parametric.DocumentId("document-" + haxe.crypto.Sha256.encode(identity + "|recorded:" + recordingContext()).substr(0, 24));
+  }
+
   /** The part's solid: from its recording when it records, evaluated once per recording key. */
   public function geometry(detail:ComponentDetail = Preview):Part {
     if (!isRecorded()) throw new NoGeometry(designation);
