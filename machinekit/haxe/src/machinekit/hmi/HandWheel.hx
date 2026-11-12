@@ -42,7 +42,7 @@ class HandWheel extends HmiPart {
     R.length("ringHeight", 9),
     R.length("dialDiameter", 44),
     R.length("dialRecess", 2),
-    R.choice("detail", ["textured", "modelled"], "textured"),
+    R.choice("surfaceDetail", ["textured", "modelled"], "textured"),
     R.count("knurlTeeth", 120),
     R.length("knurlDepth", 0.5),
     R.count("scaleDivisions", 100),
@@ -360,12 +360,12 @@ class HandWheel extends HmiPart {
       "handleRadius",
       "knurlDepth"
     ]) Std.string(n(name))].join("|") + "|" + count("knurlTeeth")
-      + "|" + count("scaleDivisions") + "|" + values().token("detail") + "|" + (flag("handle") ? "h" : "-");
+      + "|" + count("scaleDivisions") + "|" + values().token("surfaceDetail") + "|" + (flag("handle") ? "h" : "-");
     return wheelCache.get(key, () -> buildWheel());
   }
 
   /** Whether the knurling and scale are textures on a plain wheel (the default) or modelled as geometry. */
-  function textured():Bool return values().token("detail") == "textured";
+  function textured():Bool return values().token("surfaceDetail") == "textured";
 
   /** The wheel's faces that carry details, named by their segment in the revolved profile below. */
   static inline var CONE_FACE:String = "wheel:side(seg.1)";

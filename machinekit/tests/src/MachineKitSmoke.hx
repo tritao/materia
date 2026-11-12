@@ -566,10 +566,12 @@ class MachineKitSmoke {
 
   static function componentRecipes():Void {
     for (recipe in MachineKitComponents.defaultRegistry().all()) {
-      var original = recipe.create();
+      // A recipe with a required input is only made from given values (its source part's); it is checked there.
+      if (!recipe.hasDefaultPart()) continue;
+      var original = try recipe.create() catch (error:Dynamic) throw '${recipe.id}: creating with its defaults: $error';
       check(original.type == recipe, 'recipe type mismatch ${recipe.id}');
       var values = original.values();
-      var restored = recipe.create(values);
+      var restored = try recipe.create(values) catch (error:Dynamic) throw '${recipe.id}: rebuilding from its own values: $error';
       check(recipe.key(values) == recipe.key(restored.values()), 'recipe values mismatch ${recipe.id}');
       check(original.designation == restored.designation, 'recipe designation mismatch ${recipe.id}');
       var a = original.connectors(), b = restored.connectors();
@@ -601,13 +603,15 @@ class MachineKitSmoke {
       [new ComponentParameter("angle", ComponentParameterType.Angle, ComponentValue.Number(3))],
       function(_:ComponentValues) return DeepGrooveBearing.metric("608")
     );
-    check(angleType.key(null).indexOf("angle:1:3") >= 0, "angle keys round above the signed 32-bit integer range");
+    // Numbers are keyed by their exact 64-bit pattern, so an angle never overflows or rounds into another one.
+    var angleKey = machinekit.component.ComponentNumberKey.encode(3);
+    check(angleType.key(null).indexOf('angle:${angleKey.length}:$angleKey') >= 0, "angle keys are exact 64-bit values: " + angleType.key(null));
     var scalarType = new ComponentType(
       "test.scalar",
       [new ComponentParameter("scalar", ComponentParameterType.Scalar, ComponentValue.Number(3))],
       function(_:ComponentValues) return DeepGrooveBearing.metric("608")
     );
-    check(scalarType.key(null).indexOf("scalar:1:3") >= 0, "scalar keys round above the signed 32-bit integer range");
+    check(scalarType.key(null).indexOf('scalar:${angleKey.length}:$angleKey') >= 0, "scalar keys are exact 64-bit values: " + scalarType.key(null));
     var screwRecipe = MachineKitComponents.defaultRegistry().byId("machinekit.standard.socket-head-cap-screw");
     var steelScrew = screwRecipe.create(new ComponentValues().setToken("propertyClass", "8.8"));
     check(steelScrew.bom.material == "steel 8.8", "non-default screw class supplies the BOM material");
@@ -669,7 +673,8 @@ class MachineKitSmoke {
     customCodeOnly(LinearRailBlock.custom(LinearRailSystem.catalog().get("MGN12C")), "rail block");
     var firstLength = screwRecipe.defaults().setNumber("length", 20.0001);
     var secondLength = screwRecipe.defaults().setNumber("length", 20.0002);
-    check(screwRecipe.key(firstLength) == screwRecipe.key(secondLength), "length keys round to a micrometre");
+    // Keys are exact: two different lengths, however close, are two different parts.
+    check(screwRecipe.key(firstLength) != screwRecipe.key(secondLength), "length keys are exact");
     var conflicted = new Bom();
     conflicted.add({
       partNumber: "X",
@@ -709,6 +714,8 @@ class MachineKitSmoke {
     var registryDocument = new Document();
     for (registered in MachineKitComponents.defaultRegistry().all()) {
       check(DefinitionEvaluatorRegistry.isRegistered(registered.id), "MachineKit evaluator registration");
+      // A recipe with a required input has no default part to define a document from.
+      if (!registered.hasDefaultPart()) continue;
       var recipeDefinition = MachineKitDocuments.define(registryDocument, registered);
       var defaultComponent = registered.create();
       var toolInputCount = 0;

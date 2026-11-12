@@ -215,6 +215,9 @@ class ComponentRecipeSupport {
     Token(value)
   );
 
+  /** A text input with no default: a recipe that has one is only made from given values. */
+  public static function requiredText(name:String):ComponentParameter return new ComponentParameter(name, Text, Unset);
+
   public static function requiredChoice(name:String,
     options:Array<String>):ComponentParameter return new ComponentParameter(
       name,

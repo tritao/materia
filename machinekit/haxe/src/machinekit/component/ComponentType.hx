@@ -89,6 +89,18 @@ class ComponentType {
     };
   }
 
+  /**
+   * Whether `create()` with no values makes a part: false when an input has no default (a cast insert's role comes from the
+   * source part it is cast for), so such a recipe is only made from given values.
+   */
+  public function hasDefaultPart():Bool {
+    for (parameter in parameters()) switch parameter.defaultValue {
+      case Unset: return false;
+      case _:
+    }
+    return true;
+  }
+
   public function parameters():Array<ComponentParameter> return inputs.copy();
 
   /** Declare the catalogue or drawing identity for this recipe. */

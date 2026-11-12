@@ -363,7 +363,7 @@ class PendantTests {
       moved.close();
       wheelSolid.close();
     }
-    var modelled = new HandWheel(new machinekit.component.ComponentValues().setToken("detail", "modelled"));
+    var modelled = new HandWheel(new machinekit.component.ComponentValues().setToken("surfaceDetail", "modelled"));
     var modelledBodies = modelled.bodies();
     if (modelledBodies != null) {
       var modelledSolid = [for (b in modelledBodies) if (b.id == "wheel") b][0].build();

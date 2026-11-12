@@ -33,7 +33,7 @@ class LinearMountNutCassette extends MachineComponent {
     P.choice("size", ["M6"], "M6"),
     P.choice("layout", ["end-service", "compact-centre-service"], "end-service"),
     P.text("stations", "[]"),
-    P.text("sourceFingerprint", "")
+    P.requiredText("sourceFingerprint")
   ];
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType(
