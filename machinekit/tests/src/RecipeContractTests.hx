@@ -75,6 +75,8 @@ class RecipeContractTests {
       );
     }
     for (type in MachineKitComponents.defaultRegistry().all()) {
+      // A recipe with a required input and no fixture naming one has no part to check here.
+      if (!type.hasDefaultPart() && !hasFixture(type)) continue;
       for (parameter in type.parameters()) switch parameter.type {
         case CatalogDesignation(index):
           for (designation in index.designations()) {
@@ -119,8 +121,10 @@ class RecipeContractTests {
         if (prior != null && prior != key) throw '${type.id}: part number "$partNumber" aliases different values';
         partNumbers.set(partNumber, key);
 
-        checkSolid(component.geometry(Envelope), '${type.id} $key Envelope');
-        checkSolid(component.geometry(Preview), '${type.id} $key Preview');
+        // A supplier's model is its solids as shipped (a vise is many); generated geometry is one solid.
+        var solid = component.geometryFidelity() == machinekit.component.GeometryFidelity.Supplier ? checkValid : checkSolid;
+        solid(component.geometry(Envelope), '${type.id} $key Envelope');
+        solid(component.geometry(Preview), '${type.id} $key Preview');
         for (tool in component.toolSpecs()) checkValid(
           component.tool(tool.name, tool.defaults()),
           '${type.id} $key tool "${tool.name}"'
@@ -193,13 +197,15 @@ class RecipeContractTests {
   static function facetWords(component:machinekit.component.MachineComponent):Array<String
     > return [for (facet in component.facets()) facet.describe()];
 
+  static function hasFixture(type:machinekit.component.ComponentType):Bool return type.id == machinekit.structural.CastInsert.recipeType().id;
+
   static function fixtureValues(type:machinekit.component.ComponentType):ComponentValues {
-    var values = type.defaults();
-    if (type.id == machinekit.structural.CastInsert.recipeType().id) values.setToken(
+    // A recipe with a required input has no default part: the fixture names one.
+    if (hasFixture(type)) return type.resolve(new ComponentValues().setToken(
       "role",
       materia.casting.InsertSpec.InsertRole.GenericMount
-    );
-    return values;
+    ));
+    return type.defaults();
   }
 
   static function cases(type:machinekit.component.ComponentType):Array<ComponentValues> {

@@ -37,18 +37,10 @@ class ParallelGripperJaw extends MachineComponent {
         AssemblyFrames.compose(AssemblyFrames.turnY(Math.PI / 2.0), Solids.axial(0, 0, 0))
       )
     );
-    var reach = spec.guideTongueReach();
-    var inner = -side * spec.jawWidth / 2;
+    var foot = footSpan();
     addFacet(CollisionHullFacet.fromBoxes([
       [-spec.jawWidth / 2, -spec.bodyDepth / 2, 0, spec.jawWidth / 2, spec.bodyDepth / 2, spec.jawHeight],
-      [
-        Math.min(inner, inner - side * reach),
-        -spec.bodyDepth / 2,
-        -ParallelGripperSpec.GUIDE_TONGUE_HEIGHT,
-        Math.max(inner, inner - side * reach),
-        spec.bodyDepth / 2,
-        0
-      ]
+      [foot.min, -spec.bodyDepth / 2, -ParallelGripperSpec.GUIDE_TONGUE_HEIGHT, foot.max, spec.bodyDepth / 2, 0]
     ]));
     addConnector("fingerSeat",
       Mount, Solids.axial(-side * (spec.jawWidth - spec.fingerWidth) / 2.0, 0, spec.jawHeight));
@@ -101,19 +93,23 @@ class ParallelGripperJaw extends MachineComponent {
       materialSpec()
     );
 
+  /**
+   * The carriage's foot along x: under the whole jaw and out past its inner face by the guide tongue's reach, so the carriage
+   * is one L-shaped piece running on the housing's relieved guide floor.
+   */
+  function footSpan():{min:Float, max:Float} {
+    var outer = side * spec.jawWidth / 2, tip = -side * (spec.jawWidth / 2 + spec.guideTongueReach());
+    return {min: Math.min(outer, tip), max: Math.max(outer, tip)};
+  }
+
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
-    parts -> {parts.push(Solids.named(Part.box(
-      spec.jawWidth,
-      spec.bodyDepth,
-      spec.jawHeight
-    ), "jaw"));
-  parts.push(Solids.named(Part.box(spec.guideTongueReach(),
-    spec.bodyDepth, ParallelGripperSpec.GUIDE_TONGUE_HEIGHT).translated(new Vector(
-      -side * (spec.jawWidth + spec.guideTongueReach()) / 2,
-      0,
-      -ParallelGripperSpec.GUIDE_TONGUE_HEIGHT
-    )), "guide-tongue"));
-  return Solids.union(parts);
-  });
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var foot = footSpan();
+    return Solids.building([], parts -> {
+      parts.push(Solids.named(Part.box(spec.jawWidth, spec.bodyDepth, spec.jawHeight), "jaw"));
+      parts.push(Solids.named(Part.box(foot.max - foot.min, spec.bodyDepth, ParallelGripperSpec.GUIDE_TONGUE_HEIGHT)
+        .translated(new Vector((foot.min + foot.max) / 2, 0, -ParallelGripperSpec.GUIDE_TONGUE_HEIGHT)), "guide-foot"));
+      return Solids.union(parts);
+    });
+  }
 }

@@ -29,7 +29,8 @@ class MillYDriveSeat extends MachineComponent {
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
   override public function componentType():Null<ComponentType> return recipeType();
-  override public function values():ComponentValues return new ComponentValues().setBoolean("floating", floating);
+  override public function values():ComponentValues return new ComponentValues().setBoolean("floating", floating)
+    .setToken("material", materialSpec());
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var depth = floating ? 20.0 : 83.0;

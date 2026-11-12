@@ -51,5 +51,5 @@ class MillFixtureAdapter extends MachineComponent {
   override public function values():ComponentValues return new ComponentValues().setNumber("height", height).setToken(
     "pattern",
     pneumatic ? "128-square" : "82-square"
-  );
+  ).setToken("material", materialSpec());
 }

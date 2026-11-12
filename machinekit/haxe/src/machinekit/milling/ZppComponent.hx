@@ -89,6 +89,9 @@ class ZppComponent extends MachineComponent {
     return machinekit.cache.Parallel.serialized(() -> Shape.importStep(path));
   });
   override public function hasGeometry():Bool return true;
+  /** The supplier's solids as its STEP ships them; the stud links are nominal envelopes. */
+  override public function geometryFidelity():machinekit.component.GeometryFidelity return isLink()
+    ? super.geometryFidelity() : machinekit.component.GeometryFidelity.Supplier;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (isLink()) return role == "stud-link96" ? Part.cylinderSpan(5, -10, 10) : Part.cylinderSpan(4, -8, 8);
     var group = groups.get(model() + "|" + role, () -> solids());
