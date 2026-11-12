@@ -13,8 +13,19 @@ class PressBrakePartTests {
     var body = cylinder.geometry(), rod = cylinder.movingRod().geometry();
     if (CadKit.shapeValidChecked(body.shape.borrowHandle()) == 0
       || CadKit.shapeValidChecked(rod.shape.borrowHandle()) == 0) throw "Hydraulic cylinder native validity";
-    near(body.volume(), Math.PI / 4 * (200 * 200 * 180 - 160 * 160 * 100 - 100 * 100 * 40), "Barrel material volume");
-    near(rod.volume(), Math.PI / 4 * 100 * 100 * 190, "Moving rod volume");
+    // The envelope (also the mass model) is the plain bored barrel; the preview recesses the wall between the end caps.
+    var plainBarrel = Math.PI / 4 * (200 * 200 * 180 - 160 * 160 * 100 - 100 * 100 * 40);
+    var envelope = cylinder.geometry(Envelope);
+    near(envelope.volume(), plainBarrel, "Barrel material volume");
+    envelope.close();
+    var outer = 100.0, recessed = outer - cylinder.wall / 2;
+    near(body.volume(), plainBarrel - Math.PI * (outer * outer - recessed * recessed) * (180 - 2 * cylinder.capLength),
+      "Barrel preview recessed between its end caps");
+    // The rod's envelope (and mass model) is the bar; its preview turns the threaded tip and wrench neck from it.
+    var rodEnvelope = cylinder.movingRod().geometry(Envelope);
+    near(rodEnvelope.volume(), Math.PI / 4 * 100 * 100 * 190, "Moving rod volume");
+    if (!(rod.volume() < rodEnvelope.volume())) throw "Rod preview removes its tip and neck from the bar";
+    rodEnvelope.close();
     var rodLength = cylinder.movingRod().length;
     near(cylinder.bodyLength + cylinder.stemLength - rodLength, cylinder.capLength, "Retracted rod end in bore");
     near(
