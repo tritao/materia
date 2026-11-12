@@ -35,7 +35,7 @@ class HobberChipTray extends HobberMadePart {
   public static function frameFor(tableSeatHeight:Float):AssemblyFrame return F.translation(0, 0, tableSeatHeight);
 
   public function new(?values:ComponentValues) {
-    super("GE-chip-tray", null, P.resolve(inputs(), values));
+    super("GE-chip-tray", P.resolve(inputs(), values));
     finish(false);
   }
   override public function componentType():Null<ComponentType> return trayType();

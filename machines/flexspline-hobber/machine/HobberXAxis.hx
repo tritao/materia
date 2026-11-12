@@ -31,7 +31,7 @@ class HobberXAxis extends HobberUnit {
       if (id == "blockXLeft") {
         addComponent(id, block, pose);
         moving("X", Prismatic, "railXLeft", id, HobberFrame.partAt(0, 0, heights.xGuideOriginZ), [0.0, 1, 0], cutDistance, minX, layout.xRetract);
-        fixedPart("Xbridge", new HobberXCarriage(null, layout), HobberFrame.sourcePose(layout.xCarriageSeat()), id, top);
+        fixedPart("Xbridge", new HobberXCarriage(layout), HobberFrame.sourcePose(layout.xCarriageSeat()), id, top);
       } else fixedPart(id, block, pose, "Xbridge", top);
     }
     for (role in HobberCarriageRib.ROLES) {

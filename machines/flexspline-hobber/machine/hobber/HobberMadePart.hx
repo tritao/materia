@@ -14,84 +14,18 @@ import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
-/** Shared catalogue identity and manufacturing lifecycle for the machine's made parts.
- * Geometry, fastener interfaces and routes belong to the concrete part classes.
- * The catalogue family ID and complete input record preserve existing BOM identity. */
+/** Shared identity and manufacturing lifecycle for the machine's made parts. Each concrete part has its own recipe;
+ * geometry, fastener interfaces and routes belong to it. */
 class HobberMadePart extends MachineComponent {
   public final designId:String;
-  static final recipe = new machinekit.cache.Once<ComponentType>();
-  public static function parameters():Array<ComponentParameter> return [
-    P.choice(
-      "design",
-      [
-        "GE-X-carriage",
-        "GE-Z-saddle",
-        "GE-X-fixed-drive-bar",
-        "GE-X-floating-drive-bar",
-        "GE-Z-fixed-drive-bar",
-        "GE-Z-floating-drive-bar",
-        "GE-X-scale-seat",
-        "GE-Z-scale-seat",
-        "GE-Z-scale-arm",
-        "GE-chip-tray",
-        "GE-coolant",
-        "GE-spindle-seat",
-        "GE-motor-cradle",
-        "GE-outboard-carrier",
-        "electrical-panel"
-      ],
-      "GE-Z-saddle"
-    ),
-    P.quantity("tableFaceDiameter", 200, "mm"),
-    P.quantity("tableHousingDiameter", 260, "mm"),
-    P.quantity("tableFaceHeight", 228, "mm"),
-    P.quantity("tableSeatHeight", 18, "mm")
-  ];
-  public static function recipeType():ComponentType {
-    return recipe.get(() -> new ComponentType(
-      "machinekit.hobbing.saddle",
-      parameters(),
-      v -> create(v.token("design"), v)
-    ).versioned(7).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
-      .procured(_ -> Make("steel fabrication and machining"))
-      .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]));
-  }
-  public static function create(design:String, ?values:ComponentValues):HobberMadePart return switch design {
-    case "GE-X-carriage": new HobberXCarriage(values);
-    case "GE-Z-saddle": new HobberZSaddle(values);
-    case "GE-X-fixed-drive-bar": new HobberDriveBar("X", "fixed", values);
-    case "GE-X-scale-seat": new HobberScaleSeat("X", values);
-    case "GE-Z-scale-arm": new HobberZScaleArm(values);
-    case "GE-chip-tray":
-      var table = new ComponentValues();
-      if (values != null) for (name in ["tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"])
-        if (values.get(name) != null) table.setNumber(name, values.number(name));
-      new HobberChipTray(table);
-    case "GE-coolant": new HobberCoolantPort();
-    case "GE-spindle-seat": new HobberSpindleSeat(values);
-    case "GE-motor-cradle": new HobberMotorCradle(values);
-    case "GE-outboard-carrier": new HobberOutboardCarrier(values);
-    case "electrical-panel": new HobberElectricalPanel(values);
-    case "GE-X-floating-drive-bar": new HobberDriveBar("X", "floating", values);
-    case "GE-Z-scale-seat": new HobberScaleSeat("Z", values);
-    case "GE-Z-fixed-drive-bar": new HobberDriveBar("Z", "fixed", values);
-    case "GE-Z-floating-drive-bar": new HobberDriveBar("Z", "floating", values);
-    default: throw "Unknown hobber made part: "+design;
-  };
-  /**
-   * `ownValues`: the part has a recipe of its own (its `componentType`) and these are that recipe's values, so it carries none
-   * of the shared made-part recipe's.
-   */
-  public function new(design:String, ?values:ComponentValues, ?ownValues:ComponentValues) {
-    var supplied = values == null ? new ComponentValues() : values.copy();
-    supplied.setToken("design", design);
-    var v = ownValues != null ? ownValues.copy() : P.resolve(parameters(), supplied);
+  /** `values`: the values of the part's own recipe (its `componentType`). */
+  public function new(design:String, values:ComponentValues) {
     super(
       "HOBBER-" + design,
       "Designed steel " + design + "; machined seats, assumed structural adequacy",
       "steel",
       false,
-      v
+      values.copy()
     );
     addFacet(EngineeringMetadata.assumed(""));
     designId = design;
@@ -110,7 +44,6 @@ class HobberMadePart extends MachineComponent {
       for(p in parts)p.close();
     }
   }
-  override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
   override public function pinnedFaces():Array<PinnedFace> return [];
   override public function fasteningFaces():Array<BoltedFace> return [];

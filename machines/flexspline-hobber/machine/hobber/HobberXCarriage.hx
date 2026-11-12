@@ -65,8 +65,8 @@ class HobberXCarriage extends HobberMadePart {
     var edge = machinekit.assembly.JointFasteners.requiredEdgeRadius(screw.diameter, screw.headDiameter + 2);
     return Math.ceil((HobberSkeleton.reference().bedRailCentre + block.spec.blockHoleSpacingAcross / 2 + edge) / 5) * 5;
   }
-  public function new(?values:ComponentValues, ?skeleton:HobberSkeleton) {
-    super("GE-X-carriage", values, new ComponentValues());
+  public function new(?skeleton:HobberSkeleton) {
+    super("GE-X-carriage", new ComponentValues());
     this.skeleton = skeleton == null ? HobberSkeleton.reference() : skeleton;
     finish(true);
   }

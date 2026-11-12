@@ -34,7 +34,7 @@ class HobberCoolantPort extends HobberMadePart {
   public static function frameFor():AssemblyFrame return BoltedFace.frameOf({x: 45, y: 64.35, z: 72}, {x: -1, y: 0, z: 0}, {x: 0, y: 0, z: 1});
 
   public function new(?values:ComponentValues) {
-    super("GE-coolant", null, P.resolve(inputs(), values));
+    super("GE-coolant", P.resolve(inputs(), values));
     finish(false);
   }
   override public function componentType():Null<ComponentType> return portType();

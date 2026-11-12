@@ -79,8 +79,8 @@ class HobberSpindleSeat extends HobberMadePart {
   public static function spindleSeatRange():{y0:Float, y1:Float, clampYs:Array<Float>} return {y0: seatY0(), y1: SEAT_Y1, clampYs: [100.0, 150.0, 200.0]};
 
   // ---- B motor cradle (FRAME_PLAN head redesign) -------------------------------------------------------------------------------
-  public function new(?values:ComponentValues) {
-    super("GE-spindle-seat", values, new ComponentValues());
+  public function new() {
+    super("GE-spindle-seat", new ComponentValues());
     finish(false);
   }
   override public function componentType():Null<ComponentType> return spindleSeatType();

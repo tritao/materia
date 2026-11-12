@@ -7,10 +7,9 @@ import machinekit.component.MachineKitComponents;
 /** Application recipes keep their stable catalogue IDs while living with the machine. */
 class HobberComponents {
   public static function register(registry:ComponentRegistry):Void {
-    for(recipe in [HobberMadePart.recipeType(),HobberXCarriage.carriageType(),HobberDriveBar.barType(),HobberScaleSeat.seatType(),HobberZScaleArm.armType(),HobberCoolantPort.portType(),HobberChipTray.trayType(),HobberElectricalPanel.panelType(),HobberOutboardCarrier.carrierType(),HobberSpindleSeat.spindleSeatType(),HobberMotorCradle.cradleType(),HobberZSaddle.saddleType(),HobberCarriageRib.recipeType(),HobberChipCover.recipeType(),
+    for(recipe in [HobberXCarriage.carriageType(),HobberDriveBar.barType(),HobberScaleSeat.seatType(),HobberZScaleArm.armType(),HobberCoolantPort.portType(),HobberChipTray.trayType(),HobberElectricalPanel.panelType(),HobberOutboardCarrier.carrierType(),HobberSpindleSeat.spindleSeatType(),HobberMotorCradle.cradleType(),HobberZSaddle.saddleType(),HobberCarriageRib.recipeType(),HobberChipCover.recipeType(),
       HobberYPart.recipeType(),HobberZBellowsPart.recipeType()])
       if(!registry.has(recipe.id))registry.register(recipe);
-    registry.classify(HobberMadePart.recipeType().id,"Structure",ComponentKind.MachinePart);
     registry.classify(HobberXCarriage.carriageType().id,"Structure",ComponentKind.MachinePart);
     registry.classify(HobberDriveBar.barType().id,"Structure",ComponentKind.MachinePart);
     registry.classify(HobberScaleSeat.seatType().id,"Structure",ComponentKind.MachinePart);

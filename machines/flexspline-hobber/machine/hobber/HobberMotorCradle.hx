@@ -194,8 +194,8 @@ class HobberMotorCradle extends HobberMadePart {
     return flange == null ? machinekit.motion.ServoMotor.assumedMounting(cradleMotor().rating.designation) : flange;
   }
 
-  public function new(?values:ComponentValues) {
-    super("GE-motor-cradle", values, new ComponentValues());
+  public function new() {
+    super("GE-motor-cradle", new ComponentValues());
     finish(true);
   }
   override public function componentType():Null<ComponentType> return cradleType();

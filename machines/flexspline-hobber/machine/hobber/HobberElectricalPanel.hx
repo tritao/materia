@@ -27,8 +27,8 @@ class HobberElectricalPanel extends HobberMadePart {
     _ -> new HobberElectricalPanel(), false, false, null, false).versioned(1).numbered(_ -> "HOBBER-ELECTRICAL-PANEL")
     .procured(_ -> Make("cut plate, welded")).requiring(_ -> ManufacturingRoute.cutPlate().requirements()));
 
-  public function new(?values:ComponentValues) {
-    super("electrical-panel", values, new ComponentValues());
+  public function new() {
+    super("electrical-panel", new ComponentValues());
     finish(false);
   }
   override public function componentType():Null<ComponentType> return panelType();

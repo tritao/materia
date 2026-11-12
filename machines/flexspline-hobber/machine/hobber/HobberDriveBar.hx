@@ -88,9 +88,9 @@ class HobberDriveBar extends HobberMadePart {
   }
   public static function barAxis(design:String):HobberDriveAxis return design.indexOf("GE-X-")==0?HobberDrives.x():HobberDrives.z();
   public static function barSupport(design:String):String return design.indexOf("-fixed-")>=0?"fixed":"floating";
-  public function new(axis:String="X", support:String="fixed", ?values:ComponentValues) {
+  public function new(axis:String="X", support:String="fixed") {
     if((axis!="X"&&axis!="Z")||(support!="fixed"&&support!="floating"))throw "Unknown drive bar";
-    super("GE-"+axis+"-"+support+"-drive-bar", values, new ComponentValues().setToken("axis", axis).setToken("support", support));
+    super("GE-"+axis+"-"+support+"-drive-bar", new ComponentValues().setToken("axis", axis).setToken("support", support));
     finish(true);
   }
   override public function componentType():Null<ComponentType> return barType();

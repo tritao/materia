@@ -57,9 +57,9 @@ class HobberScaleSeat extends HobberMadePart {
     if (b == null) throw "Scale " + axis.id + " has no seat bar";
     return [b[0], b[2], b[4], b[1], b[3], b[5]];
   }
-  public function new(axis:String="X", ?values:ComponentValues) {
+  public function new(axis:String="X") {
     if(axis!="X"&&axis!="Z")throw "Unknown scale seat";
-    super("GE-"+axis+"-scale-seat",values,new ComponentValues().setToken("axis",axis));
+    super("GE-"+axis+"-scale-seat",new ComponentValues().setToken("axis",axis));
     finish(true);
   }
   override public function componentType():Null<ComponentType> return seatType();

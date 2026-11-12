@@ -34,8 +34,8 @@ class HobberZScaleArm extends HobberMadePart {
   /** The arm's own frame in the Z saddle's native frame: the head's seat, +Z into the arm. */
   public static function frameFor():AssemblyFrame return headSeat().frame;
 
-  public function new(?values:ComponentValues) {
-    super("GE-Z-scale-arm", values, new ComponentValues());
+  public function new() {
+    super("GE-Z-scale-arm", new ComponentValues());
     finish(true);
   }
   override public function componentType():Null<ComponentType> return armType();

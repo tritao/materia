@@ -70,8 +70,8 @@ class HobberZSaddle extends HobberMadePart {
     _ -> new HobberZSaddle(), false, false, null, false).versioned(1).numbered(_ -> "HOBBER-GE-Z-SADDLE")
     .procured(_ -> Make("steel fabrication and machining")).requiring(_ -> route().requirements()));
 
-  public function new(?values:ComponentValues) {
-    super("GE-Z-saddle", values, new ComponentValues());
+  public function new() {
+    super("GE-Z-saddle", new ComponentValues());
     finish(true);
   }
   override public function componentType():Null<ComponentType> return saddleType();

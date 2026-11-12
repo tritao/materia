@@ -39,8 +39,8 @@ class HobberOutboardCarrier extends HobberMadePart {
     {x: 45.0, y: 30.0, z: 0.0}, {x: into, y: 0, z: 0}, {x: 0, y: 1, z: 0});
   public static function outboardCarrierPins(into:Float):machinekit.component.BoltedFace.PinnedFace return PinnedFace.atPoints("outboard-pins", outboardCarrierFrame(into),
     [for (z in [-45.0, 45.0]) {x: 45.0, y: 30.0, z: z}], 4.0, 6.0, false);
-  public function new(?values:ComponentValues) {
-    super("GE-outboard-carrier", values, new ComponentValues());
+  public function new() {
+    super("GE-outboard-carrier", new ComponentValues());
     finish(false);
   }
   override public function componentType():Null<ComponentType> return carrierType();
