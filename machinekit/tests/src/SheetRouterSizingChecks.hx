@@ -227,16 +227,19 @@ class SheetRouterSizingChecks {
         near(before * 1000, x.compliance.stiffnessNPerM, "assembled compliance reaches the planner in SI");
         near(backlash / 1000, x.compliance.backlashM, "assembled backlash reaches the planner in SI");
       }
-      machine.replaceComponent("pinionXPreload", new PreloadedPinionMount());
+      // The router's radial preloads are carriers that hold the motor: a spring edit swaps in the same carrier on another spring.
+      function respring(member:String, spring:PreloadedPinionMount):Void {
+        var carrier:machinekit.transmission.RadialPinionCarrier = cast machine.component(member);
+        machine.replaceComponent(member, new machinekit.transmission.RadialPinionCarrier(carrier.purchaseNumber, carrier.motor, spring,
+          carrier.axialCentre));
+      }
+      respring("pinionXPreload", new PreloadedPinionMount());
       for (coupling in machine.definition().couplings) if (coupling.id == "pinionX-rack") check(
         coupling.stiffness != null && (cast coupling.stiffness:Float) < before / 50,
         "part edit rebuilds hinge stiffness"
       );
       machine.replaceComponent("pinionXPreload", old);
-      machine.replaceComponent(
-        "pinionYLeftPreload",
-        new PreloadedPinionMount(new ComponentValues().setNumber("springForce", 10))
-      );
+      respring("pinionYLeftPreload", new PreloadedPinionMount(new ComponentValues().setNumber("springForce", 10)));
       var inadequate = SheetRouterSizing.report(machine,
         "y"), preloadRejected = false, failures:Array<String> = inadequate.failures;
       for (failure in failures) if (failure.indexOf("preload:") == 0) preloadRejected = true;
