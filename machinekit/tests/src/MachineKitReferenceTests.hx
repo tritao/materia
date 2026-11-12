@@ -394,12 +394,15 @@ class MachineKitReferenceTests {
     }
     // StepperOnline model pages: body face/length and shaft diameter/length.
     for (reference in [
-      {name: "17HS19-1684S1", face: 42.0, length: 48.0, shaft: 5.0, shaftLength: 24.0},
-      {name: "23HS22-2804S", face: 57.3, length: 56.0, shaft: 6.35, shaftLength: 21.0},
-      {name: "34HS31-5504S", face: 86.0, length: 80.0, shaft: 14.0, shaftLength: 35.0}
+      {name: "17HS19-1684S1", face: 42.0, faceIsMaximum: false, length: 48.0, shaft: 5.0, shaftLength: 24.0},
+      // The 23HS22 drawing gives 57.3 as the maximum envelope; its pinned CAD body is 57 (tools/suppliers/stepperonline-23hs22.json).
+      {name: "23HS22-2804S", face: 57.3, faceIsMaximum: true, length: 56.0, shaft: 6.35, shaftLength: 21.0},
+      {name: "34HS31-5504S", face: 86.0, faceIsMaximum: false, length: 80.0, shaft: 14.0, shaftLength: 35.0}
     ]) {
       var variant = NemaStepper.variantCatalog().get(reference.name);
-      equal(variant.bodyFace, reference.face, reference.name + " face");
+      if (reference.faceIsMaximum) {
+        if (!(variant.bodyFace <= reference.face)) throw '${reference.name} face ${variant.bodyFace} exceeds the drawing maximum ${reference.face}';
+      } else equal(variant.bodyFace, reference.face, reference.name + " face");
       equal(variant.bodyLength, reference.length, reference.name + " length");
       equal(variant.shaftDiameter, reference.shaft, reference.name + " shaft diameter");
       equal(variant.shaftLength, reference.shaftLength, reference.name + " shaft length");
