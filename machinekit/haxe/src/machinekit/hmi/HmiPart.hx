@@ -99,10 +99,50 @@ class HmiPart extends MachineComponent {
   /** Joints between the bodies, each about the device's z axis: the encoder of a wheel (free), the shaft of a switch (detented). */
   public function joints():Array<DeviceJointSpec> return [];
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  /** A cylinder of radius `r` up Z through (x, y), from z0 to z1. */
+  public static function post(b:cadkit.parametric.recording.DocumentBuilder, r:Float, z0:Float, z1:Float, x:Float = 0,
+      y:Float = 0):cadkit.parametric.Feature return b.cylinderAlong(new Vector(x, y, 0), Vector.Z(), r, z0, z1);
+
+  /** A tube of outer radius `r` and bore `bore` up Z, from z0 to z1. */
+  public static function tube(b:cadkit.parametric.recording.DocumentBuilder, r:Float, bore:Float, z0:Float, z1:Float):cadkit.parametric.Feature
+    return b.cutAll(post(b, r, z0, z1), [post(b, bore, z0 - 1, z1 + 1)], ["bore"]);
+
+  /** The solid of revolution about Z through the (r, z) section `points`; `sweptFace` names the face each segment sweeps. */
+  public static function turned(b:cadkit.parametric.recording.DocumentBuilder, points:Array<{r:Float, z:Float}>,
+      ?angle:Float):cadkit.parametric.Feature
+    return b.revolve(b.polygon([for (p in points) new Vector(p.r, p.z, 0)], cadkit.modeling.Plane.XZ()), new Vector(0, 0, 0), Vector.Z(),
+      angle == null ? 2 * Math.PI : angle);
+
+  /**
+   * The name, within `revolved` (a `turned` solid), of the face that the profile's segment from point k to point k + 1 sweeps:
+   * the face a detail on it names.
+   */
+  public static function sweptFace(revolved:cadkit.parametric.Feature, k:Int):String {
+    var revolve = Std.downcast(revolved, cadkit.parametric.features.RevolveFeature);
+    if (revolve == null) throw "A swept face belongs to a revolved profile";
+    return 'side(f${revolve.source.id.toInt()}:seg.$k)';
+  }
+
+  /** A box `w` x `h` x `d` centred on (x, y), from z0. */
+  public static function block(b:cadkit.parametric.recording.DocumentBuilder, w:Float, h:Float, d:Float, x:Float, y:Float,
+      z0:Float):cadkit.parametric.Feature return b.boxBetween(x - w / 2, x + w / 2, y - h / 2, y + h / 2, z0, z0 + d);
+
+  /** A rounded-corner block `w` x `h`, centred on (x, y), from z0 to z1. */
+  public static function roundedBlock(b:cadkit.parametric.recording.DocumentBuilder, w:Float, h:Float, radius:Float, z0:Float, z1:Float, x:Float = 0,
+      y:Float = 0):cadkit.parametric.Feature
+    return b.extrude(b.roundedRectangle(w, h, radius, new cadkit.modeling.Plane(new Vector(x, y, z0), Vector.X(), Vector.Z())), z1 - z0);
+
+  /** `parts` fused into one step, or the one part itself. */
+  public static function fuse(b:cadkit.parametric.recording.DocumentBuilder, parts:Array<cadkit.parametric.Feature>):cadkit.parametric.Feature
+    return parts.length == 1 ? parts[0] : b.unionAll(parts);
+
+  /** A device with bodies records them fused, one labelled step each. */
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
     var specs = bodies();
-    if (specs == null) throw designation + ": no geometry";
-    return Solids.union([for (spec in specs) spec.build()]);
+    if (specs == null) return null;
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    var parts = [for (spec in specs) b.label(spec.record(b), spec.label)];
+    return b.label(fuse(b, parts), "Device");
   }
 
   /**
@@ -115,7 +155,7 @@ class HmiPart extends MachineComponent {
     var volumes:Array<Float> = [], centres:Array<Vector> = [];
     var total = 0.0;
     for (spec in specs) {
-      var solid = spec.build();
+      var solid = spec.solid();
       var physical = solid.massProperties();
       volumes.push(physical.volume);
       centres.push(physical.centerOfMass);
@@ -135,7 +175,7 @@ class HmiPart extends MachineComponent {
           name,
           spec.label,
           spec.material,
-          spec.build,
+          spec,
           this,
           i == 0,
           n("massGrams") / 1000.0 * volumes[i] / total,

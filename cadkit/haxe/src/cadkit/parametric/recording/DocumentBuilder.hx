@@ -782,6 +782,30 @@ class DocumentBuilder {
     return feature;
   }
 
+  /** A cosmetic thread on the face `source` names `face` (`cyl.side`): from `start`, over `length` (all of it when null), `offset` in. */
+  public function thread(source:Feature, face:String, spec:cadkit.threads.ThreadSpec, start:cadkit.threads.ThreadedFace.ThreadStart,
+      ?length:Float, offset:Float = 0):cadkit.parametric.features.FaceDetailFeature {
+    check();
+    return document.add(new cadkit.parametric.features.FaceDetailFeature(source, face, cadkit.parametric.features.FaceDetailFeature.FaceDetail.Thread(spec, start, length, offset)));
+  }
+
+  /** Knurling, a scale or a display on the face `source` names `face`. */
+  public function surfaceDetail(source:Feature, face:String, detail:cadkit.threads.SurfaceDetail):cadkit.parametric.features.FaceDetailFeature {
+    check();
+    return document.add(new cadkit.parametric.features.FaceDetailFeature(source, face, cadkit.parametric.features.FaceDetailFeature.FaceDetail.Surface(detail)));
+  }
+
+  /** Lettering as a solid (`StrokeText`): `text` `height` high in `stroke`-wide strokes, from z0 to z1, centred on (x, y). */
+  public function strokeText(text:String, height:Dimension, stroke:Dimension, z0:Dimension, z1:Dimension, mirror:Bool = false, x:Dimension = 0,
+      y:Dimension = 0, rotation:Dimension = 0):cadkit.parametric.features.StrokeTextFeature {
+    check();
+    var feature = document.add(new cadkit.parametric.features.StrokeTextFeature(text, height.number(), stroke.number(), z0.number(), z1.number(),
+      mirror, x.number(), y.number(), rotation.number()));
+    bind(height, feature, "text.height");
+    bind(stroke, feature, "text.stroke");
+    return feature;
+  }
+
   /** A cylinder on the line through `origin` along `axis`, between stations `from` and `to` along it. */
   public function cylinderAlong(origin:Vector, axis:Vector, radius:Dimension, from:Dimension, to:Dimension):CylinderAlongFeature {
     check();

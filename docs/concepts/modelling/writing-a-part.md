@@ -60,6 +60,8 @@ registered codec, so the document saves and reloads them all the same way.
 | Several cuts or unions in one step | `cutAll(target, tools, labels)`, `unionAll(parts)` |
 | Holes | `holes(body, specs)`; `sheetHoles` for sheet metal |
 | Sheet metal | `sheetBase`, `sheetFlange` (edges by name), `sheetCut`, `sheetHem`, ... |
+| Lettering (terminal numbers, legends) | `strokeText(text, height, stroke, z0, z1, mirror, x, y, rotation)` |
+| Cosmetic details on a face | `thread(source, "cyl.side", spec, start)`; `surfaceDetail(source, face, Knurl / Graduation / Display)` |
 
 Packages add their own types through `FeatureTypeRegistry` (MachineKit's
 castings record one step per casting feature this way).
@@ -67,10 +69,30 @@ castings record one step per casting feature this way).
 ## Face names
 
 Drawings, CAM setups and mates refer to faces by name, so a recorded part
-names every face strongly and once. Faces are named from the features that
+names every face strongly and once. MachineKit's naming audit checks every
+recipe's default part. Faces are named from the features that
 made them (`f3:box.+z`, `J1.h1.tap`); tools named by what they are
 (`Solids.named`, a prism's id) keep their faces apart. The hobber's
 equivalence gate fails on any weak or repeated name of a recorded part.
+
+A face detail names its face as the feature that made it names it: a
+cylinder's side is `cyl.side`, a box's top `box.+z`, and the face a revolved
+or extruded profile's segment k sweeps `side(f<profile>:seg.k)`
+(`HmiPart.sweptFace`). Details follow the face through later steps, so record
+them on the feature that made the face, before it is cut or fused; details
+can be chained.
+
+Avoid geometry that splits a face into disconnected pieces (a bore tangent to
+the sides of a pocket, a hole stopping just past a bore wall): each piece then
+shares one name. Draw what the part is instead (a set-screw hole breaks into
+the bore; a moulded comb is one section, not boxes side by side).
+
+## Bought devices
+
+A bought device of several bodies (`HmiPart.bodies`) records each body with a
+`DeviceBodySpec`; the device's own geometry records them fused, and each
+expanded body records its own. Displays, knurling and threads are recorded
+face details.
 
 ## The immediate API is frozen
 

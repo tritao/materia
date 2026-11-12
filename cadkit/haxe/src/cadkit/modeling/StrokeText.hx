@@ -115,6 +115,7 @@ class StrokeText {
           throw 'No stroke glyph for "${text.charAt(index)}"';
         }
         var left = index * (CELL_WIDTH + GAP) * scale - total / 2;
+        var glyph:Array<Part> = [];
         for (line in strokes) {
           var points = [for (i in 0...Std.int(line.length / 2)) new Vector(
             left + line[2 * i] * scale,
@@ -132,8 +133,16 @@ class StrokeText {
               placeY + point.x * d + point.y * c
             )];
           }
-          pieces.push(Part.prism(outline, z0, z1));
+          // Each stroke is named by its character and stroke, so the lettering's faces keep apart.
+          var prism = Part.prism(outline, z0, z1);
+          glyph.push(prism.named('char${index + 1}.stroke${strokes.indexOf(line) + 1}'));
+          prism.close();
         }
+        // A glyph's strokes overlap where they join: fused and refined, its top and bottom are one face each.
+        var fused = glyph.length == 1 ? glyph[0] : Part.fuseAll(glyph);
+        if (glyph.length > 1) for (piece in glyph) piece.close();
+        pieces.push(fused.refined());
+        fused.close();
       }
       var result = pieces.length == 1 ? pieces[0] : Part.fuseAll(pieces);
       if (pieces.length > 1) for (piece in pieces) piece.close();

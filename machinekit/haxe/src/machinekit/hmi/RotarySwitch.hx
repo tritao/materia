@@ -94,47 +94,30 @@ class RotarySwitch extends HmiPart {
   /** The switch (brass bush and nut, grey body) and the knob that turns on it. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [new DeviceBodySpec("switch", "rotary switch bush and nut", "brass", function() {
-      return Solids.union([
-        Solids.named(Part.cylinderSpan(n("bushDiameter") / 2, -t - nut, 0.0), "bush"),
-        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut")
-      ]);
-    }
-    ), new DeviceBodySpec("body", "rotary switch body", "ABS grey", function() {
-      return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
-    }, [contactsPort()]), new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
-      var r = n("knobDiameter") / 2, k = n("knobHeight");
-      var body = Part.revolve([
-        {r: 0.0, z: 0.0},
-        {r: r - 1.0, z: 0.0},
-        {r: r, z: 1.0},
-        {r: r, z: k - 2.0},
-        {r: r - 2.0, z: k},
-        {r: 0.0, z: k}
-      ]);
-      // The pointer's groove, filled flush by the white pointer body.
-      var groove = pointerGroove();
-      var cut = body.subtract(groove);
-      body.close();
-      groove.close();
-      return Solids.named(cut, "knob");
-    }
-    ), new DeviceBodySpec(
-      "pointer",
-      "rotary switch pointer",
-      "ABS white",
-      () -> Solids.named(pointerGroove(), "pointer")
-    )];
+    return [new DeviceBodySpec("switch", "rotary switch bush and nut", "brass", b -> b.label(b.unionAll([
+      b.label(HmiPart.post(b, n("bushDiameter") / 2, -t - nut, 0.0), "Bush"),
+      b.label(HmiPart.post(b, n("nutDiameter") / 2, -t - nut, -t), "Nut")
+    ]), "Bush and nut")),
+      new DeviceBodySpec("body", "rotary switch body", "ABS grey", b -> b.label(HmiPart.post(b, n("bodyDiameter") / 2, -n("behindDepth"), -t - nut),
+        "Body"), [contactsPort()]),
+      new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), b -> {
+        var r = n("knobDiameter") / 2, k = n("knobHeight");
+        var knob = b.label(HmiPart.turned(b, [
+          {r: 0.0, z: 0.0}, {r: r - 1.0, z: 0.0}, {r: r, z: 1.0}, {r: r, z: k - 2.0}, {r: r - 2.0, z: k}, {r: 0.0, z: k}
+        ]), "Knob blank");
+        // The pointer's groove, filled flush by the white pointer body.
+        b.label(b.cutAll(knob, [pointerGroove(b)], ["pointer groove"]), "Pointer groove");
+      }),
+      new DeviceBodySpec("pointer", "rotary switch pointer", "ABS white", b -> b.label(pointerGroove(b), "Pointer"))];
   }
 
+
   /** The white pointer's shape: a line along the knob's top from near the centre toward its rim, 0.5 mm deep, at the knob's rest angle (up). */
-  function pointerGroove():Part {
+  function pointerGroove(b:cadkit.parametric.recording.DocumentBuilder):cadkit.parametric.Feature {
     var r = n("knobDiameter") / 2, k = n("knobHeight"), from = 4.0, to = r - 3.5, depth = 0.5;
-    var raw = Part.box(1.4, to - from, depth);
-    var moved = raw.translated(new Vector(0.0, (from + to) / 2, k - depth));
-    raw.close();
-    return moved;
+    return b.boxBetween(-0.7, 0.7, from, to, k - depth, k);
   }
+
 
   /**
    * The knob turns on the switch between end stops and clicks into each of its positions, `detentDegrees` apart, the first at

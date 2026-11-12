@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.Part;
 import cadkit.modeling.RoundedRectangle;
@@ -133,75 +135,53 @@ class EmergencyStop extends HmiPart {
    */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [new DeviceBodySpec("operator", "emergency stop operator and latching base", "ABS grey", function() {
+    return [new DeviceBodySpec("operator", "emergency stop operator and latching base", "ABS grey", b -> {
       // The latching base is a rounded block; the stem goes up through the panel from it.
-      var base = RoundedRectangle.box(n("baseWidth"), n("baseDepth"), 3.0, -t - nut - n("baseLength"), -t - nut);
-      return Solids.union([
-        Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem"),
-        Solids.named(Part.cylinderSpan(postRadius(), -1.0, postTop()), "post"),
-        Solids.named(base, "base")
-      ]);
-    }
-    ), new DeviceBodySpec("nut", "emergency stop ring nut", "stainless A2-70", function() {
-      var ring = Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t);
-      var bore = Part.cylinderSpan(n("panelHole") / 2, -t - nut - 1.0, -t + 1.0);
-      var result = ring.subtract(bore);
-      ring.close();
-      bore.close();
-      return Solids.named(result, "nut");
-    }
-    ), new DeviceBodySpec("blocks", "emergency stop contact blocks", "device housing dark", function() {
-      // Contact blocks side by side across the base's depth, centred. Each has a shoulder at one rear corner and four shallow
-      // counterbores in its rear face for the terminal screws.
-      var blocks:Array<Part> = [];
-      for (i in 0...count("blocks")) {
-        var block = Part.box(n("blockWidth"), n("blockThickness"), n("blockLength"));
-        var y = blockY(i);
-        var step = Part.box(2.0, n("blockThickness") + 2.0, 5.0);
-        var shoulder = step.translated(new Vector(n("blockWidth") / 2 - 1.0, 0, 0));
-        step.close();
-        var cut = block.subtract(shoulder);
-        block.close();
-        shoulder.close();
-        var tools = [for (spot in terminalSpots()) Part.cylinderSpan(3.1, -1.0, TERMINAL_POCKET, spot.x, spot.y)];
-        tools.push(legendLocal());
-        var drilled = cut.subtractAll(tools);
-        cut.close();
-        for (tool in tools) tool.close();
-        var moved = drilled.translated(new Vector(0, y, blockRear()));
-        drilled.close();
-        blocks.push(Solids.named(moved, "block" + (i + 1)));
-      }
-      return Solids.union(blocks);
-    }, contactPorts()),
-      new DeviceBodySpec("contact-screws", "emergency stop terminal screws", "stainless A2-70", function() {
-      var head = ScrewHeads.pan(2.2, 1.2, 2.6, 0.7);
-      var heads:Array<Part> = [];
-      for (i in 0...count("blocks")) for (spot in terminalSpots()) heads.push(head.translated(new Vector(
-        spot.x,
-        blockY(i) + spot.y,
-        blockRear() + TERMINAL_POCKET
-      )));
-      head.close();
-      return Solids.union(heads);
-    }
-    ), new DeviceBodySpec("legend", "emergency stop terminal numbers", "ABS white", function() {
-      // The terminal numbers are an inlay, flush with the rear face: the same shape is cut from the block.
-      var pieces:Array<Part> = [];
-      for (i in 0...count("blocks")) {
-        var text = legendLocal();
-        pieces.push(text.translated(new Vector(0, blockY(i), blockRear())));
-        text.close();
-      }
-      return Solids.union(pieces);
-    }
-    ), new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), function() {
-      // Drawn released: the collar's foot stands `pressTravel` above the panel and reaches it when the head is pushed in. The head is
-      // hollow underneath and slides over the operator's post, on its wall, at both ends of the travel.
-      var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2, travel = n("pressTravel");
-      var post = postRadius();
-      return Solids.named(
-        Part.revolve([
+      b.label(b.unionAll([
+        b.label(HmiPart.post(b, n("panelHole") / 2, -t - nut, 0.0), "Stem"),
+        b.label(HmiPart.post(b, postRadius(), -1.0, postTop()), "Post"),
+        b.label(HmiPart.roundedBlock(b, n("baseWidth"), n("baseDepth"), 3.0, -t - nut - n("baseLength"), -t - nut), "Latching base")
+      ]), "Operator");
+    }),
+      new DeviceBodySpec("nut", "emergency stop ring nut", "stainless A2-70", b -> b.label(HmiPart.tube(b, n("nutDiameter") / 2,
+        n("panelHole") / 2, -t - nut, -t), "Ring nut")),
+      new DeviceBodySpec("blocks", "emergency stop contact blocks", "device housing dark", b -> {
+        // Contact blocks side by side across the base's depth, centred. Each has a shoulder at one rear corner and four shallow
+        // counterbores in its rear face for the terminal screws, and its terminal numbers inlaid flush in that face.
+        var w = n("blockWidth"), th = n("blockThickness"), rear = blockRear();
+        var blocks:Array<Feature> = [];
+        for (i in 0...count("blocks")) {
+          var y = blockY(i), which = 'block ${i + 1}';
+          var body = HmiPart.block(b, w, th, n("blockLength"), 0.0, y, rear);
+          var tools:Array<Feature> = [b.boxBetween(w / 2 - 2.0, w / 2, y - th / 2 - 1.0, y + th / 2 + 1.0, rear, rear + 5.0)];
+          var labels = ['$which shoulder'];
+          for (k => spot in terminalSpots()) {
+            tools.push(HmiPart.post(b, 3.1, rear - 1.0, rear + TERMINAL_POCKET, spot.x, y + spot.y));
+            labels.push('$which terminal ${k + 1} counterbore');
+          }
+          tools.push(legend(b, y, rear));
+          labels.push('$which terminal numbers');
+          blocks.push(b.label(b.cutAll(body, tools, labels), 'Contact block ${i + 1}'));
+        }
+        b.label(HmiPart.fuse(b, blocks), "Contact blocks");
+      }, contactPorts()),
+      new DeviceBodySpec("contact-screws", "emergency stop terminal screws", "stainless A2-70", b -> {
+        var heads:Array<Feature> = [];
+        for (i in 0...count("blocks")) for (spot in terminalSpots())
+          heads.push(ScrewHeads.pan(b, 2.2, 1.2, 2.6, 0.7, spot.x, blockY(i) + spot.y, blockRear() + TERMINAL_POCKET));
+        b.label(HmiPart.fuse(b, heads), "Terminal screws");
+      }),
+      new DeviceBodySpec("legend", "emergency stop terminal numbers", "ABS white", b -> {
+        // The terminal numbers are an inlay, flush with the rear face: the same shape is cut from the block.
+        var pieces:Array<Feature> = [for (i in 0...count("blocks")) legend(b, blockY(i), blockRear())];
+        b.label(HmiPart.fuse(b, pieces), "Terminal numbers");
+      }),
+      new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), b -> {
+        // Drawn released: the collar's foot stands `pressTravel` above the panel and reaches it when the head is pushed in. The head is
+        // hollow underneath and slides over the operator's post, on its wall, at both ends of the travel.
+        var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2, travel = n("pressTravel");
+        var post = postRadius();
+        b.label(HmiPart.turned(b, [
           {r: post, z: travel},
           {r: n("collarDiameter") / 2, z: travel},
           {r: n("collarDiameter") / 2, z: c},
@@ -213,11 +193,8 @@ class EmergencyStop extends HmiPart {
           {r: 0.0, z: above},
           {r: 0.0, z: postTop() + travel + 1.0},
           {r: post, z: postTop() + travel + 1.0}
-        ]),
-        "head"
-      );
-    }
-    )];
+        ]), "Mushroom head");
+      })];
   }
 
   /** The post the head slides over: a little narrower than the opening, and as tall as the head's travel plus the length it stays engaged. */
@@ -230,13 +207,8 @@ class EmergencyStop extends HmiPart {
   }
   ];
 
-  /** The terminal numbers in a block's own frame (rear face on z = 0), 0.3 mm deep: 11 and 12, the NC pair, mirrored to read from behind. */
-  function legendLocal():Part {
-    var text = StrokeText.solid("11 12", 2.4, 0.3, 0.0, 0.3, true);
-    var moved = text.translated(new Vector(0, -1.2, 0));
-    text.close();
-    return moved;
-  }
+  /** A block's terminal numbers, 0.3 mm deep in its rear face at `rear`, centred on y: 11 and 12, the NC pair, mirrored to read from behind. */
+  function legend(b:DocumentBuilder, y:Float, rear:Float):Feature return b.strokeText("11 12", 2.4, 0.3, rear, rear + 0.3, true, 0.0, y - 1.2);
 
   /** One block's centre across the base's depth. */
   function blockY(i:Int):Float return (i - (count("blocks") - 1) / 2) * n("blockThickness");
@@ -244,9 +216,5 @@ class EmergencyStop extends HmiPart {
   /** The block's rear face: the base's back face less the block's length. */
   function blockRear():Float return -n("panelThickness") - n("nutThickness") - n("baseLength") - n("blockLength");
 
-  static function drop(part:Part, z:Float):Part {
-    var moved = part.translated(new Vector(0, 0, z));
-    part.close();
-    return moved;
-  }
+
 }

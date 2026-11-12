@@ -318,7 +318,7 @@ class PendantTests {
     var oledBodies = oledPart.bodies();
     check(oledBodies != null && oledBodies.length == 8, "The OLED is eight bodies");
     if (oledBodies != null) {
-      var board = oledBodies[0].build();
+      var board = oledBodies[0].solid();
       var b = board.shape.bounds();
       check(
         Math.abs(b.get_max().get_x() - b.get_min().get_x() - 61.5) < 1e-6 && Math.abs(b.get_max().get_y()
@@ -340,7 +340,7 @@ class PendantTests {
     var wheelBodies = texturedWheel.bodies();
     if (wheelBodies != null) {
       var wheelSpec = [for (b in wheelBodies) if (b.id == "wheel") b][0];
-      var wheelSolid = wheelSpec.build();
+      var wheelSolid = wheelSpec.solid();
       var wheelDetails = cadkit.threads.Details.renderData(wheelSolid.shape);
       check(
         wheelDetails.length == 2 && wheelSolid.shape.threadedFaces().length == 0,
@@ -366,7 +366,7 @@ class PendantTests {
     var modelled = new HandWheel(new machinekit.component.ComponentValues().setToken("surfaceDetail", "modelled"));
     var modelledBodies = modelled.bodies();
     if (modelledBodies != null) {
-      var modelledSolid = [for (b in modelledBodies) if (b.id == "wheel") b][0].build();
+      var modelledSolid = [for (b in modelledBodies) if (b.id == "wheel") b][0].solid();
       check(
         cadkit.threads.Details.renderData(modelledSolid.shape).length == 0
         && modelledSolid.shape.subshapeCount(CadKit.ShapeKind.Face) > 400,

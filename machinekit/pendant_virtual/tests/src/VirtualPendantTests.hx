@@ -18,7 +18,7 @@ class VirtualPendantTests {
     var module = new machinekit.hmi.OledModule();
     var plainBodies = 0;
     for (body in module.bodies()) if (body.id == "glass") {
-      var plain = body.build();
+      var plain = body.solid();
       check(cadkit.threads.Details.renderData(plain.shape).length == 0, "an undriven module's glass is plain");
       plain.close();
       plainBodies++;
@@ -31,7 +31,7 @@ class VirtualPendantTests {
     var found = 0;
     for (body in oled.bodies()) {
       if (body.id != "glass") continue;
-      var glass = body.build();
+      var glass = body.solid();
       var details = cadkit.threads.Details.renderData(glass.shape);
       glass.close();
       check(details.length == 1, "the glass has one detail");

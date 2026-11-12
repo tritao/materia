@@ -10,7 +10,7 @@ import machinekit.component.*;
  * declared mass shared out by volume.
  */
 class DeviceBody extends MachineComponent {
-  final build:() -> Part;
+  final spec:DeviceBodySpec;
   final purchase:HmiPart;
   final carriesPurchase:Bool;
 
@@ -18,7 +18,7 @@ class DeviceBody extends MachineComponent {
     designation:String,
     description:String,
     material:String,
-    build:() -> Part,
+    spec:DeviceBodySpec,
     purchase:HmiPart,
     carriesPurchase:Bool,
     massKg:Float,
@@ -26,7 +26,7 @@ class DeviceBody extends MachineComponent {
     ?ports:Array<ComponentPort>
   ) {
     super(designation, description, material, true);
-    this.build = build;
+    this.spec = spec;
     this.purchase = purchase;
     this.carriesPurchase = carriesPurchase;
     if (!carriesPurchase) addFacet(new IncludedInPurchase(purchase.bom.partNumber));
@@ -43,6 +43,11 @@ class DeviceBody extends MachineComponent {
 
   override function get_bom():BomItem return carriesPurchase ? purchase.bom : super.get_bom();
 
-  override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part return build();
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> return spec.record(b);
+
+  /** The body is one of its device's: its solid follows the device's recipe values. */
+  override public function recordingContext():String {
+    var type = purchase.componentType();
+    return (type == null ? purchase.designation : type.key(purchase.values())) + "|" + spec.id;
+  }
 }

@@ -26,7 +26,7 @@ class MachineKitNamingAudit {
       var bad = weakFaces(type.id);
       if (bad == null) continue;
       if (report && bad.length
-        > 0) Sys.println('naming audit ${type.id}: ${bad.length} weak or repeated: ${bad.slice(0, 6).join(", ")}');
+        > 0) Sys.println('naming audit ${type.id}: ${bad.length} weak or repeated:\n    ' + bad.join("\n    "));
       if (bad.length > 0) failures.push('${type.id}: ${bad.slice(0, 6).join(", ")}');
     }
     if (!report && failures.length > 0) throw "MachineKitNamingAudit:\n  " + failures.join("\n  ");

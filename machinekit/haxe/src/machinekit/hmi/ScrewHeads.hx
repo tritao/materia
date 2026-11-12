@@ -1,35 +1,24 @@
 package machinekit.hmi;
 
-import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
-import machinekit.component.Solids;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 
-/** Screw heads for the terminals of bought devices, drawn pointing back (-z) with their base on z = 0. */
+/** Screw heads for the terminals of bought devices, drawn pointing back (-z) with their base at `z`. */
 class ScrewHeads {
   /**
-   * A pan head `height` tall with a cross recess `recess` across and `depth` deep, of radius `radius` at its widest. The
-   * caller owns the solid and closes it.
+   * A pan head `height` tall with a cross recess `recess` across and `depth` deep, of radius `radius` at its widest, on the axis
+   * through (x, y) with its base at z.
    */
-  public static function pan(radius:Float, height:Float, recess:Float, depth:Float):Part {
-    var head = Part.revolve([
-      {r: 0.0, z: 0.0},
-      {r: radius, z: 0.0},
-      {r: radius * 1.05, z: -height * 0.4},
-      {r: radius * 0.86, z: -height * 0.9},
-      {r: radius * 0.55, z: -height},
-      {r: 0.0, z: -height}
-    ]);
-    var cross = [
-      slot(recess, 0.3 * recess / 2.8 + 0.3, height, depth),
-      slot(0.3 * recess / 2.8 + 0.3, recess, height, depth)
-    ];
-    return Solids.cut(head, cross);
-  }
-
-  static function slot(width:Float, length:Float, height:Float, depth:Float):Part {
-    var raw = Part.box(width, length, depth + 0.2);
-    var moved = raw.translated(new Vector(0, 0, -height - 0.2));
-    raw.close();
-    return moved;
+  public static function pan(b:DocumentBuilder, radius:Float, height:Float, recess:Float, depth:Float, x:Float = 0, y:Float = 0,
+      z:Float = 0):Feature {
+    var section = [[0.0, 0.0], [radius, 0.0], [radius * 1.05, -height * 0.4], [radius * 0.86, -height * 0.9], [radius * 0.55, -height],
+      [0.0, -height]];
+    var head = b.revolve(b.polygon([for (p in section) new Vector(p[0], z + p[1], 0)], new Plane(new Vector(x, y, 0), Vector.X(), Vector.Y().scale(-1))),
+      new Vector(x, y, 0), Vector.Z(), 2 * Math.PI);
+    var narrow = 0.3 * recess / 2.8 + 0.3;
+    function slot(w:Float, l:Float):Feature return b.boxBetween(x - w / 2, x + w / 2, y - l / 2, y + l / 2, z - height - 0.2, z - height + depth);
+    return b.cutAll(head, [slot(recess, narrow), slot(narrow, recess)], ["recess across", "recess along"]);
   }
 }

@@ -437,6 +437,16 @@ gutters and the Y-bearing bay). Recorded parts' Envelope detail has no derived
 holes (an envelope is the outer clearance volume). Freeze baseline 3785 ->
 3743.
 
+2026-11-12, later: the bench mill's own parts (cross saddle and table, Z
+carriage and head, spindle drive carrier and guard, BT30 cartridge, motor and
+drawbar study hardware, flat end mill), the shaft couplings and the HMI
+devices (OLED module, push button, rotary switch, emergency stop, hand wheel)
+record; dead mill variants were deleted first (the driveless spindle head,
+the non-compact drawbar cylinder, the saddle's side pockets). CadKit gained
+`strokeText` and face-detail features (cosmetic threads, knurling, scales,
+displays), so details are steps of the history. `MachineKitNamingAudit` has
+no allowlist and passes for every recipe. Freeze baseline 3785 -> 3347.
+
 ### FP9 — Delete the immediate authoring API
 
 When the FP6 list is empty: remove the authoring surface of

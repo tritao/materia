@@ -3,7 +3,6 @@ package machinekit.hmi;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import cadkit.threads.Details;
 import cadkit.threads.SurfaceDetail;
 import cadkit.threads.SurfaceDetail.DisplayBinding;
 import cadkit.threads.SurfaceDetail.DisplaySpec;
@@ -143,37 +142,24 @@ class PushButton extends HmiPart {
   /** A metal barrel and nut, the grey rear body and the coloured cap and bezel in front. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [new DeviceBodySpec("housing", "push button barrel and nut", "stainless A2-70", function() {
-      return Solids.union([
-        Solids.named(Part.cylinderSpan(n("barrelDiameter") / 2, -t - nut, 0.0), "barrel"),
-        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut")
-      ]);
-    }
-    ), new DeviceBodySpec("body", "push button rear body", "ABS grey", function() {
-      return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
-    }, terminalPorts()), new DeviceBodySpec("bezel", "push button bezel", materialSpec(), function() {
-      var b = n("bezelDiameter") / 2, hole = n("capDiameter") / 2, bh = n("bezelHeight");
-      return Solids.named(Part.revolve([{r: hole, z: 0.0}, {r: b, z: 0.0}, {r: b, z: bh}, {r: hole, z: bh}]), "bezel");
-    }
-    ), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
-      // The cap stands clear of the barrel by its travel (no more than the bezel is deep, so it stays in the bezel), and sinks as it is pressed.
-      var c = n("capDiameter") / 2, top = n("capHeight"), rest = n("pressTravel");
-      var plain = Solids.named(
-        Part.revolve([{r: 0.0,
-        z: rest}, {r: c, z: rest}, {r: c, z: top - 1.2}, {r: c - 1.2, z: top}, {r: 0.0, z: top}]),
-        "cap"
-      );
-      var spec = light;
-      if (spec == null) return plain;
-      try {
-        var shape = Details.attach(plain.shape, HmiPart.frontFace(plain.shape, "push button cap"), Display(spec));
-        plain.close();
-        return new Part(shape);
-      } catch (error:Dynamic) {
-        plain.close();
-        throw error;
-      }
-    }
-    )];
+    return [new DeviceBodySpec("housing", "push button barrel and nut", "stainless A2-70", b -> b.label(b.unionAll([
+      b.label(HmiPart.post(b, n("barrelDiameter") / 2, -t - nut, 0.0), "Barrel"),
+      b.label(HmiPart.post(b, n("nutDiameter") / 2, -t - nut, -t), "Nut")
+    ]), "Barrel and nut")),
+      new DeviceBodySpec("body", "push button rear body", "ABS grey", b -> b.label(HmiPart.post(b, n("bodyDiameter") / 2, -n("behindDepth"), -t - nut),
+        "Rear body"), terminalPorts()),
+      new DeviceBodySpec("bezel", "push button bezel", materialSpec(), b -> {
+        var r = n("bezelDiameter") / 2, hole = n("capDiameter") / 2, bh = n("bezelHeight");
+        b.label(HmiPart.turned(b, [{r: hole, z: 0.0}, {r: r, z: 0.0}, {r: r, z: bh}, {r: hole, z: bh}]), "Bezel");
+      }),
+      new DeviceBodySpec("cap", "push button cap", materialSpec(), b -> {
+        // The cap stands clear of the barrel by its travel (no more than the bezel is deep, so it stays in the bezel), and sinks as it
+        // is pressed. Lit, its top (the face the last profile segment sweeps) carries the light.
+        var c = n("capDiameter") / 2, top = n("capHeight"), rest = n("pressTravel");
+        var cap = b.label(HmiPart.turned(b, [{r: 0.0, z: rest}, {r: c, z: rest}, {r: c, z: top - 1.2}, {r: c - 1.2, z: top}, {r: 0.0, z: top}]), "Cap");
+        var spec = light;
+        spec == null ? cap : b.label(b.surfaceDetail(cap, HmiPart.sweptFace(cap, 3), Display(spec)), "Light");
+      })];
   }
+
 }

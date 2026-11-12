@@ -3,10 +3,9 @@ package machinekit.hmi;
 import CadKit;
 import cadkit.Shape;
 import cadkit.modeling.Footprint;
-import cadkit.modeling.Part;
-import cadkit.modeling.RoundedRectangle;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
-import cadkit.threads.Details;
 import cadkit.threads.SurfaceDetail;
 import cadkit.threads.SurfaceDetail.DisplayBinding;
 import cadkit.threads.SurfaceDetail.DisplaySpec;
@@ -136,7 +135,7 @@ class OledModule extends HmiPart {
   override public function hardware():Array<PanelHardware> {
     var insert = ThreadedInsert.m2_5Short();
     var screw = ButtonHeadScrew.m2_5(5.0);
-    var frame = new PanelSolid("DISPLAY-FRAME", "display frame", clampFrame, "PA12 nylon");
+    var frame = PanelSolid.recorded("DISPLAY-FRAME", "display frame", clampFrame, "PA12 nylon");
     var result:Array<PanelHardware> = [new PanelHardware(
       "frame",
       frame,
@@ -160,53 +159,34 @@ class OledModule extends HmiPart {
    * has an ear at each corner for the screws, and four pegs that go through the board's holes and stop short of the glass,
    * which covers them. The pegs locate the board; the screws clamp it.
    */
-  function clampFrame():Part {
+  function clampFrame(b:DocumentBuilder):Feature {
     var halfW = PCB_WIDTH / 2, halfH = PCB_HEIGHT / 2;
-    var pieces:Array<Part> = [];
     // The ring: the board's outline less the opening.
-    var outer = box(PCB_WIDTH, PCB_HEIGHT, CLAMP_THICKNESS, 0.0, 0.0, 0.0);
-    var opening = box(PCB_WIDTH - 2 * RAIL_SIDE, PCB_HEIGHT - 2 * RAIL_END, CLAMP_THICKNESS + 2.0, 0.0, 0.0, -1.0);
-    pieces.push(outer.subtract(opening));
-    outer.close();
-    opening.close();
+    var ring = b.label(b.cutAll(box(b, PCB_WIDTH, PCB_HEIGHT, CLAMP_THICKNESS, 0.0, 0.0, 0.0),
+      [box(b, PCB_WIDTH - 2 * RAIL_SIDE, PCB_HEIGHT - 2 * RAIL_END, CLAMP_THICKNESS + 2.0, 0.0, 0.0, -1.0)], ["opening"]), "Ring");
+    var parts:Array<Feature> = [ring];
     for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {
+      var at = (sx < 0 ? "left " : "right ") + (sy < 0 ? "lower" : "upper");
       // An ear: a web out from the rail to a boss-sized pad around the screw.
       var webX = (halfW + CLAMP_X) / 2;
-      pieces.push(box(CLAMP_X - halfW + 1.0, EAR_WIDTH, CLAMP_THICKNESS, sx * webX, sy * CLAMP_ROW, 0.0));
-      pieces.push(Part.cylinderSpan(BOSS_DIAMETER / 2, 0.0, CLAMP_THICKNESS, sx * CLAMP_X, sy * CLAMP_ROW));
+      parts.push(b.label(box(b, CLAMP_X - halfW + 1.0, EAR_WIDTH, CLAMP_THICKNESS, sx * webX, sy * CLAMP_ROW, 0.0), 'Ear web $at'));
+      parts.push(b.label(post(b, BOSS_DIAMETER / 2, 0.0, CLAMP_THICKNESS, sx * CLAMP_X, sy * CLAMP_ROW), 'Ear pad $at'));
       // A peg through the board's hole, on a pad that fills the corner of the opening.
-      pieces.push(Part.cylinderSpan(PEG_PAD / 2, 0.0, CLAMP_THICKNESS, sx * HOLE_DX, sy * HOLE_DY));
-      pieces.push(Part.cylinderSpan(
-        PEG_DIAMETER / 2,
-        CLAMP_THICKNESS,
-        CLAMP_THICKNESS + PCB_THICKNESS + PEG_CLEARANCE,
-        sx * HOLE_DX,
-        sy * HOLE_DY
-      ));
+      parts.push(b.label(post(b, PEG_PAD / 2, 0.0, CLAMP_THICKNESS, sx * HOLE_DX, sy * HOLE_DY), 'Peg pad $at'));
+      parts.push(b.label(post(b, PEG_DIAMETER / 2, CLAMP_THICKNESS, CLAMP_THICKNESS + PCB_THICKNESS + PEG_CLEARANCE, sx * HOLE_DX, sy * HOLE_DY), 'Peg $at'));
     }
-    var plain = Solids.union(pieces);
-    var tools:Array<Part> = [];
-    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) tools.push(Part.cylinderSpan(
-      CLAMP_HOLE / 2,
-      -1.0,
-      CLAMP_THICKNESS + 1.0,
-      sx * CLAMP_X,
-      sy * CLAMP_ROW
-    ));
+    var tools:Array<Feature> = [], labels:Array<String> = [];
+    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {
+      tools.push(post(b, CLAMP_HOLE / 2, -1.0, CLAMP_THICKNESS + 1.0, sx * CLAMP_X, sy * CLAMP_ROW));
+      labels.push("screw hole " + (sx < 0 ? "left " : "right ") + (sy < 0 ? "lower" : "upper"));
+    }
     // The flex circuit passes through the bottom rail; small parts under it get a shallow relief.
-    tools.push(box(2 * FLEX_OPENING, RAIL_END + 1.0, CLAMP_THICKNESS + 2.0, 0.0, -halfH + RAIL_END / 2 - 0.5, -1.0));
-    tools.push(box(
-      RELIEF_TO - RELIEF_FROM,
-      RAIL_END + 1.0,
-      RELIEF_DEPTH + 1.0,
-      (RELIEF_FROM + RELIEF_TO) / 2,
-      -halfH + RAIL_END / 2 - 0.5,
-      CLAMP_THICKNESS - RELIEF_DEPTH
-    ));
-    var result = plain.subtractAll(tools);
-    plain.close();
-    for (t in tools) t.close();
-    return result;
+    tools.push(box(b, 2 * FLEX_OPENING, RAIL_END + 1.0, CLAMP_THICKNESS + 2.0, 0.0, -halfH + RAIL_END / 2 - 0.5, -1.0));
+    labels.push("flex opening");
+    tools.push(box(b, RELIEF_TO - RELIEF_FROM, RAIL_END + 1.0, RELIEF_DEPTH + 1.0, (RELIEF_FROM + RELIEF_TO) / 2, -halfH + RAIL_END / 2 - 0.5,
+      CLAMP_THICKNESS - RELIEF_DEPTH));
+    labels.push("parts relief");
+    return b.label(b.cutAll(b.label(b.unionAll(parts), "Frame"), tools, labels), "Screw holes, flex opening and relief");
   }
 
   var driver:Null<DisplaySpec> = null;
@@ -233,95 +213,57 @@ class OledModule extends HmiPart {
     ];
   }
 
-  function pcb():Part {
-    var raw = RoundedRectangle.box(PCB_WIDTH, PCB_HEIGHT, PCB_CORNER, boardBack(), boardBack() + PCB_THICKNESS);
-    var board = at(raw, 0.0, boardCentre(), 0.0);
-    var tools:Array<Part> = [];
-    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) tools.push(Part.cylinderSpan(
-      HOLE_DIAMETER / 2,
-      boardBack() - 1.0,
-      boardBack() + PCB_THICKNESS + 1.0,
-      sx * HOLE_DX,
-      boardCentre() + sy * HOLE_DY
-    ));
-    var result = board.subtractAll(tools);
-    board.close();
-    for (t in tools) t.close();
-    return Solids.named(result, "pcb");
+  function pcb(b:DocumentBuilder):Feature {
+    var board = b.label(b.extrude(b.roundedRectangle(PCB_WIDTH, PCB_HEIGHT, PCB_CORNER, plane(0.0, boardCentre(), boardBack())), PCB_THICKNESS), "Board");
+    var tools:Array<Feature> = [], labels:Array<String> = [];
+    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {
+      tools.push(post(b, HOLE_DIAMETER / 2, boardBack() - 1.0, boardBack() + PCB_THICKNESS + 1.0, sx * HOLE_DX, boardCentre() + sy * HOLE_DY));
+      labels.push("mounting hole " + (sx < 0 ? "left " : "right ") + (sy < 0 ? "lower" : "upper"));
+    }
+    return b.label(b.cutAll(board, tools, labels), "Mounting holes");
   }
 
   /** Double-sided foam strips that bond the glass to the board across the gap between them, above the flex circuit. */
-  function foam():Part {
-    var pieces:Array<Part> = [];
+  function foam(b:DocumentBuilder):Feature {
     var top = boardCentre() + GLASS_HEIGHT / 2;
-    for (k => dy in [3.0, 9.0]) pieces.push(box(
-      2 * 24.0,
-      3.0,
-      bossHeight() - GLASS_THICKNESS,
-      0.0,
-      top - dy - 1.5,
-      boardFront(),
-      "strip" + (k + 1)
-    ));
-    return Solids.named(Solids.union(pieces), "foam");
+    var strips:Array<Feature> = [for (k => dy in [3.0, 9.0])
+      b.label(box(b, 2 * 24.0, 3.0, bossHeight() - GLASS_THICKNESS, 0.0, top - dy - 1.5, boardFront()), 'Strip ${k + 1}')];
+    return b.label(b.unionAll(strips), "Foam strips");
   }
 
   /** The glass; when the module is `driven`, its front face carries the display (the active area), which a simulator fills. */
-  function glass():Part {
-    var plain = Solids.named(
-      box(GLASS_WIDTH, GLASS_HEIGHT, GLASS_THICKNESS, 0.0, boardCentre(), glassFront() - GLASS_THICKNESS),
-      "glass"
-    );
+  function glass(b:DocumentBuilder):Feature {
+    var plain = b.label(box(b, GLASS_WIDTH, GLASS_HEIGHT, GLASS_THICKNESS, 0.0, boardCentre(), glassFront() - GLASS_THICKNESS), "Glass");
     var spec = driver;
-    if (spec == null) return plain;
-    try {
-      var shape = Details.attach(plain.shape, HmiPart.frontFace(plain.shape, "OLED glass"), Display(spec));
-      plain.close();
-      return new Part(shape);
-    } catch (error:Dynamic) {
-      plain.close();
-      throw error;
-    }
+    return spec == null ? plain : b.label(b.surfaceDetail(plain, "box.+z", Display(spec)), "Display");
   }
 
   /** The flex circuit: along the glass's back, round the board's lower edge and up its back to the connector. */
-  function flex():Part {
+  function flex(b:DocumentBuilder):Feature {
     var w = 14.0, t = 0.12;
-    var gap = glassFront() - (GLASS_THICKNESS + bossHeight()) / 2 - 0.0;
+    var gap = glassFront() - (GLASS_THICKNESS + bossHeight()) / 2;
     var rear = boardBack() - 1.2;
     var low = boardCentre() - PCB_HEIGHT / 2 - 0.3;
     var glassBottom = boardCentre() - GLASS_HEIGHT / 2;
     var zifFront = boardCentre() + zifY() - 2.6;
-    return Solids.named(
-      Solids.union([
-        box(w, glassBottom - low, t, 0.0, (glassBottom + low) / 2, gap - t / 2),
-        box(w, t, gap - rear + t, 0.0, low - t / 2, rear - t / 2),
-        box(w, zifFront - low, t, 0.0, (zifFront + low) / 2, rear - t / 2)
-      ]),
-      "flex"
-    );
+    return b.label(b.unionAll([
+      b.label(box(b, w, glassBottom - low, t, 0.0, (glassBottom + low) / 2, gap - t / 2), "Behind the glass"),
+      b.label(box(b, w, t, gap - rear + t, 0.0, low - t / 2, rear - t / 2), "Round the edge"),
+      b.label(box(b, w, zifFront - low, t, 0.0, (zifFront + low) / 2, rear - t / 2), "Up the back")
+    ]), "Flex circuit");
   }
 
   /** The flex connector's centre above the board's centre. */
   static function zifY():Float return 12.35;
 
-  function zif():Part return Solids.named(box(16.1, 5.2, 2.25, 0.0, boardCentre() + zifY(), boardBack() - 2.25), "zif");
+  function zif(b:DocumentBuilder):Feature return b.label(box(b, 16.1, 5.2, 2.25, 0.0, boardCentre() + zifY(), boardBack() - 2.25), "Flex connector");
 
   /** Right-angle header: its 2.54 mm body stands inboard, the pins run out toward the board's edge. */
   static function headerCentre():Float return boardCentre() - 1.5;
   static function headerX0():Float return 16.09;
 
-  function headerBody():Part return Solids.named(
-    box(
-      HEADER_PITCH,
-      HEADER_PITCH * HEADER_PINS,
-      HEADER_PITCH,
-      headerX0() + HEADER_PITCH / 2,
-      headerCentre(),
-      boardBack() - HEADER_PITCH
-    ),
-    "header"
-  );
+  function headerBody(b:DocumentBuilder):Feature return b.label(box(b, HEADER_PITCH, HEADER_PITCH * HEADER_PINS, HEADER_PITCH,
+    headerX0() + HEADER_PITCH / 2, headerCentre(), boardBack() - HEADER_PITCH), "Header body");
 
   /** The module's I2C and power, on the header's seven pins. On the device, and on its header pins when it is expanded. */
   function headerPort():ComponentPort return {
@@ -333,43 +275,28 @@ class OledModule extends HmiPart {
     connector: "header"
   };
 
-  function headerPins():Part {
-    var pins:Array<Part> = [];
+  function headerPins(b:DocumentBuilder):Feature {
     var length = HEADER_LENGTH - HEADER_PITCH;
-    for (i in 0...HEADER_PINS) pins.push(box(
-      length,
-      0.64,
-      0.64,
-      headerX0() + HEADER_PITCH + length / 2,
-      headerCentre() + (i - (HEADER_PINS - 1) / 2) * HEADER_PITCH,
-      boardBack() - HEADER_PITCH / 2 - 0.32
-    ));
-    return Solids.named(Solids.union(pins), "pins");
+    var pins:Array<Feature> = [for (i in 0...HEADER_PINS) b.label(box(b, length, 0.64, 0.64, headerX0() + HEADER_PITCH + length / 2,
+      headerCentre() + (i - (HEADER_PINS - 1) / 2) * HEADER_PITCH, boardBack() - HEADER_PITCH / 2 - 0.32), 'Pin ${i + 1}')];
+    return b.label(b.unionAll(pins), "Header pins");
   }
 
   /** The 1.25 mm connector, open toward the board's left edge, with a slot for the mating housing. */
-  function sevenPinConnector():Part {
-    var body = box(5.2, 14.01, CONNECTOR_HEIGHT, -24.15, boardCentre() + 0.5, boardBack() - CONNECTOR_HEIGHT);
-    var slot = box(3.5, 10.5, 2.2, -24.15 - 1.3, boardCentre() + 0.5, boardBack() - 2.8);
-    var result = body.subtract(slot);
-    body.close();
-    slot.close();
-    return Solids.named(result, "connector");
+  function sevenPinConnector(b:DocumentBuilder):Feature {
+    var body = b.label(box(b, 5.2, 14.01, CONNECTOR_HEIGHT, -24.15, boardCentre() + 0.5, boardBack() - CONNECTOR_HEIGHT), "Connector body");
+    return b.label(b.cutAll(body, [box(b, 3.5, 10.5, 2.2, -24.15 - 1.3, boardCentre() + 0.5, boardBack() - 2.8)], ["mating slot"]), "Mating slot");
   }
 
-  /** A box centred on (x, y) with its lower face at z0. */
-  /** A `w` x `h` x `d` box centred on (x, y) from z0, its faces named under `name` when given. */
-  static function box(w:Float, h:Float, d:Float, x:Float, y:Float, z0:Float, ?name:String):Part {
-    var placed = at(Part.box(w, h, d), x, y, z0);
-    if (name == null) return placed;
-    var result = placed.named(name);
-    placed.close();
-    return result;
-  }
+  /** A `w` x `h` x `d` box centred on (x, y) from z0. */
+  static function box(b:DocumentBuilder, w:Float, h:Float, d:Float, x:Float, y:Float, z0:Float):Feature
+    return b.boxBetween(x - w / 2, x + w / 2, y - h / 2, y + h / 2, z0, z0 + d);
 
-  static function at(raw:Part, x:Float, y:Float, z:Float):Part {
-    var moved = raw.translated(new Vector(x, y, z));
-    raw.close();
-    return moved;
-  }
+  /** A cylinder of radius `r` up Z through (x, y), from z0 to z1. */
+  static function post(b:DocumentBuilder, r:Float, z0:Float, z1:Float, x:Float, y:Float):Feature
+    return b.cylinderAlong(new Vector(x, y, 0), Vector.Z(), r, z0, z1);
+
+  /** The XY plane through (x, y, z). */
+  static function plane(x:Float, y:Float, z:Float):cadkit.modeling.Plane
+    return new cadkit.modeling.Plane(new Vector(x, y, z), Vector.X(), Vector.Z());
 }

@@ -1,16 +1,12 @@
 package machinekit.hmi;
 
-import cadkit.Shape;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Footprint;
-import cadkit.modeling.Axis;
-import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Polygon;
-import cadkit.modeling.StrokeText;
-import cadkit.threads.Details;
 import cadkit.threads.SurfaceDetail;
 import cadkit.threads.ThreadedFace.ThreadStart;
-import cadkit.threads.Threads;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
@@ -164,76 +160,52 @@ class HandWheel extends HmiPart {
   }
   ];
 
-  /** The studs, each a named cylinder whose side carries the thread texture; plain when `textured` is false. */
-  function studSolid(textured:Bool):Part {
+  /** The studs, each a cylinder whose side carries the thread texture; plain when `textured` is false. */
+  function studs(b:DocumentBuilder, textured:Bool):Feature {
     var thread = FastenerThreads.coarse(n("studDiameter"));
-    var studs:Array<Part> = [];
-    var i = 0;
-    for (position in studPositions()) {
-      i++;
-      var rod = Solids.named(
-        Part.cylinderSpan(n("studDiameter") / 2, -n("studLength"), 0.0, position.x, position.y),
-        'stud$i'
-      );
-      if (textured) {
-        studs.push(new Part(Threads.attach(
-          rod.shape,
-          'stud$i:cyl.side',
-          thread,
-          AxisMaximum,
-          n("studLength") - 0.5,
-          0.5
-        )));
-        rod.close();
-      } else studs.push(rod);
+    var rods:Array<Feature> = [];
+    for (i => position in studPositions()) {
+      var rod = b.label(HmiPart.post(b, n("studDiameter") / 2, -n("studLength"), 0.0, position.x, position.y), 'Stud ${i + 1}');
+      rods.push(textured ? b.thread(rod, "cyl.side", thread, AxisMaximum, n("studLength") - 0.5, 0.5) : rod);
     }
-    return Solids.union(studs);
+    return b.label(b.unionAll(rods), "Studs");
   }
 
-  /** ISO 4032 hex nuts on the studs behind the panel, each bore named for its own internal thread texture. */
-  function nutSolid(textured:Bool):Part {
+  /** ISO 4032 hex nuts on the studs behind the panel, each bore carrying its own internal thread texture. */
+  function nuts(b:DocumentBuilder, textured:Bool):Feature {
     var size = HexNut.metric("M" + Dimension.format(n("studDiameter")));
-    var nuts:Array<Part> = [];
-    var i = 0;
-    for (position in studPositions()) {
-      i++;
-      var body = Part.prism(Polygon.regular(6, size.acrossFlats), 0.0, size.height);
-      var bore = Solids.named(Part.cylinderSpan(n("studDiameter") / 2, -0.1, size.height + 0.1), 'bore$i');
-      var tool = bore;
-      if (textured) {
-        tool = new Part(Threads.attach(bore.shape, 'bore$i:cyl.side', size.thread, AxisMinimum));
-        bore.close();
-      }
-      var cut = Solids.cut(body, [tool]);
-      var moved = cut.translated(new Vector(position.x, position.y, -n("panelThickness") - size.height));
-      cut.close();
-      nuts.push(moved);
+    var z0 = -n("panelThickness") - size.height;
+    var nuts:Array<Feature> = [];
+    for (i => position in studPositions()) {
+      var plane = new cadkit.modeling.Plane(new Vector(position.x, position.y, z0), Vector.X(), Vector.Z());
+      var hex = b.extrude(b.polygon(Polygon.regular(6, size.acrossFlats), plane), size.height);
+      var bore:Feature = HmiPart.post(b, n("studDiameter") / 2, z0 - 0.1, z0 + size.height + 0.1, position.x, position.y);
+      if (textured) bore = b.thread(bore, "cyl.side", size.thread, AxisMinimum);
+      nuts.push(b.label(b.cutAll(hex, [bore], ["threaded bore"]), 'Nut ${i + 1}'));
     }
-    return Solids.union(nuts);
+    return b.label(b.unionAll(nuts), "Nuts");
   }
 
   /**
-   * The whole device as one solid, with plain studs and nuts: their coincident surfaces cannot keep two thread textures. The
-   * envelope has a plain wheel (no knurling or scale), which is the silhouette, and so does a textured wheel's single solid; the preview is the fused bodies, built once
-   * for each set of numbers because the knurling and scale make it cost seconds.
+   * The whole device as one solid, with plain studs and nuts (their coincident surfaces cannot keep two thread textures) and
+   * the wheel's plain silhouette when it is textured or the envelope is asked for.
    */
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var key = recipeType().key(values());
-    return previewCache.get(detail == Envelope ? null : key, () -> {
-      var parts:Array<Part> = [];
-      for (spec in bodies()) parts.push(spec.id == "studs" ? studSolid(false) : spec.id == "nuts"
-        ? nutSolid(false) : spec.id == "wheel" && (detail == Envelope || textured()) ? plainWheel() : spec.build());
-      return Solids.union(parts);
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
+    var parts:Array<Feature> = [];
+    for (spec in bodies()) parts.push(switch spec.id {
+      case "studs": studs(b, false);
+      case "nuts": nuts(b, false);
+      case "wheel" if (detail == Envelope || textured()): plainWheel(b);
+      case _: b.label(spec.record(b), spec.label);
     });
+    return b.label(HmiPart.fuse(b, parts), "Device");
   }
 
-  /** Whole-device preview solids already built, by recipe key. */
-  static final previewCache = machinekit.cache.Memos.parts("hand-wheel-previews", 16);
-
   /** The wheel's silhouette: the cone, the grip at its tip radius, the recessed dial and the spinner, without knurling or scale. */
-  function plainWheel():Part {
+  function plainWheel(b:DocumentBuilder):Feature {
     var top = bodyHeight(), flange = n("flangeThickness");
-    var parts:Array<Part> = [Part.revolve([
+    var wheel = HmiPart.turned(b, [
       {r: 0.0, z: flange},
       {r: n("outerDiameter") / 2, z: flange},
       {r: n("ringDiameter") / 2, z: flange + n("coneHeight")},
@@ -241,15 +213,10 @@ class HandWheel extends HmiPart {
       {r: n("dialDiameter") / 2, z: top},
       {r: n("dialDiameter") / 2, z: top - n("dialRecess")},
       {r: 0.0, z: top - n("dialRecess")}
-    ])];
-    if (flag("handle")) parts.push(Part.cylinderSpan(
-      n("handleDiameter") / 2,
-      top - n("dialRecess"),
-      top + n("handleProtrusion"),
-      0.0,
-      -n("handleRadius")
-    ));
-    return Solids.union(parts);
+    ]);
+    if (!flag("handle")) return b.label(wheel, "Wheel");
+    var handle = HmiPart.post(b, n("handleDiameter") / 2, top - n("dialRecess"), top + n("handleProtrusion"), 0.0, -n("handleRadius"));
+    return b.label(b.unionAll([wheel, handle]), "Wheel");
   }
 
   /** The terminal block's height behind the boss, and the pole spacing between its barriers. */
@@ -267,178 +234,107 @@ class HandWheel extends HmiPart {
    * the housing: the cone, grip ring, dial and spinner handle. The wheel's rotation is the encoder's angle.
    */
   override public function bodies():Null<Array<DeviceBodySpec>> {
-    var top = bodyHeight(), flange = n("flangeThickness");
+    var flange = n("flangeThickness");
     var rear = -n("bossDepth");
-    return [new DeviceBodySpec("housing", "hand wheel housing", materialSpec(), function() {
+    return [new DeviceBodySpec("housing", "hand wheel housing", materialSpec(), b -> {
       // The flange, with a groove round its foot for the seal.
-      var flangeBody = Part.cylinderSpan(n("outerDiameter") / 2, 0.0, flange);
-      var groove = Part.cylinderSpan(n("outerDiameter") / 2 + 1.0, -1.0, GASKET_HEIGHT);
-      var inner = Part.cylinderSpan(n("outerDiameter") / 2 - GASKET_WIDTH, -2.0, GASKET_HEIGHT + 1.0);
-      var cutter = groove.subtract(inner);
-      groove.close();
-      inner.close();
-      var result = flangeBody.subtract(cutter);
-      flangeBody.close();
-      cutter.close();
-      return Solids.named(result, "flange");
-    }
-    ), new DeviceBodySpec("gasket", "hand wheel panel seal", "rubber", function() {
-      var ring = Part.cylinderSpan(n("outerDiameter") / 2, 0.0, GASKET_HEIGHT);
-      var bore = Part.cylinderSpan(n("outerDiameter") / 2 - GASKET_WIDTH, -1.0, GASKET_HEIGHT + 1.0);
-      var result = ring.subtract(bore);
-      ring.close();
-      bore.close();
-      return Solids.named(result, "gasket");
-    }
-    ), new DeviceBodySpec(
-      "backplate",
-      "hand wheel back plate",
-      "ABS black",
-      () -> Solids.named(Part.cylinderSpan(n("bossDiameter") / 2, rear, 0.0), "boss")
-    ), new DeviceBodySpec(
-      "studs",
-      "hand wheel mounting studs",
-      "steel 10.9",
-      () -> studSolid(true)
-    ), new DeviceBodySpec(
-      "nuts",
-      "hand wheel stud nuts",
-      "stainless A2-70",
-      () -> nutSolid(true)
-    ), new DeviceBodySpec("terminals", "hand wheel terminal block", "ABS black", function() {
-      // A base on the boss with a barrier at each end and between the poles.
-      var height = blockHeight(), base = Math.min(1.0, height * 0.4), wall = 1.2, poles = terminalNames().length;
-      var pitch = (n("terminalLength") - wall) / poles;
-      var parts:Array<Part> = [boxAt(n("terminalLength"), n("terminalWidth"), base, 0.0, rear - base)];
-      for (k in 0...poles + 1) parts.push(boxAt(
-        wall,
-        n("terminalWidth"),
-        height,
-        -n("terminalLength") / 2 + wall / 2 + k * pitch,
-        rear - height
-      ));
-      return Solids.named(Solids.union(parts), "terminals");
-    }, terminalPorts()),
-      new DeviceBodySpec("terminal-screws", "hand wheel terminal screws", "stainless A2-70", function() {
-      // A pan head with a cross recess in each pole, sitting on the base and pointing back.
-      var base = Math.min(1.0, blockHeight() * 0.4), headHeight = Math.min(1.2, blockHeight() - base - 0.3);
-      var one = ScrewHeads.pan(2.2, headHeight, 2.8, 0.8);
-      var heads:Array<Part> = [for (x in poleCentres()) one.translated(new Vector(x, 0, rear - base))];
-      one.close();
-      return Solids.union(heads);
-    }
-    ), new DeviceBodySpec("labels", "hand wheel terminal names", "ABS white", function() {
-      // Raised lettering on the boss's rear face beside the poles, mirrored so it reads from behind.
-      var pieces:Array<Part> = [];
-      var poles = poleCentres(), names = terminalNames();
-      var y = -(n("terminalWidth") / 2 + 1.5 + 3.2);
-      for (k in 0...names.length) {
-        var text = StrokeText.solid(names[k], 3.2, 0.4, rear - 0.3, rear, true);
-        pieces.push(text.translated(new Vector(-poles[k], y, 0)));
-        text.close();
-      }
-      return Solids.named(Solids.union(pieces), "labels");
-    }
-    ), new DeviceBodySpec("wheel", "hand wheel", materialSpec(), wheelSolid)];
-  }
-
-  /** Wheel solids already built, by the numbers they depend on: the knurling and the scale make one cost seconds to build. */
-  static final wheelCache = machinekit.cache.Memos.parts("hand-wheel-wheels", 16);
-
-  /** The wheel, from the cache when these numbers have been built before; the caller owns the solid and closes it. */
-  function wheelSolid():Part {
-    var key = [for (name in [
-      "outerDiameter",
-      "flangeThickness",
-      "coneHeight",
-      "ringDiameter",
-      "ringHeight",
-      "dialDiameter",
-      "dialRecess",
-      "handleDiameter",
-      "handleProtrusion",
-      "handleRadius",
-      "knurlDepth"
-    ]) Std.string(n(name))].join("|") + "|" + count("knurlTeeth")
-      + "|" + count("scaleDivisions") + "|" + values().token("surfaceDetail") + "|" + (flag("handle") ? "h" : "-");
-    return wheelCache.get(key, () -> buildWheel());
+      var body = b.label(HmiPart.post(b, n("outerDiameter") / 2, 0.0, flange), "Flange");
+      var groove = b.cutAll(HmiPart.post(b, n("outerDiameter") / 2 + 1.0, -1.0, GASKET_HEIGHT),
+        [HmiPart.post(b, n("outerDiameter") / 2 - GASKET_WIDTH, -2.0, GASKET_HEIGHT + 1.0)], ["groove inside"]);
+      b.label(b.cutAll(body, [groove], ["seal groove"]), "Seal groove");
+    }),
+      new DeviceBodySpec("gasket", "hand wheel panel seal", "rubber", b -> b.label(HmiPart.tube(b, n("outerDiameter") / 2,
+        n("outerDiameter") / 2 - GASKET_WIDTH, 0.0, GASKET_HEIGHT), "Seal")),
+      new DeviceBodySpec("backplate", "hand wheel back plate", "ABS black", b -> b.label(HmiPart.post(b, n("bossDiameter") / 2, rear, 0.0), "Boss")),
+      new DeviceBodySpec("studs", "hand wheel mounting studs", "steel 10.9", b -> studs(b, true)),
+      new DeviceBodySpec("nuts", "hand wheel stud nuts", "stainless A2-70", b -> nuts(b, true)),
+      new DeviceBodySpec("terminals", "hand wheel terminal block", "ABS black", b -> {
+        // A moulded comb on the boss: a base with a barrier at each end and between the poles, one section across its width.
+        var height = blockHeight(), base = Math.min(1.0, height * 0.4), wall = 1.2, poles = terminalNames().length;
+        var pitch = (n("terminalLength") - wall) / poles, x0 = -n("terminalLength") / 2;
+        var section = [new Vector(x0, rear, 0)];
+        for (k in 0...poles + 1) {
+          var left = x0 + k * pitch;
+          section.push(new Vector(left, rear - height, 0));
+          section.push(new Vector(left + wall, rear - height, 0));
+          if (k < poles) {
+            section.push(new Vector(left + wall, rear - base, 0));
+            section.push(new Vector(left + pitch, rear - base, 0));
+          }
+        }
+        section.push(new Vector(x0 + n("terminalLength"), rear, 0));
+        // The section lies in the XZ plane at the block's front face (y = -width / 2) and is extruded back across the width.
+        var plane = new cadkit.modeling.Plane(new Vector(0, -n("terminalWidth") / 2, 0), Vector.X(), Vector.Y().scale(-1));
+        b.label(b.extrude(b.polygon(section, plane), n("terminalWidth"), Vector.Y()), "Terminal block");
+      }, terminalPorts()),
+      new DeviceBodySpec("terminal-screws", "hand wheel terminal screws", "stainless A2-70", b -> {
+        // A pan head with a cross recess in each pole, sitting on the base and pointing back.
+        var base = Math.min(1.0, blockHeight() * 0.4), headHeight = Math.min(1.2, blockHeight() - base - 0.3);
+        b.label(b.unionAll([for (x in poleCentres()) ScrewHeads.pan(b, 2.2, headHeight, 2.8, 0.8, x, 0.0, rear - base)]), "Terminal screws");
+      }),
+      new DeviceBodySpec("labels", "hand wheel terminal names", "ABS white", b -> {
+        // Raised lettering on the boss's rear face beside the poles, mirrored so it reads from behind.
+        var poles = poleCentres(), names = terminalNames();
+        var y = -(n("terminalWidth") / 2 + 1.5 + 3.2);
+        b.label(b.unionAll([for (k in 0...names.length) b.strokeText(names[k], 3.2, 0.4, rear - 0.3, rear, true, -poles[k], y)]), "Terminal names");
+      }),
+      new DeviceBodySpec("wheel", "hand wheel", materialSpec(), wheel)];
   }
 
   /** Whether the knurling and scale are textures on a plain wheel (the default) or modelled as geometry. */
   function textured():Bool return values().token("surfaceDetail") == "textured";
 
-  /** The wheel's faces that carry details, named by their segment in the revolved profile below. */
-  static inline var CONE_FACE:String = "wheel:side(seg.1)";
-  static inline var GRIP_FACE:String = "wheel:side(seg.2)";
+  /** The segments of the wheel's revolved profile below whose faces carry details. */
+  static inline var CONE_SEGMENT:Int = 1;
+  static inline var GRIP_SEGMENT:Int = 2;
 
-  function buildWheel():Part {
+  function wheel(b:DocumentBuilder):Feature {
     var top = bodyHeight(), flange = n("flangeThickness");
     // Textured, the grip is a plain cylinder at its tip radius; modelled, its root, with the teeth added to it.
     var root = textured() ? n("ringDiameter") / 2 : n("ringDiameter") / 2 - n("knurlDepth");
-    var body = Solids.named(
-      Part.revolve([
-        {r: 0.0, z: flange},
-        {r: n("outerDiameter") / 2, z: flange},
-        {r: root, z: flange + n("coneHeight")},
-        {r: root, z: top},
-        {r: n("dialDiameter") / 2, z: top},
-        {r: n("dialDiameter") / 2, z: top - n("dialRecess")},
-        {r: 0.0, z: top - n("dialRecess")}
-      ]),
-      "wheel"
-    );
-    var parts:Array<Part> = [];
+    var body:Feature = b.label(HmiPart.turned(b, [
+      {r: 0.0, z: flange},
+      {r: n("outerDiameter") / 2, z: flange},
+      {r: root, z: flange + n("coneHeight")},
+      {r: root, z: top},
+      {r: n("dialDiameter") / 2, z: top},
+      {r: n("dialDiameter") / 2, z: top - n("dialRecess")},
+      {r: 0.0, z: top - n("dialRecess")}
+    ]), "Wheel body");
+    var parts:Array<Feature> = [];
     if (textured()) {
       // The knurling on the grip and the scale on the skirt are cosmetic details of those two faces.
-      var knurled = Details.attach(body.shape, GRIP_FACE, Knurl(count("knurlTeeth"), n("knurlDepth")));
-      body.close();
+      var knurled = b.label(b.surfaceDetail(body, HmiPart.sweptFace(body, GRIP_SEGMENT), Knurl(count("knurlTeeth"), n("knurlDepth"))), "Knurling");
       var rise = n("coneHeight"), reach = n("ringDiameter") / 2 - n("outerDiameter") / 2;
-      var graduated = count("scaleDivisions") > 0 ? Details.attach(
-        knurled,
-        CONE_FACE,
-        Graduation(count("scaleDivisions"), 10, Math.sqrt(rise * rise + reach * reach), n("ringDiameter") / 2)
-      ) : knurled;
-      if (graduated != knurled) knurled.close();
-      parts.push(new Part(graduated));
+      parts.push(count("scaleDivisions") > 0 ? b.label(b.surfaceDetail(knurled, HmiPart.sweptFace(body, CONE_SEGMENT),
+        Graduation(count("scaleDivisions"), 10, Math.sqrt(rise * rise + reach * reach), n("ringDiameter") / 2)), "Scale") : knurled);
     } else {
       parts.push(body);
-      parts.push(knurledRing(flange + n("coneHeight"), top, root));
-      if (count("scaleDivisions") > 0) parts.push(scaleBand());
+      parts.push(knurledRing(b, flange + n("coneHeight"), top, root));
+      if (count("scaleDivisions") > 0) parts.push(scaleBand(b));
     }
     if (flag("handle")) {
-      var from = top - n("dialRecess");
-      var pin = Part.cylinderSpan(n("handleDiameter") / 2, from, top + n("handleProtrusion"), 0.0, -n("handleRadius"));
+      var from = top - n("dialRecess"), end = top + n("handleProtrusion");
+      var pin = HmiPart.post(b, n("handleDiameter") / 2, from, end, 0.0, -n("handleRadius"));
       // A hex socket in the spinner's end, for the screw that holds it.
-      var socket = Part.prism(
-        Polygon.regular(6, 3.0),
-        top + n("handleProtrusion") - 1.5,
-        top + n("handleProtrusion") + 0.1
-      );
-      var socketMoved = socket.translated(new Vector(0.0, -n("handleRadius"), 0.0));
-      socket.close();
-      var handle = pin.subtract(socketMoved);
-      pin.close();
-      socketMoved.close();
-      parts.push(Solids.named(handle, "handle"));
+      var socket = b.extrude(b.polygon(Polygon.regular(6, 3.0), new cadkit.modeling.Plane(new Vector(0.0, -n("handleRadius"), end - 1.5), Vector.X(),
+        Vector.Z())), 1.6);
+      parts.push(b.label(b.cutAll(pin, [socket], ["hex socket"]), "Spinner handle"));
     }
-    return Solids.union(parts);
+    return b.label(HmiPart.fuse(b, parts), "Wheel");
   }
 
   /** Fine straight knurling round the grip: a triangular tooth profile, one extrusion from root radius to tip radius. */
-  function knurledRing(z0:Float, z1:Float, root:Float):Part {
+  function knurledRing(b:DocumentBuilder, z0:Float, z1:Float, root:Float):Feature {
     var teeth = count("knurlTeeth"), tip = n("ringDiameter") / 2;
     var outline:Array<Vector> = [];
     for (i in 0...teeth) {
-      var a = 2 * Math.PI * i / teeth, b = a + Math.PI / teeth;
+      var a = 2 * Math.PI * i / teeth, c = a + Math.PI / teeth;
       outline.push(new Vector(tip * Math.cos(a), tip * Math.sin(a)));
-      outline.push(new Vector(root * Math.cos(b), root * Math.sin(b)));
+      outline.push(new Vector(root * Math.cos(c), root * Math.sin(c)));
     }
-    var solid = Part.prism(outline, z0, z1);
-    var bore = Part.cylinderSpan(root - 0.4, z0 - 1.0, z1 + 1.0);
-    var ring = solid.subtract(bore);
-    solid.close();
-    bore.close();
-    return Solids.named(ring, "knurl");
+    var toothed = b.extrude(b.polygon(outline, new cadkit.modeling.Plane(new Vector(0, 0, z0), Vector.X(), Vector.Z())), z1 - z0);
+    return b.label(b.cutAll(toothed, [HmiPart.post(b, root - 0.4, z0 - 1.0, z1 + 1.0)], ["bore"]), "Knurled grip");
   }
 
   /**
@@ -447,7 +343,7 @@ class HandWheel extends HmiPart {
    * follows the cone, and one sliver per length is turned into place; the numerals are cut as plan-view shapes and intersected
    * with a thin skin along the cone. Zero is at the left and the numbers rise counter-clockwise.
    */
-  function scaleBand():Part {
+  function scaleBand(b:DocumentBuilder):Feature {
     var outerR = n("outerDiameter") / 2, flange = n("flangeThickness"), rise = n("coneHeight");
     var root = n("ringDiameter") / 2 - n("knurlDepth");
     var dr = root - outerR, length = Math.sqrt(dr * dr + rise * rise);
@@ -455,63 +351,37 @@ class HandWheel extends HmiPart {
     // The cone at fraction t from its foot (plan radius and height).
     function radius(t:Float):Float return outerR + dr * t;
     function height(t:Float):Float return flange + rise * t;
+    function band(from:Float, to:Float):Array<{r:Float, z:Float}> return [
+      {r: radius(from) - nx * 0.1, z: height(from) - nz * 0.1},
+      {r: radius(to) - nx * 0.1, z: height(to) - nz * 0.1},
+      {r: radius(to) + nx * 0.12, z: height(to) + nz * 0.12},
+      {r: radius(from) + nx * 0.12, z: height(from) + nz * 0.12}
+    ];
     var divisions = count("scaleDivisions");
-    var pieces:Array<Part> = [];
+    var pieces:Array<Feature> = [];
     // One sliver of each length, then a copy turned to each division.
-    var width = 0.22;
+    var width = 0.22, turn = width / radius(0.2);
     for (reach in [0.36, 0.28, 0.2]) {
-      var turn = width / radius(0.2);
-      var sliver = Part.revolve(
-        [
-          {r: radius(0.06) - nx * 0.1, z: height(0.06) - nz * 0.1},
-          {r: radius(reach) - nx * 0.1, z: height(reach) - nz * 0.1},
-          {r: radius(reach) + nx * 0.12, z: height(reach) + nz * 0.12},
-          {r: radius(0.06) + nx * 0.12, z: height(0.06) + nz * 0.12}
-        ],
-        turn
-      );
+      var sliver = HmiPart.turned(b, band(0.06, reach), turn);
       for (k in 0...divisions) {
         var long = k % 10 == 0, medium = !long && k % 5 == 0;
         if ((reach == 0.36) != long || (reach == 0.28) != medium) continue;
         var a = Math.PI + 2 * Math.PI * k / divisions;
-        pieces.push(sliver.placed(Location.rotation(Axis.Z(), a - turn / 2)));
+        pieces.push(b.rotate(sliver, new Vector(0, 0, 0), Vector.Z(), a - turn / 2));
       }
-      sliver.close();
     }
     // The tens, upright from outside: the baseline on the outer side, the top toward the centre.
     var tens = divisions >= 10 ? Std.int(divisions / 10) : 0;
     if (tens > 0) {
-      var skin = Part.revolve([
-        {r: radius(0.40) - nx * 0.1, z: height(0.40) - nz * 0.1},
-        {r: radius(0.96) - nx * 0.1, z: height(0.96) - nz * 0.1},
-        {r: radius(0.96) + nx * 0.12, z: height(0.96) + nz * 0.12},
-        {r: radius(0.40) + nx * 0.12, z: height(0.40) + nz * 0.12}
-      ]);
+      var skin = HmiPart.turned(b, band(0.40, 0.96));
       var z0 = flange - 1.0, z1 = flange + rise + 1.0;
-      var numerals:Array<Part> = [];
-      for (k in 0...tens) {
+      var numerals:Array<Feature> = [for (k in 0...tens) {
         var a = Math.PI + 2 * Math.PI * (k * 10) / divisions, baseline = radius(0.46);
-        numerals.push(StrokeText.solid(
-          Std.string(k * 10),
-          2.2,
-          0.24,
-          z0,
-          z1,
-          false,
-          baseline * Math.cos(a),
-          baseline * Math.sin(a),
-          a + Math.PI / 2
-        ));
-      }
-      var flat = Part.fuseAll(numerals);
-      for (numeral in numerals) numeral.close();
-      pieces.push(skin.intersect(flat));
-      skin.close();
-      flat.close();
+        b.strokeText(Std.string(k * 10), 2.2, 0.24, z0, z1, false, baseline * Math.cos(a), baseline * Math.sin(a), a + Math.PI / 2);
+      }];
+      pieces.push(b.label(b.intersect(skin, numerals.length == 1 ? numerals[0] : b.unionAll(numerals)), "Numerals"));
     }
-    var all = Part.fuseAll(pieces);
-    for (piece in pieces) piece.close();
-    return Solids.named(all, "scale");
+    return b.label(b.unionAll(pieces), "Scale");
   }
 
   override public function joints():Array<DeviceJointSpec> return [new DeviceJointSpec(
@@ -521,19 +391,4 @@ class HandWheel extends HmiPart {
     "wheel"
   )];
 
-  /** A box centred on (x, y) with its lower face at z0. */
-  static function boxAt(w:Float, h:Float, d:Float, x:Float, z0:Float):Part return boxAtY(w, h, d, x, 0.0, z0);
-
-  static function boxAtY(w:Float, h:Float, d:Float, x:Float, y:Float, z0:Float):Part {
-    var raw = Part.box(w, h, d);
-    var moved = raw.translated(new Vector(x, y, z0));
-    raw.close();
-    return moved;
-  }
-
-  static function shifted(part:Part, z:Float):Part {
-    var moved = part.translated(new Vector(0, 0, z));
-    part.close();
-    return moved;
-  }
 }
