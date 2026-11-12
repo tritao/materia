@@ -1194,11 +1194,12 @@ class MachineKitSmoke {
     var previewBox = bounds(preview);
     near(previewBox.maxX, 4, "groove leaves the shaft's outer surface elsewhere");
     preview.close();
-    check(
-      shaft.designation
-      == "SHAFT-8x51.5-6x8.5-F8:bearingA@10-F8:bearingB@43-G4:ring@50x1.2x7.6-K9:outputKey@52:DIN6885-B-2x2x6-S6x8-D1.2x1",
-      "shaft designation includes its faces, keyway and groove"
-    );
+    // A shaft with faces, a keyway or a groove has a capped geometry identity, which those features change.
+    var plain = new SteppedShaft([{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}], [{name: "bearingA", z: 10}, {name: "bearingB", z: 43}],
+      [], [{name: "ring", z0: 50, width: 1.2, diameter: 7.6}]);
+    check(StringTools.startsWith(shaft.designation, "SHAFT-STEPPED-")
+      && shaft.designation.length <= machinekit.component.PartNumberLint.MAX_LENGTH && shaft.designation != plain.designation,
+      "shaft designation identifies its faces, keyway and groove: " + shaft.designation);
     check(
       new SteppedShaft([{diameter: 6.35, length: 20}]).designation == "SHAFT-6.35x20",
       "fractional shaft designation is rounded, not a raw float"
@@ -1227,10 +1228,12 @@ class MachineKitSmoke {
         shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]
       }
     );
-    check(
-      detailedShaft.designation == "SHAFT-12x20-8x20-CI1-CO0.5-S20-R0.5-U2x7.5-TI10x1.5x6-TO6x1x5",
-      "detailed shaft designation includes chamfers, shoulders and threads"
-    );
+    // Chamfers, shoulders and threads are part of the shaft's capped geometry identity.
+    var undetailedShaft = new SteppedShaft([{diameter: 12, length: 20}, {diameter: 8, length: 20}]);
+    check(StringTools.startsWith(detailedShaft.designation, "SHAFT-STEPPED-")
+      && detailedShaft.designation.length <= machinekit.component.PartNumberLint.MAX_LENGTH
+      && detailedShaft.designation != undetailedShaft.designation,
+      "detailed shaft designation identifies chamfers, shoulders and threads: " + detailedShaft.designation);
     var otherDetailedShaft = new SteppedShaft(
       [{diameter: 12, length: 20}, {diameter: 8, length: 20}],
       null,

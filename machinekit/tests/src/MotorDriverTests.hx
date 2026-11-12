@@ -17,10 +17,10 @@ class MotorDriverTests {
   }
   public static function run():Void {
     for (name in MotorDriver.catalog().designations()) {
-      check(
-        MotorDriver.catalog().metadata(name).conformance == GenericApproximation,
-        "Generic drivers must declare assumed catalog provenance"
-      );
+      // The eRob's integrated amplifier comes from the maker's data; every other row is an assumed generic driver class.
+      var expected:machinekit.catalog.CatalogMetadata.Conformance = name == machinekit.motion.ErobActuatorData.INTEGRATED_AMPLIFIER
+        ? NominalEnvelope : GenericApproximation;
+      check(MotorDriver.catalog().metadata(name).conformance == expected, '$name declares ${expected} catalogue provenance');
       var driver = new MotorDriver(name, new machinekit.power.PhaseRmsCurrent(1.68), 1);
       var rebuilt:MotorDriver = cast driver.componentType().create(driver.values());
       check(
