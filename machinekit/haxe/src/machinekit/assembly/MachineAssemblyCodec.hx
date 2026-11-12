@@ -448,7 +448,9 @@ class MachineAssemblyCodec {
     }
     var subassemblies = new Map<String, AssemblySubdefinition>();
     for (occurrence in level.occurrences) {
-      target.memberGroups.set(occurrence.id, MachineAssembly.checkedGroup(occurrence.groupPath));
+      // The group path is optional: a record without one (an editor document's) leaves the member ungrouped.
+      var groupPath:Null<String> = occurrence.groupPath;
+      if (groupPath != null) target.memberGroups.set(occurrence.id, MachineAssembly.checkedGroup(groupPath));
       if (occurrence.assembly != null) {
         var entry = table.get(occurrence.assembly);
         var childPath = path.length == 0 ? occurrence.id : path + "/" + occurrence.id;
@@ -492,7 +494,8 @@ class MachineAssemblyCodec {
           definition.collisionHulls)) throw 'Collision hulls disagree with recipe for "${occurrence.id}"';
       }
       target.addMember(occurrence.id, component, occurrence.initialPose);
-      target.assignGroup(occurrence.id, occurrence.groupPath);
+      var memberGroup:Null<String> = occurrence.groupPath;
+      if (memberGroup != null) target.assignGroup(occurrence.id, memberGroup);
     }
     for (connector in machine.memberConnectors) target.addMemberConnector(
       connector.instanceId,

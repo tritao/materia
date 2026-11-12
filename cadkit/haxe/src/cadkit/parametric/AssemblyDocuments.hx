@@ -231,6 +231,14 @@ class AssemblyDocuments {
         var assembly = readOrNull(element, "assembly");
         if (assembly != null) occurrence.assembly = assembly;
         if (readOrNull(element, "grounded") == "true") occurrence.grounded = true;
+        var includePath = readOrNull(element, "includePath"), visible = readOrNull(element, "visible");
+        var groupPath = readOrNull(element, "groupPath"), kinds = readOrNull(element, "selectionKinds");
+        var includeFolder = readOrNull(element, "includeFolder");
+        if (includePath != null) occurrence.includePath = includePath;
+        if (visible != null) occurrence.visible = visible == "true";
+        if (groupPath != null) occurrence.groupPath = groupPath;
+        if (kinds != null) occurrence.selectionKinds = [for (kind in (haxe.Json.parse(kinds) : Array<Dynamic>)) Std.string(kind)];
+        if (includeFolder != null) occurrence.includeFolder = includeFolder == "true";
         scope.occurrences.push(occurrence);
         byElement.set(element.id.value, {scope: scopeName, id: occurrence.id});
       }
@@ -442,6 +450,12 @@ class AssemblyDocuments {
       if (component != null) put(element, "record", JsonWire.encode(component));
       if (occurrence.assembly != null) put(element, "assembly", occurrence.assembly);
       if (occurrence.grounded == true) put(element, "grounded", "true");
+      // The occurrence's optional fields round-trip with it: include, visibility, functional group, selection kinds.
+      if (occurrence.includePath != null) put(element, "includePath", occurrence.includePath);
+      if (occurrence.visible != null) put(element, "visible", occurrence.visible ? "true" : "false");
+      if (occurrence.groupPath != null) put(element, "groupPath", occurrence.groupPath);
+      if (occurrence.selectionKinds != null) put(element, "selectionKinds", haxe.Json.stringify(occurrence.selectionKinds));
+      if (occurrence.includeFolder != null) put(element, "includeFolder", occurrence.includeFolder ? "true" : "false");
       members.set(occurrence.id, element);
     }
     return members;

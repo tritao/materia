@@ -70,9 +70,14 @@ class MachineAssemblyDescriptionTests {
     var rebuiltBom = rebuilt.billOfMaterials().lines();
     originalBom.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
     rebuiltBom.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
-    if (!Same.bom(originalBom, rebuiltBom)) throw '$label BOM changed after round trip';
-    if (!Same.diagnostics(assembly.check().items,
-      rebuilt.check().items)) throw '$label diagnostics changed after round trip';
+    if (!Same.bom(originalBom, rebuiltBom)) throw '$label BOM changed after round trip: ' + [for (line in originalBom) line.partNumber + "x"
+      + line.quantity].join(",") + ' versus ' + [for (line in rebuiltBom) line.partNumber + "x" + line.quantity].join(",");
+    var originalFindings = assembly.check().items, rebuiltFindings = rebuilt.check().items;
+    if (!Same.diagnostics(originalFindings, rebuiltFindings)) {
+      var before = [for (item in originalFindings.slice(0, 3)) item.code + " " + item.subject].join("; ");
+      var after = [for (item in rebuiltFindings.slice(0, 3)) item.code + " " + item.subject].join("; ");
+      throw '$label diagnostics changed after round trip: ${originalFindings.length} [$before] versus ${rebuiltFindings.length} [$after]';
+    }
     if (massAvailable) {
       var originalMass = assembly.massProperties(), restoredMass = rebuilt.massProperties();
       close(originalMass.mass, restoredMass.mass, '$label mass');
@@ -857,8 +862,9 @@ class MachineAssemblyDescriptionTests {
       return MachineAssembly.fromDescription(description);
     }
     var incompatible = changed("nut", "pitch", SavedValue.Number(3));
-    if (!incompatible.check().hasErrors() || incompatible.check().items[0].message.indexOf("update the nut")
-      < 0) throw "An incompatible nut rebuilds with an actionable transmission diagnostic";
+    var incompatibleErrors = [for (item in incompatible.check().items) if (item.severity == Error) item.message];
+    if (incompatibleErrors.length == 0 || incompatibleErrors[0].indexOf("update the nut")
+      < 0) throw "An incompatible nut rebuilds with an actionable transmission diagnostic: " + incompatibleErrors.join("; ");
     var unresolvedIncluded = new MachineAssembly();
     unresolvedIncluded.include("bad", incompatible);
     if (!unresolvedIncluded.check().hasErrors()) throw "Including an unresolved transmission retains its diagnostic";

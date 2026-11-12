@@ -12,13 +12,17 @@ import machinekit.component.Solids;
 class PneumaticCylinderRod extends MachineComponent {
   public final diameter:Float;
   public final length:Float;
+  /** The cylinder purchase this rod comes in (its part number), or "" for a rod bought on its own. */
+  public final purchasedWith:String;
   static final recipe = new machinekit.cache.Once<ComponentType>();
-  public function new(diameter:Float, length:Float) {
+  public function new(diameter:Float, length:Float, purchasedWith:String = "") {
     if (!(diameter > 0) || !(length > 0) || !Math.isFinite(diameter + length)) throw "Invalid cylinder rod dimensions";
     super('CYLINDER-ROD-${diameter}x$length', "Reference pneumatic cylinder rod", "steel");
     addFacet(machinekit.component.EngineeringMetadata.assumed(""));
     this.diameter = diameter;
     this.length = length;
+    this.purchasedWith = purchasedWith;
+    if (purchasedWith != "") includedInPurchase(purchasedWith);
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
   override public function hasGeometry():Bool return true;
@@ -38,8 +42,9 @@ class PneumaticCylinderRod extends MachineComponent {
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType(
       "machinekit.pneumatic.cylinder-rod",
-      [ComponentRecipeSupport.length("diameter", 10), ComponentRecipeSupport.length("length", 115)],
-      v -> new PneumaticCylinderRod(v.number("diameter"), v.number("length"))
+      [ComponentRecipeSupport.length("diameter", 10), ComponentRecipeSupport.length("length", 115),
+        ComponentRecipeSupport.text("purchasedWith", "")],
+      v -> new PneumaticCylinderRod(v.number("diameter"), v.number("length"), v.token("purchasedWith"))
     ).numbered(v -> 'PNEUMATIC-ROD-${machinekit.component.Dimension.format(v.number("diameter"))}x${machinekit.component.Dimension.format(v.number("length"))}')
       .procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "length"]));
   }
@@ -48,7 +53,7 @@ class PneumaticCylinderRod extends MachineComponent {
     diameter).setNumber(
       "length",
       length
-    ).setToken(
+    ).setToken("purchasedWith", purchasedWith).setToken(
       "material",
       materialSpec()
     );

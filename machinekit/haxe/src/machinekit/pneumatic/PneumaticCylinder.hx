@@ -74,9 +74,7 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
     return value;
   }
   public function movingRod():PneumaticCylinderRod {
-    var part = new PneumaticCylinderRod(rod, stroke + stemLength);
-    part.includedInPurchase(bom.partNumber);
-    return part;
+    return new PneumaticCylinderRod(rod, stroke + stemLength, bom.partNumber);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(Solids.building([],
