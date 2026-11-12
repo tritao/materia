@@ -100,7 +100,7 @@ class ConstrainedSketchFeature extends Feature {
           this,
           "constraint." + constraint.id,
           toCanonicalDimension(authored, constraint.kind, constraint.value),
-          constraint.kind == "angle" ? -1e300 : 0,
+          SketchConstraint.mustBePositive(constraint.kind) ? 0 : -1e300,
           false,
           1e300,
           constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length
@@ -320,7 +320,7 @@ class ConstrainedSketchFeature extends Feature {
             this,
             "constraint." + id,
             toCanonicalDimension(next, constraint.kind, constraint.value),
-            constraint.kind == "angle" ? -1e300 : 0,
+            SketchConstraint.mustBePositive(constraint.kind) ? 0 : -1e300,
             false,
             1e300,
             constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length
@@ -406,13 +406,11 @@ class ConstrainedSketchFeature extends Feature {
       entityIds.set(entity.id, true);
     }
     for (constraint in sketch.constraints()) {
-      var firstIsPoint = constraint.kind == "fixed" || constraint.kind == "coincident"
-        || constraint.kind == "distance" || constraint.kind == "pointOn" || constraint.kind == "symmetric";
+      var firstIsPoint = SketchConstraint.referencesPoint(constraint.kind, 0);
       if (firstIsPoint ? !pointIds.exists(constraint.first)
         : !entityIds.exists(constraint.first)) throw "constraint references a missing object: " + constraint.id;
       if (constraint.second != null) {
-        var secondIsPoint = constraint.kind == "coincident"
-          || constraint.kind == "distance" || constraint.kind == "symmetric";
+        var secondIsPoint = SketchConstraint.referencesPoint(constraint.kind, 1);
         if (secondIsPoint ? !pointIds.exists(constraint.second)
           : !entityIds.exists(constraint.second)) throw "constraint references a missing object: " + constraint.id;
       }
@@ -536,7 +534,7 @@ class ConstrainedSketchFeature extends Feature {
   }
 
   private static function isDimensional(kind:String):Bool {
-    return kind == "distance" || kind == "radius" || kind == "angle";
+    return SketchConstraint.isDimension(kind);
   }
 
   private static function toCanonicalDimension(sketch:ConstrainedSketch, kind:String, value:Float):Float {

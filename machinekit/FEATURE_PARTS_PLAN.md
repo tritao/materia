@@ -421,6 +421,27 @@ waits for the layout to move onto skeleton frames.
 undo/redo; reopen the project and the overrides are there; invalid input is
 rejected with the feature named.
 
+Dimensioned outlines are the override surface for profiled parts.
+`cadkit.parametric.recording.Outline` draws a closed outline point to point
+with every edge and rounded corner named, and records it as a fully defined
+constrained sketch dimensioned like a part drawing: shared corner points,
+horizontal and vertical edges, one horizontal or vertical distance from the
+first point for each distinct x and y (`<edge>.x`, `<edge>.y`), and rounds as
+arcs of dimensioned radius (`<round>.radius`) tangent to both edges. Swept by
+`turned` or `extruded`, each face is named after its edge
+(`DocumentBuilder.sweptFace`), so editing a dimension or adding a groove
+renames nothing. A turned part (shaft, nut barrel, pilot) is one revolved
+half-section rather than a union of cylinders. Rounds join a horizontal and a
+vertical edge (main's arcs keep their drawn angles).
+
+The sketch solver gained signed horizontal and vertical distances for this,
+ported from the `sketching` branch (sketcher S1–S10, Oct 2026). That branch is
+not merged: it is ~14k lines of code (plus ~30k of committed build output),
+3,000 commits behind, written against an older document version and
+overlapping main's sheet-metal sketch regions. It is a parts bin: port a piece
+when a part or the editor needs it (next likely: walking large dimension edits
+without flips, fully-define diagnosis, the in-editor sketch tools).
+
 ### FP8 — MachineKit library and other machines
 
 - MachineKit's own parts (catalog components, shared bases, structural,
@@ -447,6 +468,15 @@ the non-compact drawbar cylinder, the saddle's side pockets). CadKit gained
 displays), so details are steps of the history. `MachineKitNamingAudit` has
 no allowlist and passes for every recipe. Freeze baseline 3785 -> 3347.
 
+2026-11-12, later still: servo and stepper motors (both vendor NEMA 23
+bodies, from a lines-and-arcs outline sketch), the lead-screw, ball and SFU
+nuts (threaded bores carry the nut's thread) and `SteppedShaft` record. The
+shaft is one turned dimensioned outline: sections, shoulders, root fillets,
+chamfers, threaded ends (marked with their threads), ring grooves and
+undercuts; keyways are milled after. A shoulder fillet rounds the root only,
+and a shoulder takes a fillet or an undercut, not both. Freeze baseline
+3347 -> 3235.
+
 ### FP9 — Delete the immediate authoring API
 
 When the FP6 list is empty: remove the authoring surface of
@@ -457,10 +487,9 @@ feature evaluators call. Update the CadKit docs and examples.
 
 ## Open decisions
 
-- **D1. Overrides at all?** FP7 lets the editor change values that otherwise
-  live in code, so the file plus overrides becomes the source. Alternative: the
-  editor only shows the tree and every change goes through code.
-  Recommendation: do FP0–FP6, then decide.
+- **D1. Overrides at all?** Settled 2026-11-12: yes. The editor edits
+  recorded dimensions (sketch dimensions of dimensioned outlines included) as
+  instance overrides; code stays the source of the part's structure.
 - **D2. Where skeleton inputs live:** Haxe constants (recommended; derivation
   next to them) or a data file the editor writes.
 - **D3. Castings:** settled by FP0: castings already have a named feature

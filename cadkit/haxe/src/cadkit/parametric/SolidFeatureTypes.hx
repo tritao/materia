@@ -369,7 +369,7 @@ private class ConstrainedSketchCodec extends SolidCodec {
     for (constraint in sketch.constraints()) {
       var number = constraint.value;
       // A driving dimension saves its current value, in the sketch's units.
-      if (!constraint.reference && (constraint.kind == "distance" || constraint.kind == "radius"))
+      if (!constraint.reference && SketchConstraint.isLengthDimension(constraint.kind))
         number = UnitConversion.fromCanonical(value.dimension(constraint.id).value, ParameterKind.Length, sketch.units);
       else if (!constraint.reference && constraint.kind == "angle") number = value.dimension(constraint.id).value;
       var record:Dynamic = {id: constraint.id, kind: constraint.kind, first: constraint.first, second: constraint.second,

@@ -55,7 +55,7 @@ registered codec, so the document saves and reloads them all the same way.
 | A box by size, aligned to the frame | `block(x, y, z, align)`, or `box(x, y, z)` from the origin |
 | A box between two corners | `boxBetween(x0, x1, y0, y1, z0, z1)` |
 | A cylinder on any axis | `cylinderAlong(origin, axis, r, from, to)`, or `cylinder(r, h)` up +Z |
-| A profile | `polygon(points, plane)`, `polygonSketch`, constrained sketches |
+| A profile | `Outline` (named edges, dimensioned; `turned` or `extruded`), `polygon(points, plane)`, constrained sketches |
 | Moving a solid | `place(...)` / `placeIn(frame)`; `translate`; `rotate` by an editable angle |
 | Several cuts or unions in one step | `cutAll(target, tools, labels)`, `unionAll(parts)` |
 | Holes | `holes(body, specs)`; `sheetHoles` for sheet metal |
@@ -75,10 +75,23 @@ made them (`f3:box.+z`, `J1.h1.tap`); tools named by what they are
 (`Solids.named`, a prism's id) keep their faces apart. The hobber's
 equivalence gate fails on any weak or repeated name of a recorded part.
 
+Draw a profiled part (a shaft, a nut, a plate with a shaped outline) as an
+`Outline`: each edge and rounded corner gets a name, and the face it sweeps is
+named after it, `DocumentBuilder.sweptFace(sweep, "journal")`, whatever other
+edges the outline has. The outline records a fully dimensioned sketch (each
+x and y from the first point, `journal.x`, `shoulder.y`, rounds by
+`<round>.radius`), so the part can be changed by editing one dimension. A
+turned part is the outline of its half-section in (radius, z):
+
+```haxe
+var shaft = new Outline(0, 0).to("input-end", 4, 0).to("journal", 4, 10).round("root", 0.5)
+  .to("shoulder", 6, 10).to("body", 6, 30).to("output-end", 0, 30).close("axis").turned(b);
+```
+
 A face detail names its face as the feature that made it names it: a
-cylinder's side is `cyl.side`, a box's top `box.+z`, and the face a revolved
-or extruded profile's segment k sweeps `side(f<profile>:seg.k)`
-(`HmiPart.sweptFace`). Details follow the face through later steps, so record
+cylinder's side is `cyl.side`, a box's top `box.+z`, an outline edge's face
+`sweptFace(sweep, edge)`, and the face a `polygon` profile's segment k sweeps
+`side(f<profile>:seg.k)` (`HmiPart.sweptFace`). Details follow the face through later steps, so record
 them on the feature that made the face, before it is cut or fused; details
 can be chained.
 

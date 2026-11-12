@@ -312,6 +312,12 @@ class SketchSolver {
           var r = radii.get(constraint.first);
           if (r == null) throw layout.invalid("a radius measures a circle or arc", [constraint.id]);
           result.set(constraint.id, r);
+        case "horizontalDistance", "verticalDistance":
+          var a = coordinates.get(constraint.first), second = constraint.second;
+          var b = second == null ? null : coordinates.get(second);
+          if (a == null || b == null) throw layout.invalid("a distance measures two points", [constraint.id]);
+          var axis = constraint.kind == "horizontalDistance" ? 0 : 1;
+          result.set(constraint.id, b[axis] - a[axis]);
         case "angle":
           var second = constraint.second;
           if (second == null) throw layout.invalid("an angle measures two lines", [constraint.id]);

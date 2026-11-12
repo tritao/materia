@@ -19,7 +19,7 @@ class SketchEquations {
   /** Constraints that fix shape rather than size: they hold for every scaled or moved copy of a solution. */
   public static function isShapeConstraint(kind:String):Bool {
     return switch kind {
-      case "fixed", "distance", "radius", "angle":
+      case "fixed", "distance", "radius", "angle", "horizontalDistance", "verticalDistance":
         false;
       default:
         true;
@@ -66,6 +66,10 @@ class SketchEquations {
           values.push(ends[1][0] - ends[0][0]);
         case "distance":
           values.push(distance(point(c.first, x), point(needSecond(c), x)) - c.value);
+        case "horizontalDistance":
+          values.push(point(needSecond(c), x)[0] - point(c.first, x)[0] - c.value);
+        case "verticalDistance":
+          values.push(point(needSecond(c), x)[1] - point(c.first, x)[1] - c.value);
         case "radius":
           values.push(radius(c.first, x, c.id) - c.value);
         case "equal":
@@ -270,6 +274,11 @@ class SketchEquations {
           row += 1;
         case "distance":
           distanceRow(w, x, pointVar(c.first), pointVar(needSecond(c)), 1);
+          row += 1;
+        case "horizontalDistance", "verticalDistance":
+          var offset = c.kind == "horizontalDistance" ? 0 : 1;
+          w.entry(0, pointVar(needSecond(c)) + offset, 1);
+          w.entry(0, pointVar(c.first) + offset, -1);
           row += 1;
         case "radius":
           w.entry(0, radiusVar(c.first), 1);

@@ -1232,7 +1232,7 @@ class MachineKitSmoke {
         outputChamfer: 0.5,
         inputThread: {diameter: 10, pitch: 1.5, length: 6},
         outputThread: {diameter: 6, pitch: 1, length: 5},
-        shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]
+        shoulders: [{z: 20, reliefWidth: 2, reliefDiameter: 7.5}]
       }
     );
     // Chamfers, shoulders and threads are part of the shaft's capped geometry identity.
@@ -1251,7 +1251,7 @@ class MachineKitSmoke {
         outputChamfer: 0.5,
         inputThread: {diameter: 10, pitch: 1.5, length: 6},
         outputThread: {diameter: 6, pitch: 1, length: 5},
-        shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]
+        shoulders: [{z: 20, reliefWidth: 2, reliefDiameter: 7.5}]
       }
     );
     check(
@@ -1270,10 +1270,19 @@ class MachineKitSmoke {
     solid(detailedPreview, "detailed shaft preview");
     check(detailedPreview.volume() < detailedEnvelope.volume(), "detailed shaft machining features");
     check(bounds(detailedPreview).maxX <= 6.001, "detailed shaft shoulder envelope");
+    check(detailedPreview.shape.threadedFaces().length == 2, "detailed shaft marks both threaded ends");
+    var shaftFaces = detailedPreview.shape.elementNames(CadKit.ShapeKind.Face);
+    for (edge in ["input-thread", "output-thread", "undercut-1", "input-chamfer", "section-1", "section-2"])
+      check([for (name in shaftFaces) if (name.indexOf(':e.$edge)') >= 0) name].length == 1, 'detailed shaft names its $edge face: $shaftFaces');
     detailedPreview.close();
     detailedEnvelope.close();
 
     throws(() -> new SteppedShaft([{diameter: -1, length: 10}]), "positive diameter and length");
+    throws(
+      () -> new SteppedShaft([{diameter: 12, length: 20}, {diameter: 8, length: 20}], null, null, null,
+        {shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]}),
+      "takes a root fillet or an undercut, not both"
+    );
     throws(() -> new SteppedShaft([{diameter: 8,
       length: 10}], [{name: "x", z: 20}]), 'Face "x" lies outside the shaft');
     throws(

@@ -111,7 +111,7 @@ class SketchLayout {
     for (constraint in constraintList) {
       if (constraintIndex++ % 16 == 0) checkCancelled();
       if (!Math.isFinite(constraint.value)) throw invalid("constraint values must be finite", [constraint.id]);
-      if ((constraint.kind == "distance" || constraint.kind == "radius") && constraint.value <= 0) throw invalid(
+      if (SketchConstraint.mustBePositive(constraint.kind) && constraint.value <= 0) throw invalid(
         "distance and radius constraints must be positive",
         [constraint.id]
       );
@@ -167,8 +167,7 @@ class SketchLayout {
       var index:Int = cast radiusIndex.get(entity.id);
       scale = Math.max(scale, Math.abs(x[index]));
     }
-    for (constraint in constraintList) if (constraint.kind == "distance"
-      || constraint.kind == "radius") scale = Math.max(
+    for (constraint in constraintList) if (SketchConstraint.isLengthDimension(constraint.kind)) scale = Math.max(
         scale,
         Math.abs(constraint.value)
       );

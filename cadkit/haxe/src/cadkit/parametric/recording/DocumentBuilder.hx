@@ -354,25 +354,48 @@ class DocumentBuilder {
 
   /**
    * One closed outline of straight edges and arcs, every point fixed, in `plane` (XY when omitted): consecutive edges meet end to
-   * start. Edge `i` is the entity `e<i>`, so the face the outline's edge `i` sweeps is `side(<sketch>:e<i>)`.
+   * start. A `Named` edge is the entity of that name, any other edge `i` the entity `e<i>`; the face an extrude or revolve of the
+   * sketch makes from an edge is `sweptFace(sweep, entity)`.
    */
   public function outlineSketch(edges:Array<OutlineEdge>, ?plane:Plane):ConstrainedSketchFeature {
     if (edges.length < 2) throw new ParametricError("an outline sketch needs at least two edges");
-    var sketch = new ConstrainedSketch(plane);
+    var sketch = new ConstrainedSketch(plane), ids:Map<String, Bool> = new Map();
     function fixed(id:String, at:Vector):Void {
       sketch.addPoint(new SketchPoint(id, at.x, at.y));
       sketch.addConstraint(SketchConstraint.fixed("fixed-" + id, id));
     }
+    function add(i:Int, id:String, edge:OutlineEdge):Void {
+      if (ids.exists(id)) throw new ParametricError('an outline sketch names two edges "$id"');
+      ids.set(id, true);
+      switch edge {
+        case Straight(from, to):
+          fixed('a$i', from);
+          fixed('b$i', to);
+          sketch.addEntity(SketchEntity.line(id, 'a$i', 'b$i'));
+        case Arc(center, radius, start, end, clockwise):
+          fixed('o$i', center);
+          sketch.addEntity(SketchEntity.arc(id, 'o$i', radius, start, end, clockwise));
+        case Named(_, _):
+          throw new ParametricError('outline edge "$id" is named twice');
+      }
+    }
     for (i in 0...edges.length) switch edges[i] {
-      case Straight(from, to):
-        fixed('a$i', from);
-        fixed('b$i', to);
-        sketch.addEntity(SketchEntity.line('e$i', 'a$i', 'b$i'));
-      case Arc(center, radius, start, end, clockwise):
-        fixed('o$i', center);
-        sketch.addEntity(SketchEntity.arc('e$i', 'o$i', radius, start, end, clockwise));
+      case Named(name, edge): add(i, name, edge);
+      default: add(i, 'e$i', edges[i]);
     }
     return constrainedSketch(sketch, new Map());
+  }
+
+  /**
+   * The name, within `sweep` (an extrude or revolve of an `outlineSketch`), of the face it makes from the sketch's edge `edge`:
+   * the name a thread or surface detail on that face takes.
+   */
+  public static function sweptFace(sweep:Feature, edge:String):String {
+    var source = Std.isOfType(sweep, RevolveFeature) ? (cast sweep : RevolveFeature).source
+      : Std.isOfType(sweep, ExtrudeFeature) ? (cast sweep : ExtrudeFeature).source : null;
+    if (source == null || !Std.isOfType(source, ConstrainedSketchFeature))
+      throw new ParametricError("a swept face belongs to an extrude or revolve of an outline sketch");
+    return 'side(f${source.id.toInt()}:e.$edge)';
   }
 
   /** Circles of one radius at fixed centres, as a constrained sketch in `plane` (XY when omitted); circle `i` is the entity `c<i>`. */
@@ -1007,8 +1030,12 @@ class DocumentBuilder {
   }
 }
 
-/** One edge of an `outlineSketch`: a straight edge between two points, or an arc about a centre between two angles (radians). */
+/**
+ * One edge of an `outlineSketch`: a straight edge between two points, an arc about a centre between two angles (radians), or
+ * either of those under a name its swept face keeps (`Outline` names every edge).
+ */
 enum OutlineEdge {
   Straight(from:Vector, to:Vector);
   Arc(center:Vector, radius:Float, startAngle:Float, endAngle:Float, clockwise:Bool);
+  Named(name:String, edge:OutlineEdge);
 }

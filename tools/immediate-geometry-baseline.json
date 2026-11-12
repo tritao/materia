@@ -229,7 +229,7 @@
  "machinekit/haxe/src/machinekit/motion/ShaftCoupling.hx": 3,
  "machinekit/haxe/src/machinekit/motion/ShaftEncoder.hx": 5,
  "machinekit/haxe/src/machinekit/motion/SpindleBearing.hx": 6,
- "machinekit/haxe/src/machinekit/motion/SteppedShaft.hx": 19,
+ "machinekit/haxe/src/machinekit/motion/SteppedShaft.hx": 7,
  "machinekit/haxe/src/machinekit/motion/TorqueMotor.hx": 3,
  "machinekit/haxe/src/machinekit/pneumatic/AirSupply.hx": 5,
  "machinekit/haxe/src/machinekit/pneumatic/PneumaticBodies.hx": 17,

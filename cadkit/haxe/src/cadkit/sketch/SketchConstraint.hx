@@ -55,7 +55,24 @@ class SketchConstraint {
   );
 
   /** Distances, radii and angles: the kinds that have a value to drive or to measure. */
-  public static function isDimension(kind:String):Bool return kind == "distance" || kind == "radius" || kind == "angle";
+  public static function isDimension(kind:String):Bool return switch kind {
+    case "distance", "radius", "angle", "horizontalDistance", "verticalDistance": true;
+    default: false;
+  };
+
+  /** Dimensions measured in the sketch's length unit: every dimension but the angle. */
+  public static function isLengthDimension(kind:String):Bool return isDimension(kind) && kind != "angle";
+
+  /** Dimensions that must be positive. Horizontal and vertical distances are signed: the sign says which side. */
+  public static function mustBePositive(kind:String):Bool return kind == "distance" || kind == "radius";
+
+  /** Whether the constraint's reference in `slot` (0 first, 1 second, 2 third) names a point rather than an entity. */
+  public static function referencesPoint(kind:String, slot:Int):Bool return switch kind {
+    case "fixed": slot == 0;
+    case "coincident", "distance", "horizontalDistance", "verticalDistance", "symmetric": slot < 2;
+    case "pointOn": slot == 0;
+    default: false;
+  };
   public static function raw(id:String, kind:String,
     first:String, second:Null<String>, third:Null<String>, value:Float):SketchConstraint return new SketchConstraint(
       id,
@@ -176,6 +193,14 @@ class SketchConstraint {
     null,
     0
   );
+  /** Point `second` lies `value` to the right of point `first` (signed: negative to the left). */
+  public static function horizontalDistance(id:String, first:String, second:String, value:Float):SketchConstraint
+    return new SketchConstraint(id, "horizontalDistance", first, second, null, value);
+
+  /** Point `second` lies `value` above point `first` (signed: negative below). */
+  public static function verticalDistance(id:String, first:String, second:String, value:Float):SketchConstraint
+    return new SketchConstraint(id, "verticalDistance", first, second, null, value);
+
   /** Reflect first point to second point across the referenced line. */
   public static function symmetric(id:String,
     first:String, second:String, axis:String):SketchConstraint return new SketchConstraint(

@@ -1,13 +1,9 @@
 package machinekit.motion;
 
-import CadKit;
 import haxe.Json;
 import machinekit.component.ComponentValues;
 import machinekit.standard.ParallelKeySpec;
 import cadkit.modeling.Axis;
-import cadkit.modeling.Part;
-import cadkit.modeling.Selection;
-import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -220,6 +216,8 @@ class SteppedShaft extends MachineComponent {
       var fillet = optionalFloat(shoulder.fillet);
       if (shoulder.fillet != null
         && (!(fillet > 0) || fillet >= stepHeight)) throw 'Shoulder fillet at z=${shoulder.z} is too large';
+      if (shoulder.fillet != null && shoulder.reliefWidth != null)
+        throw 'Shoulder at z=${shoulder.z} takes a root fillet or an undercut, not both';
       if (shoulder.reliefWidth != null) {
         var width = optionalFloat(shoulder.reliefWidth);
         if (!(width > 0) || width >= 2 * Math.min(sectionLengthBefore(shoulder.z),
@@ -442,145 +440,100 @@ class SteppedShaft extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var ownedParts:Array<Part> = [];
-    return Solids.building(ownedParts, tracked -> {var z = 0.0, sectionsParts: Array<Part> = [];
-    for (section in sections) {
-      var part = Part.cylinderSpan(section.diameter / 2, z, z + section.length);
-      tracked.push(part);
-      sectionsParts.push(part);
+  /**
+   * The shaft turned from one half-section about its axis: each section, thread, groove and shoulder undercut is a named edge,
+   * so its face is `side(<section>:e.<name>)` (`DocumentBuilder.sweptFace`) whatever else the shaft has. Threads are marked on
+   * their faces, and keyways are milled into the turned shaft. The envelope is the plain stepped sections.
+   */
+  override public function record(b:cadkit.parametric.recording.DocumentBuilder, detail:ComponentDetail):Null<cadkit.parametric.Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    var turned = halfSection(detail != Envelope).turned(b);
+    if (detail == Envelope) return b.label(turned, "Turned shaft");
+    var finished:cadkit.parametric.Feature = b.label(turned, "Turned shaft");
+    var input = this.detail.inputThread, output = this.detail.outputThread;
+    if (input != null) finished = b.label(b.thread(finished, cadkit.parametric.recording.DocumentBuilder.sweptFace(turned, "input-thread"),
+      threadSpec(input), AxisMinimum, input.length), "Input thread");
+    if (output != null) finished = b.label(b.thread(finished, cadkit.parametric.recording.DocumentBuilder.sweptFace(turned, "output-thread"),
+      threadSpec(output), AxisMaximum, output.length), "Output thread");
+    if (keyways.length == 0) return finished;
+    var tools:Array<cadkit.parametric.Feature> = [for (keyway in keyways) {
+      var radius = diameterAt(keyway.z0) / 2, spec = keyway.key.spec;
+      b.boxBetween(-spec.width / 2, spec.width / 2, radius - spec.shaftDepth, radius + spec.shaftDepth, keyway.z0, keyway.z0 + keyway.key.length);
+    }];
+    return b.label(b.cutAll(finished, tools, [for (keyway in keyways) 'keyway ${keyway.name}']), "Keyways");
+  }
+
+  static function threadSpec(thread:ShaftThreadEnd):cadkit.threads.ThreadSpec
+    return new cadkit.threads.ThreadSpec('M${Dimension.format(thread.diameter)}x${Dimension.format(thread.pitch)}', thread.diameter, thread.pitch);
+
+  /**
+   * The shaft's outline in (radius, z) from the input end round to the output end and back along the axis. Sections are
+   * `section-<k>`, the steps between them `shoulder-<k>` (with a `fillet-<k>` at the root), and a thread, groove or shoulder
+   * undercut cut into a section is its own edge between `<name>.start` and `<name>.end` steps; a section a groove divides
+   * continues as `section-<k>.2`. Without `detailed`, only the sections.
+   */
+  function halfSection(detailed:Bool):cadkit.parametric.recording.Outline {
+    var pieces:Array<{z0:Float, z1:Float, r:Float, name:String, cut:Bool}> = [];
+    var z = 0.0;
+    for (k => section in sections) {
+      pieces.push({z0: z, z1: z + section.length, r: section.diameter / 2, name: 'section-${k + 1}', cut: false});
       z += section.length;
     }
-    var body = Solids.union(sectionsParts);
-    tracked.push(body);
-    if (detail == Envelope) return body;
-    body = applyEndDetails(body);
-    tracked.push(body);
-    var tools:Array<Part> = [];
-    for (keyway in keyways) {
-      var tool = keywayTool(keyway);
-      tracked.push(tool);
-      tools.push(tool);
+    var shoulders = this.detail.shoulders == null || !detailed ? [] : this.detail.shoulders;
+    if (detailed) {
+      var cuts:Array<{z0:Float, z1:Float, r:Float, name:String}> = [];
+      var input = this.detail.inputThread, output = this.detail.outputThread;
+      if (input != null) cuts.push({z0: 0, z1: input.length, r: input.diameter / 2, name: "input-thread"});
+      if (output != null) cuts.push({z0: totalLength - output.length, z1: totalLength, r: output.diameter / 2, name: "output-thread"});
+      for (k => groove in grooves)
+        cuts.push({z0: groove.z0, z1: groove.z0 + groove.width, r: groove.diameter / 2, name: groove.name == null ? 'groove-${k + 1}' : 'groove-${groove.name}'});
+      for (shoulder in shoulders) if (optionalFloat(shoulder.reliefWidth) > 0) {
+        var width = optionalFloat(shoulder.reliefWidth), diameter = optionalFloat(shoulder.reliefDiameter);
+        cuts.push({z0: shoulder.z - width / 2, z1: shoulder.z + width / 2, r: diameter / 2, name: 'undercut-${shoulderIndex(shoulder.z) + 1}'});
+      }
+      for (cut in cuts) {
+        var next:Array<{z0:Float, z1:Float, r:Float, name:String, cut:Bool}> = [], placed = false;
+        for (piece in pieces) {
+          if (piece.z1 <= cut.z0 + 1e-9 || piece.z0 >= cut.z1 - 1e-9) {
+            next.push(piece);
+            continue;
+          }
+          if (piece.z0 < cut.z0 - 1e-9) next.push({z0: piece.z0, z1: cut.z0, r: piece.r, name: piece.name, cut: piece.cut});
+          if (!placed) next.push({z0: cut.z0, z1: cut.z1, r: cut.r, name: cut.name, cut: true});
+          placed = true;
+          if (piece.z1 > cut.z1 + 1e-9) next.push({z0: cut.z1, z1: piece.z1, r: piece.r, name: piece.name, cut: piece.cut});
+        }
+        pieces = next;
+      }
+      // A section that a cut divides keeps its name on its first piece; the rest are numbered on.
+      var seen:Map<String, Int> = new Map();
+      for (i in 0...pieces.length) {
+        var piece = pieces[i], before:Int = seen.exists(piece.name) ? seen.get(piece.name) : 0, count = before + 1;
+        seen.set(piece.name, count);
+        if (count > 1) pieces[i] = {z0: piece.z0, z1: piece.z1, r: piece.r, name: piece.name + "." + count, cut: piece.cut};
+      }
     }
-    for (groove in grooves) {
-      var tool = grooveTool(groove);
-      tracked.push(tool);
-      tools.push(tool);
+    var inputChamfer = detailed ? optionalFloat(this.detail.inputChamfer) : 0;
+    var outputChamfer = detailed ? optionalFloat(this.detail.outputChamfer) : 0;
+    var first = pieces[0], last = pieces[pieces.length - 1];
+    if (inputChamfer >= first.z1 - first.z0 || inputChamfer >= first.r) throw "Shaft input chamfer is longer than its end";
+    if (outputChamfer >= last.z1 - last.z0 || outputChamfer >= last.r) throw "Shaft output chamfer is longer than its end";
+    var outline = new cadkit.parametric.recording.Outline(0, 0).to("input-end", first.r - inputChamfer, 0);
+    if (inputChamfer > 0) outline.to("input-chamfer", first.r, inputChamfer);
+    for (i in 0...pieces.length) {
+      var piece = pieces[i];
+      outline.to(piece.name, piece.r, i == pieces.length - 1 ? totalLength - outputChamfer : piece.z1);
+      if (i == pieces.length - 1) break;
+      var after = pieces[i + 1];
+      var step = after.cut ? after.name + ".start" : piece.cut ? piece.name + ".end" : 'shoulder-${shoulderIndex(piece.z1) + 1}';
+      var fillet = 0.0;
+      if (!piece.cut && !after.cut) for (shoulder in shoulders) if (Math.abs(shoulder.z - piece.z1) < 1e-6) fillet = optionalFloat(shoulder.fillet);
+      var round = 'fillet-${shoulderIndex(piece.z1) + 1}';
+      if (fillet > 0 && piece.r < after.r) outline.round(round, fillet);
+      outline.to(step, after.r, piece.z1);
+      if (fillet > 0 && piece.r > after.r) outline.round(round, fillet);
     }
-    for (shoulder in (this.detail.shoulders
-      == null ? [] : this.detail.shoulders)) if (optionalFloat(shoulder.reliefWidth) > 0) {
-      var tool = shoulderReliefTool(shoulder);
-      tracked.push(tool);
-      tools.push(tool);
-    }
-    if (tools.length == 0) return body;
-    var result = Solids.cut(body, tools);
-    tracked.push(result);
-    return result;
-    });
-  }
-
-  function applyEndDetails(body:Part):Part {
-    var ownedParts:Array<Part> = [body];
-    return Solids.building(ownedParts, tracked -> {var result = body;
-    var inputThread = detail.inputThread, outputThread = detail.outputThread;
-    if (inputThread != null) {
-      result = applyThread(result, inputThread, true);
-      tracked.push(result);
-    }
-    if (outputThread != null) {
-      result = applyThread(result, outputThread, false);
-      tracked.push(result);
-    }
-    if (optionalFloat(detail.inputChamfer) > 0) {
-      result = finishEdge(result, 0, optionalFloat(detail.inputChamfer), false);
-      tracked.push(result);
-    }
-    if (optionalFloat(detail.outputChamfer) > 0) {
-      result = finishEdge(result, totalLength, optionalFloat(detail.outputChamfer), false);
-      tracked.push(result);
-    }
-    for (shoulder in (detail.shoulders == null ? [] : detail.shoulders)) if (optionalFloat(shoulder.fillet) > 0) {
-      result = finishEdge(result, shoulder.z, optionalFloat(shoulder.fillet), true);
-      tracked.push(result);
-    }
-    return result;
-    });
-  }
-
-  function applyThread(body:Part, thread:ShaftThreadEnd, atInput:Bool):Part {
-    var z0 = atInput ? 0 : totalLength - thread.length;
-    var z1 = atInput ? thread.length : totalLength;
-    var outer = diameterAt(atInput ? 0 : totalLength) / 2 + 1;
-    var inner = thread.diameter / 2;
-    return cutPart(body,
-      Solids.cut(Part.cylinderSpan(outer, z0, z1), [Part.cylinderSpan(inner, z0 - 0.05, z1 + 0.05)]));
-  }
-
-  function finishEdge(body:Part, z:Float, distance:Float, fillet:Bool):Part {
-    var selection = body.edges().curve(CadKit.CurveKind.Circle).filter(function(edge) {
-      return Math.abs(Selection.center(edge).z - z) < 1e-6;
-    }
-    );
-    if (selection.count() == 0) {
-      selection.close();
-      throw 'No circular shaft edge at z=$z for ${fillet ? "fillet" : "chamfer"}';
-    }
-    try {
-      var result = fillet ? body.fillet(selection, distance) : body.chamfer(selection, distance);
-      selection.close();
-      body.close();
-      return result;
-    } catch (error:Dynamic) {
-      selection.close();
-      body.close();
-      throw error;
-    }
-  }
-
-  function cutPart(body:Part, tool:Part):Part {
-    try {
-      var result = body.subtract(tool);
-      body.close();
-      tool.close();
-      return result;
-    } catch (error:Dynamic) {
-      body.close();
-      tool.close();
-      throw error;
-    }
-  }
-
-  function shoulderReliefTool(shoulder:ShaftShoulderDetail):Part {
-    var width = optionalFloat(shoulder.reliefWidth);
-    var rawDiameter = shoulder.reliefDiameter;
-    if (rawDiameter == null) throw 'Shoulder relief at z=${shoulder.z} needs a diameter';
-    var diameter = rawDiameter;
-    var adjacent = Math.max(diameterAt(shoulder.z - 1e-5), diameterAt(shoulder.z + 1e-5));
-    return Solids.cut(
-      Part.cylinderSpan(adjacent / 2 + 1, shoulder.z - width / 2, shoulder.z + width / 2),
-      [Part.cylinderSpan(diameter / 2, shoulder.z - width / 2 - 0.05, shoulder.z + width / 2 + 0.05)]
-    );
-  }
-
-  /** Annulus from the groove diameter out past the shaft surface. */
-  function grooveTool(groove:ShaftGroove):Part {
-    var inner = groove.diameter / 2, outer = diameterAt(groove.z0) / 2 + 1, z1 = groove.z0 + groove.width;
-    return Part.revolve([{r: inner, z: groove.z0}, {r: outer, z: groove.z0}, {r: outer, z: z1}, {r: inner, z: z1}]);
-  }
-
-  function keywayTool(keyway:ShaftKeyway):Part {
-    var radius = diameterAt(keyway.z0) / 2,
-      depth = keyway.key.spec.shaftDepth, width = keyway.key.spec.width, floor = radius - depth;
-    return Part.prism(
-      [
-        new Vector(-width / 2, floor),
-        new Vector(width / 2, floor),
-        new Vector(width / 2, radius + depth),
-        new Vector(-width / 2, radius + depth),
-      ],
-      keyway.z0,
-      keyway.z0 + keyway.key.length
-    );
+    if (outputChamfer > 0) outline.to("output-chamfer", last.r - outputChamfer, totalLength);
+    return outline.to("output-end", 0, totalLength).close("axis");
   }
 }
