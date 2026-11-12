@@ -440,9 +440,10 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 
   /**
 	 * The envelope is the box behind the mounting face, square to the flange; the preview the motor body
-	 * (`MotorBody`), with bolt holes only where the mounting interface is declared.
+	 * (`MotorBody`), with bolt holes only where the mounting interface is declared. A motor that records draws its own.
 	 */
   override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (isRecorded()) return super.geometry(detail);
     var face = rating.bodyDiameter, length = rating.bodyLength;
     if (detail == Envelope) return Solids.named(Part.box(face, face, length, Center, Center, Max), "body");
     var declared = mounting();

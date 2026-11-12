@@ -62,8 +62,8 @@ class MillSpindleHead extends MachineAssembly {
         "spindle"
       );
     }
-    for (p in [[-37.5, 0.0], [37.5, 0.0], [0.0, -37.5], [0.0, 37.5]]) fixed(
-      'reactionBolt${p[0]}-${p[1]}',
+    for (i => p in [[-37.5, 0.0], [37.5, 0.0], [0.0, -37.5], [0.0, 37.5]]) fixed(
+      'reactionBolt${i + 1}',
       SocketHeadCapScrew.metric("M5", 12),
       F.translation(p[0], l.spindleY + p[1], gauge.z + 244.6),
       "reactionFrame"

@@ -1,7 +1,7 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
-import cadkit.modeling.Curve;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
@@ -32,42 +32,23 @@ class FlatEndMill extends MachineComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var radius = parameterNumber("diameter") / 2,
-      flute = parameterNumber("fluteLength"), stickout = parameterNumber("stickout");
-    var blank = stickout == flute ? Part.cylinderSpan(radius, 0, flute) : Solids.union([
-      Part.cylinderSpan(radius, 0, flute),
-      Part.cylinderSpan(radius * 0.9333333333, flute, stickout)
-    ]);
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
+    var radius = parameterNumber("diameter") / 2, flute = parameterNumber("fluteLength"), stickout = parameterNumber("stickout");
+    var axis = Vector.Z(), origin = new Vector(0, 0, 0);
+    var cutter:Feature = b.label(b.cylinderAlong(origin, axis, radius, 0, flute), "Flutes");
+    var blank:Feature = stickout == flute ? cutter : b.label(b.unionAll([
+      cutter,
+      b.label(b.cylinderAlong(origin, axis, radius * 0.9333333333, flute, stickout), "Neck")
+    ]), "Cutter blank");
     if (detail == Envelope) return blank;
-    // Two assumed 30-degree helical gullets make orientation readable at preview fidelity.
-    // Keep the packaging envelope available separately from these nominal cutting details.
-    var cuts:Array<Part> = [];
-    try {
-      for (phase in [0.0, Math.PI]) {
-        var sections:Array<Curve> = [];
-        try {
-          var twist = flute * Math.tan(Math.PI / 6) / radius;
-          var steps = Std.int(Math.min(96, Math.max(8, Math.ceil(twist / (Math.PI / 12)))));
-          for (i in 0...steps + 1) {
-            var z = -0.02 + (flute + 0.04) * i / steps, a = phase + z * Math.tan(Math.PI / 6) / radius;
-            sections.push(Curve.circle(
-              radius * 0.48,
-              new Plane(new Vector(radius * 0.88 * Math.cos(a), radius * 0.88 * Math.sin(a), z), Vector.X(), Vector.Z())
-            ));
-          }
-          cuts.push(Part.loft(sections));
-          for (section in sections) section.close();
-        } catch (error:Dynamic) {
-          for (section in sections) section.close();
-          throw error;
-        }
-      }
-      return Solids.cut(blank, cuts);
-    } catch (error:Dynamic) {
-      blank.close();
-      for (cut in cuts) cut.close();
-      throw error;
-    }
+    // Two assumed 30-degree helical gullets make orientation readable at preview fidelity; the envelope stays the blank.
+    var helix = Math.tan(Math.PI / 6) / radius, twist = flute * helix;
+    var steps = Std.int(Math.min(96, Math.max(8, Math.ceil(twist / (Math.PI / 12)))));
+    var gullets:Array<Feature> = [for (phase in [0.0, Math.PI]) b.loft([for (i in 0...steps + 1) {
+      var z = -0.02 + (flute + 0.04) * i / steps, a = phase + z * helix;
+      b.wire(b.circle(radius * 0.48, new Plane(new Vector(radius * 0.88 * Math.cos(a), radius * 0.88 * Math.sin(a), z), Vector.X(), Vector.Z())));
+    }])];
+    return b.label(b.cutAll(blank, gullets, ["gullet 1", "gullet 2"]), "Helical gullets");
   }
 }

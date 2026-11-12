@@ -1,8 +1,8 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
-import machinekit.assembly.PosedParts;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
@@ -118,187 +118,113 @@ class MillCrossSaddle extends MachineComponent {
   override public function machinable():Bool return true;
   override public function hasGeometry():Bool return true;
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
     var guide = parameterNumber("guideSpacing") / 2;
     var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
-    var padHalf = Math.max(20, (parameterNumber("blockHolePitchC") + parameterNumber("blockClearance") + 8) / 2);
-    var tools:Array<Part> = [];
-    if (parameterNumber("bore") > 0) tools.push(Part.cylinderAlongY(
-      parameterNumber("bore") / 2,
-      -d / 2 - 1,
-      d / 2 + 1,
-      0,
-      parameterNumber("boreZ")
-    ));
-    for (x in [-35.0, 35.0]) for (z in [-20.0, 20.0]) tools.push(Part.cylinderAlongY(
-      2.5,
-      d / 2 - 16,
-      d / 2 + 1,
-      x,
-      h / 2 + z
-    ));
+    var pitchB = parameterNumber("blockHolePitchB"), pitchC = parameterNumber("blockHolePitchC");
+    var padHalf = Math.max(20, (pitchC + parameterNumber("blockClearance") + 8) / 2);
+    var ribbed = values().boolean("ribbed"), access = values().boolean("blockAccess"), boss = values().boolean("nutBoss");
+    var service = values().boolean("nutServiceAccess");
+    var tools:Array<Feature> = [], labels:Array<String> = [];
+    function cut(tool:Feature, label:String):Void {
+      tools.push(tool);
+      labels.push(label);
+    }
+    /** A box `sx` x `sy` x `sz` centred on (x, y), rising from z. */
+    function block(sx:Float, sy:Float, sz:Float, x:Float, y:Float, z:Float):Feature
+      return b.boxBetween(x - sx / 2, x + sx / 2, y - sy / 2, y + sy / 2, z, z + sz);
+    function alongY(r:Float, y0:Float, y1:Float, x:Float, z:Float):Feature return b.cylinderAlong(new Vector(x, 0, z), Vector.Y(), r, y0, y1);
+    function alongX(r:Float, x0:Float, x1:Float, y:Float, z:Float):Feature return b.cylinderAlong(new Vector(0, y, z), Vector.X(), r, x0, x1);
+    function up(r:Float, z0:Float, z1:Float, x:Float, y:Float):Feature return b.cylinderAlong(new Vector(x, y, 0), Vector.Z(), r, z0, z1);
+    function sided(v:Float):String return v < 0 ? "left" : "right";
+    function ended(v:Float):String return v < 0 ? "front" : "rear";
+    if (parameterNumber("bore") > 0) cut(alongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, parameterNumber("boreZ")), "nut tunnel");
+    for (x in [-35.0, 35.0]) for (z in [-20.0, 20.0]) cut(alongY(2.5, d / 2 - 16, d / 2 + 1, x, h / 2 + z), 'rear tap ${sided(x)} ${z < 0 ? "low" : "high"}');
     if (values().boolean("motorPocket")) {
       // Square Leadshine flange/body and front-facing connector envelope.
-      tools.push(Part.box(102, 66, 66).translated(new Vector(-170, 0, 7)));
+      cut(block(102, 66, 66, -170, 0, 7), "motor pocket");
       // The connector envelope runs on through the end wall, so the motor (with its mounting plate) withdraws outwards along X.
-      tools.push(Part.box(107, 20, 24).translated(new Vector(-172.5, -38, 28)));
-      var bore = Part.cylinderSpan(33, -226, -64);
-      tools.push(PosedParts.moved(bore, F.fromRotationMatrix(0, 0, 40, [0, 0, 1, 1, 0, 0, 0, 1, 0])));
-      bore.close();
-      tools.push(Part.box(12, 86, 82).translated(new Vector(MillXYStageLayout.X_MOTOR_FACE - 6, 0, -1)));
-      tools.push(Part.box(17, 40, 42).translated(new Vector(-218.5, 0, 40)));
-      for (y in [-32.0, 32.0]) for (z in [10.0, 70.0]) {
-        var hole = Part.cylinderSpan(2.5, MillXYStageLayout.X_MOTOR_FACE - 1, MillXYStageLayout.X_MOTOR_FACE + 13);
-        tools.push(PosedParts.moved(hole, F.fromRotationMatrix(0, y, z, [0, 0, 1, 1, 0, 0, 0, 1, 0])));
-        hole.close();
-      }
+      cut(block(107, 20, 24, -172.5, -38, 28), "connector channel");
+      // Beyond the pocket the bore only clears the coupling; it stays inside the pocket's square so the pocket keeps its back face.
+      cut(alongX(32, -226, -64, 0, 40), "motor bore");
+      cut(block(12, 86, 82, MillXYStageLayout.X_MOTOR_FACE - 6, 0, -1), "motor plate slot");
+      cut(block(17, 40, 42, -218.5, 0, 40), "end wall window");
+      for (y in [-32.0, 32.0]) for (z in [10.0, 70.0])
+        cut(alongX(2.5, MillXYStageLayout.X_MOTOR_FACE - 1, MillXYStageLayout.X_MOTOR_FACE + 13, y, z), 'motor plate tap ${ended(y)} ${z < 40 ? "low" : "high"}');
     }
-    for (x in [-32.0, 32.0]) tools.push(Part.cylinderAlongY(2.5, -d / 2 - 1, -d / 2 + 16, x, 12));
-    if (values().boolean("ribbed")) {
-      // Side-entry service pockets are centered on the real block pattern.
-      if (values().boolean("blockAccess")) {
-        var pocketWidth = parameterNumber("blockHolePitchC") + 20;
-        var inner = parameterNumber("blockSpan") - parameterNumber("blockHolePitchB") / 2 - 10;
-        for (sx in [-1, 1]) for (sy in [-1, 1]) tools.push(accessPocket(
-          sx * guide,
-          pocketWidth,
-          sy < 0 ? -d / 2 - 1 : inner,
-          sy < 0 ? -inner : d / 2 + 1,
-          h
-        ));
+    for (x in [-32.0, 32.0]) cut(alongY(2.5, -d / 2 - 1, -d / 2 + 16, x, 12), 'front tap ${sided(x)}');
+    if (ribbed) {
+      var cells:Array<Array<Float>>;
+      if (access) {
+        var pocketWidth = pitchC + 20, inner = parameterNumber("blockSpan") - pitchB / 2 - 10;
+        // Side-entry service pockets are centered on the real block pattern.
+        for (sx in [-1, 1]) for (sy in [-1, 1])
+          cut(accessPocket(b, sx * guide, pocketWidth, sy < 0 ? -d / 2 - 1 : inner, sy < 0 ? -inner : d / 2 + 1, h), 'block access ${sided(sx)} ${ended(sy)}');
         // Separate lightening cells leave full-height webs beside each guide pad.
-        for (side in [-1, 1]) for (interval in [
-          [-w / 2 + 40, -guide - pocketWidth / 2 - 12],
-          [-guide + pocketWidth / 2 + 12, -45.0],
-          [45.0, guide - pocketWidth / 2 - 12],
-          [guide + pocketWidth / 2 + 12, w / 2 - 20]
-        ]) if (interval[1] > interval[0]) tools.push(Part.box(
-          interval[1] - interval[0],
-          d / 2 - 28,
-          h - 28
-        ).translated(new Vector(
-          (interval[0] + interval[1]) / 2,
-          side * (d / 4 + 14),
-          14
-        )));
-      } else
-      // Four bottom guide pads, continuous X guide chords, transverse end
-      // webs and the central nut spine remain joined by a 14 mm sole.
-      for (side in [-1, 1]) for (interval in [
-        [-w / 2 + 40, -guide - padHalf],
-        [-guide + padHalf, -45.0],
-        [45.0, guide - padHalf],
-        [guide + padHalf, w / 2 - 20]
-      ]) tools.push(Part.box(
-        interval[1] - interval[0],
-        d / 2 - 28,
-        h - 28
-      ).translated(new Vector(
-        (interval[0] + interval[1]) / 2,
-        side * (d / 4 + 14),
-        14
-      )));
-      for (interval in [
-        [-w / 2 - 1, -guide - padHalf],
-        [-guide + padHalf, -45.0],
-        [45.0, guide - padHalf],
-        [guide + padHalf, w / 2 + 1]
-      ]) tools.push(Part.box(
-        interval[1] - interval[0],
-        d + 2,
-        5
-      ).translated(new Vector(
-        (interval[0] + interval[1]) / 2,
-        0,
-        -1
-      )));
-      for (x in [-guide, guide]) tools.push(Part.box(2 * padHalf, 24, 5).translated(new Vector(x, 0, -1)));
-      for (sx in [-1, 1]) for (sy in [-1, 1]) for (dx in [
-        -parameterNumber("blockHolePitchC") / 2,
-        parameterNumber("blockHolePitchC") / 2
-      ]) for (dy in [
-        -parameterNumber("blockHolePitchB") / 2,
-        parameterNumber("blockHolePitchB") / 2
-      ]) {
-        var x = sx * parameterNumber("guideSpacing") / 2 + dx, y = sy * parameterNumber("blockSpan") + dy;
-        tools.push(Part.cylinderSpan(
-          parameterNumber("blockClearance") / 2,
-          -1,
-          values().boolean("blockAccess") ? BLOCK_SEAT + 1 : h + 1,
-          x,
-          y
-        ));
-        if (!values().boolean("blockAccess")) tools.push(Part.cylinderSpan(5, 12, h + 1, x, y));
+        cells = [[-w / 2 + 40, -guide - pocketWidth / 2 - 12], [-guide + pocketWidth / 2 + 12, -45.0], [45.0, guide - pocketWidth / 2 - 12],
+          [guide + pocketWidth / 2 + 12, w / 2 - 20]];
+      } else {
+        // Four bottom guide pads, continuous X guide chords, transverse end webs and the central nut spine remain joined by
+        // a 14 mm sole.
+        cells = [[-w / 2 + 40, -guide - padHalf], [-guide + padHalf, -45.0], [45.0, guide - padHalf], [guide + padHalf, w / 2 - 20]];
+      }
+      for (side in [-1, 1]) for (k => cell in cells) if (cell[1] > cell[0])
+        cut(block(cell[1] - cell[0], d / 2 - 28, h - 28, (cell[0] + cell[1]) / 2, side * (d / 4 + 14), 14), 'lightening cell ${ended(side)} ${k + 1}');
+      for (k => cell in [[-w / 2 - 1, -guide - padHalf], [-guide + padHalf, -45.0], [45.0, guide - padHalf], [guide + padHalf, w / 2 + 1]])
+        cut(block(cell[1] - cell[0], d + 2, 5, (cell[0] + cell[1]) / 2, 0, -1), 'sole relief ${k + 1}');
+      for (x in [-guide, guide]) cut(block(2 * padHalf, 24, 5, x, 0, -1), 'pad split ${sided(x)}');
+      for (sx in [-1, 1]) for (sy in [-1, 1]) for (dx in [-pitchC / 2, pitchC / 2]) for (dy in [-pitchB / 2, pitchB / 2]) {
+        var x = sx * guide + dx, y = sy * parameterNumber("blockSpan") + dy;
+        var at = '${sided(sx)} ${ended(sy)} ${dx < 0 ? "inner" : "outer"} ${dy < 0 ? "front" : "rear"}';
+        cut(up(parameterNumber("blockClearance") / 2, -1, access ? BLOCK_SEAT + 1 : h + 1, x, y), 'block screw $at');
+        if (!access) cut(up(5, 12, h + 1, x, y), 'block screw counterbore $at');
       }
     }
-    var body = Part.box(w, d, h);
-    if (values().boolean("nutBoss")) {
-      var pieces = [
-        body,
-        Part.box(MillYNutMount.BOSS_WIDTH, MillYNutMount.BOSS_DEPTH, h).translated(new Vector(
-          0,
-          -d / 2 + MillYNutMount.BOSS_DEPTH / 2,
-          0
-        ))
-      ];
-      for (sx in [-1, 1]) for (sy in [-1, 1]) pieces.push(Part.prism(
-        [
-          new Vector(sx * 46, sy * d / 2),
-          new Vector(sx * 58, sy * d / 2),
-          new Vector(sx * (guide - (parameterNumber("blockHolePitchC") + 20) / 2), sy * 40),
-          new Vector(sx * (guide - (parameterNumber("blockHolePitchC") + 20) / 2 - 12), sy * 40)
-        ],
-        BLOCK_SEAT,
-        h - 14
-      ));
-      // Add the load-transfer ribs after lightening cuts, then retain all interfaces.
-      var relieved = Solids.cut(body, tools);
-      pieces[0] = relieved;
-      body = Solids.union(pieces);
-      tools = [];
-      tools.push(Part.cylinderAlongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, parameterNumber("boreZ")));
-      if (values().boolean("nutServiceAccess")) for (tool in machinekit
-        .design.DesignInterfaces.of(this).drillingTools()) tools.push(tool);
-      else for (p in MillYNutMount.anchors()) tools.push(Part.cylinderAlongY(2.5, -d / 2 - 1, -d / 2 + 22, p.x, p.y));
-      for (p in MillYNutMount.pilots()) {
-        if (p.x < 0) tools.push(Part.cylinderAlongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x, p.y));
-        else tools.push(Solids.union([
-          Part.cylinderAlongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x - 0.2, p.y),
-          Part.cylinderAlongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x + 0.2, p.y),
-          Part.box(0.4, 11, 6.1).translated(new Vector(p.x, -d / 2 + 4.5, p.y - 3.05))
-        ]));
+    var body:Feature = b.label(b.boxBetween(-w / 2, w / 2, -d / 2, d / 2, 0, h), "Stock · Saddle");
+    if (!boss) return b.label(b.cutAll(body, tools, labels), "Tunnel, pockets and screw holes");
+    // Add the load-transfer ribs after lightening cuts, then retain all interfaces.
+    var parts:Array<Feature> = [
+      b.label(b.cutAll(body, tools, labels), "Tunnel, pockets and screw holes"),
+      b.label(block(MillYNutMount.BOSS_WIDTH, MillYNutMount.BOSS_DEPTH, h, 0, -d / 2 + MillYNutMount.BOSS_DEPTH / 2, 0), "Nut boss")
+    ];
+    var ribX = guide - (pitchC + 20) / 2;
+    for (sx in [-1, 1]) for (sy in [-1, 1]) {
+      var profile = [new Vector(sx * 46, sy * d / 2, 0), new Vector(sx * 58, sy * d / 2, 0), new Vector(sx * ribX, sy * 40, 0), new Vector(sx * (ribX - 12), sy * 40, 0)];
+      parts.push(b.label(b.extrude(b.polygon(profile, new cadkit.modeling.Plane(new Vector(0, 0, BLOCK_SEAT), Vector.X(), Vector.Z())), h - 14 - BLOCK_SEAT), 'Load rib ${sided(sx)} ${ended(sy)}'));
+    }
+    var ribbedBody = b.label(b.unionAll(parts), "Saddle with nut boss");
+    tools = [];
+    labels = [];
+    cut(alongY(parameterNumber("bore") / 2, -d / 2 - 1, d / 2 + 1, 0, parameterNumber("boreZ")), "nut tunnel through boss");
+    if (service) {
+      var drilling = machinekit.design.DesignInterfaces.of(this).recordDrilling(b);
+      for (i in 0...drilling.tools.length) cut(drilling.tools[i], drilling.labels[i]);
+    } else for (p in MillYNutMount.anchors()) cut(alongY(2.5, -d / 2 - 1, -d / 2 + 22, p.x, p.y), 'nut anchor ${sided(p.x)} ${p.y < 30 ? "low" : "high"}');
+    for (p in MillYNutMount.pilots()) {
+      if (p.x < 0) cut(alongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x, p.y), "nut pilot left");
+      else {
+        // The right pilot is slotted 0.4 mm along X so the nut mount locates on one pin.
+        cut(alongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x - 0.2, p.y), "nut pilot slot left end");
+        cut(alongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x + 0.2, p.y), "nut pilot slot right end");
+        cut(block(0.4, 11, 6.1, p.x, -d / 2 + 4.5, p.y - 3.05), "nut pilot slot");
       }
-      if (values().boolean("nutServiceAccess")) {
-        tools.push(Part.box(20, 2, h - 23).translated(new Vector(0, -d / 2, 24)));
-        tools.push(Part.cylinderSpan(10, 24, h + 1, 0, -d / 2 + 1));
-      } else tools.push(Part.cylinderSpan(5, 24, h + 1, 0, -d / 2 + 5));
     }
-    var raw = Solids.cut(body, tools);
-    raw = machined(raw);
-    if (!values().boolean("blockAccess") && !values().boolean("nutBoss")) return raw;
-    try {
-      var result = raw.refined();
-      raw.close();
-      return result;
-    } catch (e:Dynamic) {
-      raw.close();
-      throw e;
-    }
+    if (service) {
+      cut(block(20, 2, h - 23, 0, -d / 2, 24), "service notch");
+      cut(up(10, 24, h + 1, 0, -d / 2 + 1), "service bore");
+    } else cut(up(5, 24, h + 1, 0, -d / 2 + 5), "grease bore");
+    return b.label(b.cutAll(ribbedBody, tools, labels), service ? "Nut tunnel, anchors, pilots and service notch" : "Nut tunnel, anchors, pilots and grease bore");
   }
   /** Rounded XZ profile extruded from the side face to the inner bolt row. */
-  static function accessPocket(x:Float, width:Float, y0:Float, y1:Float, height:Float):Part {
-    var floor = BLOCK_SEAT, top = height - 14, radius = 4.0, depth = y1 - y0;
-    var parts = [
-      Part.box(width - 2 * radius, depth, top - floor).translated(new Vector(x, (y0 + y1) / 2, floor)),
-      Part.box(width, depth, top - floor - 2 * radius).translated(new Vector(x, (y0 + y1) / 2, floor + radius))
+  static function accessPocket(b:DocumentBuilder, x:Float, width:Float, y0:Float, y1:Float, height:Float):Feature {
+    var floor = BLOCK_SEAT, top = height - 14, radius = 4.0;
+    var parts:Array<Feature> = [
+      b.boxBetween(x - width / 2 + radius, x + width / 2 - radius, y0, y1, floor, top),
+      b.boxBetween(x - width / 2, x + width / 2, y0, y1, floor + radius, top - radius)
     ];
-    for (sx in [-1, 1]) for (z in [floor + radius, top - radius]) parts.push(Part.cylinderAlongY(
-      radius,
-      y0,
-      y1,
-      x + sx * (width / 2 - radius),
-      z
-    ));
-    return Solids.union(parts);
+    for (sx in [-1, 1]) for (z in [floor + radius, top - radius])
+      parts.push(b.cylinderAlong(new Vector(x + sx * (width / 2 - radius), 0, z), Vector.Y(), radius, y0, y1));
+    return b.unionAll(parts);
   }
 }

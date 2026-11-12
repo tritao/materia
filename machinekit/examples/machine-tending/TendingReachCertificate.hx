@@ -20,7 +20,7 @@ class TendingReachCertificate {
 		0.7071067811865476
 	],
 	"cls": "Reach1300",
-	"fingerprint": "0aabb8efced6b76ecb39bb407b2aa603238919ae7d94f59bdb608ec3ac2d4941",
+	"fingerprint": "735d372296007b44999690acae0bc4333c2f1b47c295b6166d9e8007ce7c209c",
 	"format": "materia.tending-reach",
 	"handlingApproachMm": 50,
 	"jointMargin": 0.10164825114034924,

@@ -1,6 +1,7 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
@@ -81,27 +82,37 @@ class MillCrossTable extends MachineComponent {
   override public function machinable():Bool return true;
   override public function hasGeometry():Bool return true;
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var width = parameterNumber("width"),
-      thickness = parameterNumber("thickness"), ribHeight = parameterNumber("ribHeight");
-    var tools:Array<Part> = [];
-    if (values().boolean("nutSeat")) tools.push(Part.box(42, 86, 13).translated(new Vector(20, 0, -1)));
-    var slots = Std.int((parameterNumber("depth") / 2 - 20) / 40);
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
+    var width = parameterNumber("width"), depth = parameterNumber("depth"), thickness = parameterNumber("thickness");
+    var ribHeight = parameterNumber("ribHeight"), ribWidth = parameterNumber("ribWidth"), x = width / 2;
+    var parts:Array<Feature> = [b.label(b.boxBetween(-x, x, -depth / 2, depth / 2, 0, thickness), "Deck")];
+    for (side in [-1, 1]) {
+      var y = side * parameterNumber("ribSpacing") / 2;
+      parts.push(b.label(b.boxBetween(-x, x, y - ribWidth / 2, y + ribWidth / 2, -ribHeight, 0), side < 0 ? "Front rib" : "Rear rib"));
+    }
+    var body = b.label(b.unionAll(parts), "Table casting");
+    var tools:Array<Feature> = [], labels:Array<String> = [];
+    var seat = values().boolean("nutSeat");
+    if (seat) {
+      tools.push(b.boxBetween(-1, 41, -43, 43, -1, 12));
+      labels.push("nut bracket seat");
+    }
+    var slots = Std.int((depth / 2 - 20) / 40);
     for (slot in -slots...slots + 1) {
       var y = slot * 40.0;
-      tools.push(Part.box(width + 2, 10, 9).translated(new Vector(0, y, thickness - 8)));
-      tools.push(Part.box(width + 2, 18, 6).translated(new Vector(0, y, thickness - 14)));
+      tools.push(b.boxBetween(-x - 1, x + 1, y - 5, y + 5, thickness - 8, thickness + 1));
+      labels.push('T-slot ${slot + slots + 1} throat');
+      tools.push(b.boxBetween(-x - 1, x + 1, y - 9, y + 9, thickness - 14, thickness - 8));
+      labels.push('T-slot ${slot + slots + 1} head');
     }
-    if (values().boolean("nutSeat")) for (y in [-25.0, 25.0]) {
-      tools.push(Part.cylinderSpan(3.3, 11, 41, 20, y));
-      tools.push(Part.cylinderSpan(5.5, 33, 41, 20, y));
+    if (seat) for (y in [-25.0, 25.0]) {
+      var at = y < 0 ? "front" : "rear";
+      tools.push(b.cylinderAlong(new Vector(20, y, 0), Vector.Z(), 3.3, 11, 41));
+      labels.push('nut bracket screw $at');
+      tools.push(b.cylinderAlong(new Vector(20, y, 0), Vector.Z(), 5.5, 33, 41));
+      labels.push('nut bracket counterbore $at');
     }
-    var pieces = [Part.box(width, parameterNumber("depth"), thickness)];
-    for (side in [-1, 1]) pieces.push(Part.box(width, parameterNumber("ribWidth"), ribHeight).translated(new Vector(
-      0,
-      side * parameterNumber("ribSpacing") / 2,
-      -ribHeight
-    )));
-    return machined(Solids.cut(Solids.union(pieces), tools));
+    return b.label(b.cutAll(body, tools, labels), seat ? "T-slots and nut bracket seat" : "T-slots");
   }
 }

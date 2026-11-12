@@ -166,6 +166,25 @@ class DesignInterfaces implements ComponentFacet {
     return tools;
   }
 
+  /**
+   * What `drillingTools` cuts, as features `b` records for a part that records: each hole's bore, relief and counterbore
+   * along its frame's +Z, labelled by hole.
+   */
+  public function recordDrilling(b:cadkit.parametric.recording.DocumentBuilder):{tools:Array<cadkit.parametric.Feature>, labels:Array<String>} {
+    var tools:Array<cadkit.parametric.Feature> = [], labels:Array<String> = [];
+    function drill(frame:AssemblyFrame, radius:Float, from:Float, to:Float, label:String):Void {
+      var axis = materia.assembly.AssemblyFrames.transformVector(frame, 0, 0, 1);
+      tools.push(b.cylinderAlong(new cadkit.modeling.Vector(frame.x, frame.y, frame.z), new cadkit.modeling.Vector(axis.x, axis.y, axis.z), radius, from, to));
+      labels.push(label);
+    }
+    for (h in holes) {
+      drill(h.frame, h.radius, -1, h.depth + (h.through == true ? 1 : 0), h.id + " bore");
+      if (h.relief != null) drill(h.frame, h.relief.diameter / 2, h.relief.start, h.depth, h.id + " relief");
+      if (h.counterbore != null) drill(h.frame, h.counterbore.radius, -1, h.counterbore.depth, h.id + " counterbore");
+    }
+    return {tools: tools, labels: labels};
+  }
+
   /** `part` placed at `frame` and named `id`; consumes `part`. */
   static function drillingTool(part:Part, frame:AssemblyFrame, id:String):Part {
     try {

@@ -1,8 +1,8 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import cadkit.modeling.Sketch;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Plane;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
@@ -137,102 +137,78 @@ class MillSpindleDrivePart extends MachineComponent {
   public function guardBoltY():Float return 90;
   public function plateWidth():Float return Math.max(Math.max(188, motorFace() + 24), 2 * (guardBoltX() + 8));
   public function plateRear():Float return Math.max(180, parameterNumber("centres") + motorFace() / 2 + 10);
-  static function box(w:Float, d:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Part return Part.prism(
-    [
-      new Vector(x - w / 2, y - d / 2),
-      new Vector(x + w / 2, y - d / 2),
-      new Vector(x + w / 2, y + d / 2),
-      new Vector(x - w / 2, y + d / 2)
-    ],
-    z0,
-    z1
-  );
-  static function slot(radius:Float, y:Float, z0:Float, z1:Float, x:Float = 0):Part {
-    // Cover whole-tooth centre correction plus the full +/-5 mm adjustment.
-    var profile = Sketch.slot(20 + 2 * radius, 2 * radius, new Plane(new Vector(x, y, z0), Vector.Y(), Vector.Z()));
-    try {
-      var result = profile.extrude(z1 - z0);
-      profile.close();
-      return result;
-    } catch (e:Dynamic) {
-      profile.close();
-      throw e;
-    }
-  }
+  /** A box `w` x `d` centred on (x, y), from z0 to z1. */
+  static function box(b:DocumentBuilder, w:Float, d:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Feature
+    return b.boxBetween(x - w / 2, x + w / 2, y - d / 2, y + d / 2, z0, z1);
+
+  /** A hole of radius `r` up Z through (x, y), from z0 to z1. */
+  static function hole(b:DocumentBuilder, r:Float, z0:Float, z1:Float, x:Float, y:Float):Feature
+    return b.cylinderAlong(new Vector(x, y, 0), Vector.Z(), r, z0, z1);
+
+  /** A slot of radius `r` along Y centred on (x, y), from z0 to z1: it covers the whole-tooth centre correction and the
+   * full +/-5 mm belt adjustment. */
+  static function slot(b:DocumentBuilder, r:Float, y:Float, z0:Float, z1:Float, x:Float = 0):Feature
+    return b.extrude(b.slot(20 + 2 * r, 2 * r, new Plane(new Vector(x, y, z0), Vector.Y(), Vector.Z())), z1 - z0);
+
   override public function componentType():Null<ComponentType> return recipeType(parameterToken("role"));
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var owned:Array<Part> = [];
-    return Solids.building(owned, tracked -> {function keep(p: Part): Part {
-      tracked.push(p);
-      return p;
-    }
-    var pieces:Array<Part> = [], cuts:Array<Part> = [], front = 34.0, rear = plateRear(), width = plateWidth();
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
+    var front = 34.0, rear = plateRear(), width = plateWidth();
     var bottom = parameterNumber("mountBottom"), plate = face() - 12, nominal = parameterNumber("centres");
-    if (parameterToken("role") == "carrier") {
-      pieces.push(keep(box(width, rear - front, plate, face(), 0, (front + rear) / 2)));
-      // Keep the release bridge and cylinder separate from the drive carrier.
-      cuts.push(keep(box(144, 104, plate - 1, face() + 1)));
-      for (side in [-1, 1]) {
-        pieces.push(keep(box(32, 38, bottom, bottom + 10, side * 72, 119)));
-        pieces.push(keep(box(12, 38, bottom, plate + 1, side * 82, 119)));
-        for (y in [110.0, 130.0]) {
-          cuts.push(keep(Part.cylinderSpan(3.3, bottom - 1, bottom + 11, side * 68, y)));
-          cuts.push(keep(Part.cylinderSpan(5.5, plate - 1, face() + 1, side * 68, y)));
-        }
-        cuts.push(keep(Part.cylinderSpan(1.65, plate - 1, plate + 8, side * guardBoltX(), guardBoltY())));
-        cuts.push(keep(Part.cylinderSpan(8, plate - 1, face() + 1, side * 60, 35)));
-      }
-      cuts.push(keep(slot((motor().rating.shaftDiameter + 2) / 2, nominal, plate - 1, face() + 1)));
-      cuts.push(keep(slot((pilotDiameter() + 0.2) / 2, nominal, face() - pilotHeight() - 0.2, face() + 1)));
-      var screw = machinekit.standard.SocketHeadCapScrew.metric(screwSize(), 20);
-      for (p in mountingHoles()) {
-        cuts.push(keep(slot(holeDiameter() / 2, nominal + p.y, plate - 1, face() + 1, -p.x)));
-        // Keep socket heads clear of the support webs below the plate.
-        cuts.push(keep(slot(
-          (screw.spec.headDiameter + 1) / 2,
-          nominal + p.y,
-          plate - screw.spec.headHeight - 0.5,
-          plate,
-          -p.x
-        )));
-      }
-    } else {
-      var radius = guardRadius(), centre = centres(), top = face() - 10;
-      function capsule(r:Float, z:Float, h:Float, inner:Bool = false):Part {
-        var sketch = Sketch.slot(centre + 2 * r,
-          2 * r, new Plane(new Vector(0, centre / 2, z), Vector.Y(), Vector.Z()));
-        try {
-          var p = sketch.extrude(h);
-          sketch.close();
-          if (parameterNumber("guardRearLimit") > 0) {
-            var limit = parameterNumber("guardRearLimit") - (inner ? 2 : 0);
-            var clip = box(2 * r + 2, limit + r + 1, z - 1, z + h + 1, 0, (limit - r - 1) / 2);
-            var result = p.intersect(clip);
-            clip.close();
-            p.close();
-            return result;
-          }
-          return p;
-        } catch (e:Dynamic) {
-          sketch.close();
-          throw e;
-        }
-      }
-      var outer = keep(capsule(radius, 250, top - 250)), inner = keep(capsule(radius - 2, 249, top - 248, true));
-      pieces.push(keep(Solids.cut(outer, [inner])));
-      pieces.push(keep(capsule(radius, top - 2, 2)));
-      cuts.push(keep(box(width + 2, rear - front, top - 3, top + 1, 0, (front + rear) / 2)));
-      cuts.push(keep(Part.cylinderSpan(12, 249, top + 1)));
-      if (top > MillDrawbarLayout.BRIDGE_BOTTOM - 8) cuts.push(keep(box(144, 104, top - 3, top + 1)));
-      for (x in [-60.0, 60.0]) for (y in [-35.0, 35.0]) cuts.push(keep(Part.cylinderSpan(8, 249, top + 1, x, y)));
-      for (side in [-1, 1]) {
-        pieces.push(keep(box(20, 20, top - 4, top - 2, side * (radius + 4), guardBoltY())));
-        cuts.push(keep(Part.cylinderSpan(2.25, top - 5, top + 1, side * guardBoltX(), guardBoltY())));
-      }
+    var tools:Array<Feature> = [], labels:Array<String> = [];
+    function cut(tool:Feature, label:String):Void {
+      tools.push(tool);
+      labels.push(label);
     }
-    var joined = keep(Solids.union(pieces));
-    return Solids.cut(joined, cuts);
-    });
+    function sided(side:Int):String return side < 0 ? "left" : "right";
+    if (parameterToken("role") == "carrier") {
+      var parts:Array<Feature> = [b.label(box(b, width, rear - front, plate, face(), 0, (front + rear) / 2), "Motor plate")];
+      for (side in [-1, 1]) {
+        parts.push(b.label(box(b, 32, 38, bottom, bottom + 10, side * 72, 119), "Foot " + sided(side)));
+        parts.push(b.label(box(b, 12, 38, bottom, plate + 1, side * 82, 119), "Web " + sided(side)));
+      }
+      var body = b.label(b.unionAll(parts), "Carrier");
+      // Keep the release bridge and cylinder separate from the drive carrier.
+      cut(box(b, 144, 104, plate - 1, face() + 1), "release clearance");
+      for (side in [-1, 1]) {
+        for (y in [110.0, 130.0]) {
+          var at = sided(side) + (y < 120 ? " front" : " rear");
+          cut(hole(b, 3.3, bottom - 1, bottom + 11, side * 68, y), 'anchor bolt $at');
+          cut(hole(b, 5.5, plate - 1, face() + 1, side * 68, y), 'anchor access $at');
+        }
+        cut(hole(b, 1.65, plate - 1, plate + 8, side * guardBoltX(), guardBoltY()), "guard tap " + sided(side));
+        cut(hole(b, 8, plate - 1, face() + 1, side * 60, 35), "reaction pillar clearance " + sided(side));
+      }
+      cut(slot(b, (motor().rating.shaftDiameter + 2) / 2, nominal, plate - 1, face() + 1), "shaft slot");
+      cut(slot(b, (pilotDiameter() + 0.2) / 2, nominal, face() - pilotHeight() - 0.2, face() + 1), "pilot slot");
+      var screw = machinekit.standard.SocketHeadCapScrew.metric(screwSize(), 20);
+      var i = 0;
+      for (p in mountingHoles()) {
+        i++;
+        cut(slot(b, holeDiameter() / 2, nominal + p.y, plate - 1, face() + 1, -p.x), 'motor screw slot $i');
+        // Keep socket heads clear of the support webs below the plate.
+        cut(slot(b, (screw.spec.headDiameter + 1) / 2, nominal + p.y, plate - screw.spec.headHeight - 0.5, plate, -p.x), 'motor screw head slot $i');
+      }
+      return b.label(b.cutAll(body, tools, labels), "Clearances, anchor bolts and motor slots");
+    }
+    var radius = guardRadius(), centre = centres(), top = face() - 10, limit = parameterNumber("guardRearLimit");
+    function capsule(r:Float, z:Float, h:Float, name:String, inner:Bool = false):Feature {
+      var body = b.extrude(b.slot(centre + 2 * r, 2 * r, new Plane(new Vector(0, centre / 2, z), Vector.Y(), Vector.Z())), h);
+      if (limit <= 0) return b.label(body, name);
+      var rear = limit - (inner ? 2 : 0);
+      return b.label(b.intersect(body, box(b, 2 * r + 2, rear + r + 1, z - 1, z + h + 1, 0, (rear - r - 1) / 2)), name);
+    }
+    var wall = b.label(b.cutAll(capsule(radius, 250, top - 250, "Wall"), [capsule(radius - 2, 249, top - 248, "Inside", true)], ["inside"]), "Wall");
+    var parts:Array<Feature> = [wall, capsule(radius, top - 2, 2, "Lid")];
+    for (side in [-1, 1]) parts.push(b.label(box(b, 20, 20, top - 4, top - 2, side * (radius + 4), guardBoltY()), "Bolt lug " + sided(side)));
+    var body = b.label(b.unionAll(parts), "Guard");
+    cut(box(b, width + 2, rear - front, top - 3, top + 1, 0, (front + rear) / 2), "plate clearance");
+    cut(hole(b, 12, 249, top + 1, 0, 0), "drawbar clearance");
+    if (top > MillDrawbarLayout.BRIDGE_BOTTOM - 8) cut(box(b, 144, 104, top - 3, top + 1), "bridge clearance");
+    for (x in [-60.0, 60.0]) for (y in [-35.0, 35.0])
+      cut(hole(b, 8, 249, top + 1, x, y), "pillar clearance " + (y < 0 ? "front " : "back ") + (x < 0 ? "left" : "right"));
+    for (side in [-1, 1]) cut(hole(b, 2.25, top - 5, top + 1, side * guardBoltX(), guardBoltY()), "guard bolt " + sided(side));
+    return b.label(b.cutAll(body, tools, labels), "Clearances and guard bolts");
   }
 }

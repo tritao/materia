@@ -4,18 +4,10 @@ import machinekit.component.MachineKitComponents;
 
 /**
 	Every MachineKit component's default geometry names its faces strongly and uniquely: a face with a weak or repeated
-	name can only be found again by its shape, so a mate picked on it does not survive edits. Components listed in
-	`UNNAMED` are known not to yet. A supplier's model is its STEP as shipped, with no feature history to name faces by.
+	name can only be found again by its shape, so a mate picked on it does not survive edits. A supplier's model is its
+	STEP as shipped, with no feature history to name faces by.
 */
 class MachineKitNamingAudit {
-  /**
-		Components with faces that only their geometry can tell apart: shrink this list, never grow it.
-		- shaft-coupling: each set-screw hole's planar end is split in two halves with the same neighbours.
-		(Split faces of revolution, such as a barrel's side halved by a base, are named by their angular sector.)
-		Such pieces get weak ordinals by position (`~0`, `~1`), which resolve only when the geometry confirms them.
-	*/
-  static var UNNAMED:Array<String> = ["machinekit.motion.shaft-coupling"];
-
   /**
    * Recipes with no default part: each is built from the identity of a source part, so `create()` without it is
    * rejected. Their faces are named where the sources build them.
@@ -35,9 +27,7 @@ class MachineKitNamingAudit {
       if (bad == null) continue;
       if (report && bad.length
         > 0) Sys.println('naming audit ${type.id}: ${bad.length} weak or repeated: ${bad.slice(0, 6).join(", ")}');
-      var listed = UNNAMED.indexOf(type.id) >= 0;
-      if (bad.length > 0 && !listed) failures.push('${type.id}: ${bad.slice(0, 6).join(", ")}');
-      if (bad.length == 0 && listed) failures.push('${type.id} names every face now: remove it from UNNAMED');
+      if (bad.length > 0) failures.push('${type.id}: ${bad.slice(0, 6).join(", ")}');
     }
     if (!report && failures.length > 0) throw "MachineKitNamingAudit:\n  " + failures.join("\n  ");
   }

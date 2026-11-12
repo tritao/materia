@@ -1,6 +1,7 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
@@ -60,59 +61,41 @@ class MillZCarriage extends MachineComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
     var w = parameterNumber("width"), h = parameterNumber("height"), t = parameterNumber("thickness");
     var nut = selectedNut(parameterToken("nutModel")),
       reach = parameterNumber("nutReach"), shelf = parameterNumber("nutPlate");
     var face = parameterNumber("nutCentreZ") + nut.bodyLength / 2 - nut.flangeOffset - nut.flangeThickness;
-    var shelfWidth = nut.flangeDiameter + 2 * SHELF_MARGIN;
-    var pieces = [
-      Part.box(w, t, h).translated(new Vector(0, -t / 2, 0)),
-      Part.box(shelfWidth, reach + shelfWidth / 2, shelf).translated(new Vector(
-        0,
-        (reach + shelfWidth / 2) / 2,
-        face - shelf
-      ))
+    var shelfWidth = nut.flangeDiameter + 2 * SHELF_MARGIN, depth = reach + shelfWidth / 2, gusset = Math.min(reach / 2, 25);
+    var parts:Array<Feature> = [
+      b.label(b.boxBetween(-w / 2, w / 2, -t, 0, 0, h), "Plate"),
+      b.label(b.boxBetween(-shelfWidth / 2, shelfWidth / 2, 0, depth, face - shelf, face), "Nut shelf")
     ];
-    for (side in [-1, 1]) pieces.push(Part.box(6, Math.min(reach / 2, 25), GUSSET_HEIGHT).translated(new Vector(
-      side * (shelfWidth / 2 - 3),
-      Math.min(reach / 2, 25) / 2,
-      face - shelf - GUSSET_HEIGHT
-    )));
-    var body = Solids.union(pieces);
-    var tools = [Part.cylinderSpan(nut.bodyDiameter / 2 + 0.2, face - shelf - 1, face + 1, 0, reach)];
-    for (point in nut.boltPattern()) tools.push(Part.cylinderSpan(
-      nut.mountScrew == "M6" ? 3.35 : 2.75,
-      face - shelf - 1,
-      face + 1,
-      point.x,
-      reach + point.y
-    ));
-    var block = guide(parameterToken("profile"));
-    for (side in [-1, 1]) for (span in [-parameterNumber("blockSpan"), parameterNumber("blockSpan")]) for (x in [
-      -block.spec.blockHoleSpacingAcross / 2,
-      block.spec.blockHoleSpacingAcross / 2
-    ]) for (z in [
-      -block.spec.blockHoleSpacingAlong / 2,
-      block.spec.blockHoleSpacingAlong / 2
-    ]) tools.push(Part.cylinderAlongY(
-      block.spec.blockMountThread == "M6" ? 3.3 : 2.25,
-      -t - 1,
-      1,
-      side * parameterNumber("railSpacing") / 2 + x,
-      parameterNumber("nutCentreZ") + span + z
-    ));
+    for (side in [-1, 1]) {
+      var x = side * (shelfWidth / 2 - 3);
+      parts.push(b.label(b.boxBetween(x - 3, x + 3, 0, gusset, face - shelf - GUSSET_HEIGHT, face - shelf), side < 0 ? "Gusset left" : "Gusset right"));
+    }
+    var body = b.label(b.unionAll(parts), "Carriage");
+    var up = Vector.Z(), back = Vector.Y();
+    var tools:Array<Feature> = [b.cylinderAlong(new Vector(0, reach, 0), up, nut.bodyDiameter / 2 + 0.2, face - shelf - 1, face + 1)];
+    var labels = ["nut bore"], i = 0;
+    for (point in nut.boltPattern()) {
+      tools.push(b.cylinderAlong(new Vector(point.x, reach + point.y, 0), up, nut.mountScrew == "M6" ? 3.35 : 2.75, face - shelf - 1, face + 1));
+      labels.push('nut screw ${++i}');
+    }
+    var block = guide(parameterToken("profile")), across = block.spec.blockHoleSpacingAcross / 2, along = block.spec.blockHoleSpacingAlong / 2;
+    var blockTap = block.spec.blockMountThread == "M6" ? 3.3 : 2.25, span = parameterNumber("blockSpan");
+    for (side in [-1, 1]) for (s in [-1, 1]) for (x in [-across, across]) for (z in [-along, along]) {
+      var px = side * parameterNumber("railSpacing") / 2 + x, pz = parameterNumber("nutCentreZ") + s * span + z;
+      tools.push(b.cylinderAlong(new Vector(px, 0, pz), back, blockTap, -t - 1, 1));
+      labels.push('block screw ${side < 0 ? "left" : "right"} ${s < 0 ? "lower" : "upper"} ${x < 0 ? "inner" : "outer"} ${z < 0 ? "low" : "high"}');
+    }
     // Blind nominal M6 taps match the head flange; retain the rear face of the carriage.
-    for (x in [-parameterNumber("headBoltX"), parameterNumber("headBoltX")]) for (z in [
-      h / 2 - parameterNumber("headBoltZ"),
-      h / 2 + parameterNumber("headBoltZ")
-    ]) tools.push(Part.cylinderAlongY(
-      2.5,
-      -t - 1,
-      -t + 12,
-      x,
-      z
-    ));
-    return Solids.cut(body, tools);
+    for (x in [-parameterNumber("headBoltX"), parameterNumber("headBoltX")]) for (z in [h / 2 - parameterNumber("headBoltZ"), h / 2 + parameterNumber("headBoltZ")]) {
+      tools.push(b.cylinderAlong(new Vector(x, 0, z), back, 2.5, -t - 1, -t + 12));
+      labels.push('head tap ${x < 0 ? "left" : "right"} ${z < h / 2 ? "low" : "high"}');
+    }
+    return b.label(b.cutAll(body, tools, labels), "Nut bore, nut screws, block screws and head taps");
   }
 }

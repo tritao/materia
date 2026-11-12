@@ -415,7 +415,7 @@ class MillXYStageChecks {
       F.translation(0, l.yServiceRear + 20, l.yScrewZ - 10)
     );
     var clearService = machinekit.assembly.AssemblyIntegrity.service(MillFramePreview.concept(reference, frame));
-    check(clearService.errors().length == 0, "rear motor withdrawal is clear: " + [for (e in clearService.errors()) e.message].join("; "));
+    check(clearService.errors().length == 0, "rear motor withdrawal is clear: " + [for (e in clearService.errors()) e.subject + ": " + e.message].join("; "));
     var extractionAudit = machinekit.assembly.AssemblyIntegrity.service(MillFramePreview.concept(reference, extractionBlocked));
     check(
       extractionAudit.errors().filter(item -> item.code == "integrity.service.xyStage/yMotorWithdrawal"

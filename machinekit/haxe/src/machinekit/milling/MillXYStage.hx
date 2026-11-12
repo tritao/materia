@@ -255,15 +255,15 @@ class MillXYStage extends MillGuidedXYStage {
     attach("motorX", l.motor, motor, "motorMountX");
     var mounting = l.motor.mounting();
     if (mounting == null) throw "X motor needs mounting data";
-    for (p in mounting.holes) {
+    for (i => p in mounting.holes) {
       attach(
-        'motorBoltX${p.x}-${p.y}',
+        'motorBoltX${i + 1}',
         SocketHeadCapScrew.metric("M5", 25),
         orient(MillXYStageLayout.X_MOTOR_FACE - 12, l.centreY + p.x, l.xMotorZ + p.y, [0, 0, 1], [-1, 0, 0]),
         "motorMountX"
       );
       attach(
-        'motorNutX${p.x}-${p.y}',
+        'motorNutX${i + 1}',
         machinekit.standard.HexNut.metric("M5"),
         orient(
           MillXYStageLayout.X_MOTOR_FACE + mounting.flangeThickness,

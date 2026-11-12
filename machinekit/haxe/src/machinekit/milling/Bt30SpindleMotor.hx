@@ -2,6 +2,8 @@ package machinekit.milling;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import machinekit.component.*;
 import machinekit.motion.ServoMotor;
 
@@ -38,7 +40,9 @@ class Bt30SpindleMotor extends ServoMotor {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("material", materialSpec());
-  override public function mounting():Null<machinekit.motion.MotorFlange> return {
+  override public function mounting():Null<machinekit.motion.MotorFlange> return flange();
+
+  static function flange():machinekit.motion.MotorFlange return {
     face: 110,
     flangeThickness: 10,
     pilotDiameter: 40,
@@ -60,21 +64,26 @@ class Bt30SpindleMotor extends ServoMotor {
     return Solids.union(parts);
   }
 
-  override public function geometry(detail:ComponentDetail = Preview):Part return withFlange(super.geometry(detail));
-
-  /** Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail. */
-  override public function massGeometry():Null<Part> return withFlange(super.massGeometry());
-
-  function withFlange(base:Part):Part {
-    var tools = [];
-    for (x in [-30.0, 30.0]) for (y in [-30.0, 30.0]) tools.push(Part.cylinderSpan(2.1, -8, 1, x, y));
-    return Solids.cut(
-      Solids.union([
-        base,
-        Part.box(110, 110, 10).translated(new Vector(0, 0, -10)),
-        Solids.cut(Part.cylinderSpan(20, 0, 2), [Part.cylinderSpan(10.5, -1, 3)])
-      ]),
-      tools
-    );
+  /**
+   * A round body behind a square mounting flange with a pilot boss on its face; the envelope fills the clearance holes and the
+   * pilot bore. The drawn body is the motor's mass model.
+   */
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    var flange = flange(), side = flange.face, t = flange.flangeThickness, pilot = flange.pilotDiameter / 2;
+    var axis = Vector.Z(), origin = new Vector(0, 0, 0);
+    var body = b.label(b.cylinderAlong(origin, axis, rating.bodyDiameter / 2, -rating.bodyLength, -t), "Body");
+    var plate = b.label(b.boxBetween(-side / 2, side / 2, -side / 2, side / 2, -t, 0), "Flange");
+    var boss = b.label(b.cylinderAlong(origin, axis, pilot, 0, flange.pilotHeight), "Pilot");
+    var motor = b.label(b.unionAll([body, plate, boss]), "Motor");
+    if (detail == Envelope) return motor;
+    var tools:Array<Feature> = [b.cylinderAlong(origin, axis, rating.shaftDiameter / 2 + 0.5, -1, flange.pilotHeight + 1)], labels = ["shaft bore"];
+    for (h in flange.holes) {
+      tools.push(b.cylinderAlong(new Vector(h.x, h.y, 0), axis, flange.holeDiameter / 2, -t - 1, 1));
+      labels.push("flange hole " + (h.y < 0 ? "front " : "back ") + (h.x < 0 ? "left" : "right"));
+    }
+    return b.label(b.cutAll(motor, tools, labels), "Shaft bore and flange holes");
   }
+
+  override public function massGeometry():Null<Part> return null;
 }

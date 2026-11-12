@@ -111,8 +111,8 @@ class MillZAxis extends AxisBuilder {
     var mounting = l.motor.mounting();
     if (mounting == null) throw "Z motor needs catalog mounting data";
     attach("motor", l.motor, down(0, l.screwY, l.motorFace), "motorMount");
-    for (p in mounting.holes) attach(
-      'motorBolt${p.x}-${p.y}',
+    for (i => p in mounting.holes) attach(
+      'motorBolt${i + 1}',
       SocketHeadCapScrew.metric("M6", 16),
       F.translation(-p.x, l.screwY + p.y, l.motorFace + mounting.flangeThickness),
       "motorMount"

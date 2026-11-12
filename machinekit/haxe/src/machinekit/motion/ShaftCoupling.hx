@@ -1,7 +1,8 @@
 package machinekit.motion;
 
 import haxe.Json;
-import cadkit.modeling.Part;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
 import materia.assembly.AssemblyFrames;
 import machinekit.component.Bom;
@@ -23,7 +24,7 @@ typedef ShaftCouplingSetScrew = {
 
 /** Rigid sleeve coupling joining two shaft ends, with an independent bore on each side (a
  * reducer coupling when they differ). Preview includes configurable radial tapped holes for
- * the semantic set screws; Envelope keeps the turned sleeve and bores only.
+ * the semantic set screws, through the wall into the bore; Envelope keeps the turned sleeve and bores only.
  * CAD frame: axis along +Z, side A face at z=0, side B face at z=length, matching
  * `DeepGrooveBearing`. Connectors: `sideA`, `sideB` (faces) and `axis` (mid-length), all with
  * +Y along +Z.
@@ -132,22 +133,21 @@ class ShaftCoupling extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = Solids.named(Part.cylinderSpan(outerDiameter / 2, 0, length), "body");
-    var boreATool = Solids.named(Part.cylinderSpan(boreA / 2, -0.1, length / 2 + 0.1), "bore.a");
-    var boreBTool = Solids.named(Part.cylinderSpan(boreB / 2, length / 2 - 0.1, length + 0.1), "bore.b");
-    if (detail == Envelope) return Solids.cut(body, [boreATool, boreBTool]);
-    var tools = [boreATool, boreBTool];
-    var screwRadius = setScrewHoleDiameter / 2;
-    for (hole in setScrews) {
-      var radial = new Vector(Math.cos(hole.angle), Math.sin(hole.angle), 0);
-      var start = radial.scale(outerDiameter / 2 + 0.1).add(new Vector(0, 0, hole.z));
-      tools.push(Solids.named(
-        Part.cylinderAlong(screwRadius, start, radial.scale(-1), (outerDiameter - Math.min(boreA, boreB)) / 2 + 0.2),
-        "setscrew" + (setScrews.indexOf(hole) + 1)
-      ));
+  /** The turned sleeve less its two bores; Preview adds the set-screw holes, each tapped through the wall into the bore. */
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    var axis = Vector.Z(), origin = new Vector(0, 0, 0);
+    var body = b.label(b.cylinderAlong(origin, axis, outerDiameter / 2, 0, length), "Stock · Sleeve");
+    var tools:Array<Feature> = [
+      b.cylinderAlong(origin, axis, boreA / 2, -0.1, length / 2 + 0.1),
+      b.cylinderAlong(origin, axis, boreB / 2, length / 2 - 0.1, length + 0.1)
+    ], labels = ["bore A", "bore B"];
+    if (detail != Envelope) for (i in 0...setScrews.length) {
+      var hole = setScrews[i], radial = new Vector(Math.cos(hole.angle), Math.sin(hole.angle), 0);
+      tools.push(b.cylinderAlong(new Vector(0, 0, hole.z), radial, setScrewHoleDiameter / 2, 0, outerDiameter / 2 + 0.1));
+      labels.push('set screw ${i + 1}');
     }
-    return Solids.cut(body, tools);
+    return b.label(b.cutAll(body, tools, labels), detail == Envelope ? "Bores" : "Bores and set-screw holes");
   }
 
   /** Set screw that clamps the coupling to a shaft. */

@@ -1,6 +1,8 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
@@ -53,97 +55,69 @@ class MillZHead extends MachineComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  /** The plan profile `points` (x, y) extruded up from z0 to z1. */
+  static function prism(b:DocumentBuilder, points:Array<Array<Float>>, z0:Float, z1:Float):Feature
+    return b.extrude(b.polygon([for (p in points) new Vector(p[0], p[1], 0)], new Plane(new Vector(0, 0, z0), Vector.X(), Vector.Z())), z1 - z0);
+
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    PartRecordings.recipeInputs(this, b);
     var w = parameterNumber("width"), d = parameterNumber("reach"), h = parameterNumber("height");
     var plate = parameterNumber("plate"), wall = parameterNumber("wall"), spindle = parameterNumber("spindleReach");
     var collar = 2 * (parameterNumber("spindleDiameter") / 2 + 10), collarRear = -spindle + collar / 2;
-    var rearPlate = parameterNumber("rearPlate");
-    var pieces = [Part.box(w, collar, h).translated(new Vector(0, -spindle, 0))];
-    for (z in [0.0, h - plate]) pieces.push(Part.box(w, d, plate).translated(new Vector(0, -d / 2, z)));
-    for (side in [-1, 1]) pieces.push(Part.prism(
-      [
-        new Vector(side * w / 2, 0),
-        new Vector(side * parameterNumber("noseWidth") / 2, collarRear),
-        new Vector(side * (parameterNumber("noseWidth") / 2 - wall), collarRear),
-        new Vector(side * (w / 2 - wall), 0)
-      ],
-      0,
-      h
-    ));
+    var rearPlate = parameterNumber("rearPlate"), nose = parameterNumber("noseWidth"), extension = parameterNumber("rootExtension");
+    var parts:Array<Feature> = [b.label(b.boxBetween(-w / 2, w / 2, -spindle - collar / 2, -spindle + collar / 2, 0, h), "Spindle collar")];
+    for (z in [0.0, h - plate]) parts.push(b.label(b.boxBetween(-w / 2, w / 2, -d, 0, z, z + plate), z == 0 ? "Bottom plate" : "Top plate"));
+    for (side in [-1, 1]) parts.push(b.label(prism(b, [
+      [side * w / 2, 0],
+      [side * nose / 2, collarRear],
+      [side * (nose / 2 - wall), collarRear],
+      [side * (w / 2 - wall), 0]
+    ], 0, h), side < 0 ? "Side wall left" : "Side wall right"));
     // Two cross webs connect the side walls, top and bottom into one body.
-    for (fraction in [1.0 / 3, 2.0 / 3]) pieces.push(Part.box(w, wall, h).translated(new Vector(
-      0,
-      collarRear * fraction,
-      0
-    )));
-    var tools = [Part.cylinderSpan(parameterNumber("spindleDiameter") / 2, -1, h + 1, 0, -spindle)];
-    // Two rows of side windows leave top/bottom chords, cross webs and a middle rib.
-    for (row in 0...2) for (cell in 0...3) {
-      var rear = collarRear * cell / 3 - wall / 2 - 2;
-      var front = collarRear * (cell + 1) / 3 + wall / 2 + 2;
-      if (cell == 0) rear = -rearPlate - 2;
-      if (rear > front) tools.push(Part.box(w + 2, rear - front, (h - 3 * plate) / 2).translated(new Vector(
-        0,
-        (rear + front) / 2,
-        plate + row * (h - plate) / 2
-      )));
+    for (k => fraction in [1.0 / 3, 2.0 / 3]) {
+      var y = collarRear * fraction;
+      parts.push(b.label(b.boxBetween(-w / 2, w / 2, y - wall / 2, y + wall / 2, 0, h), 'Cross web ${k + 1}'));
     }
-    // Front-access head bolts pass only through the rear flange. Counterbores seat M6 heads.
-    for (x in [-parameterNumber("boltX"), parameterNumber("boltX")]) for (z in [
-      h / 2 - parameterNumber("boltZ"),
-      h / 2 + parameterNumber("boltZ")
-    ]) {
-      tools.push(Part.cylinderAlongY(3.3, -rearPlate - 1, 1, x, z));
-      tools.push(Part.cylinderAlongY(5.5, -rearPlate - 1, -rearPlate + COUNTERBORE_DEPTH, x, z));
-    }
-    if (values().boolean("bt30Mounts")) {
-      for (x in [-MillSpindleMotorLayout.FOOT_BOLT_X, MillSpindleMotorLayout.FOOT_BOLT_X]) for (y in [
-        MillSpindleMotorLayout.FOOT_BOLT_FRONT,
-        MillSpindleMotorLayout.FOOT_BOLT_REAR
-      ]) tools.push(Part.cylinderSpan(2.5, h - 12, h + 1, x, -spindle + y));
-      for (i in 0...6) {
-        var a = i * Math.PI / 3;
-        tools.push(Part.cylinderSpan(2.5, -1, 12, 53.5 * Math.cos(a), -spindle + 53.5 * Math.sin(a)));
-      }
-    }
-    var raw = Solids.union(pieces), nose = parameterNumber("noseWidth");
-    var outline = Part.prism(
-      [
-        new Vector(-w / 2, 0),
-        new Vector(w / 2, 0),
-        new Vector(nose / 2, collarRear),
-        new Vector(nose / 2, -d),
-        new Vector(-nose / 2, -d),
-        new Vector(-nose / 2, collarRear)
-      ],
-      0,
-      h
-    );
-    var tapered = raw.intersect(outline);
-    raw.close();
-    outline.close();
-    var extension = parameterNumber("rootExtension");
-    var flange = Part.box(parameterNumber("rearWidth"), rearPlate, h + 2 * extension).translated(new Vector(
-      0,
-      -rearPlate / 2,
-      -extension
-    ));
-    var root = [tapered, flange];
+    var outline = b.label(prism(b, [[-w / 2, 0], [w / 2, 0], [nose / 2, collarRear], [nose / 2, -d], [-nose / 2, -d], [-nose / 2, collarRear]], 0, h), "Taper outline");
+    var tapered = b.label(b.intersect(b.unionAll(parts), outline), "Tapered head");
+    var root:Array<Feature> = [tapered, b.label(b.boxBetween(-parameterNumber("rearWidth") / 2, parameterNumber("rearWidth") / 2, -rearPlate, 0, -extension, h + extension), "Rear flange")];
     if (extension > 0) for (side in [-1, 1]) for (upper in [false, true]) {
       var z = upper ? h : 0, outer = upper ? h + extension : -extension;
-      var rib = Part.prism([new Vector(0,
-        z), new Vector(collarRear / 2, z), new Vector(0, outer)], -wall / 2, wall / 2);
-      root.push(machinekit.assembly.PosedParts.moved(
-        rib,
-        materia.assembly.AssemblyFrames.fromRotationMatrix(
-          side * (upper && values().boolean("bt30Mounts") ? 50 : w / 2 - 2 * wall),
-          0,
-          0,
-          [0, 0, 1, 1, 0, 0, 0, 1, 0]
-        )
-      ));
-      rib.close();
+      var x = side * (upper && values().boolean("bt30Mounts") ? 50 : w / 2 - 2 * wall);
+      var profile = b.polygon([new Vector(0, z, 0), new Vector(collarRear / 2, z, 0), new Vector(0, outer, 0)], new Plane(new Vector(x - wall / 2, 0, 0), Vector.Y(), Vector.X()));
+      root.push(b.label(b.extrude(profile, wall), 'Root rib ${side < 0 ? "left" : "right"} ${upper ? "upper" : "lower"}'));
     }
-    return Solids.cut(Solids.union(root), tools);
+    var body = b.label(b.unionAll(root), "Head");
+    var tools:Array<Feature> = [b.cylinderAlong(new Vector(0, -spindle, 0), Vector.Z(), parameterNumber("spindleDiameter") / 2, -1, h + 1)];
+    var labels = ["spindle bore"];
+    // Two rows of side windows leave top/bottom chords, cross webs and a middle rib.
+    for (row in 0...2) for (cell in 0...3) {
+      var rear = cell == 0 ? -rearPlate - 2 : collarRear * cell / 3 - wall / 2 - 2;
+      var front = collarRear * (cell + 1) / 3 + wall / 2 + 2, z = plate + row * (h - plate) / 2;
+      if (rear > front) {
+        tools.push(b.boxBetween(-w / 2 - 1, w / 2 + 1, front, rear, z, z + (h - 3 * plate) / 2));
+        labels.push('window ${row == 0 ? "lower" : "upper"} ${cell + 1}');
+      }
+    }
+    // Front-access head bolts pass only through the rear flange. Counterbores seat M6 heads.
+    for (x in [-parameterNumber("boltX"), parameterNumber("boltX")]) for (z in [h / 2 - parameterNumber("boltZ"), h / 2 + parameterNumber("boltZ")]) {
+      var at = (x < 0 ? "left " : "right ") + (z < h / 2 ? "low" : "high");
+      tools.push(b.cylinderAlong(new Vector(x, 0, z), Vector.Y(), 3.3, -rearPlate - 1, 1));
+      labels.push('head bolt $at');
+      tools.push(b.cylinderAlong(new Vector(x, 0, z), Vector.Y(), 5.5, -rearPlate - 1, -rearPlate + COUNTERBORE_DEPTH));
+      labels.push('head bolt counterbore $at');
+    }
+    if (values().boolean("bt30Mounts")) {
+      for (x in [-MillSpindleMotorLayout.FOOT_BOLT_X, MillSpindleMotorLayout.FOOT_BOLT_X]) for (y in [MillSpindleMotorLayout.FOOT_BOLT_FRONT, MillSpindleMotorLayout.FOOT_BOLT_REAR]) {
+        tools.push(b.cylinderAlong(new Vector(x, -spindle + y, 0), Vector.Z(), 2.5, h - 12, h + 1));
+        labels.push('carrier tap ${x < 0 ? "left" : "right"} ${y == MillSpindleMotorLayout.FOOT_BOLT_FRONT ? "front" : "rear"}');
+      }
+      for (i in 0...6) {
+        var a = i * Math.PI / 3;
+        tools.push(b.cylinderAlong(new Vector(53.5 * Math.cos(a), -spindle + 53.5 * Math.sin(a), 0), Vector.Z(), 2.5, -1, 12));
+        labels.push('cartridge tap ${i + 1}');
+      }
+    }
+    return b.label(b.cutAll(body, tools, labels), "Bore, windows and bolt holes");
   }
 }

@@ -1,6 +1,8 @@
 package machinekit.milling;
 
-import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
+import cadkit.parametric.Feature;
+import cadkit.parametric.recording.DocumentBuilder;
 import machinekit.component.*;
 
 /** BT30 packaging study. Ø90 body and Ø125 flange follow the DAIYA BT30SP
@@ -30,21 +32,22 @@ class Bt30Cartridge extends MachineComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("material", materialSpec());
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = Solids.union([Part.cylinderSpan(45, SEAT, REAR), Part.cylinderSpan(62.5, 40, SEAT)]);
+  override public function record(b:DocumentBuilder, detail:ComponentDetail):Null<Feature> {
+    machinekit.component.PartRecordings.recipeInputs(this, b);
+    var axis = Vector.Z();
+    function post(r:Float, lo:Float, hi:Float, x:Float = 0, y:Float = 0):Feature return b.cylinderAlong(new Vector(x, y, 0), axis, r, lo, hi);
+    var body = b.label(b.unionAll([b.label(post(45, SEAT, REAR), "Housing"), b.label(post(62.5, 40, SEAT), "Flange")]), "Housing and flange");
     // The nose, receiving taper and drawbar spring seat belong to the rotor.
-    var cuts = [Part.cylinderSpan(26, 39, REAR + 1)];
+    var tools = [post(26, 39, REAR + 1)], labels = ["rotor bore"];
     for (i in 0...6) {
       var a = i * Math.PI / 3;
-      cuts.push(Part.cylinderSpan(3.3, 39, 61, 53.5 * Math.cos(a), 53.5 * Math.sin(a)));
+      tools.push(post(3.3, 39, 61, 53.5 * Math.cos(a), 53.5 * Math.sin(a)));
+      labels.push('flange bolt ${i + 1}');
     }
-    for (p in [[-37.5, 0.0], [37.5, 0.0], [0.0, -37.5], [0.0, 37.5]]) cuts.push(Part.cylinderSpan(
-      2.1,
-      231,
-      243,
-      p[0],
-      p[1]
-    ));
-    return Solids.cut(body, cuts);
+    for (p in [[-37.5, 0.0], [37.5, 0.0], [0.0, -37.5], [0.0, 37.5]]) {
+      tools.push(post(2.1, 231, 243, p[0], p[1]));
+      labels.push("reaction tap " + (p[0] < 0 ? "left" : p[0] > 0 ? "right" : p[1] < 0 ? "front" : "back"));
+    }
+    return b.label(b.cutAll(body, tools, labels), "Rotor bore, flange bolts and reaction taps");
   }
 }
