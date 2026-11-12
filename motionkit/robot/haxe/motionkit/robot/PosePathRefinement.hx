@@ -51,7 +51,7 @@ class PosePathRefinement {
           new robotkit.spatial.Quat(pose.qx, pose.qy, pose.qz, pose.qw),
           rates.angular,
           rates.angularSecond,
-          axis
+          axis.components()
         );
         new PoseDerivatives(rates.linear, projected.velocity, rates.linearSecond, projected.acceleration);
       default:

@@ -162,15 +162,8 @@ class StructuredJointPathPlanner implements JointPathPlanner {
           default:
             false;
         };
-      case Cone(axis, angle):
-        switch b {
-          case Cone(other, half):
-            var same = axis != null && other != null && axis.length == other.length && angle == half;
-            if (same) for (i in 0...axis.length) if (axis[i] != other[i]) same = false;
-            same;
-          default:
-            false;
-        };
+      case Cone(_, _):
+        a == b;
     };
   }
   public function retreatTarget():Null<Array<Float>> return retreat == null ? null : retreat.copy();

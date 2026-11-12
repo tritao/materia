@@ -391,14 +391,14 @@ class PlanCheckTests extends MotionKitTestSupport {
     var fixed = runner.program(contact, true, robotkit.spatial.Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI / 2)).ops;
     switch free[0] {
       case MoveL(_, _, _, _, freedom):
-        check((switch freedom { case FreeAboutTool: true; default: false; }), "ordinary handling leaves spin free");
+        check(freedom == motionkit.path.OrientationPolicy.FreeAboutTool, "ordinary handling leaves spin free");
       case _:
         throw "handling must approach linearly";
     }
     switch fixed[0] {
       case MoveL(_, _, _, _, freedom):
         check(
-          (switch freedom { case Interpolated: true; default: false; }),
+          freedom == motionkit.path.OrientationPolicy.Interpolated,
           "approach turns smoothly to the requested heading"
         );
       case _:
@@ -406,7 +406,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     }
     switch fixed[1] {
       case MoveL(pose, _, _, _, freedom):
-        check((switch freedom { case Fixed: true; default: false; }), "requested handling orientation fixes spin");
+        check(freedom == motionkit.path.OrientationPolicy.Fixed, "requested handling orientation fixes spin");
         near(pose.qz, Math.sin(Math.PI / 4), "an explicit handling orientation fixes the requested yaw");
       case _:
         throw "handling must approach linearly";
@@ -420,7 +420,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     switch fixed[fixed.length - 1] {
       case MoveL(_, _, _, _, freedom):
         check(
-          (switch freedom { case Fixed: true; default: false; }),
+          freedom == motionkit.path.OrientationPolicy.Fixed,
           "oriented handling stops at the raised pose and keeps the carried part's orientation"
         );
       case _:

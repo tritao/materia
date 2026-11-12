@@ -45,8 +45,7 @@ class PoseMath {
       case Fixed:
         return {first: [0.0, 0.0, 0.0], second: [0.0, 0.0, 0.0]};
       case Cone(axis, halfAngle):
-        if (axis == null
-          || axis.length != 3 || !Math.isFinite(halfAngle) || halfAngle < 0) throw "Invalid orientation cone";
+        if (axis == null || !Math.isFinite(halfAngle) || halfAngle < 0) throw "Invalid orientation cone";
       default:
     }
     var dot = a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw;
@@ -75,8 +74,7 @@ class PoseMath {
       case Fixed:
         return a.rotationArray();
       case Cone(axis, halfAngle):
-        if (axis == null
-          || axis.length != 3 || !Math.isFinite(halfAngle) || halfAngle < 0.0) throw "Invalid orientation cone";
+        if (axis == null || !Math.isFinite(halfAngle) || halfAngle < 0.0) throw "Invalid orientation cone";
       case Interpolated | FreeAboutTool | Free:
     }
     var dot = a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw;

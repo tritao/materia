@@ -133,11 +133,8 @@ class ToolFreedom {
     return Math.atan2(Math.sqrt(x * x + y * y + z * z), a[0] * b[0] + a[1] * b[1] + a[2] * b[2]);
   }
 
-  static function coneAxis(axis:Array<Float>, halfAngle:Float):Array<Float> {
-    if (axis == null || axis.length != 3
-      || !Math.isFinite(halfAngle) || halfAngle < 0 || halfAngle > Math.PI) throw "Invalid orientation cone";
-    var norm = Math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
-    if (!Math.isFinite(norm) || norm <= 0) throw "Invalid orientation cone axis";
-    return [for (value in axis) value / norm];
+  static function coneAxis(axis:motionkit.path.Direction3, halfAngle:Float):Array<Float> {
+    if (axis == null || !Math.isFinite(halfAngle) || halfAngle < 0 || halfAngle > Math.PI) throw "Invalid orientation cone";
+    return axis.components();
   }
 }

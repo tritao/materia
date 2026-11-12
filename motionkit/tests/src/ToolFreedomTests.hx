@@ -270,12 +270,12 @@ class ToolFreedomTests extends MotionKitTestSupport {
     var actual = new Pose3(0, 0, 0);
     var spun = new Pose3(0, 0, 0, Math.sin(0.5), 0, 0, Math.cos(0.5));
     near(
-      ToolFreedom.orientationError(actual, spun, OrientationPolicy.Cone([0, 0, 2], 0.2)),
+      ToolFreedom.orientationError(actual, spun, OrientationPolicy.Cone(motionkit.path.Direction3.of([0, 0, 2]), 0.2)),
       0,
       "Cone axis is in the path frame, independently of waypoint orientation",
       1e-12
     );
-    var cone = ToolFreedom.of(actual, OrientationPolicy.Cone([1, 0, 0], 0.3), 0.01);
+    var cone = ToolFreedom.of(actual, OrientationPolicy.Cone(motionkit.path.Direction3.of([1, 0, 0]), 0.3), 0.01);
     var axis = ToolFreedom.toolAxis(cone.target);
     near(axis[0], 1, "Cone IK target aligns local tool Z with its path-frame axis", 1e-12);
     near(cone.orientationTolerance, 0.3, "Cone aperture becomes the IK orientation tolerance", 1e-12);

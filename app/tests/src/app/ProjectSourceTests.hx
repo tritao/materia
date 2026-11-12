@@ -2724,7 +2724,7 @@ typedef CubeRun = {
             for (policy in [
               motionkit.path.OrientationPolicy.Fixed,
               motionkit.path.OrientationPolicy.FreeAboutTool,
-              motionkit.path.OrientationPolicy.Cone(axis, 0.1)
+              motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(axis), 0.1)
             ]) checkNativeCandidateSet(
               numeric,
               target,
@@ -2811,7 +2811,7 @@ typedef CubeRun = {
             for (policy in [
               motionkit.path.OrientationPolicy.Fixed,
               motionkit.path.OrientationPolicy.FreeAboutTool,
-              motionkit.path.OrientationPolicy.Cone(axis, 0.1)
+              motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(axis), 0.1)
             ]) checkNativeCandidateSet(
               numeric,
               target,

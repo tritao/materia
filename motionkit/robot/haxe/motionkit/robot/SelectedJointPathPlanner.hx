@@ -176,13 +176,7 @@ class SelectedJointPathPlanner implements JointPathPlanner {
     };
   }
   static function snapshot(task:RefinementTarget):RefinementTarget {
-    var freedom = switch task.freedom {
-      case Cone(axis, angle):
-        motionkit.path.OrientationPolicy.Cone(axis.copy(), angle);
-      default:
-        task.freedom;
-    };
-    return new RefinementTarget(task.pose, freedom, task.velocity, task.acceleration, task.accelerationBefore);
+    return new RefinementTarget(task.pose, task.freedom, task.velocity, task.acceleration, task.accelerationBefore);
   }
   static function copy(curve:JointPathSamples):JointPathSamples {
     var result = new JointPathSamples(curve.s, curve.q, curve.qPrime, curve.qDoublePrime, curve.qDoublePrimeBefore);

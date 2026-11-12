@@ -278,7 +278,7 @@ class KinematicsTests extends MotionKitTestSupport {
       for (policy in [
         motionkit.path.OrientationPolicy.Fixed,
         motionkit.path.OrientationPolicy.FreeAboutTool,
-        motionkit.path.OrientationPolicy.Cone(coneAxis, 0.1)
+        motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(coneAxis), 0.1)
       ]) {
         var activeGrid = switch policy {
           case Cone(_, _):
@@ -569,7 +569,7 @@ class KinematicsTests extends MotionKitTestSupport {
       for (policy in [
         motionkit.path.OrientationPolicy.Fixed,
         motionkit.path.OrientationPolicy.FreeAboutTool,
-        motionkit.path.OrientationPolicy.Cone(coneAxis, 0.1)
+        motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(coneAxis), 0.1)
       ]) {
         var activeGrid = switch policy {
           case Cone(_, _):
@@ -2148,7 +2148,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [new PoseLine(
         new PoseWaypoint(coneStartPose, 1e-6, 1e-6),
         new PoseWaypoint(coneEndPose, 1e-6, 1e-6),
-        motionkit.path.OrientationPolicy.Cone(coneAxis, 0.1),
+        motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(coneAxis), 0.1),
         0.1,
         0.1
       )]
@@ -2301,7 +2301,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in start) 0.5],
       [for (_ in start) 1.0],
       1,
-      [motionkit.path.OrientationPolicy.Cone(toolAxis, 0.1)]
+      [motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(toolAxis), 0.1)]
     );
     var coneProblem = new motionkit.robot.CandidateProblem(
       fixture.arm,
@@ -2415,7 +2415,7 @@ class KinematicsTests extends MotionKitTestSupport {
         );
         var before = poseRotationDelta(line.waypointAt(distance - 2 * h).pose, p, 1 / (2 * h));
         var after = poseRotationDelta(p, line.waypointAt(distance + 2 * h).pose, 1 / (2 * h));
-        var conePolicy = motionkit.path.OrientationPolicy.Cone([0.2, 0.3, 1.0], 0.2);
+        var conePolicy = motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of([0.2, 0.3, 1.0]), 0.2);
         var projected = motionkit.robot.OrientationDifferential.cone(
           new Quat(p.qx, p.qy, p.qz, p.qw),
           rates.angular,
@@ -2656,7 +2656,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var ownAxis = rotation.rotate(new Vec3(0, 0, 1)).toArray();
     var kept = motionkit.robot.OrientationLattice.sample(
       target,
-      motionkit.path.OrientationPolicy.Cone(ownAxis, 0.2),
+      motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(ownAxis), 0.2),
       1,
       1,
       1
@@ -2670,13 +2670,13 @@ class KinematicsTests extends MotionKitTestSupport {
     var almostOpposite = rotation.rotate(new Vec3(1e-5, 0, -1).normalized()).toArray();
     var almostFlipped = motionkit.robot.OrientationLattice.centre(
       target,
-      motionkit.path.OrientationPolicy.Cone(almostOpposite, 0.0)
+      motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(almostOpposite), 0.0)
     );
     near(
       motionkit.robot.ToolFreedom.orientationError(
         almostFlipped,
         target,
-        motionkit.path.OrientationPolicy.Cone(almostOpposite, 0.0)
+        motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(almostOpposite), 0.0)
       ),
       0,
       "cone axis alignment remains accurate near the antipodal case",
@@ -2685,13 +2685,13 @@ class KinematicsTests extends MotionKitTestSupport {
     var opposite = rotation.rotate(new Vec3(0, 0, -1)).toArray();
     var flipped = motionkit.robot.OrientationLattice.centre(
       target,
-      motionkit.path.OrientationPolicy.Cone(opposite, 0.2)
+      motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(opposite), 0.2)
     );
     near(
       motionkit.robot.ToolFreedom.orientationError(
         flipped,
         target,
-        motionkit.path.OrientationPolicy.Cone(opposite, 0.2)
+        motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(opposite), 0.2)
       ),
       0,
       "cone centre handles the antipodal axis",
@@ -2702,7 +2702,7 @@ class KinematicsTests extends MotionKitTestSupport {
       motionkit.path.OrientationPolicy.Fixed,
       motionkit.path.OrientationPolicy.FreeAboutTool,
       motionkit.path.OrientationPolicy.Free,
-      motionkit.path.OrientationPolicy.Cone([0.3, 0.4, 0.5], 0.4)
+      motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of([0.3, 0.4, 0.5]), 0.4)
     ]) {
       var cells = motionkit.robot.OrientationLattice.sample(target, freedom);
       var expected = switch freedom {
@@ -2740,7 +2740,7 @@ class KinematicsTests extends MotionKitTestSupport {
           1e-7
         );
       }
-      if ((switch freedom { case Free: true; default: false; })) {
+      if (freedom == motionkit.path.OrientationPolicy.Free) {
         var axis = rotation.rotate(new Vec3(0, 0, 1)), oppositeFound = false;
         for (cell in cells) {
           var q = new Quat(cell.pose.qx, cell.pose.qy, cell.pose.qz, cell.pose.qw);
@@ -4095,7 +4095,7 @@ class KinematicsTests extends MotionKitTestSupport {
         for (policy in [
           motionkit.path.OrientationPolicy.Fixed,
           motionkit.path.OrientationPolicy.FreeAboutTool,
-          motionkit.path.OrientationPolicy.Cone(axis, 0.1)
+          motionkit.path.OrientationPolicy.Cone(motionkit.path.Direction3.of(axis), 0.1)
         ]) {
           var candidates = sampler.sample(target, q, policy, 4, 1, 4), found = false;
           for (candidate in candidates) {

@@ -297,6 +297,14 @@ Also:
 - `ManipulatorKinematics`' own damped-least-squares moves to KinematicsKit `DifferentialIk`, as
   KINEMATICS.md planned.
 - One `Pose3`. MotionKit, RobotKit mobile and VisionKit each have their own.
+- One value vector. MotionKit passes vectors as bare `Array<Float>` (weave axes, angular rates and
+  accelerations), each consumer re-checking length and normalising; RobotKit's `Vec3` is a class, so
+  nothing holding it can be `Equatable`. A small spatial package below MotionKit, RobotKit and VisionKit
+  (no dependencies of its own; trajectorykit is the only shared package today but is not about
+  geometry) owns an immutable `Vec3` struct, `Direction3` (finite, nonzero, stored normalised, so
+  parallel directions are equal) and the one `Pose3`, all `Equatable`. `motionkit.path.Direction3`
+  (the orientation cone's axis) moves there; MotionKit's array vectors and RobotKit's `Vec3` migrate
+  to it.
 
 **Geometry vocabulary.**
 - Delete `ArcSegment` (a subset of `CircularSegment`).
